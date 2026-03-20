@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: local
+    hooks:
+      - id: tflint
+        name: TFLint
+        description: Check for Terraform errors and best practices.
+        entry: tflint
+        language: system
+        files: \.tf$
+
+      - id: yamllint
+        name: YAML Lint
+        description: Check YAML files for syntax and style.
+        entry: yamllint
+        language: system
+        types: [yaml]
+        args: [-d, "{extends: relaxed, rules: {line-length: disable}}"]
