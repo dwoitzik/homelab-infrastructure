@@ -15,6 +15,8 @@ repos:
         entry: tflint
         language: system
         files: \.tf$
+        pass_filenames: false
+        args: ["--recursive"]
 
       - id: yamllint
         name: YAML Lint
