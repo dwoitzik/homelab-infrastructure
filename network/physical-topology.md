@@ -28,15 +28,15 @@ This document describes the hardware interconnects and physical layer configurat
 ## 3. Visual Representation
 ```mermaid
 graph TD
-    subgraph Public_Zone
+    subgraph Public
         FB[Fritzbox 6591]
     end
 
-    subgraph Core_Network
+    subgraph Homelab
         MT[MikroTik RB5009]
     end
 
-    subgraph Compute_Nodes
+    subgraph Compute
         PVE[Proxmox Node - Ryzen 7]
         RPA[Raspberry Pi A]
         RPB[Raspberry Pi B]
@@ -44,9 +44,9 @@ graph TD
 
     FB ---|1G Uplink| MT
     MT ---|1G Access| Admin[Admin Workstation]
-    MT ---|10G Trunk| PVE
-    MT ---|10G Access| RPA
-    MT ---|10G Access| RPB
+    MT ---|1G Trunk| PVE
+    MT ---|1G Access| RPA
+    MT ---|1G Access| RPB
 
     subgraph Storage
         HDD[2TB External HDD]
