@@ -110,3 +110,19 @@ resource "routeros_interface_bridge_vlan" "vlan_matrix" {
     for port, vlan in local.rpi_port_mapping : port if vlan == each.value
   ]
 }
+
+###############################################################################
+# Static DHCP Leases for Raspberry Pi Cluster
+###############################################################################
+
+resource "routeros_ip_dhcp_server_lease" "rpi_nodes" {
+  for_each = {
+    "rpi-srv-01" = { mac = "D8:3A:DD:1D:9A:70", ip = "10.0.20.2" }
+    "rpi-srv-02" = { mac = "D8:3A:DD:27:9E:98", ip = "10.0.20.3" }
+  }
+
+  address     = each.value.ip
+  mac_address = each.value.mac
+  server      = "dhcp-vlan20-srv"
+  comment     = "Static lease for ${each.key}"
+}
