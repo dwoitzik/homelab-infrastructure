@@ -1,26 +1,30 @@
 ###############################################################################
-# MikroTik Bootstrap for Terraform
-# Description: Prepares a 'no-defaults' RB5009 for Terraform management.
-# Setup: Enables REST-API and provides IP connectivity on ether2 (VLAN 10).
+# MikroTik Bootstrap for Terraform (Production Ready)
+# Description: Prepares a 'no-defaults' RB5009 with SSL REST-API.
+# Setup: PKI, User Management, and Management VLAN 10.
 ###############################################################################
 
-# 1. Create a dedicated group for Terraform with necessary permissions
+# 1. Create a dedicated group for Terraform
 /user group add name=terraform-api policy=read,write,api,rest,test,winbox,password
 
-# 2. Create the Terraform user (CHANGE THE PASSWORD!)
-/user add name=terraform group=terraform-api password="YOUR_SECURE_PASSWORD" comment="Managed by Terraform"
+# 2. Create the Terraform user (Update password before running!)
+/user add name=terraform group=terraform-api password="GcNVZn2%6@gARP" comment="Managed by Terraform"
 
-# 3. Create the Base Bridge (Required for VLAN filtering later)
+# 3. Network Base: Bridge & Management VLAN
 /interface bridge add name=bridge1 vlan-filtering=no comment="Core Bridge"
-
-# 4. Define Management VLAN (VLAN 10)
 /interface vlan add interface=bridge1 name=vlan10-mgmt vlan-id=10
-
-# 5. Assign Management IP to the Router
 /ip address add address=10.0.10.1/24 interface=vlan10-mgmt
-
-# 6. Bridge ether2 to VLAN 10 (Access Port for Admin PC)
 /interface bridge port add bridge=bridge1 interface=ether2 pvid=10
 
-# 7. Enable the REST-API (www-ssl) for Terraform communication
-/ip service set www-ssl disabled=no port=443
+# 4. PKI Setup (SSL Certificates)
+# Create and sign Root CA
+/certificate add name=local-root-cert common-name=local-cert key-usage=key-cert-sign,crl-sign trusted=yes
+/certificate sign local-root-cert
+
+# Create and sign Server Certificate for REST-API
+/certificate add name=webfig common-name=10.0.10.1 days-valid=3650 key-usage=digital-signature,key-agreement,tls-server trusted=yes
+/certificate sign ca=local-root-cert webfig
+
+# 5. Enable Secure REST-API
+/ip service set www-ssl certificate=webfig disabled=no port=443
+/ip service set www disabled=yes
