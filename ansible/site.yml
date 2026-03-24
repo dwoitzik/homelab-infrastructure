@@ -1,0 +1,10 @@
+---
+- name: Provision Raspberry Pi Homelab Nodes
+  hosts: nodes
+  become: yes
+  vars_files:
+    - vars/secrets.yml
+  roles:
+    - common
+    - docker
+    - keepalived
