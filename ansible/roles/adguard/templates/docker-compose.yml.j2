@@ -1,0 +1,11 @@
+services:
+  adguardhome:
+    image: adguard/adguardhome:latest
+    container_name: adguardhome
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /opt/adguardhome/work:/opt/adguardhome/work
+      - /opt/adguardhome/conf:/opt/adguardhome/conf
+    environment:
+      - TZ=Europe/Berlin
