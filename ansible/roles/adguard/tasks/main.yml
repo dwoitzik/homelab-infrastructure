@@ -1,0 +1,55 @@
+---
+- name: Create AdGuard Home directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  with_items:
+    - /opt/adguardhome/work
+    - /opt/adguardhome/conf
+
+- name: Deploy AdGuard Home Docker Compose file
+  template:
+    src: docker-compose.yml.j2
+    dest: /opt/adguardhome/docker-compose.yml
+    mode: '0644'
+
+- name: Start AdGuard Home container
+  community.docker.docker_compose_v2:
+    project_src: /opt/adguardhome
+    state: present
+
+- name: Deploy AdGuardHome-Sync on replica node
+  when: inventory_hostname == 'rpi-srv-02'
+  block:
+    - name: Create Sync directory
+      file:
+        path: /opt/adguardhome-sync
+        state: directory
+        mode: '0755'
+
+    - name: Deploy Sync Docker Compose
+      copy:
+        dest: /opt/adguardhome-sync/docker-compose.yml
+        content: |
+          services:
+            adguardhome-sync:
+              image: ghcr.io/bakito/adguardhome-sync
+              container_name: adguardhome-sync
+              restart: unless-stopped
+              environment:
+                - ORIGIN_URL=http://10.0.20.2:80
+                - ORIGIN_USERNAME=dw
+                - ORIGIN_PASSWORD={{ adguard_ui_password }}
+                - REPLICA_URL=http://10.0.20.3:80
+                - REPLICA_USERNAME=dw
+                - REPLICA_PASSWORD={{ adguard_ui_password }}
+                - CRON=*/5 * * * * # Sync every 5 minutes
+        mode: '0644'
+
+    - name: Start AdGuardHome-Sync
+      community.docker.docker_compose_v2:
+        project_src: /opt/adguardhome-sync
+        state: present

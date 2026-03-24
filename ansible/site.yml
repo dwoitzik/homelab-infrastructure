@@ -8,3 +8,6 @@
     - common
     - docker
     - keepalived
+    - watchtower
+    - adguard
+    - unbound

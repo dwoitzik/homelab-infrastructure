@@ -1,0 +1,34 @@
+---
+- name: Create Unbound configuration directory
+  file:
+    path: /opt/unbound/conf
+    state: directory
+    mode: '0755'
+
+- name: Deploy Unbound configuration
+  template:
+    src: unbound.conf.j2
+    dest: /opt/unbound/conf/unbound.conf
+    mode: '0644'
+
+- name: Deploy Unbound Docker Compose
+  copy:
+    dest: /opt/unbound/docker-compose.yml
+    content: |
+      services:
+        unbound:
+          image: klutchell/unbound:latest
+          container_name: unbound
+          restart: unless-stopped
+          ports:
+            - "5335:53/udp"
+            - "5335:53/tcp"
+          volumes:
+            - /opt/unbound/conf/unbound.conf:/etc/unbound/unbound.conf
+    mode: '0644'
+
+- name: Force restart Unbound
+  community.docker.docker_compose_v2:
+    project_src: /opt/unbound
+    state: present
+    recreate: always
