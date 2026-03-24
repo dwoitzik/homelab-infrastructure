@@ -17,10 +17,28 @@
 The nodes are managed via **Ansible** to ensure configuration parity and idempotency.
 Key services deployed:
 1. **Keepalived:** High-Availability via VRRP (Virtual IP `10.0.20.5`).
-2. **AdGuard Home:** Network-wide DNS blocking (Planned).
-3. **Nginx Proxy Manager:** Centralized SSL management (Planned).
+2. **AdGuard Home:** Network-wide DNS blocking (Deployed).
+3. **Unbound:** Recursive DNS resolution (Deployed).
+4. **Nginx Proxy Manager:** Centralized SSL management (In Progress).
 
 ## High Availability (HA) Logic
 We use two physical nodes to prevent a "Single Point of Failure" (SPoF).
 - **Protocol:** VRRP (Virtual Router Redundancy Protocol).
 - **Behavior:** If the primary node (`rpi-srv-01`) goes offline, the Virtual IP automatically migrates to the backup node (`rpi-srv-02`) within seconds, ensuring zero downtime for DNS and proxy services.
+
+## DNS & Security Stack
+We use a layered DNS approach to ensure privacy, speed, and high availability.
+
+| Service | Technology | Role |
+| :--- | :--- | :--- |
+| **AdGuard Home** | Docker | Primary DNS sinkhole (Ad-blocking & UI). |
+| **Unbound** | Docker | Recursive DNS resolver (no upstream logging). |
+| **Watchtower** | Docker | Automated container updates and maintenance. |
+| **Keepalived** | VRRP | Virtual IP management (10.0.20.5) for DNS failover. |
+
+### Recursive DNS Flow
+Instead of forwarding requests to Google or Cloudflare, our cluster resolves queries directly via the Global Root Servers:
+`Client -> AdGuard Home (VIP) -> Unbound (Local) -> Root Servers`
+
+### Automatic Synchronization
+Configuration changes on `rpi-srv-01` are automatically synced to `rpi-srv-02` every 5 minutes using `adguardhome-sync`, ensuring both nodes share the same filter lists and DNS rewrites.

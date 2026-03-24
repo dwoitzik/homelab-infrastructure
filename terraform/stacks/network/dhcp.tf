@@ -14,7 +14,7 @@ resource "routeros_ip_dhcp_server_network" "vlan_networks" {
   for_each   = local.homelab_vlans
   address    = "10.0.${each.value}.0/24"
   gateway    = "10.0.${each.value}.1"
-  dns_server = ["1.1.1.1", "8.8.8.8"]
+  dns_server = ["10.0.20.5"]
   comment    = "Network for ${each.key}"
 }
 
@@ -36,7 +36,7 @@ resource "routeros_ip_pool" "vlan10_pool" {
 resource "routeros_ip_dhcp_server_network" "vlan10_network" {
   address    = "10.0.10.0/24"
   gateway    = "10.0.10.1"
-  dns_server = ["1.1.1.1", "8.8.8.8"] # Fallback DNS
+  dns_server = ["10.0.20.5"]
 }
 
 resource "routeros_ip_dhcp_server" "vlan10_dhcp" {

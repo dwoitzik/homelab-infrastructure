@@ -9,3 +9,4 @@ common_packages:
   - htop
   - net-tools
   - bridge-utils
+  - dnsutils
