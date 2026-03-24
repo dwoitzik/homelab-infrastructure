@@ -1,0 +1,16 @@
+vrrp_instance VI_1 {
+    state {{ "MASTER" if inventory_hostname == 'rpi-srv-01' else "BACKUP" }}
+    interface eth0
+    virtual_router_id 51
+    priority {{ 150 if inventory_hostname == 'rpi-srv-01' else 100 }}
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ keepalived_auth_pass }}
+    }
+
+    virtual_ipaddress {
+        10.0.20.5/24  # Virtual IP (VIP) for HA services
+    }
+}

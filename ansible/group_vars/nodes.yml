@@ -1,0 +1,11 @@
+---
+ansible_python_interpreter: /usr/bin/python3
+upgrade_packages: yes
+
+common_packages:
+  - curl
+  - vim
+  - git
+  - htop
+  - net-tools
+  - bridge-utils
