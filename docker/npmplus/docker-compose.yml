@@ -1,0 +1,56 @@
+services:
+  npmplus:
+    container_name: npmplus
+    image: docker.io/zoeyvid/npmplus:latest
+    restart: always
+    network_mode: host
+    volumes:
+      - "/opt/npmplus:/data"
+      - "/opt/npmplus/nginx:/opt/npmplus/nginx:ro"
+    environment:
+      - "TZ=Europe/Berlin"
+      - "ACME_EMAIL=hello@woitzik.dev"
+      - "NGINX_QUIC_BPF=true"
+      - "NGINX_HSTS_SUBDOMAINS=true"
+      - "GOA=true"
+      - "NGINX_LOG_NOT_FOUND=true"
+      - "FULLCLEAN=true"
+
+    cap_add:
+      - BPF
+      - PERFMON
+      - NET_ADMIN
+
+    dns:
+      - 10.20.0.3
+      - 1.1.1.1
+
+  crowdsec:
+    container_name: crowdsec
+    image: docker.io/crowdsecurity/crowdsec:latest
+    restart: always
+    network_mode: bridge
+    ports:
+      - "127.0.0.1:7422:7422"
+      - "127.0.0.1:8080:8080"
+    environment:
+      - "TZ=Europe/Berlin"
+      - "COLLECTIONS=ZoeyVid/npmplus"
+    volumes:
+      - "/opt/crowdsec/conf:/etc/crowdsec"
+      - "/opt/crowdsec/data:/var/lib/crowdsec/data"
+      - "/opt/npmplus/nginx:/opt/npmplus/nginx:ro"
+
+  geoipupdate:
+    container_name: npmplus-geoipupdate
+    image: ghcr.io/maxmind/geoipupdate:latest
+    restart: always
+    network_mode: bridge
+    environment:
+      - "TZ=Europe/Berlin"
+      - "GEOIPUPDATE_EDITION_IDS=GeoLite2-Country GeoLite2-City GeoLite2-ASN"
+      - "GEOIPUPDATE_ACCOUNT_ID=1248281"
+      - "GEOIPUPDATE_LICENSE_KEY=REPLACE_ME_VIA_VAULT"
+      - "GEOIPUPDATE_FREQUENCY=24"
+    volumes:
+      - "/opt/npmplus/goaccess/geoip:/usr/share/GeoIP"
