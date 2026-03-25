@@ -40,10 +40,10 @@
               container_name: adguardhome-sync
               restart: unless-stopped
               environment:
-                - ORIGIN_URL=http://10.0.20.2:80
+                - ORIGIN_URL=http://10.0.20.2:3001
                 - ORIGIN_USERNAME=dw
                 - ORIGIN_PASSWORD={{ adguard_ui_password }}
-                - REPLICA_URL=http://10.0.20.3:80
+                - REPLICA_URL=http://10.0.20.3:3001
                 - REPLICA_USERNAME=dw
                 - REPLICA_PASSWORD={{ adguard_ui_password }}
                 - CRON=*/5 * * * * # Sync every 5 minutes

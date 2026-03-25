@@ -10,6 +10,7 @@
     src: unbound.conf.j2
     dest: /opt/unbound/conf/unbound.conf
     mode: '0644'
+  notify: Restart Unbound
 
 - name: Deploy Unbound Docker Compose
   copy:
@@ -26,9 +27,9 @@
           volumes:
             - /opt/unbound/conf/unbound.conf:/etc/unbound/unbound.conf
     mode: '0644'
+  notify: Restart Unbound
 
-- name: Force restart Unbound
+- name: Ensure Unbound is running
   community.docker.docker_compose_v2:
     project_src: /opt/unbound
     state: present
-    recreate: always

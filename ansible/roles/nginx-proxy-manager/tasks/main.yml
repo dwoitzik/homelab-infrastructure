@@ -1,0 +1,32 @@
+---
+- name: Create Nginx Proxy Manager directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  with_items:
+    - /opt/npm
+    - /opt/npm/data
+    - /opt/npm/letsencrypt
+
+- name: Deploy Nginx Proxy Manager Docker Compose
+  copy:
+    dest: /opt/npm/docker-compose.yml
+    content: |
+      services:
+        app:
+          image: 'jc21/nginx-proxy-manager:latest'
+          container_name: npm
+          restart: unless-stopped
+          network_mode: host
+          volumes:
+            - /opt/npm/data:/data
+            - /opt/npm/letsencrypt:/etc/letsencrypt
+          environment:
+            - DISABLE_IPV6=true
+    mode: '0644'
+
+- name: Start Nginx Proxy Manager
+  community.docker.docker_compose_v2:
+    project_src: /opt/npm
+    state: present
