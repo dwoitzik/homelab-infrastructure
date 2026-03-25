@@ -13,6 +13,12 @@ server:
     hide-identity: yes
     hide-version: yes
     prefetch: yes
+    prefetch-key: yes
+    serve-expired: yes
+    serve-expired-ttl: 0
+    cache-min-ttl: 0
+    msg-cache-size: 64m
+    rrset-cache-size: 128m
 
     do-daemonize: no
     username: "unbound"

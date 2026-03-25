@@ -11,3 +11,4 @@
     - watchtower
     - adguard
     - unbound
+    - nginx-proxy-manager
