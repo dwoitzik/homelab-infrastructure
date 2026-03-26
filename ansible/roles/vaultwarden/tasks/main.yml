@@ -1,0 +1,33 @@
+---
+- name: Create Vaultwarden directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  with_items:
+    - /opt/vaultwarden
+    - /opt/vaultwarden/vw-data
+
+- name: Deploy Vaultwarden Docker Compose
+  copy:
+    dest: /opt/vaultwarden/docker-compose.yml
+    content: |
+      services:
+        vaultwarden:
+          image: vaultwarden/server:latest
+          container_name: vaultwarden
+          restart: always
+          environment:
+            - WEBSOCKET_ENABLED=true
+            - SIGNUPS_ALLOWED=false
+          volumes:
+            - /opt/vaultwarden/vw-data:/data
+          ports:
+            - "8080:80"
+    mode: '0644'
+  notify: Restart Vaultwarden
+
+- name: Start Vaultwarden container
+  community.docker.docker_compose_v2:
+    project_src: /opt/vaultwarden
+    state: present

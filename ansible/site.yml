@@ -1,5 +1,5 @@
 ---
-- name: Provision Raspberry Pi Homelab Nodes
+- name: Provision Base OS and Docker
   hosts: nodes
   become: yes
   vars_files:
@@ -7,8 +7,23 @@
   roles:
     - common
     - docker
-    - keepalived
     - watchtower
+
+- name: Provision HA Core Services
+  hosts: rpi_nodes
+  become: yes
+  vars_files:
+    - vars/secrets.yml
+  roles:
+    - keepalived
     - adguard
     - unbound
     - nginx-proxy-manager
+
+- name: Provision Application Services
+  hosts: app_nodes
+  become: yes
+  vars_files:
+    - vars/secrets.yml
+  roles:
+    - vaultwarden
