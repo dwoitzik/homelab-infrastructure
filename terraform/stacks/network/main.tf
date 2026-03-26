@@ -46,8 +46,8 @@ resource "routeros_interface_bridge_port" "mgmt_port" {
 resource "routeros_interface_bridge_port" "proxmox_port" {
   bridge    = routeros_interface_bridge.core_bridge.name
   interface = local.proxmox_port
-  pvid      = 10
-  comment   = "Proxmox Trunk"
+  pvid      = 1
+  comment   = "Proxmox Trunk (Tagged VLANs)"
 }
 
 resource "routeros_interface_bridge_port" "rpi_ports" {
@@ -92,12 +92,14 @@ resource "routeros_ip_address" "vlan_ips" {
 # Bridge VLAN Matrix (L2 Forwarding)
 ###############################################################################
 
-# Matrix for VLAN 10 (Manual)
 resource "routeros_interface_bridge_vlan" "vlan10" {
   bridge   = routeros_interface_bridge.core_bridge.name
   vlan_ids = [10]
-  tagged   = [routeros_interface_bridge.core_bridge.name]
-  untagged = ["ether2", local.proxmox_port]
+  tagged   = [
+    routeros_interface_bridge.core_bridge.name,
+    local.proxmox_port
+  ]
+  untagged = ["ether2"]
 }
 
 # Matrix for other VLANs (Loop)
@@ -118,7 +120,7 @@ resource "routeros_interface_bridge_vlan" "vlan_matrix" {
 }
 
 ###############################################################################
-# Static DHCP Leases for Raspberry Pi Cluster
+# Static DHCP Leases
 ###############################################################################
 
 resource "routeros_ip_dhcp_server_lease" "server_nodes" {
@@ -131,5 +133,16 @@ resource "routeros_ip_dhcp_server_lease" "server_nodes" {
   address     = each.value.ip
   mac_address = each.value.mac
   server      = "dhcp-vlan20-srv"
+  comment     = "Static lease for ${each.key}"
+}
+
+resource "routeros_ip_dhcp_server_lease" "mgmt_nodes" {
+  for_each = {
+    "ct-mgmt-pbs-01" = { mac = "bc:24:11:24:7a:71", ip = "10.0.10.110" }
+  }
+
+  address     = each.value.ip
+  mac_address = each.value.mac
+  server      = routeros_ip_dhcp_server.vlan10_dhcp.name
   comment     = "Static lease for ${each.key}"
 }
