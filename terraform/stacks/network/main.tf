@@ -22,6 +22,9 @@ locals {
     port   = 51820
     name   = "wg-roadwarrior"
   }
+
+  vpn_handy_ip  = "10.6.0.2/32"
+  vpn_laptop_ip = "10.6.0.3/32"
 }
 
 ###############################################################################
@@ -39,14 +42,16 @@ resource "routeros_interface_bridge" "core_bridge" {
 resource "routeros_interface_bridge_port" "mgmt_port" {
   bridge    = routeros_interface_bridge.core_bridge.name
   interface = "ether2"
-  pvid      = 10
-  comment   = "Management Access Port"
+  pvid      = 100
+  hw        = true
+  comment   = "Admin Workstation Access Port"
 }
 
 resource "routeros_interface_bridge_port" "proxmox_port" {
   bridge    = routeros_interface_bridge.core_bridge.name
   interface = local.proxmox_port
   pvid      = 1
+  hw        = true
   comment   = "Proxmox Trunk (Tagged VLANs)"
 }
 
@@ -55,6 +60,7 @@ resource "routeros_interface_bridge_port" "rpi_ports" {
   bridge    = routeros_interface_bridge.core_bridge.name
   interface = each.key
   pvid      = each.value
+  hw        = true
   comment   = "Keepalived Node"
 }
 
@@ -67,6 +73,17 @@ resource "routeros_interface_vlan" "vlan10_mgmt" {
   interface = routeros_interface_bridge.core_bridge.name
   name      = "vlan10-mgmt"
   vlan_id   = 10
+}
+
+resource "routeros_ip_firewall_addr_list" "mgmt_devices" {
+  list    = "Mgmt_Devices"
+  address = "10.0.100.0/24"
+}
+
+resource "routeros_ip_firewall_addr_list" "internal_networks" {
+  for_each = local.homelab_vlans
+  list     = "Internal_Networks"
+  address  = "10.0.${each.value}.0/24"
 }
 
 resource "routeros_ip_address" "vlan10_ip" {
@@ -99,7 +116,6 @@ resource "routeros_interface_bridge_vlan" "vlan10" {
     routeros_interface_bridge.core_bridge.name,
     local.proxmox_port
   ]
-  untagged = ["ether2"]
 }
 
 # Matrix for other VLANs (Loop)
@@ -114,9 +130,10 @@ resource "routeros_interface_bridge_vlan" "vlan_matrix" {
     local.proxmox_port
   ]
 
-  untagged = [
-    for port, vlan in local.rpi_port_mapping : port if vlan == each.value
-  ]
+  untagged = concat(
+    [for port, vlan in local.rpi_port_mapping : port if vlan == each.value],
+    each.value == 100 ? ["ether2"] : []
+  )
 }
 
 ###############################################################################
@@ -145,4 +162,32 @@ resource "routeros_ip_dhcp_server_lease" "mgmt_nodes" {
   mac_address = each.value.mac
   server      = routeros_ip_dhcp_server.vlan10_dhcp.name
   comment     = "Static lease for ${each.key}"
+}
+
+###############################################################################
+# LEDs
+###############################################################################
+
+resource "routeros_system_script" "leds_off" {
+  name   = "leds_off"
+  source = "/system leds set [find] enabled=no"
+}
+
+resource "routeros_system_script" "leds_on" {
+  name   = "leds_on"
+  source = "/system leds set [find] enabled=yes"
+}
+
+resource "routeros_system_scheduler" "night_mode" {
+  name       = "night_mode_leds"
+  start_time = "22:00:00"
+  interval   = "1d"
+  on_event   = "leds_off"
+}
+
+resource "routeros_system_scheduler" "day_mode" {
+  name       = "day_mode_leds"
+  start_time = "06:00:00"
+  interval   = "1d"
+  on_event   = "leds_on"
 }
