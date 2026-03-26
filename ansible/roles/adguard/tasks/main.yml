@@ -11,15 +11,26 @@
     - /opt/adguardhome/conf
 
 - name: Deploy AdGuard Home Docker Compose file
-  template:
-    src: docker-compose.yml.j2
+  copy:
     dest: /opt/adguardhome/docker-compose.yml
+    content: |
+      services:
+        adguardhome:
+          image: adguard/adguardhome
+          container_name: adguardhome
+          restart: always
+          network_mode: host
+          volumes:
+            - /opt/adguardhome/work:/opt/adguardhome/work
+            - /opt/adguardhome/conf:/opt/adguardhome/conf
+            - /opt/npm/letsencrypt:/opt/npm/letsencrypt:ro
     mode: '0644'
+  notify: Restart AdGuard Home
 
 - name: Start AdGuard Home container
   community.docker.docker_compose_v2:
     project_src: /opt/adguardhome
-    state: present
+    state: restarted
 
 - name: Deploy AdGuardHome-Sync on replica node
   when: inventory_hostname == 'rpi-srv-02'
