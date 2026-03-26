@@ -23,3 +23,8 @@ resource "routeros_ip_firewall_filter" "drop_wan_input" {
   action           = "drop"
   comment          = "Firewall: Drop all external input"
 }
+
+resource "routeros_ip_cloud" "ddns" {
+  ddns_enabled = true
+  update_time  = true
+}
