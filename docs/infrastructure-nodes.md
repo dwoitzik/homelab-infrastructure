@@ -75,3 +75,16 @@ In case of local hardware failure:
 3. Link GDrive via `rclone`.
 4. Sync back chunks from GDrive to local HDD.
 5. Re-import Datastore in PBS.
+
+## Backup Automation & Retention
+Backups are fully automated to ensure consistency without manual intervention.
+
+### PVE Backup Schedule
+- **Frequency:** Daily at 03:00 AM.
+- **Target:** Local PBS (`pbs-local`).
+- **Retention Policy:** 7 daily / 4 weekly snapshots (Prune & Garbage Collection active).
+
+### Offsite Automation
+- **Cloud Sync:** Triggered via Cron at 04:00 AM (after local backup).
+- **Tooling:** `rclone` with Google Drive backend.
+- **Monitoring:** Heartbeat monitoring via Healthchecks.io.
