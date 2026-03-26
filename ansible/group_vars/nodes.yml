@@ -10,3 +10,5 @@ common_packages:
   - net-tools
   - bridge-utils
   - dnsutils
+  - gnupg
+  - ca-certificates
