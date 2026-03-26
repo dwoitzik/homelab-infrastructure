@@ -42,3 +42,36 @@ Instead of forwarding requests to Google or Cloudflare, our cluster resolves que
 
 ### Automatic Synchronization
 Configuration changes on `rpi-srv-01` are automatically synced to `rpi-srv-02` every 5 minutes using `adguardhome-sync`, ensuring both nodes share the same filter lists and DNS rewrites.
+
+## Performance & Efficiency Tuning
+To maximize stability and hardware longevity, the following tweaks are applied:
+
+### Raspberry Pi Cluster
+- **Radio Modules:** WiFi and Bluetooth disabled via `dtoverlay` in `/boot/config.txt`.
+- **Memory Management:** ZRAM enabled (via Ansible) to reduce SD card wear-and-tear by using compressed RAM as swap.
+
+### Proxmox Host (`pve-mgmt-01`)
+- **CPU Scaling:** Governor set to `powersave` to reduce idle power consumption.
+- **Hardware Offloading:** Enabled on MikroTik `ether5` to offload L2 switching from the CPU.
+
+# Backup Strategy: 3-2-1 Rule
+
+## 1. Local Backup (Stage 1)
+- **Target:** Proxmox Backup Server (LXC 110)
+- **Storage:** 2 TB HDD (`/dev/sdb1`) mounted at `/mnt/pbs-storage`
+- **Retention:** 7 Days daily, 4 Weeks weekly.
+- **Hardware:** Spin-down active (10 min) to reduce noise/wear.
+
+## 2. Offsite Cloud Backup (Stage 2)
+- **Service:** Google Drive (via `rclone`)
+- **Encryption:** Client-side encrypted by PBS before upload.
+- **Logic:** `rclone sync` runs daily at 04:00 AM via Cron.
+- **Path:** `gdrive:Backup-Homelab/PBS`
+
+## 3. Disaster Recovery
+In case of local hardware failure:
+1. Reinstall Proxmox.
+2. Setup PBS Container.
+3. Link GDrive via `rclone`.
+4. Sync back chunks from GDrive to local HDD.
+5. Re-import Datastore in PBS.
