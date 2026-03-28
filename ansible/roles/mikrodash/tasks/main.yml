@@ -1,0 +1,36 @@
+---
+- name: Ensure MikroDash directory exists
+  file:
+    path: /opt/mikrodash
+    state: directory
+    mode: '0755'
+
+- name: Deploy MikroDash docker-compose.yml
+  copy:
+    dest: /opt/mikrodash/docker-compose.yml
+    content: |
+      services:
+        mikrodash:
+          image: ghcr.io/secops-7/mikrodash:latest
+          container_name: mikrodash
+          restart: unless-stopped
+          ports:
+            - "3081:3081"
+          environment:
+            - ROUTER_HOST=10.0.10.1
+            - ROUTER_PORT=8728
+            - ROUTER_TLS=false
+            - ROUTER_USER=mikrodash
+            - ROUTER_PASS={{ mikrodash_password }}
+            - PORT=3081
+          volumes:
+            - mikrodash-data:/datavolumes
+      volumes:
+        mikrodash-data:
+    mode: '0644'
+  notify: Restart MikroDash
+
+- name: Ensure MikroDash is running
+  community.docker.docker_compose_v2:
+    project_src: /opt/mikrodash
+    state: present

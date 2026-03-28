@@ -27,3 +27,4 @@
     - vars/secrets.yml
   roles:
     - vaultwarden
+    - mikrodash

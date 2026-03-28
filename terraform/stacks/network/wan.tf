@@ -25,6 +25,6 @@ resource "routeros_ip_firewall_filter" "drop_wan_input" {
 }
 
 resource "routeros_ip_cloud" "ddns" {
-  ddns_enabled = true
+  ddns_enabled = "yes"
   update_time  = true
 }

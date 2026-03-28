@@ -1,28 +1,47 @@
 server:
+    # Basic Settings
     interface: 0.0.0.0
     port: 53
     do-ip4: yes
     do-udp: yes
     do-tcp: yes
 
+    # IPv6 Tuning
+    do-ip6: no
+    prefer-ip4: yes
+
+    # Security: Access Control
     access-control: 127.0.0.0/8 allow
     access-control: 10.0.0.0/8 allow
     access-control: 172.16.0.0/12 allow
     access-control: 192.168.0.0/16 allow
 
+    # Privacy & Security
     hide-identity: yes
     hide-version: yes
+    harden-glue: yes
+    harden-dnssec-stripped: yes
+    use-caps-for-id: yes # Minimalistic 0x20 encoding for extra security
+
+    # Performance: Prefetching & Caching
     prefetch: yes
     prefetch-key: yes
     serve-expired: yes
-    serve-expired-ttl: 0
-    cache-min-ttl: 0
+    serve-expired-ttl: 3600
+    cache-min-ttl: 300 # Forces 5min cache for stability
     msg-cache-size: 64m
     rrset-cache-size: 128m
 
+    # Multi-threading (Optimized for Raspberry Pi / LXC Cores)
+    num-threads: 2
+    msg-cache-slabs: 4
+    rrset-cache-slabs: 4
+    infra-cache-slabs: 4
+    key-cache-slabs: 4
+
+    # System Integration
     do-daemonize: no
     username: "unbound"
     chroot: ""
-
-    so-rcvbuf: 0
-    so-sndbuf: 0
+    so-rcvbuf: 1m
+    so-sndbuf: 1m
