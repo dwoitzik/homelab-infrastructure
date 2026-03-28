@@ -30,13 +30,23 @@ resource "routeros_ip_firewall_mangle" "mss_clamp" {
 # INPUT CHAIN (Traffic TO the Router)
 # ===============================================
 
+resource "routeros_ip_firewall_filter" "in_04_mikrodash" {
+  action       = "accept"
+  chain        = "input"
+  src_address  = "10.0.20.252"
+  protocol     = "tcp"
+  dst_port     = "8728,8729"
+  place_before = routeros_ip_firewall_filter.drop_all_input.id
+  comment      = "IN-04: Allow MikroDash API access from Docker LXC"
+}
+
 resource "routeros_ip_firewall_filter" "in_03_wg" {
   action       = "accept"
   chain        = "input"
   protocol     = "udp"
   dst_port     = local.vpn_config.port
   in_interface = "ether1"
-  place_before = routeros_ip_firewall_filter.drop_all_input.id
+  place_before = routeros_ip_firewall_filter.in_04_mikrodash.id
   comment      = "IN-03: WireGuard handshake"
 }
 
@@ -59,6 +69,18 @@ resource "routeros_ip_firewall_filter" "in_01_established" {
 # ===============================================
 # FORWARD CHAIN (Traffic THROUGH the Router)
 # ===============================================
+
+resource "routeros_ip_firewall_filter" "fwd_12_fb_wlan_to_proxy" {
+  action       = "accept"
+  chain        = "forward"
+  src_address  = "192.168.178.0/24"
+  dst_address  = "10.0.20.5"
+  dst_port     = "80,443"
+  protocol     = "tcp"
+  in_interface = "ether1"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "12: WAN - Allow Fritzbox WLAN access to internal Proxy"
+}
 
 resource "routeros_ip_firewall_filter" "fwd_11_dmz_to_wan" {
   action        = "accept"
@@ -106,6 +128,9 @@ resource "routeros_ip_firewall_filter" "fwd_07_vpn_handy_dmz" {
   dst_address  = "10.0.30.0/24"
   place_before = routeros_ip_firewall_filter.fwd_08_allow_dns.id
   comment      = "07: VPN - Mobile access to DMZ (External Proxy)"
+  lifecycle {
+    ignore_changes = [src_address]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_06_vpn_handy_srv" {
@@ -115,6 +140,9 @@ resource "routeros_ip_firewall_filter" "fwd_06_vpn_handy_srv" {
   dst_address  = "10.0.20.0/24"
   place_before = routeros_ip_firewall_filter.fwd_07_vpn_handy_dmz.id
   comment      = "06: VPN - Mobile limited to internal services"
+  lifecycle {
+    ignore_changes = [src_address]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_05_vpn_laptop" {
@@ -124,6 +152,9 @@ resource "routeros_ip_firewall_filter" "fwd_05_vpn_laptop" {
   dst_address  = "10.0.0.0/16"
   place_before = routeros_ip_firewall_filter.fwd_06_vpn_handy_srv.id
   comment      = "05: VPN - Laptop Full Access"
+  lifecycle {
+    ignore_changes = [src_address]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_04_proxy_to_mgmt" {
