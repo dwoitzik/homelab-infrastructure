@@ -80,7 +80,7 @@ resource "routeros_ip_firewall_filter" "in_01_established" {
 # FORWARD CHAIN (Traffic THROUGH the Router)
 # ===============================================
 
-resource "routeros_ip_firewall_filter" "fwd_12_fb_wlan_to_proxy" {
+resource "routeros_ip_firewall_filter" "fwd_13_fb_wlan_to_proxy" {
   action       = "accept"
   chain        = "forward"
   src_address  = "192.168.178.0/24"
@@ -89,16 +89,25 @@ resource "routeros_ip_firewall_filter" "fwd_12_fb_wlan_to_proxy" {
   protocol     = "tcp"
   in_interface = "ether1"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "12: WAN - Allow Fritzbox WLAN access to internal Proxy"
+  comment      = "13: WAN - Allow Fritzbox WLAN access to internal Proxy"
 }
 
-resource "routeros_ip_firewall_filter" "fwd_11_dmz_to_wan" {
+resource "routeros_ip_firewall_filter" "fwd_12_dmz_to_wan" {
   action        = "accept"
   chain         = "forward"
   src_address   = "10.0.30.0/24"
   out_interface = "ether1"
   place_before  = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment       = "11: DMZ - Internet access only"
+  comment       = "12: DMZ - Internet access only"
+}
+
+resource "routeros_ip_firewall_filter" "fwd_11_mgmt_to_wan" {
+  action        = "accept"
+  chain         = "forward"
+  src_address   = "10.0.10.0/24"
+  out_interface = "ether1"
+  place_before  = routeros_ip_firewall_filter.fwd_12_dmz_to_wan.id
+  comment       = "11: MGMT - Internet access (Critical for PBS rclone & Updates)"
 }
 
 resource "routeros_ip_firewall_filter" "fwd_10_srv_to_wan" {
@@ -106,7 +115,7 @@ resource "routeros_ip_firewall_filter" "fwd_10_srv_to_wan" {
   chain         = "forward"
   src_address   = "10.0.20.0/24"
   out_interface = "ether1"
-  place_before  = routeros_ip_firewall_filter.fwd_11_dmz_to_wan.id
+  place_before  = routeros_ip_firewall_filter.fwd_11_mgmt_to_wan.id
   comment       = "10: SRV - Internet access (Critical for Unbound DNS)"
 }
 
