@@ -80,18 +80,6 @@ resource "routeros_ip_firewall_filter" "in_01_established" {
 # FORWARD CHAIN (Traffic THROUGH the Router)
 # ===============================================
 
-resource "routeros_ip_firewall_filter" "fwd_13_fb_wlan_to_proxy" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = "192.168.178.0/24"
-  dst_address  = "10.0.20.5"
-  dst_port     = "80,443"
-  protocol     = "tcp"
-  in_interface = "ether1"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "13: WAN - Allow Fritzbox WLAN access to internal Proxy"
-}
-
 resource "routeros_ip_firewall_filter" "fwd_12_dmz_to_wan" {
   action        = "accept"
   chain         = "forward"
@@ -119,24 +107,13 @@ resource "routeros_ip_firewall_filter" "fwd_10_srv_to_wan" {
   comment       = "10: SRV - Internet access (Critical for Unbound DNS)"
 }
 
-resource "routeros_ip_firewall_filter" "fwd_09_dmz_to_backends" {
-  chain            = "forward"
-  action           = "accept"
-  src_address      = "10.0.30.0/24"
-  dst_address_list = "Reverse_Proxy_Targets"
-  dst_port         = "80,443,8006,8007"
-  protocol         = "tcp"
-  place_before     = routeros_ip_firewall_filter.fwd_10_srv_to_wan.id
-  comment          = "09: DMZ - Access to specific Reverse Proxy Backends"
-}
-
 resource "routeros_ip_firewall_filter" "fwd_08_allow_dns" {
   action       = "accept"
   chain        = "forward"
   dst_address  = "10.0.20.5"
   dst_port     = "53"
   protocol     = "udp"
-  place_before = routeros_ip_firewall_filter.fwd_09_dmz_to_backends.id
+  place_before = routeros_ip_firewall_filter.fwd_10_srv_to_wan.id
   comment      = "08: DNS - Allow internal DNS queries to AdGuard VIP"
 }
 
