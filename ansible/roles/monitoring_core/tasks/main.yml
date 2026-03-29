@@ -1,0 +1,35 @@
+---
+- name: Ensure directory for monitoring stack exists
+  ansible.builtin.file:
+    path: /opt/docker/monitoring
+    state: directory
+    mode: '0755'
+
+- name: Download official snmp.yml configuration
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/prometheus/snmp_exporter/main/snmp.yml
+    dest: /opt/docker/monitoring/snmp.yml
+    mode: '0644'
+
+- name: Set secure SNMP community string in snmp.yml
+  ansible.builtin.replace:
+    path: /opt/docker/monitoring/snmp.yml
+    regexp: 'community: public'
+    replace: 'community: homelab-monitor'
+  notify: Restart monitoring stack
+
+- name: Deploy prometheus.yml config
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: /opt/docker/monitoring/prometheus.yml
+  notify: Restart monitoring stack
+
+- name: Deploy docker-compose.yml for core monitoring
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/docker/monitoring/docker-compose.yml
+
+- name: Start monitoring core containers
+  community.docker.docker_compose_v2:
+    project_src: /opt/docker/monitoring
+    state: present
