@@ -1,0 +1,49 @@
+---
+- name: Disable traditional file-based swap to prevent SD card wear
+  ansible.builtin.systemd:
+    name: dphys-swapfile
+    state: stopped
+    enabled: no
+  ignore_errors: yes
+
+- name: Remove traditional swap package completely
+  ansible.builtin.apt:
+    name: dphys-swapfile
+    state: absent
+
+- name: Install zram-tools for compressed memory swapping
+  ansible.builtin.apt:
+    name: zram-tools
+    state: present
+    update_cache: yes
+
+- name: Configure zram to use 50% of available RAM
+  ansible.builtin.lineinfile:
+    path: /etc/default/zramswap
+    regexp: '^#?PERCENT='
+    line: 'PERCENT=50'
+  notify: Restart zramswap
+
+- name: Ensure /etc/apt/keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Azlux repository GPG key for log2ram
+  ansible.builtin.get_url:
+    url: https://azlux.fr/repo.gpg.key
+    dest: /etc/apt/keyrings/azlux.asc
+    mode: '0644'
+
+- name: Add Azlux repository for log2ram package
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/azlux.asc] http://packages.azlux.fr/debian/ bookworm main"
+    state: present
+    filename: azlux
+
+- name: Install log2ram package
+  ansible.builtin.apt:
+    name: log2ram
+    state: present
+    update_cache: yes

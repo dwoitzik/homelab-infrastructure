@@ -16,6 +16,7 @@
   vars_files:
     - vars/secrets.yml
   roles:
+    - rpi_optimize
     - keepalived
     - adguard
     - unbound
