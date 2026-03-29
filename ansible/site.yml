@@ -8,6 +8,7 @@
     - common
     - docker
     - watchtower
+    - monitoring_agent
 
 - name: Provision HA Core Services
   hosts: rpi_nodes
@@ -28,3 +29,4 @@
   roles:
     - vaultwarden
     - mikrodash
+    - monitoring_core

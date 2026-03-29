@@ -30,13 +30,23 @@ resource "routeros_ip_firewall_mangle" "mss_clamp" {
 # INPUT CHAIN (Traffic TO the Router)
 # ===============================================
 
+resource "routeros_ip_firewall_filter" "in_05_snmp" {
+  action       = "accept"
+  chain        = "input"
+  src_address  = "10.0.20.0/24"
+  protocol     = "udp"
+  dst_port     = "161"
+  place_before = routeros_ip_firewall_filter.drop_all_input.id
+  comment      = "IN-05: Allow SNMP from SRV-Net (Monitoring)"
+}
+
 resource "routeros_ip_firewall_filter" "in_04_mikrodash" {
   action       = "accept"
   chain        = "input"
   src_address  = "10.0.20.252"
   protocol     = "tcp"
   dst_port     = "8728,8729"
-  place_before = routeros_ip_firewall_filter.drop_all_input.id
+  place_before = routeros_ip_firewall_filter.in_05_snmp.id
   comment      = "IN-04: Allow MikroDash API access from Docker LXC"
 }
 

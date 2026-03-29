@@ -1,0 +1,16 @@
+---
+- name: Ensure directory for node_exporter exists
+  ansible.builtin.file:
+    path: /opt/docker/node_exporter
+    state: directory
+    mode: '0755'
+
+- name: Deploy docker-compose.yml for node_exporter
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/docker/node_exporter/docker-compose.yml
+
+- name: Start node_exporter container
+  community.docker.docker_compose_v2:
+    project_src: /opt/docker/node_exporter
+    state: present
