@@ -1,0 +1,36 @@
+---
+services:
+  npm:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: npm
+    restart: unless-stopped
+    network_mode: "{{ npm_network_mode | default('bridge') }}"
+{% if npm_network_mode | default('bridge') != 'host' %}
+    ports:
+      - '80:80'
+      - '81:81'
+      - '443:443'
+{% endif %}
+    volumes:
+      - /opt/npm/data:/data
+      - /opt/npm/letsencrypt:/etc/letsencrypt
+{% if npm_enable_crowdsec | default(false) | bool %}
+      # Mount NPM logs for CrowdSec analysis
+      - /opt/npm/data/logs:/var/log/npm:ro
+{% endif %}
+    environment:
+      - DISABLE_IPV6=true
+
+{% if npm_enable_crowdsec | default(false) | bool %}
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: crowdsec
+    restart: unless-stopped
+    environment:
+      COLLECTIONS: "crowdsecurity/nginx crowdsecurity/http-cve"
+    volumes:
+      - /opt/npm/crowdsec/data:/var/lib/crowdsec/data
+      - /opt/npm/crowdsec/config:/etc/crowdsec
+      # Read-only access to NPM logs
+      - /opt/npm/data/logs:/var/log/npm:ro
+{% endif %}

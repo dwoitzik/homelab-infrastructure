@@ -1,32 +1,32 @@
 ---
-- name: Create Nginx Proxy Manager directories
-  file:
+- name: Ensure base Nginx Proxy Manager directories exist
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
-  with_items:
+  loop:
     - /opt/npm
     - /opt/npm/data
     - /opt/npm/letsencrypt
 
-- name: Deploy Nginx Proxy Manager Docker Compose
-  copy:
+- name: Ensure CrowdSec directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/npm/crowdsec
+    - /opt/npm/crowdsec/config
+    - /opt/npm/crowdsec/data
+  when: npm_enable_crowdsec | default(false) | bool
+
+- name: Deploy Nginx Proxy Manager docker-compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
     dest: /opt/npm/docker-compose.yml
-    content: |
-      services:
-        app:
-          image: 'jc21/nginx-proxy-manager:latest'
-          container_name: npm
-          restart: unless-stopped
-          network_mode: host
-          volumes:
-            - /opt/npm/data:/data
-            - /opt/npm/letsencrypt:/etc/letsencrypt
-          environment:
-            - DISABLE_IPV6=true
     mode: '0644'
 
-- name: Start Nginx Proxy Manager
+- name: Ensure Nginx Proxy Manager stack is running
   community.docker.docker_compose_v2:
     project_src: /opt/npm
     state: present

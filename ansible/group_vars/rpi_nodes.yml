@@ -1,0 +1,6 @@
+---
+ansible_user: dw
+ansible_ssh_private_key_file: ~/.ssh/homelab-infrastructure
+
+npm_network_mode: "host"
+npm_enable_crowdsec: false
