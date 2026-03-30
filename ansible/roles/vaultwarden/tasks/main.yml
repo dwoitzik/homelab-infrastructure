@@ -1,33 +1,20 @@
 ---
-- name: Create Vaultwarden directories
-  file:
+- name: Ensure Vaultwarden directories exist
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
-  with_items:
+  loop:
     - /opt/vaultwarden
     - /opt/vaultwarden/vw-data
 
-- name: Deploy Vaultwarden Docker Compose
-  copy:
+- name: Deploy Vaultwarden docker-compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
     dest: /opt/vaultwarden/docker-compose.yml
-    content: |
-      services:
-        vaultwarden:
-          image: vaultwarden/server:latest
-          container_name: vaultwarden
-          restart: always
-          environment:
-            - WEBSOCKET_ENABLED=true
-            - SIGNUPS_ALLOWED=false
-          volumes:
-            - /opt/vaultwarden/vw-data:/data
-          ports:
-            - "8080:80"
     mode: '0644'
-  notify: Restart Vaultwarden
 
-- name: Start Vaultwarden container
+- name: Ensure Vaultwarden container is running
   community.docker.docker_compose_v2:
     project_src: /opt/vaultwarden
     state: present
