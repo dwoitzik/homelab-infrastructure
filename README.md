@@ -10,6 +10,7 @@ Configuration and documentation for a highly available, secure homelab environme
 * **DNS & Ad-Blocking:** AdGuard Home + Unbound (Recursive DNS)
 * **Cloud Governance:** Microsoft Azure (Arc-enabled)
 
+```mermaid
 graph TB
     subgraph cloud["☁️ Cloud & External"]
         NET([Internet])
