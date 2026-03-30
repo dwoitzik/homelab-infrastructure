@@ -80,6 +80,17 @@ resource "routeros_ip_firewall_filter" "in_01_established" {
 # FORWARD CHAIN (Traffic THROUGH the Router)
 # ===============================================
 
+resource "routeros_ip_firewall_filter" "fwd_13_wan_to_dmz_minecraft" {
+  action       = "accept"
+  chain        = "forward"
+  dst_address  = "10.0.30.3"
+  dst_port     = "25565"
+  protocol     = "tcp"
+  in_interface = "ether1"
+  place_before = routeros_ip_firewall_filter.fwd_12_dmz_to_wan.id
+  comment      = "13: WAN - Allow Internet traffic to DMZ Minecraft Server"
+}
+
 resource "routeros_ip_firewall_filter" "fwd_12_dmz_to_wan" {
   action        = "accept"
   chain         = "forward"
@@ -195,4 +206,19 @@ resource "routeros_ip_firewall_filter" "fwd_00_fasttrack" {
   hw_offload       = true
   place_before     = routeros_ip_firewall_filter.fwd_01_established.id
   comment          = "00: Global - Fasttrack for CPU efficiency"
+}
+
+# ===============================================
+# NAT CHAIN (Port Forwarding)
+# ===============================================
+
+resource "routeros_ip_firewall_nat" "dnat_minecraft" {
+  action       = "dst-nat"
+  chain        = "dstnat"
+  in_interface = "ether1"
+  protocol     = "tcp"
+  dst_port     = "25565"
+  to_addresses = "10.0.30.3"
+  to_ports     = "25565"
+  comment      = "NAT: Port Forwarding for DMZ Minecraft Server"
 }

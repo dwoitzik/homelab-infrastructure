@@ -1,0 +1,35 @@
+---
+- name: Ensure Minecraft directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/minecraft
+    - /opt/minecraft/data
+
+- name: Deploy Minecraft docker-compose.yml
+  ansible.builtin.copy:
+    dest: /opt/minecraft/docker-compose.yml
+    content: |
+      services:
+        minecraft:
+          image: itzg/minecraft-server
+          container_name: mc-server
+          environment:
+            EULA: "TRUE"
+            TYPE: "PAPER"
+            MEMORY: "3G"
+            VERSION: "LATEST"
+            TZ: "Europe/Berlin"
+          ports:
+            - "25565:25565"
+          volumes:
+            - ./data:/data
+          restart: unless-stopped
+    mode: '0644'
+
+- name: Start Minecraft server container
+  community.docker.docker_compose_v2:
+    project_src: /opt/minecraft
+    state: present

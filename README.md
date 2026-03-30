@@ -10,6 +10,60 @@ Configuration and documentation for a highly available, secure homelab environme
 * **DNS & Ad-Blocking:** AdGuard Home + Unbound (Recursive DNS)
 * **Cloud Governance:** Microsoft Azure (Arc-enabled)
 
+graph TB
+    subgraph cloud["☁️ Cloud & External"]
+        NET([Internet])
+        CF["Cloudflare DNS\nDNS-01 · *.woitzik.dev"]
+        AZ["Microsoft Azure\nArc-enabled governance"]
+    end
+
+    subgraph router["🔀 Network Layer"]
+        MK["MikroTik RB5009\nVLAN isolation · zero-trust firewall · hairpin NAT"]
+        VLAN["VLAN Zones\nMgmt · DMZ · Server · IoT"]
+    end
+
+    subgraph compute["🖥️ Compute"]
+        PVE["Proxmox VE\nRyzen 7 5725U · VM + LXC host"]
+        DOCKER["Docker Services\nNginx Proxy Manager · apps by zone"]
+    end
+
+    subgraph edge["🍓 Edge Cluster — Keepalived VIP"]
+        RPI1["RPi 4B — primary\nAdGuard · Unbound · NPM"]
+        RPI2["RPi 4B — replica\nAdGuard sync · standby"]
+        VIP(["Virtual IP\nActive/Passive failover"])
+    end
+
+    subgraph dns["🔍 DNS Resolution Chain"]
+        AGH["AdGuard Home\nfiltering + ad-block"]
+        UB["Unbound\nrecursive resolver"]
+        ROOT(["Root DNS servers\nno upstream dependency"])
+    end
+
+    subgraph iac["⚙️ Automation & IaC"]
+        TF["Terraform\nProxmox · MikroTik · Cloudflare"]
+        AN["Ansible\nRoles · Vault · HA cluster"]
+        GHA["GitHub Actions\ntflint · yamllint · validate"]
+        PC["pre-commit\nlocal lint + checks"]
+    end
+
+    NET --> MK
+    CF -. "wildcard cert" .-> MK
+    AZ -. "Arc agent" .-> PVE
+    MK --> VLAN
+    MK --> PVE
+    MK --> RPI1
+    PVE --> DOCKER
+    DOCKER --> RPI1
+    RPI1 -. "sync" .-> RPI2
+    RPI1 --> VIP
+    RPI2 --> VIP
+    RPI1 --> AGH
+    AGH --> UB
+    UB --> ROOT
+    iac -. "provisions & configures" .-> compute
+    iac -. "provisions & configures" .-> edge
+    iac -. "provisions & configures" .-> router
+
 ## 📁 Repository Layout
 * `/network`: Logical topology, VLAN definitions, and RouterOS firewall/NAT configurations via Terraform.
 * `/terraform`: Infrastructure provisioning for Proxmox, MikroTik routing, and Cloudflare DNS.
