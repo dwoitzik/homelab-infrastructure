@@ -20,6 +20,16 @@
     - /opt/npm/crowdsec/data
   when: npm_enable_crowdsec | default(false) | bool
 
+- name: Get docker group info
+  ansible.builtin.getent:
+    key: docker
+    database: group
+  register: docker_group_info
+
+- name: Set docker_gid fact
+  ansible.builtin.set_fact:
+    docker_gid: "{{ getent_group.docker[1] }}"
+
 - name: Deploy Nginx Proxy Manager docker-compose configuration
   ansible.builtin.template:
     src: docker-compose.yml.j2

@@ -1,5 +1,7 @@
 ---
-- name: Restart monitoring stack
-  community.docker.docker_compose_v2:
-    project_src: /opt/docker/monitoring
-    state: restarted
+- name: Reload monitoring services
+  ansible.builtin.uri:
+    url: "http://localhost:9090/-/reload"
+    method: POST
+    status_code: 200
+  listen: "Reload monitoring services"

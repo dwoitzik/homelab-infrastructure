@@ -11,13 +11,13 @@ scrape_configs:
     static_configs:
       - targets:
 {% for host in groups['nodes'] | default([]) %}
-        - '{{ hostvars[host]['ansible_host'] | default(host) }}:9100'
+        - '{{ hostvars[host].ansible_host }}:9100'
 {% endfor %}
 
   - job_name: 'mikrotik_snmp'
     static_configs:
       - targets:
-        - '10.0.20.1'
+        - '10.0.20.1' # Dein MikroTik
     metrics_path: /snmp
     params:
       module: [if_mib]
