@@ -1,0 +1,3 @@
+---
+npm_network_mode: "bridge"
+npm_enable_crowdsec: true
