@@ -1,0 +1,20 @@
+---
+services:
+  mikrodash:
+    image: ghcr.io/secops-7/mikrodash:latest
+    container_name: mikrodash
+    restart: unless-stopped
+    ports:
+      - "{{ mikrodash_port | default('3081') }}:3081"
+    environment:
+      - ROUTER_HOST={{ mikrodash_router_ip | default('10.0.10.1') }}
+      - ROUTER_PORT=8728
+      - ROUTER_TLS=false
+      - ROUTER_USER=mikrodash
+      - ROUTER_PASS={{ mikrodash_password }}
+      - PORT=3081
+    volumes:
+      - mikrodash-data:/data
+
+volumes:
+  mikrodash-data:

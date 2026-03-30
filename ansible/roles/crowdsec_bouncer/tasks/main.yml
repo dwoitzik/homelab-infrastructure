@@ -1,0 +1,33 @@
+---
+- name: Install CrowdSec Firewall Bouncer (nftables)
+  ansible.builtin.apt:
+    name: crowdsec-firewall-bouncer-nftables
+    state: present
+    update_cache: yes
+
+- name: Configure Bouncer API Key
+  ansible.builtin.lineinfile:
+    path: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+    regexp: "^api_key:"
+    line: "api_key: {{ vault_crowdsec_api_key }}"
+  notify: Restart crowdsec-bouncer
+
+- name: Configure Bouncer API URL
+  ansible.builtin.lineinfile:
+    path: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+    regexp: "^api_url:"
+    line: "api_url: http://127.0.0.1:8080/"
+  notify: Restart crowdsec-bouncer
+
+- name: Ensure Bouncer service is enabled and started
+  ansible.builtin.service:
+    name: crowdsec-firewall-bouncer
+    state: started
+    enabled: yes
+
+- name: Set bouncer mode to nftables
+  ansible.builtin.lineinfile:
+    path: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+    regexp: "^mode:"
+    line: "mode: nftables"
+  notify: Restart crowdsec-bouncer

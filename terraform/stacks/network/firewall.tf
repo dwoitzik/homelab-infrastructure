@@ -218,7 +218,7 @@ resource "routeros_ip_firewall_nat" "dnat_minecraft" {
   in_interface = "ether1"
   protocol     = "tcp"
   dst_port     = "25565"
-  to_addresses = "10.0.30.3"
+  to_addresses = "10.0.30.2"
   to_ports     = "25565"
   comment      = "NAT: Port Forwarding for DMZ Minecraft Server"
 }

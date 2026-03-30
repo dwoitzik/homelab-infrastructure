@@ -48,3 +48,13 @@
   community.docker.docker_compose_v2:
     project_src: /opt/unbound
     state: present
+
+- name: Optimize kernel network buffers for Unbound
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: yes
+  with_dict:
+    net.core.rmem_max: "4194304"
+    net.core.wmem_max: "4194304"

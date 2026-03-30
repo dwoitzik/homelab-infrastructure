@@ -15,7 +15,7 @@ services:
       - /opt/npm/data:/data
       - /opt/npm/letsencrypt:/etc/letsencrypt
 {% if npm_enable_crowdsec | default(false) | bool %}
-      # Mount NPM logs for CrowdSec analysis
+      # Mount NPM logs read-only for CrowdSec analysis
       - /opt/npm/data/logs:/var/log/npm:ro
 {% endif %}
     environment:
@@ -27,10 +27,16 @@ services:
     container_name: crowdsec
     restart: unless-stopped
     environment:
-      COLLECTIONS: "crowdsecurity/nginx crowdsecurity/http-cve"
+      - GID={{ docker_gid }}
+      - COLLECTIONS=crowdsecurity/nginx crowdsecurity/http-cve
+      - LAPI_LISTEN_ADDR=0.0.0.0
+      - TRUSTED_PROXIES=172.16.0.0/12,10.0.0.0/8,192.168.0.0/16
     volumes:
       - /opt/npm/crowdsec/data:/var/lib/crowdsec/data
       - /opt/npm/crowdsec/config:/etc/crowdsec
       # Read-only access to NPM logs
       - /opt/npm/data/logs:/var/log/npm:ro
+      - /opt/npm/crowdsec/config/local_api_credentials.yaml:/etc/crowdsec/local_api_credentials.yaml
+    ports:
+      - "127.0.0.1:8080:8080"
 {% endif %}
