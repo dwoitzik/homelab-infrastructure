@@ -64,6 +64,7 @@ graph TB
     iac -. "provisions & configures" .-> compute
     iac -. "provisions & configures" .-> edge
     iac -. "provisions & configures" .-> router
+'''
 
 ## 📁 Repository Layout
 * `/network`: Logical topology, VLAN definitions, and RouterOS firewall/NAT configurations via Terraform.
