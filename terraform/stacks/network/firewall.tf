@@ -83,7 +83,7 @@ resource "routeros_ip_firewall_filter" "in_01_established" {
 resource "routeros_ip_firewall_filter" "fwd_13_wan_to_dmz_minecraft" {
   action       = "accept"
   chain        = "forward"
-  dst_address  = "10.0.30.3"
+  dst_address  = "10.0.30.2"
   dst_port     = "25565"
   protocol     = "tcp"
   in_interface = "ether1"
