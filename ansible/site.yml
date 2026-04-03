@@ -1,7 +1,7 @@
 ---
 - name: Provision Base OS and Docker infrastructure
   hosts: nodes
-  become: yes
+  become: true
   roles:
     - common
     - docker
@@ -10,17 +10,17 @@
 
 - name: Provision HA Core Services
   hosts: rpi_nodes
-  become: yes
+  become: true
   roles:
     - rpi_optimize
     - keepalived
     - adguard
     - unbound
-    - nginx-proxy-manager
+    - nginx_proxy_manager
 
 - name: Provision Application Services
   hosts: app_nodes
-  become: yes
+  become: true
   roles:
     - vaultwarden
     - mikrodash
@@ -30,13 +30,13 @@
 
 - name: Provision DMZ External Proxy
   hosts: dmz_proxies
-  become: yes
+  become: true
   roles:
-    - nginx-proxy-manager
+    - nginx_proxy_manager
     - crowdsec_bouncer
 
 - name: Provision DMZ Game Servers
   hosts: dmz_games
-  become: yes
+  become: true
   roles:
     - minecraft

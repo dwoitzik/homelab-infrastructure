@@ -12,7 +12,7 @@
 
 - name: Perform system update (apt-get update & upgrade)
   ansible.builtin.apt:
-    update_cache: yes
+    update_cache: true
     upgrade: dist
     cache_valid_time: 3600
 
@@ -20,7 +20,7 @@
   ansible.builtin.apt:
     name: "{{ common_packages }}"
     state: present
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 3600
 
 - name: Set timezone to Europe/Berlin

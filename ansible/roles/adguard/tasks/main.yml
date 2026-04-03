@@ -1,17 +1,17 @@
 ---
 - name: Create AdGuard Home directories
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
-  with_items:
+  loop:
     - /opt/adguardhome/work
     - /opt/adguardhome/conf
 
 - name: Deploy AdGuard Home Docker Compose file
-  copy:
+  ansible.builtin.copy:
     dest: /opt/adguardhome/docker-compose.yml
     content: |
       services:
@@ -36,13 +36,13 @@
   when: inventory_hostname == 'rpi-srv-02'
   block:
     - name: Create Sync directory
-      file:
+      ansible.builtin.file:
         path: /opt/adguardhome-sync
         state: directory
         mode: '0755'
 
     - name: Deploy Sync Docker Compose
-      copy:
+      ansible.builtin.copy:
         dest: /opt/adguardhome-sync/docker-compose.yml
         content: |
           services:
