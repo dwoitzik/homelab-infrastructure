@@ -20,5 +20,5 @@
   ansible.builtin.command: docker compose up -d
   args:
     chdir: /opt/minio
-  register: compose_output
-  changed_when: compose_output.stdout != ""
+  register: minio_compose_output
+  changed_when: minio_compose_output.stdout != ""
