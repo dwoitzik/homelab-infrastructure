@@ -6,21 +6,16 @@
     owner: 1000
     group: 1000
   loop:
+    - /opt/minio
     - /opt/minio/data
-    - /opt/minio/config
 
-- name: Deploy Minio Container
-  community.docker.docker_container:
-    name: minio
-    image: quay.io/minio/minio
-    command: server /data --console-address ":9001"
-    state: started
-    restart_policy: always
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    env:
-      MINIO_ROOT_USER: "{{ minio_root_user }}"
-      MINIO_ROOT_PASSWORD: "{{ minio_root_password }}"
-    volumes:
-      - /opt/minio/data:/data
+- name: Deploy Minio docker-compose template
+  template:
+    src: docker-compose.yml.j2
+    dest: /opt/minio/docker-compose.yml
+    mode: '0644'
+
+- name: Start Minio container via docker compose
+  command: docker compose up -d
+  args:
+    chdir: /opt/minio
