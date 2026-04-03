@@ -3,8 +3,8 @@
   ansible.builtin.systemd:
     name: dphys-swapfile
     state: stopped
-    enabled: no
-  ignore_errors: yes
+    enabled: false
+  failed_when: false
 
 - name: Remove traditional swap package completely
   ansible.builtin.apt:
@@ -15,7 +15,7 @@
   ansible.builtin.apt:
     name: zram-tools
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Configure zram to use 50% of available RAM
   ansible.builtin.lineinfile:
@@ -46,4 +46,4 @@
   ansible.builtin.apt:
     name: log2ram
     state: present
-    update_cache: yes
+    update_cache: true

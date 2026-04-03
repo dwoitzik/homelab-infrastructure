@@ -3,7 +3,7 @@
   ansible.builtin.apt:
     name: crowdsec-firewall-bouncer-nftables
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Configure Bouncer API Key
   ansible.builtin.lineinfile:
@@ -23,7 +23,7 @@
   ansible.builtin.service:
     name: crowdsec-firewall-bouncer
     state: started
-    enabled: yes
+    enabled: true
 
 - name: Set bouncer mode to nftables
   ansible.builtin.lineinfile:
