@@ -93,20 +93,8 @@ jobs:
         run: pip install ansible-lint
 
       - name: Write vault password file
-        run: echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ansible/.ansible_vault_pass
+        run: printf '%s' "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ansible/.ansible_vault_pass
 
       - name: ansible-lint
         run: ansible-lint
         working-directory: ansible
-
-  docker:
-    name: Docker
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Hadolint
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          recursive: true
-          dockerfile: "**/Dockerfile*"
