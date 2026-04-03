@@ -1,22 +1,35 @@
 [![CI](https://github.com/dwoitzik/homelab-infrastructure/actions/workflows/ci.yml/badge.svg)](https://github.com/dwoitzik/homelab-infrastructure/actions/workflows/ci.yml)
+![License](https://img.shields.io/github/license/dwoitzik/homelab-infrastructure)
+![HCL](https://img.shields.io/github/languages/top/dwoitzik/homelab-infrastructure)
 
 # Homelab Infrastructure as Code
 
-Configuration and documentation for a highly available, secure homelab environment. This project manages the lifecycle of local hardware, network routing, and integrated cloud services entirely through automated Infrastructure as Code (IaC) workflows.
+Configuration and automation for a highly available, secure homelab environment. This project manages the full lifecycle of local hardware, network routing, and integrated cloud services entirely through automated Infrastructure as Code workflows — from bare metal provisioning to application deployment.
+
+> All infrastructure changes flow through **Atlantis** (self-hosted GitOps) via pull requests. No manual `terraform apply` or ad-hoc changes.
 
 ## 🛠️ Infrastructure Stack
-* **Hypervisor:** Proxmox VE (Ryzen 7 5725U)
-* **Networking:** MikroTik RB5009 (RouterOS)
-* **Edge Nodes:** 2x Raspberry Pi 4B (Debian)
-* **Reverse Proxy & SSL:** Nginx Proxy Manager (NPM)
-* **DNS & Ad-Blocking:** AdGuard Home + Unbound (Recursive DNS)
-* **Cloud Governance:** Microsoft Azure (Arc-enabled)
+
+| Layer | Technology |
+|---|---|
+| Hypervisor | Proxmox VE (Ryzen 7 5725U) |
+| Networking | MikroTik RB5009 (RouterOS) |
+| Edge nodes | 2× Raspberry Pi 4B (Debian) |
+| Reverse proxy & SSL | Nginx Proxy Manager + Let's Encrypt wildcard |
+| DNS & ad-blocking | AdGuard Home + Unbound (recursive) |
+| Monitoring | Prometheus + Grafana + node exporter + SNMP |
+| Secrets | Ansible Vault + Vaultwarden |
+| Security | CrowdSec firewall bouncer |
+| GitOps | Atlantis (self-hosted, Cloudflare Tunnel) |
+| Cloud governance | Microsoft Azure Arc |
+
+## 🗺️ Architecture
 
 ```mermaid
 graph TB
     subgraph cloud["☁️ Cloud & External"]
         NET([Internet])
-        CF["Cloudflare DNS\nDNS-01 · *.woitzik.dev"]
+        CF["Cloudflare\nDNS-01 · Tunnel · *.woitzik.dev"]
         AZ["Microsoft Azure\nArc-enabled governance"]
     end
 
@@ -25,72 +38,107 @@ graph TB
         VLAN["VLAN Zones\nMgmt · DMZ · Server · IoT"]
     end
 
-    subgraph compute["🖥️ Compute"]
-        PVE["Proxmox VE\nRyzen 7 5725U · VM + LXC host"]
-        DOCKER["Docker Services\nNginx Proxy Manager · apps by zone"]
+    subgraph compute["🖥️ Compute — Proxmox VE"]
+        PVE["Proxmox VE\nRyzen 7 5725U"]
+        DOCKER["Docker LXC\nAtlantis · Grafana · Vaultwarden · MikroDash"]
     end
 
     subgraph edge["🍓 Edge Cluster — Keepalived VIP"]
         RPI1["RPi 4B — primary\nAdGuard · Unbound · NPM"]
         RPI2["RPi 4B — replica\nAdGuard sync · standby"]
-        VIP(["Virtual IP\nActive/Passive failover"])
+        VIP(["Virtual IP · Active/Passive failover"])
     end
 
-    subgraph dns["🔍 DNS Resolution Chain"]
-        AGH["AdGuard Home\nfiltering + ad-block"]
-        UB["Unbound\nrecursive resolver"]
-        ROOT(["Root DNS servers\nno upstream dependency"])
+    subgraph gitops["⚙️ GitOps Pipeline"]
+        GH["GitHub PR"]
+        ATL["Atlantis\nterraform plan/apply"]
+        CFT["Cloudflare Tunnel\nzero inbound ports"]
     end
 
-    subgraph iac["⚙️ Automation & IaC"]
-        TF["Terraform\nProxmox · MikroTik · Cloudflare"]
+    subgraph iac["🔧 IaC & Automation"]
+        TF["Terraform\nMikroTik · Proxmox · Cloudflare"]
         AN["Ansible\nRoles · Vault · HA cluster"]
-        GHA["GitHub Actions\ntflint · yamllint · validate"]
-        PC["pre-commit\nlocal lint + checks"]
+        GHA["GitHub Actions\ntflint · ansible-lint"]
     end
 
     NET --> MK
-    CF -. "wildcard cert" .-> MK
+    CF -. "wildcard cert + tunnel" .-> DOCKER
     AZ -. "Arc agent" .-> PVE
     MK --> VLAN
     MK --> PVE
     MK --> RPI1
     PVE --> DOCKER
-    DOCKER --> RPI1
     RPI1 -. "sync" .-> RPI2
     RPI1 --> VIP
     RPI2 --> VIP
-    RPI1 --> AGH
-    AGH --> UB
-    UB --> ROOT
-    iac -. "provisions & configures" .-> compute
-    iac -. "provisions & configures" .-> edge
-    iac -. "provisions & configures" .-> router
+    GH --> CFT --> ATL --> TF
+    iac -. "provisions" .-> compute
+    iac -. "configures" .-> edge
+    iac -. "manages" .-> router
 ```
 
 ## 📁 Repository Layout
-* `/network`: Logical topology, VLAN definitions, and RouterOS firewall/NAT configurations via Terraform.
-* `/terraform`: Infrastructure provisioning for Proxmox, MikroTik routing, and Cloudflare DNS.
-* `/ansible`: Idempotent configuration management for server nodes, Docker environments, and high-availability clustering.
-* `/docker`: Container specifications organized by network zone.
-* `/docs`: Technical design decisions and architectural guides.
+
+```
+homelab-infrastructure/
+├── ansible/                  # Configuration management
+│   ├── roles/                # One role per service
+│   ├── playbooks/            # site.yml + targeted playbooks
+│   ├── group_vars/           # Variables + Ansible Vault secrets
+│   └── inventory.ini         # Host inventory
+├── terraform/
+│   └── stacks/
+│       └── network/          # MikroTik firewall, VLANs, NAT (active)
+├── docker/                   # Compose file references
+├── docs/
+│   └── decisions/            # Architecture Decision Records (ADRs)
+├── network/                  # RouterOS scripts
+├── atlantis.yaml             # GitOps project config
+└── .github/workflows/        # CI pipeline
+```
 
 ## 🚀 Core Architectural Concepts
 
-### 1. High Availability & Clustering
-* **Keepalived VIP:** Active/Passive failover utilizing a Virtual IP (VIP) across the Raspberry Pi edge nodes to ensure zero-downtime DNS and Proxy services.
-* **State Synchronization:** Automated replication of AdGuard Home configurations across primary and replica nodes using `adguardhome-sync`.
+### 1. GitOps with Atlantis
+All Terraform changes are applied exclusively through pull requests. Atlantis runs `terraform plan` automatically on every PR and posts the diff as a comment. Applying requires an explicit `atlantis apply` comment — no direct CLI access to production. Atlantis is exposed via Cloudflare Tunnel with zero inbound ports open.
 
-### 2. Privacy-First DNS Resolution
-* **Recursive DNS:** Implementation of Unbound as a local, recursive DNS resolver to eliminate reliance on third-party upstream providers.
-* **Kernel Optimization:** Tuned kernel network buffers via Ansible to maximize UDP/TCP throughput for high-volume DNS queries.
+### 2. High Availability & Clustering
+Active/Passive failover across both Raspberry Pi edge nodes using Keepalived with a shared Virtual IP. AdGuard Home configuration is continuously replicated from primary to replica via `adguardhome-sync`. Failover is transparent to clients — no reconfiguration needed.
 
-### 3. Advanced Networking & Security
-* **Zone Isolation:** Strict VLAN-based network segmentation isolating Management, DMZ, Server, and IoT traffic.
-* **Zero-Trust Firewalling:** MikroTik forward/input chains explicitly dropping unauthorized inter-VLAN traffic.
-* **Hairpin NAT:** Resolved asymmetric routing scenarios to allow upstream clients seamless access to internal VIPs.
-* **Automated SSL:** Let's Encrypt wildcard certificates (`*.woitzik.dev`) managed via DNS-01 challenges (Cloudflare), eliminating the need for exposed inbound HTTP ports.
+### 3. Privacy-First DNS Resolution
+Unbound runs as a full recursive resolver, querying root DNS servers directly with no upstream provider. AdGuard Home sits in front for filtering and ad-blocking. Kernel network buffers are tuned via Ansible for high-volume UDP throughput.
 
-### 4. Automation & Workflows
-* **Idempotent Playbooks:** Ansible roles designed for repeatable, safe execution using handlers and cache validation.
-* **CI/CD:** GitHub Actions for code linting and infrastructure validation.
+### 4. Zero-Trust Network Security
+Strict VLAN segmentation across Management, DMZ, Server, and IoT zones. MikroTik forward/input chains default-drop with explicit accept rules per flow. CrowdSec firewall bouncer runs on DMZ nodes. All firewall rules are managed as Terraform resources — no manual RouterOS changes.
+
+### 5. Observability
+Prometheus scrapes node exporter metrics from all hosts and SNMP metrics from the MikroTik router. Grafana provides dashboards for host health, network traffic, and DNS query rates.
+
+### 6. Secrets Management
+Ansible Vault encrypts all credentials at rest. Vaultwarden provides a self-hosted password manager for operational secrets. No secrets committed to the repository in plaintext.
+
+## 🔄 Making Changes
+
+### Infrastructure (Terraform)
+```bash
+git checkout -b feature/my-change
+# edit terraform/stacks/network/*.tf
+git push origin feature/my-change
+# open PR → Atlantis posts terraform plan automatically
+# comment "atlantis apply" to apply
+```
+
+### Configuration (Ansible)
+```bash
+# dry run
+ansible-playbook ansible/playbooks/site.yml --check --vault-password-file ansible/.ansible_vault_pass
+
+# apply to specific hosts
+ansible-playbook ansible/playbooks/site.yml --limit app_nodes --vault-password-file ansible/.ansible_vault_pass
+```
+
+## 📖 Documentation
+
+- [Architecture Decision Records](docs/decisions/)
+- [Ansible roles](ansible/README.md)
+- [Terraform stacks](terraform/README.md)
