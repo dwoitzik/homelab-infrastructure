@@ -90,7 +90,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install ansible-lint
-        run: pip install ansible-lint
+        run: pip install ansible-lint ansible-core
+
+      - name: Install collections
+        run: ansible-galaxy collection install -r ansible/requirements.yml
 
       - name: Write vault password file
         run: printf '%s' "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ansible/.ansible_vault_pass
