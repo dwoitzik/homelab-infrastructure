@@ -25,6 +25,8 @@
     - vaultwarden
     - mikrodash
     - monitoring_core
+    - atlantis
+    - cloudflared
 
 - name: Provision DMZ External Proxy
   hosts: dmz_proxies

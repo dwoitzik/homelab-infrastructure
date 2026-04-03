@@ -1,0 +1,26 @@
+---
+- name: Create cloudflared directory
+  ansible.builtin.file:
+    path: /opt/cloudflared
+    state: directory
+    mode: "0750"
+
+- name: Template Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/cloudflared/docker-compose.yml
+    mode: "0640"
+  notify: Restart cloudflared
+
+- name: Template environment file
+  ansible.builtin.template:
+    src: cloudflared.env.j2
+    dest: /opt/cloudflared/.env
+    mode: "0600"
+  notify: Restart cloudflared
+
+- name: Deploy cloudflared stack
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: /opt/cloudflared
+  changed_when: false
