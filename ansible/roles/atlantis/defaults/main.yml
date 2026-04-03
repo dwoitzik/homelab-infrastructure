@@ -1,0 +1,9 @@
+---
+atlantis_version: "v0.31.0"
+atlantis_base_dir: "/opt/atlantis"
+atlantis_port: 4141
+
+# GitHub
+atlantis_gh_user: "dwoitzik"
+atlantis_gh_repo: "homelab-infrastructure"
+atlantis_hostname: "atlantis.woitzik.dev"

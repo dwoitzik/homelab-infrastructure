@@ -9,6 +9,7 @@
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: /opt/docker/node_exporter/docker-compose.yml
+    mode: "0644"
 
 - name: Start node_exporter container
   community.docker.docker_compose_v2:
