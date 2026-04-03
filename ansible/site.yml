@@ -22,6 +22,7 @@
   hosts: app_nodes
   become: true
   roles:
+    - minio
     - vaultwarden
     - mikrodash
     - monitoring_core

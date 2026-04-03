@@ -1,0 +1,26 @@
+---
+- name: Create Minio directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: 1000
+    group: 1000
+  loop:
+    - /opt/minio/data
+    - /opt/minio/config
+
+- name: Deploy Minio Container
+  community.docker.docker_container:
+    name: minio
+    image: quay.io/minio/minio
+    command: server /data --console-address ":9001"
+    state: started
+    restart_policy: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env:
+      MINIO_ROOT_USER: "{{ minio_root_user }}"
+      MINIO_ROOT_PASSWORD: "{{ minio_root_password }}"
+    volumes:
+      - /opt/minio/data:/data
