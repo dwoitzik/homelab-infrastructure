@@ -222,3 +222,4 @@ resource "routeros_ip_firewall_nat" "dnat_minecraft" {
   to_ports     = "25565"
   comment      = "NAT: Port Forwarding for DMZ Minecraft Server"
 }
+# test

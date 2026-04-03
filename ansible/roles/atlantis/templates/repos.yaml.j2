@@ -1,0 +1,14 @@
+repos:
+  - id: github.com/{{ atlantis_gh_user }}/{{ atlantis_gh_repo }}
+    allowed_overrides: []
+    allow_custom_workflows: false
+
+workflows:
+  default:
+    plan:
+      steps:
+        - init
+        - plan
+    apply:
+      steps:
+        - apply
