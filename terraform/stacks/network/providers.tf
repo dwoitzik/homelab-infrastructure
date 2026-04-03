@@ -9,9 +9,9 @@ terraform {
   }
 
   backend "s3" {
-    bucket                      = "terraform-state"
-    key                         = "network/terraform.tfstate"
-    region                      = "main"
+    bucket = "terraform-state"
+    key    = "network/terraform.tfstate"
+    region = "main"
 
     endpoints = {
       s3 = "http://10.0.20.252:9000"
