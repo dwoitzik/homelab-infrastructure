@@ -1,3 +1,5 @@
+[![CI](https://github.com/dwoitzik/homelab-infrastructure/actions/workflows/ci.yml/badge.svg)](https://github.com/dwoitzik/homelab-infrastructure/actions/workflows/ci.yml)
+
 # Homelab Infrastructure as Code
 
 Configuration and documentation for a highly available, secure homelab environment. This project manages the lifecycle of local hardware, network routing, and integrated cloud services entirely through automated Infrastructure as Code (IaC) workflows.
