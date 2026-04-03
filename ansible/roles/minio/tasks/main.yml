@@ -1,21 +1,24 @@
 ---
 - name: Create Minio directories
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: 1000
-    group: 1000
+    owner: '1000'
+    group: '1000'
+    mode: '0755'
   loop:
     - /opt/minio
     - /opt/minio/data
 
 - name: Deploy Minio docker-compose template
-  template:
+  ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: /opt/minio/docker-compose.yml
     mode: '0644'
 
 - name: Start Minio container via docker compose
-  command: docker compose up -d
+  ansible.builtin.command: docker compose up -d
   args:
     chdir: /opt/minio
+  register: compose_output
+  changed_when: compose_output.stdout != ""
