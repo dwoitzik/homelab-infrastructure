@@ -164,6 +164,16 @@ resource "routeros_ip_firewall_filter" "fwd_05_vpn_laptop" {
   }
 }
 
+resource "routeros_ip_firewall_filter" "in_04b_atlantis_rest" {
+  action       = "accept"
+  chain        = "input"
+  src_address  = "10.0.20.252"
+  protocol     = "tcp"
+  dst_port     = "443"
+  place_before = routeros_ip_firewall_filter.in_04_mikrodash.id
+  comment      = "IN-04b: Allow Atlantis REST API access from Docker LXC"
+}
+
 resource "routeros_ip_firewall_filter" "fwd_04_proxy_to_mgmt" {
   chain        = "forward"
   action       = "accept"
