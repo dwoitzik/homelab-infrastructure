@@ -39,7 +39,7 @@ graph TB
     end
 
     subgraph compute["🖥️ Compute — Proxmox VE"]
-        PVE["Proxmox VE\nRyzen 7 5725U"]
+        PVE["Proxmox VE\nRyzen 7 5825U"]
         DOCKER["Docker LXC\nAtlantis · Grafana · Vaultwarden · MikroDash"]
     end
 

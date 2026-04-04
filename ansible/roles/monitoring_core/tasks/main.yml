@@ -22,7 +22,7 @@
     cmd: docker compose down
     chdir: /opt/docker/monitoring
   changed_when: true
-  when: monitoring_config_stat.results | selectattr('stat.isdir', 'defined') | selectattr('stat.isdir') | list | length > 0
+  when: monitoring_core_monitoring_config_stat.results | selectattr('stat.isdir', 'defined') | selectattr('stat.isdir') | list | length > 0
 
 - name: Remove incorrectly created config directories
   ansible.builtin.file:
