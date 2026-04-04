@@ -17,13 +17,15 @@ repos:
         language: system
         files: \.tf$
         pass_filenames: true
+
       - id: ansible-lint
         name: Ansible Lint
         description: Enforces Ansible best practices and fully qualified collection names.
         entry: ansible-lint
         language: system
         files: ^ansible/.*\.(yml|yaml)$
-        pass_filenames: true
+        pass_filenames: false
+        args: ["ansible/"]
 
       - id: tflint
         name: TFLint

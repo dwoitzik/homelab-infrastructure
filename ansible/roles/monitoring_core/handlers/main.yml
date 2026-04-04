@@ -4,7 +4,7 @@
     url: "http://localhost:9090/-/reload"
     method: POST
     status_code: 200
-  register: result
+  register: monitoring_core_result
   until: result.status is defined and result.status == 200
   retries: 5
   delay: 5
@@ -15,7 +15,7 @@
     url: "http://localhost:9093/-/reload"
     method: POST
     status_code: 200
-  register: result
+  register: monitoring_core_result
   until: result.status is defined and result.status == 200
   retries: 5
   delay: 5

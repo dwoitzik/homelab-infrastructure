@@ -11,7 +11,7 @@
 - name: Check for incorrectly created config directories
   ansible.builtin.stat:
     path: "{{ item }}"
-  register: monitoring_config_stat
+  register: monitoring_core_monitoring_config_stat
   loop:
     - /opt/docker/monitoring/alertmanager.yml
     - /opt/docker/monitoring/loki.yml
