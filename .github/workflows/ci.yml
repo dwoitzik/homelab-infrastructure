@@ -40,6 +40,32 @@ jobs:
       - name: TFLint
         run: tflint
 
+  terraform-proxmox:
+    name: Terraform / proxmox
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/stacks/proxmox
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        run: terraform fmt -check
+
+      - name: Terraform init
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+
+      - name: TFLint
+        run: tflint
+
   ansible:
     name: Ansible
     runs-on: ubuntu-latest
