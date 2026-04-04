@@ -1,31 +1,84 @@
 ---
-- name: Ensure monitoring infrastructure directory exists
+- name: Ensure monitoring infrastructure directories exist
   ansible.builtin.file:
-    path: /opt/docker/monitoring
+    path: "{{ item }}"
     state: directory
-    mode: '0755'
+    mode: "0755"
+  loop:
+    - /opt/docker/monitoring
+    - /opt/docker/monitoring/grafana/provisioning/datasources
+
+- name: Check for incorrectly created config directories
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: monitoring_config_stat
+  loop:
+    - /opt/docker/monitoring/alertmanager.yml
+    - /opt/docker/monitoring/loki.yml
+    - /opt/docker/monitoring/alerts.yml
+
+- name: Stop monitoring stack if config directories exist
+  ansible.builtin.command:
+    cmd: docker compose down
+    chdir: /opt/docker/monitoring
+  changed_when: true
+  when: monitoring_config_stat.results | selectattr('stat.isdir', 'defined') | selectattr('stat.isdir') | list | length > 0
+
+- name: Remove incorrectly created config directories
+  ansible.builtin.file:
+    path: "{{ item.item }}"
+    state: absent
+  loop: "{{ monitoring_config_stat.results }}"
+  when: item.stat.isdir is defined and item.stat.isdir
 
 - name: Deploy SNMP exporter configuration
   ansible.builtin.template:
     src: snmp.yml.j2
     dest: /opt/docker/monitoring/snmp.yml
-    mode: '0644'
+    mode: "0644"
   notify: Reload monitoring services
 
 - name: Deploy Prometheus configuration
   ansible.builtin.template:
     src: prometheus.yml.j2
     dest: /opt/docker/monitoring/prometheus.yml
-    mode: '0644'
+    mode: "0644"
   notify: Reload monitoring services
+
+- name: Deploy Prometheus alert rules
+  ansible.builtin.template:
+    src: alerts.yml.j2
+    dest: /opt/docker/monitoring/alerts.yml
+    mode: "0644"
+  notify: Reload monitoring services
+
+- name: Deploy Alertmanager configuration
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: /opt/docker/monitoring/alertmanager.yml
+    mode: "0644"
+  notify: Reload alertmanager
+
+- name: Deploy Loki configuration
+  ansible.builtin.template:
+    src: loki.yml.j2
+    dest: /opt/docker/monitoring/loki.yml
+    mode: "0644"
+
+- name: Deploy Grafana datasource provisioning
+  ansible.builtin.copy:
+    src: grafana/provisioning/datasources/datasources.yml
+    dest: /opt/docker/monitoring/grafana/provisioning/datasources/datasources.yml
+    mode: "0644"
 
 - name: Deploy monitoring docker-compose stack
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: /opt/docker/monitoring/docker-compose.yml
-    mode: '0644'
+    mode: "0644"
 
 - name: Ensure monitoring stack is running
-  community.docker.docker_compose_v2:
-    project_src: /opt/docker/monitoring
-    state: present
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: /opt/docker/monitoring
+  changed_when: false

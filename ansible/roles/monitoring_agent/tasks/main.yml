@@ -3,7 +3,7 @@
   ansible.builtin.file:
     path: /opt/docker/node_exporter
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Deploy docker-compose.yml for node_exporter
   ansible.builtin.template:
@@ -12,6 +12,33 @@
     mode: "0644"
 
 - name: Start node_exporter container
-  community.docker.docker_compose_v2:
-    project_src: /opt/docker/node_exporter
-    state: present
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: /opt/docker/node_exporter
+  changed_when: false
+
+- name: Ensure directory for promtail exists
+  ansible.builtin.file:
+    path: /opt/docker/promtail
+    state: directory
+    mode: "0755"
+
+- name: Deploy promtail configuration
+  ansible.builtin.template:
+    src: promtail.yml.j2
+    dest: /opt/docker/promtail/promtail.yml
+    mode: "0644"
+  notify: Restart promtail
+
+- name: Deploy promtail docker-compose
+  ansible.builtin.template:
+    src: promtail-compose.yml.j2
+    dest: /opt/docker/promtail/docker-compose.yml
+    mode: "0644"
+  notify: Restart promtail
+
+- name: Start promtail container
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: /opt/docker/promtail
+  changed_when: false

@@ -12,3 +12,5 @@ common_packages:
   - dnsutils
   - gnupg
   - ca-certificates
+
+monitoring_core_host: "10.0.20.252"
