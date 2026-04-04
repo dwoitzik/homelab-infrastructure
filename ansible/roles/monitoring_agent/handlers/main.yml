@@ -1,0 +1,6 @@
+---
+- name: Restart promtail
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate
+    chdir: /opt/docker/promtail
+  changed_when: true
