@@ -1,22 +1,18 @@
 ---
 - name: Reload monitoring services
   ansible.builtin.uri:
-    url: "http://localhost:9090/-/reload"
+    url: http://localhost:9090/-/reload
     method: POST
-    status_code: 200
   register: monitoring_core_result
-  until: result.status is defined and result.status == 200
+  until: monitoring_core_result.status == 200
   retries: 5
-  delay: 5
-  listen: "Reload monitoring services"
+  delay: 2
 
 - name: Reload alertmanager
   ansible.builtin.uri:
-    url: "http://localhost:9093/-/reload"
+    url: http://localhost:9093/-/reload
     method: POST
-    status_code: 200
   register: monitoring_core_result
-  until: result.status is defined and result.status == 200
+  until: monitoring_core_result.status == 200
   retries: 5
-  delay: 5
-  listen: "Reload alertmanager"
+  delay: 2
