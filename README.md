@@ -12,7 +12,7 @@ Configuration and automation for a highly available, secure homelab environment.
 
 | Layer | Technology |
 |---|---|
-| Hypervisor | Proxmox VE (Ryzen 7 5725U) |
+| Hypervisor | Proxmox VE (Ryzen 7 5825U) |
 | Networking | MikroTik RB5009 (RouterOS) |
 | Edge nodes | 2× Raspberry Pi 4B (Debian) |
 | Reverse proxy & SSL | Nginx Proxy Manager + Let's Encrypt wildcard |
@@ -77,24 +77,32 @@ graph TB
     iac -. "manages" .-> router
 ```
 
+## 📊 Monitoring
+
+| Dashboard | Description |
+|---|---|
+| Node Exporter Full | CPU, memory, disk, network for all 5 hosts |
+| MikroTik Network | Interface traffic, errors, discards per VLAN |
+
+![Node Exporter Dashboard](docs/images/grafana-node-exporter.png)
+![MikroTik Dashboard](docs/images/grafana-mikrotik.png)
+
 ## 📁 Repository Layout
 
 ```
-homelab-infrastructure/
-├── ansible/                  # Configuration management
-│   ├── roles/                # One role per service
-│   ├── playbooks/            # site.yml + targeted playbooks
-│   ├── group_vars/           # Variables + Ansible Vault secrets
-│   └── inventory.ini         # Host inventory
 ├── terraform/
 │   └── stacks/
-│       └── network/          # MikroTik firewall, VLANs, NAT (active)
-├── docker/                   # Compose file references
+│       ├── network/          # MikroTik firewall, VLANs, NAT
+│       └── proxmox/          # LXC container definitions
+├── ansible/
+│   ├── roles/                # One role per service (18 roles)
+│   ├── group_vars/           # Variables + Ansible Vault secrets
+│   └── inventory.ini
 ├── docs/
-│   └── decisions/            # Architecture Decision Records (ADRs)
-├── network/                  # RouterOS scripts
-├── atlantis.yaml             # GitOps project config
-└── .github/workflows/        # CI pipeline
+│   ├── decisions/            # ADR-001 through ADR-004
+│   └── images/               # Screenshots
+├── atlantis.yaml             # GitOps — manages network + proxmox stacks
+└── .github/workflows/ci.yml  # Terraform lint + Ansible lint
 ```
 
 ## 🚀 Core Architectural Concepts
