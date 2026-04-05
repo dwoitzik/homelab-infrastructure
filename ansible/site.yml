@@ -18,6 +18,12 @@
     - unbound
     - nginx_proxy_manager
 
+- name: Provision Management Services
+  hosts: mgmt_nodes
+  become: true
+  roles:
+    - pbs
+
 - name: Provision Application Services
   hosts: app_nodes
   become: true

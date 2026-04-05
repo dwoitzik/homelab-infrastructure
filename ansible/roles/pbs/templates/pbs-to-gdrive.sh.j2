@@ -1,0 +1,21 @@
+#!/bin/bash
+# Offsite backup sync — PBS to Google Drive
+# Managed by Ansible — do not edit manually
+
+LOGFILE="/var/log/pbs-to-gdrive.log"
+
+echo "$(date): Start GDrive Sync" >> "$LOGFILE"
+
+/usr/bin/rclone sync /mnt/backups gdrive:Backup-Homelab/PBS \
+  --quiet \
+  --transfers 8 \
+  --checkers 16
+
+if [ $? -eq 0 ]; then
+    echo "$(date): Sync erfolgreich beendet" >> "$LOGFILE"
+else
+    echo "$(date): Sync FEHLGESCHLAGEN" >> "$LOGFILE"
+fi
+
+# Healthcheck ping
+curl -fsS -m 10 --retry 5 "{{ pbs_healthcheck_url }}"

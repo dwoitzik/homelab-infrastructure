@@ -15,6 +15,14 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
 
   initialization {
     hostname = "ct-mgmt-pbs-01"
+    ip_config {
+      ipv4 {
+        address = "dhcp"
+      }
+      ipv6 {
+        address = "auto"
+      }
+    }
   }
 
   cpu {
