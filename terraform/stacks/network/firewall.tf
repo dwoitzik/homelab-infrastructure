@@ -164,6 +164,17 @@ resource "routeros_ip_firewall_filter" "fwd_05_vpn_laptop" {
   }
 }
 
+resource "routeros_ip_firewall_filter" "fwd_04c_srv_to_dmz_metrics" {
+  chain        = "forward"
+  action       = "accept"
+  src_address  = "10.0.20.252"
+  dst_address  = "10.0.30.0/24"
+  dst_port     = "9100,9080"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_04_proxy_to_mgmt.id
+  comment      = "04c: Monitoring - Prometheus scrape DMZ node exporters"
+}
+
 resource "routeros_ip_firewall_filter" "in_04b_atlantis_rest" {
   action       = "accept"
   chain        = "input"
