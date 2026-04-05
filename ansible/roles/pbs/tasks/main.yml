@@ -1,0 +1,48 @@
+---
+- name: Remove PBS enterprise repository
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/pbs-enterprise.sources
+    state: absent
+
+- name: Add PBS community repository
+  ansible.builtin.apt_repository:
+    repo: "deb http://download.proxmox.com/debian/pbs trixie pbs-no-subscription"
+    state: present
+    filename: pbs-community
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install rclone
+  ansible.builtin.apt:
+    name: rclone
+    state: present
+    update_cache: true
+
+- name: Ensure rclone config directory exists
+  ansible.builtin.file:
+    path: /root/.config/rclone
+    state: directory
+    mode: "0700"
+
+- name: Deploy rclone config
+  ansible.builtin.template:
+    src: rclone.conf.j2
+    dest: /root/.config/rclone/rclone.conf
+    mode: "0600"
+
+- name: Deploy pbs-to-gdrive sync script
+  ansible.builtin.template:
+    src: pbs-to-gdrive.sh.j2
+    dest: /usr/local/bin/pbs-to-gdrive.sh
+    mode: "0750"
+
+- name: Configure rclone sync cron job
+  ansible.builtin.cron:
+    name: "PBS to GDrive offsite backup"
+    minute: "0"
+    hour: "4"
+    job: "/usr/local/bin/pbs-to-gdrive.sh >> /dev/null 2>&1"
+    user: root
+    state: present
