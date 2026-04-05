@@ -1,0 +1,166 @@
+{
+  "title": "MikroTik Network",
+  "uid": "mikrotik-network",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "tags": ["mikrotik", "snmp", "network"],
+  "templating": {
+    "list": [
+      {
+        "name": "instance",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(ifHCInOctets, instance)",
+        "label": "Instance",
+        "current": {},
+        "refresh": 2
+      },
+      {
+        "name": "interface",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(ifHCInOctets{instance=\"$instance\"}, ifDescr)",
+        "label": "Interface",
+        "current": {},
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "title": "Interface status",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 4 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "1": { "text": "UP", "color": "green" }, "2": { "text": "DOWN", "color": "red" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "textMode": "auto" },
+      "targets": [
+        {
+          "expr": "ifOperStatus{instance=\"$instance\", ifDescr=~\"$interface\"}",
+          "legendFormat": "{{ifDescr}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+    {
+      "title": "Inbound traffic",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": { "lineWidth": 1, "fillOpacity": 10 }
+        }
+      },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "rate(ifHCInOctets{instance=\"$instance\", ifDescr=~\"$interface\"}[5m]) * 8",
+          "legendFormat": "↓ {{ifDescr}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+    {
+      "title": "Outbound traffic",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": { "lineWidth": 1, "fillOpacity": 10 }
+        }
+      },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "rate(ifHCOutOctets{instance=\"$instance\", ifDescr=~\"$interface\"}[5m]) * 8",
+          "legendFormat": "↑ {{ifDescr}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+    {
+      "title": "Interface errors (in)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 6 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps",
+          "custom": { "lineWidth": 1 },
+          "color": { "fixedColor": "red", "mode": "fixed" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(ifInErrors{instance=\"$instance\", ifDescr=~\"$interface\"}[5m])",
+          "legendFormat": "{{ifDescr}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+    {
+      "title": "Interface errors (out)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 6 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps",
+          "custom": { "lineWidth": 1 },
+          "color": { "fixedColor": "orange", "mode": "fixed" }
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(ifOutErrors{instance=\"$instance\", ifDescr=~\"$interface\"}[5m])",
+          "legendFormat": "{{ifDescr}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+    {
+      "title": "Inbound discards",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 18, "w": 12, "h": 6 },
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "pps" } },
+      "targets": [
+        {
+          "expr": "rate(ifInDiscards{instance=\"$instance\", ifDescr=~\"$interface\"}[5m])",
+          "legendFormat": "{{ifDescr}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+    {
+      "title": "Outbound discards",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 18, "w": 12, "h": 6 },
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "unit": "pps" } },
+      "targets": [
+        {
+          "expr": "rate(ifOutDiscards{instance=\"$instance\", ifDescr=~\"$interface\"}[5m])",
+          "legendFormat": "{{ifDescr}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    }
+  ]
+}
