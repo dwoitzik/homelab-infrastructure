@@ -71,6 +71,24 @@
     dest: /opt/docker/monitoring/grafana/provisioning/datasources/datasources.yml
     mode: "0644"
 
+- name: Ensure Grafana dashboards provisioning directory exists
+  ansible.builtin.file:
+    path: /opt/docker/monitoring/grafana/provisioning/dashboards
+    state: directory
+    mode: "0755"
+
+- name: Deploy Grafana dashboard provisioning config
+  ansible.builtin.copy:
+    src: grafana/provisioning/dashboards/dashboards.yml
+    dest: /opt/docker/monitoring/grafana/provisioning/dashboards/dashboards.yml
+    mode: "0644"
+
+- name: Deploy MikroTik network dashboard
+  ansible.builtin.copy:
+    src: grafana/provisioning/dashboards/mikrotik-network.json
+    dest: /opt/docker/monitoring/grafana/provisioning/dashboards/mikrotik-network.json
+    mode: "0644"
+
 - name: Deploy monitoring docker-compose stack
   ansible.builtin.template:
     src: docker-compose.yml.j2
