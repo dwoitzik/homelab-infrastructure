@@ -28,7 +28,7 @@ resource "routeros_wireguard_peer" "handy_dw" {
 resource "routeros_wireguard_peer" "laptop_dw" {
   interface            = routeros_wireguard.wg_vpn.name
   comment              = "Laptop DW - Full Admin Access"
-  public_key           = "mE7EAs5FqZ49rGjA71A7p5pPZ6nLzV6/u6u6u6u6u6u="
+  public_key           = "zD+/yfLfjQ7N1H5NBIwa2zKNd/bLZ6VRdEbKBxCmOVA="
   allowed_address      = [local.vpn_laptop_ip]
   persistent_keepalive = "25s"
 }
