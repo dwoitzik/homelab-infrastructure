@@ -80,6 +80,15 @@ resource "routeros_ip_firewall_filter" "in_01_established" {
 # FORWARD CHAIN (Traffic THROUGH the Router)
 # ===============================================
 
+resource "routeros_ip_firewall_filter" "fwd_14_vpn_to_wan" {
+  action        = "accept"
+  chain         = "forward"
+  src_address   = local.vpn_config.subnet
+  out_interface = "ether1"
+  place_before  = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment       = "14: VPN - Allow Internet Access for Full Tunnel"
+}
+
 resource "routeros_ip_firewall_filter" "fwd_13_wan_to_dmz_minecraft" {
   action       = "accept"
   chain        = "forward"
