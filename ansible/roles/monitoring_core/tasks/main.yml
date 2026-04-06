@@ -28,7 +28,7 @@
   ansible.builtin.file:
     path: "{{ item.item }}"
     state: absent
-  loop: "{{ monitoring_config_stat.results }}"
+  loop: "{{ monitoring_core_monitoring_config_stat.results }}"
   when: item.stat.isdir is defined and item.stat.isdir
 
 - name: Deploy SNMP exporter configuration
@@ -87,6 +87,12 @@
   ansible.builtin.copy:
     src: grafana/provisioning/dashboards/mikrotik-network.json
     dest: /opt/docker/monitoring/grafana/provisioning/dashboards/mikrotik-network.json
+    mode: "0644"
+
+- name: Deploy Loki logs dashboard
+  ansible.builtin.copy:
+    src: grafana/provisioning/dashboards/loki-logs.json
+    dest: /opt/docker/monitoring/grafana/provisioning/dashboards/loki-logs.json
     mode: "0644"
 
 - name: Deploy monitoring docker-compose stack
