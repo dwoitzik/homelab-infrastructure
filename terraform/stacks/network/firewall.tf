@@ -99,7 +99,6 @@ resource "routeros_ip_firewall_filter" "drop_wan_input" {
   comment          = "IN-98: Firewall - Drop all other external input"
 }
 
-
 # ===============================================
 # FORWARD CHAIN (Traffic THROUGH the Router)
 # ===============================================
@@ -241,6 +240,15 @@ resource "routeros_ip_firewall_filter" "fwd_13_wan_to_dmz_minecraft" {
   in_interface = "ether1"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment      = "13: WAN - Allow Internet traffic to DMZ Minecraft Server"
+}
+
+resource "routeros_ip_firewall_filter" "fwd_14_vpn_to_wan" {
+  action        = "accept"
+  chain         = "forward"
+  src_address   = local.vpn_config.subnet
+  out_interface = "ether1"
+  place_before  = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment       = "14: VPN - Allow Internet Access for Full Tunnel"
 }
 
 # ===============================================
