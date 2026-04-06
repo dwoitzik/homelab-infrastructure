@@ -1,0 +1,55 @@
+{
+  "title": "Docker & System Logs",
+  "uid": "loki-homelab-logs",
+  "schemaVersion": 38,
+  "timezone": "browser",
+  "refresh": "10s",
+  "tags": ["loki", "logs", "docker", "syslog"],
+  "templating": {
+    "list": [
+      {
+        "name": "job",
+        "type": "query",
+        "datasource": "Loki",
+        "query": "label_values(job)",
+        "label": "Job / Source",
+        "current": { "text": "docker", "value": "docker" },
+        "includeAll": true,
+        "multi": true
+      },
+      {
+        "name": "container",
+        "type": "query",
+        "datasource": "Loki",
+        "query": "label_values({job=\"docker\"}, container)",
+        "label": "Docker Container",
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "title": "Log Stream",
+      "type": "logs",
+      "datasource": "Loki",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 20 },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "expr": "{job=~\"$job\", container=~\"$container\"} |= ``",
+          "datasource": "Loki"
+        }
+      ]
+    }
+  ]
+}
