@@ -11,11 +11,10 @@
     dest: /opt/docker/node_exporter/docker-compose.yml
     mode: "0644"
 
-- name: Start node_exporter container
-  ansible.builtin.command:
-    cmd: docker compose up -d
-    chdir: /opt/docker/node_exporter
-  changed_when: false
+- name: Ensure node_exporter is running
+  community.docker.docker_compose_v2:
+    project_src: /opt/docker/node_exporter
+    state: present
 
 - name: Ensure directory for promtail exists
   ansible.builtin.file:

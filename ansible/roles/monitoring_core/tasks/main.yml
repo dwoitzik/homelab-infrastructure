@@ -7,6 +7,9 @@
   loop:
     - /opt/docker/monitoring
     - /opt/docker/monitoring/grafana/provisioning/datasources
+    - /opt/docker/monitoring/grafana/provisioning/dashboards
+    - /opt/docker/monitoring/grafana/provisioning/plugins
+    - /opt/docker/monitoring/grafana/provisioning/alerting
 
 - name: Check for incorrectly created config directories
   ansible.builtin.stat:

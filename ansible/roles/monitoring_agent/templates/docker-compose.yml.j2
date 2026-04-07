@@ -7,10 +7,14 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
+      - /run/udev:/run/udev:ro
     command:
       - '--path.procfs=/host/proc'
       - '--path.rootfs=/rootfs'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+{% if ansible_architecture is search("arm") or ansible_architecture == "aarch64" %}
+      - '--no-collector.kernel_hung'
+{% endif %}
     ports:
       - "9100:9100"
