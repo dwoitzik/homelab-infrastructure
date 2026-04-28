@@ -1,0 +1,25 @@
+- name: Create required directories for Paperless-ngx
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - /opt/docker/paperless
+    - /opt/docker/paperless/db
+    - /opt/docker/paperless/data
+    - /opt/docker/paperless/media
+    - /opt/docker/paperless/export
+    - /opt/docker/paperless/consume
+
+- name: Deploy Paperless-ngx docker-compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/docker/paperless/docker-compose.yml
+    mode: '0644'
+
+- name: Ensure Paperless-ngx stack is running
+  community.docker.docker_compose_v2:
+    project_src: /opt/docker/paperless
+    state: present
