@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:16
+    container_name: paperless_db
+    restart: unless-stopped
+    volumes:
+      - /opt/docker/paperless/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=paperless
+      - POSTGRES_USER=paperless
+      - POSTGRES_PASSWORD={{ paperless_db_password }}
+
+  redis:
+    image: redis:7
+    container_name: paperless_redis
+    restart: unless-stopped
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: paperless_gotenberg
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--chromium-allow-list=file:///tmp/.*"
+
+  tika:
+    image: apache/tika:latest
+    container_name: paperless_tika
+    restart: unless-stopped
+
+  webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless_webserver
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+      - gotenberg
+      - tika
+    ports:
+      - "8010:8000"
+    volumes:
+      - /opt/docker/paperless/data:/usr/src/paperless/data
+      - /opt/docker/paperless/media:/usr/src/paperless/media
+      - /opt/docker/paperless/export:/usr/src/paperless/export
+      - /opt/docker/paperless/consume:/usr/src/paperless/consume
+    environment:
+      - PAPERLESS_REDIS=redis://paperless_redis:6379
+      - PAPERLESS_DBHOST=paperless_db
+      - PAPERLESS_DBNAME=paperless
+      - PAPERLESS_DBUSER=paperless
+      - PAPERLESS_DBPASS={{ paperless_db_password }}
+      - PAPERLESS_OCR_LANGUAGE=deu+eng
+      - PAPERLESS_TIME_ZONE=Europe/Berlin
+      - PAPERLESS_TIKA_ENABLED=1
+      - PAPERLESS_TIKA_ENDPOINT=http://paperless_tika:9998
+      - PAPERLESS_TIKA_GOTENBERG_ENDPOINT=http://paperless_gotenberg:3000
+      - PAPERLESS_URL=https://docs.woitzik.dev
+      - PAPERLESS_CSRF_TRUSTED_ORIGINS=https://docs.woitzik.dev
+      - PAPERLESS_IGNORE_DATES=2004-01-16,1972-07-07,1979-12-30
