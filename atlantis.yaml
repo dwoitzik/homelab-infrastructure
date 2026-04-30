@@ -3,7 +3,7 @@ version: 3
 projects:
   - name: network
     dir: terraform/stacks/network
-    terraform_version: 1.10.0
+    terraform_version: 1.10.5
     workspace: default
     autoplan:
       enabled: true
