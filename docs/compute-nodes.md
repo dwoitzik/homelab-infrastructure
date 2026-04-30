@@ -6,6 +6,7 @@ This document details the compute hardware and the specific optimizations applie
 | Component | Specification | Rationale |
 | :--- | :--- | :--- |
 | **CPU** | Ryzen 7 5725U | High core count for virtualization and container density. |
+| **RAM** | 64 GB | Significant headroom for Docker stacks and in-memory databases. |
 | **GPU** | Radeon Vega (iGPU) | Hardware acceleration for media services (e.g., Jellyfin, Immich). |
 | **Storage A** | 512 GB NVMe | Fast local storage for OS and VMs. |
 | **Storage B** | 2 TB External HDD | Dedicated USB 3.0 mount for Proxmox Backup Server. |
