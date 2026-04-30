@@ -126,6 +126,60 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
   }
 }
 
+# --- AI & LLM Stack ---
+
+resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
+  vm_id        = 201
+  node_name    = local.target_node
+  started      = true
+  unprivileged = true
+
+  initialization {
+    hostname = "ct-srv-ai-01"
+  }
+
+  cpu {
+    cores = 8
+  }
+
+  memory {
+    dedicated = 32768
+    swap      = 8192
+  }
+
+  features {
+    nesting = true
+    keyctl  = true
+  }
+
+  disk {
+    datastore_id = local.storage
+    size         = 80
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr0"
+    mac_address = "bc:24:11:55:aa:bb"
+    vlan_id     = 20
+    firewall    = true
+  }
+
+  operating_system {
+    template_file_id = local.template
+    type             = "debian"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      description,
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+      network_interface[0].mac_address,
+    ]
+  }
+}
+
 # --- DMZ Stack ---
 
 resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
