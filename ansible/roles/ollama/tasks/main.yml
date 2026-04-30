@@ -2,7 +2,7 @@
 - name: Check if Ollama is already installed
   ansible.builtin.stat:
     path: /usr/local/bin/ollama
-  register: ollama_bin
+  register: ollama_check_bin
 
 - name: Download and execute official Ollama install script
   ansible.builtin.shell: |
@@ -10,7 +10,7 @@
     curl -fsSL https://ollama.com/install.sh | sh
   args:
     executable: /bin/bash
-  when: not ollama_bin.stat.exists
+  when: not ollama_check_bin.stat.exists
   changed_when: true
 
 - name: Ensure Ollama user is in video and render groups
@@ -50,5 +50,5 @@
 
 - name: Pull the Gemma 2 27B model
   ansible.builtin.command: ollama pull gemma2:27b
-  register: pull_result
-  changed_when: "'downloading' in pull_result.stdout"
+  register: ollama_pull_result
+  changed_when: "'downloading' in ollama_pull_result.stdout"
