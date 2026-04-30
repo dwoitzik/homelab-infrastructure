@@ -160,7 +160,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   network_interface {
     name        = "eth0"
     bridge      = "vmbr0"
-    mac_address = "bc:24:11:55:aa:bb"
+    mac_address = "bc:24:11:55:aa:bc"
     vlan_id     = 20
     firewall    = true
   }
