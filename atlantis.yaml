@@ -3,6 +3,7 @@ version: 3
 projects:
   - name: network
     dir: terraform/stacks/network
+    terraform_version: 1.10.0
     workspace: default
     autoplan:
       enabled: true
@@ -12,6 +13,7 @@ projects:
 
   - name: proxmox
     dir: terraform/stacks/proxmox
+    terraform_version: 1.10.0
     workspace: default
     autoplan:
       enabled: true
