@@ -1,0 +1,54 @@
+---
+- name: Check if Ollama is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/ollama
+  register: ollama_check_bin
+
+- name: Download and execute official Ollama install script
+  ansible.builtin.shell: |
+    set -o pipefail
+    curl -fsSL https://ollama.com/install.sh | sh
+  args:
+    executable: /bin/bash
+  when: not ollama_check_bin.stat.exists
+  changed_when: true
+
+- name: Ensure Ollama user is in video and render groups
+  ansible.builtin.user:
+    name: ollama
+    groups: video, render
+    append: true
+
+- name: Ensure systemd override directory for Ollama exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/ollama.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure Ollama environment variables
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/ollama.service.d/override.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Service]
+      Environment="OLLAMA_HOST=0.0.0.0"
+      Environment="HSA_OVERRIDE_GFX_VERSION=9.0.0"
+  notify: Restart Ollama
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure Ollama service is enabled and started
+  ansible.builtin.systemd:
+    name: ollama
+    state: started
+    enabled: true
+
+- name: Pull the Gemma 2 27B model
+  ansible.builtin.command: ollama pull gemma2:27b
+  register: ollama_pull_result
+  changed_when: "'downloading' in ollama_pull_result.stdout"
