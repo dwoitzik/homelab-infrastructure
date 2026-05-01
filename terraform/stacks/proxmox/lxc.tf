@@ -34,20 +34,9 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
     swap      = 512
   }
 
-  features {
-    nesting = true
-    keyctl  = true
-    fuse    = true
-  }
-
   disk {
     datastore_id = local.storage
     size         = 10
-  }
-
-  mount_point {
-    volume = "/mnt/pbs-storage"
-    path   = "/mnt/backups"
   }
 
   network_interface {
@@ -68,6 +57,7 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
       initialization[0].user_account,
       operating_system[0].template_file_id,
       network_interface[0].mac_address,
+      features,
     ]
   }
 }
@@ -95,7 +85,6 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
 
   features {
     nesting = true
-    keyctl  = true
   }
 
   disk {
@@ -122,6 +111,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
       initialization[0].user_account,
       operating_system[0].template_file_id,
       network_interface[0].mac_address,
+      features,
     ]
   }
 }
@@ -149,7 +139,6 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
 
   features {
     nesting = true
-    keyctl  = true
   }
 
   disk {
@@ -160,7 +149,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   network_interface {
     name        = "eth0"
     bridge      = "vmbr0"
-    mac_address = "bc:24:11:55:aa:bb"
+    mac_address = "bc:24:11:55:aa:f5"
     vlan_id     = 20
     firewall    = true
   }
@@ -176,6 +165,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
       initialization[0].user_account,
       operating_system[0].template_file_id,
       network_interface[0].mac_address,
+      features,
     ]
   }
 }
@@ -299,6 +289,7 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
       initialization[0].user_account,
       operating_system[0].template_file_id,
       network_interface[0].mac_address,
+      features,
     ]
   }
 }

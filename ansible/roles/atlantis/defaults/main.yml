@@ -1,5 +1,5 @@
 ---
-atlantis_version: "v0.31.0"
+atlantis_version: "v0.33.0"
 atlantis_base_dir: "/opt/atlantis"
 atlantis_port: 4141
 

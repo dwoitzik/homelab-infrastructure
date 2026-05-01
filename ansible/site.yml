@@ -48,3 +48,9 @@
   become: true
   roles:
     - minecraft
+
+- name: Provision AI & LLM Services
+  hosts: ai_nodes
+  become: true
+  roles:
+    - ollama
