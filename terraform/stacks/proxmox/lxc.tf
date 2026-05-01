@@ -34,18 +34,9 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
     swap      = 512
   }
 
-  features {
-    nesting = true
-  }
-
   disk {
     datastore_id = local.storage
     size         = 10
-  }
-
-  mount_point {
-    volume = "/mnt/pbs-storage"
-    path   = "/mnt/backups"
   }
 
   network_interface {
