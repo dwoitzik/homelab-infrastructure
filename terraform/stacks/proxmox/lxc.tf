@@ -36,7 +36,6 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
 
   features {
     nesting = true
-    fuse    = true
   }
 
   disk {
@@ -94,7 +93,6 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
 
   features {
     nesting = true
-    keyctl  = true
   }
 
   disk {
@@ -148,7 +146,6 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
 
   features {
     nesting = true
-    keyctl  = true
   }
 
   disk {
