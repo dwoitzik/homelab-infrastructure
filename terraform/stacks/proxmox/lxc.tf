@@ -36,7 +36,6 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
 
   features {
     nesting = true
-    keyctl  = true
     fuse    = true
   }
 
