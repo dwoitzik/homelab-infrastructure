@@ -66,6 +66,7 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
       initialization[0].user_account,
       operating_system[0].template_file_id,
       network_interface[0].mac_address,
+      features,
     ]
   }
 }
@@ -119,6 +120,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
       initialization[0].user_account,
       operating_system[0].template_file_id,
       network_interface[0].mac_address,
+      features,
     ]
   }
 }
@@ -172,6 +174,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
       initialization[0].user_account,
       operating_system[0].template_file_id,
       network_interface[0].mac_address,
+      features,
     ]
   }
 }
@@ -295,6 +298,7 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
       initialization[0].user_account,
       operating_system[0].template_file_id,
       network_interface[0].mac_address,
+      features,
     ]
   }
 }
