@@ -32,5 +32,5 @@
   ansible.builtin.command: docker compose up -d
   args:
     chdir: /opt/open-webui
-  register: openwebui_start
+  register: open_webui_start
   changed_when: "'Started' in openwebui_start.stdout or 'Created' in openwebui_start.stdout or 'Pulled' in openwebui_start.stdout"
