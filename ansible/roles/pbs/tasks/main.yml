@@ -1,18 +1,27 @@
 ---
-- name: Remove PBS enterprise repository
-  ansible.builtin.file:
-    path: /etc/apt/sources.list.d/pbs-enterprise.sources
-    state: absent
 
-- name: Add PBS community repository
-  ansible.builtin.apt_repository:
-    repo: "deb http://download.proxmox.com/debian/pbs trixie pbs-no-subscription"
+- name: Add bind mount to PBS container configuration on PVE host
+  ansible.builtin.lineinfile:
+    path: "/etc/pve/lxc/110.conf"
+    line: "mp0: /mnt/pbs-storage,mp=/mnt/backups"
     state: present
-    filename: pbs-community
+  delegate_to: 10.0.10.10
+  vars:
+    ansible_user: root
 
-- name: Update apt cache
-  ansible.builtin.apt:
-    update_cache: true
+- name: Force restart PBS Container to apply mount point
+  ansible.builtin.shell: pct stop 110 && sleep 3 && pct start 110
+  delegate_to: 10.0.10.10
+  vars:
+    ansible_user: root
+  failed_when: false
+  changed_when: true
+
+- name: Ensure mount point directory inside container exists
+  ansible.builtin.file:
+    path: /mnt/backups
+    state: directory
+    mode: "0755"
 
 - name: Install rclone
   ansible.builtin.apt:
