@@ -120,6 +120,12 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
 
   initialization {
     hostname = "ct-srv-ai-01"
+    ip_config {
+      ipv4 {
+        address = "10.0.20.251/24"
+        gateway = "10.0.20.1"
+      }
+    }
   }
 
   cpu {
