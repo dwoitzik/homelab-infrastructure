@@ -52,13 +52,7 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
   }
 
   lifecycle {
-    ignore_changes = [
-      description,
-      initialization[0].user_account,
-      operating_system[0].template_file_id,
-      network_interface[0].mac_address,
-      features,
-    ]
+    ignore_changes = all
   }
 }
 
@@ -126,6 +120,12 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
 
   initialization {
     hostname = "ct-srv-ai-01"
+    ip_config {
+      ipv4 {
+        address = "10.0.20.251/24"
+        gateway = "10.0.20.1"
+      }
+    }
   }
 
   cpu {

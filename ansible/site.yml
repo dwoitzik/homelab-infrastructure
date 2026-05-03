@@ -35,6 +35,7 @@
     - atlantis
     - cloudflared
     - paperless
+    - open_webui
 
 - name: Provision DMZ External Proxy
   hosts: dmz_proxies
