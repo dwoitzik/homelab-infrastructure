@@ -1,4 +1,12 @@
 ---
+- name: Ensure required dependencies are installed (curl, zstd)
+  ansible.builtin.apt:
+    name:
+      - curl
+      - zstd
+    state: present
+    update_cache: true
+
 - name: Check if Ollama is already installed
   ansible.builtin.stat:
     path: /usr/local/bin/ollama
@@ -48,7 +56,7 @@
     state: started
     enabled: true
 
-- name: Pull the Gemma 2 27B model
-  ansible.builtin.command: ollama pull gemma2:27b
+- name: Pull the Gemma 4 26B-A4B model
+  ansible.builtin.command: ollama pull gemma4:26b
   register: ollama_pull_result
   changed_when: "'downloading' in ollama_pull_result.stdout"

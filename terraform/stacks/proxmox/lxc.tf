@@ -52,13 +52,7 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
   }
 
   lifecycle {
-    ignore_changes = [
-      description,
-      initialization[0].user_account,
-      operating_system[0].template_file_id,
-      network_interface[0].mac_address,
-      features,
-    ]
+    ignore_changes = all
   }
 }
 
