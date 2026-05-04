@@ -1,4 +1,44 @@
 ---
+- name: Purge Proxmox Enterprise repository files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/apt/sources.list.d/pbs-enterprise.list
+    - /etc/apt/sources.list.d/pbs-enterprise.sources
+    - /etc/apt/sources.list.d/pve-enterprise.list
+    - /etc/apt/sources.list.d/pve-enterprise.sources
+
+- name: Remove enterprise lines from main sources.list
+  ansible.builtin.lineinfile:
+    path: /etc/apt/sources.list
+    regexp: '.*enterprise\.proxmox\.com.*'
+    state: absent
+
+- name: Install gnupg and ca-certificates
+  ansible.builtin.apt:
+    name:
+      - gnupg
+      - ca-certificates
+    state: present
+    update_cache: true
+
+- name: Download Proxmox release key
+  ansible.builtin.get_url:
+    url: https://enterprise.proxmox.com/debian/proxmox-release-trixie.gpg
+    dest: /etc/apt/trusted.gpg.d/proxmox-release-trixie.gpg
+    mode: '0644'
+
+- name: Add Proxmox Backup Server repository
+  ansible.builtin.apt_repository:
+    repo: "deb http://download.proxmox.com/debian/pbs trixie pbs-no-subscription"
+    state: present
+    filename: pbs
+
+- name: Install Proxmox Backup Server package
+  ansible.builtin.apt:
+    name: proxmox-backup-server
+    state: present
 
 - name: Add bind mount to PBS container configuration on PVE host
   ansible.builtin.lineinfile:
@@ -9,31 +49,23 @@
   vars:
     ansible_user: root
 
-- name: Force restart PBS Container to apply mount point
+- name: Force restart PBS Container
   ansible.builtin.shell: pct stop 110 && sleep 3 && pct start 110
   delegate_to: 10.0.10.10
   vars:
     ansible_user: root
-  failed_when: false
   changed_when: true
+
+- name: Wait for PBS container to wake up
+  ansible.builtin.wait_for_connection:
+    delay: 5
+    timeout: 60
 
 - name: Ensure mount point directory inside container exists
   ansible.builtin.file:
     path: /mnt/backups
     state: directory
     mode: "0755"
-
-- name: Install rclone
-  ansible.builtin.apt:
-    name: rclone
-    state: present
-    update_cache: true
-
-- name: Ensure rclone config directory exists
-  ansible.builtin.file:
-    path: /root/.config/rclone
-    state: directory
-    mode: "0700"
 
 - name: Deploy rclone config
   ansible.builtin.template:
