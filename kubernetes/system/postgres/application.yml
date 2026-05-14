@@ -11,17 +11,15 @@ spec:
     chart: postgresql
     helm:
       values: |
-        global:
-          storageClass: "longhorn"
+        image:
+          tag: 16-debian-12
         auth:
-          database: authelia
-          username: authelia
-          # In einem echten Setup würden wir hier Secrets nutzen,
-          # aber für den ersten Test setzen wir es fest:
-          password: "authelia-password-123"
+          existingSecret: "postgres-secret"
+          passwordKey: "password"
         primary:
           persistence:
             enabled: true
+            storageClass: "longhorn"
             size: 8Gi
   destination:
     server: https://kubernetes.default.svc
