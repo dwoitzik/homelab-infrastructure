@@ -16,7 +16,7 @@ spec:
         auth:
           database: authelia
           username: authelia
-          # In einem echten Setup würden wir hier Secrets nutzen, 
+          # In einem echten Setup würden wir hier Secrets nutzen,
           # aber für den ersten Test setzen wir es fest:
           password: "authelia-password-123"
         primary:

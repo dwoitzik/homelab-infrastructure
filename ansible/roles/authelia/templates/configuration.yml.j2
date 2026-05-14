@@ -1,0 +1,82 @@
+theme: auto
+
+server:
+  address: 'tcp://0.0.0.0:9091'
+
+log:
+  level: info
+
+identity_validation:
+  reset_password:
+    jwt_secret: "{{ authelia_jwt_secret }}"
+
+totp:
+  issuer: authelia.com
+
+authentication_backend:
+  file:
+    path: /config/users.yml
+
+session:
+  secret: "{{ authelia_session_secret }}"
+  expiration: 3600
+  inactivity: 300
+  cookies:
+    - name: authelia_session
+      domain: 'woitzik.dev'
+      authelia_url: 'https://auth.woitzik.dev'
+
+storage:
+  encryption_key: "{{ authelia_storage_encryption_key }}"
+  local:
+    path: /config/db.sqlite3
+
+notifier:
+  filesystem:
+    filename: /config/notification.txt
+
+access_control:
+  default_policy: deny
+  rules:
+    - domain: auth.woitzik.dev
+      policy: bypass
+    
+    - domain: vault.woitzik.dev
+      policy: bypass
+
+    - domain: 
+        - docs.woitzik.dev
+        - minio.woitzik.dev
+        - pve.woitzik.dev
+        - backup.woitzik.dev
+        - monitoring.woitzik.dev
+        - router.woitzik.dev
+        - atlantis.woitzik.dev
+        - dns.woitzik.dev
+        - ai.woitzik.dev
+        - proxy.woitzik.dev
+      policy: two_factor
+
+identity_providers:
+  oidc:
+    hmac_secret: "{{ authelia_oidc_hmac_secret }}"
+    issuer_private_key: |
+      {{ authelia_oidc_private_key | indent(6) }}
+    clients:
+      - client_id: 'proxmox'
+        client_name: 'Proxmox VE'
+        client_secret: '{{ authelia_proxmox_client_secret_hash }}'
+        public: false
+        authorization_policy: two_factor
+        redirect_uris:
+          - 'https://pve.woitzik.dev'
+          - 'https://pve.woitzik.dev/api2/extjs/access/oidc/login'
+          - 'https://pve.woitzik.dev:8006/api2/extjs/access/oidc/login'
+          - 'https://pve.woitzik.dev:443/api2/extjs/access/oidc/login'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        userinfo_signed_response_alg: 'none'
+        consent_mode: implicit
