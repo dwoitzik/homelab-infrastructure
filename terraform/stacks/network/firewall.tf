@@ -251,6 +251,28 @@ resource "routeros_ip_firewall_filter" "fwd_14_vpn_to_wan" {
   comment       = "14: VPN - Allow Internet Access for Full Tunnel"
 }
 
+resource "routeros_ip_firewall_filter" "fwd_15_mgmt_to_proxy_oidc" {
+  action       = "accept"
+  chain        = "forward"
+  src_address  = "10.0.10.0/24"
+  dst_address  = "10.0.20.5"
+  dst_port     = "443"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "15: MGMT - Allow Proxmox to reach internal Proxy for OIDC"
+}
+
+resource "routeros_ip_firewall_filter" "fwd_16_heimnetz_to_proxy" {
+  action       = "accept"
+  chain        = "forward"
+  src_address  = "192.168.178.0/24"
+  dst_address  = "10.0.20.5"
+  dst_port     = "80,443"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "16: Heimnetz - Allow access to Nginx Proxy Manager (Core Services)"
+}
+
 # ===============================================
 # NAT CHAIN (Port Forwarding)
 # ===============================================
