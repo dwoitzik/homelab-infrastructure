@@ -21,8 +21,6 @@ spec:
         ingressRoute:
           dashboard:
             enabled: false
-        additionalArguments:
-          - "--providers.kubernetesingress.ingressendpoint.publishedservice=kube-system/traefik"
         tlsStore:
           default:
             defaultCertificate:
