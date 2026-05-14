@@ -15,9 +15,18 @@ spec:
           web:
             redirectTo:
               port: websecure
+          websecure:
+            tls:
+              enabled: true
         ingressRoute:
           dashboard:
             enabled: false
+        additionalArguments:
+          - "--providers.kubernetesingress.ingressendpoint.publishedservice=kube-system/traefik"
+        tlsStore:
+          default:
+            defaultCertificate:
+              secretName: wildcard-woitzik-dev-tls
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system
