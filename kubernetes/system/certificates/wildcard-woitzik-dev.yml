@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-woitzik-dev
+  namespace: kube-system
+spec:
+  secretName: wildcard-woitzik-dev-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  commonName: "*.woitzik.dev"
+  dnsNames:
+  - "*.woitzik.dev"
+  - "woitzik.dev"
