@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgres-authelia
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: 15.5.3
+    chart: postgresql
+    helm:
+      values: |
+        global:
+          storageClass: "longhorn"
+        auth:
+          database: authelia
+          username: authelia
+          # In einem echten Setup würden wir hier Secrets nutzen, 
+          # aber für den ersten Test setzen wir es fest:
+          password: "authelia-password-123"
+        primary:
+          persistence:
+            enabled: true
+            size: 8Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: database
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
