@@ -9,7 +9,7 @@ locals {
 resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
   vm_id        = 110
   node_name    = local.target_node
-  tags         = ["backup", "community-script"]
+  tags         = ["backup", "management"]
   started      = true
   unprivileged = true
 
@@ -61,6 +61,7 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
 resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
   vm_id        = 200
   node_name    = local.target_node
+  tags         = ["docker", "server", "services"]
   started      = true
   unprivileged = true
 
@@ -115,6 +116,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
 resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   vm_id        = 201
   node_name    = local.target_node
+  tags         = ["ai", "llm", "server"]
   started      = true
   unprivileged = true
 
@@ -175,6 +177,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
 resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
   vm_id        = 301
   node_name    = local.target_node
+  tags         = ["dmz", "proxy", "network"]
   started      = true
   unprivileged = true
 
@@ -236,6 +239,7 @@ resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
 resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   vm_id        = 302
   node_name    = local.target_node
+  tags         = ["dmz", "gaming"]
   started      = true
   unprivileged = true
 
