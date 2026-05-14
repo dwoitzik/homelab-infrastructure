@@ -1,0 +1,33 @@
+---
+name: Build
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  test:
+    name: Build Ansible Galaxy collection artifact.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the codebase.
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python 3.13.
+        uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4
+        with:
+          python-version: '3.13.x'
+
+      - name: Install test dependencies.
+        run: pip3 install ansible
+
+      - name: Build artifact.
+        run: ansible-galaxy collection build
+
+      - name: Upload artifact.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: galaxy-collection
+          path: k3s-orchestration-*.tar.gz
