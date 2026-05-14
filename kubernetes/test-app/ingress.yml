@@ -2,10 +2,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: test-webserver-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
 spec:
   ingressClassName: traefik
+  tls:
+  - hosts:
+    - test.woitzik.dev
+    secretName: test-webserver-tls
   rules:
-  - http:
+  - host: test.woitzik.dev
+    http:
       paths:
       - path: /
         pathType: Prefix
