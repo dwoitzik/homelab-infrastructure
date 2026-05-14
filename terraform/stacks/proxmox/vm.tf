@@ -38,6 +38,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   }
 
   initialization {
+    datastore_id = local.storage
     ip_config {
       ipv4 {
         address = "10.0.20.11/24"
@@ -94,6 +95,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   }
 
   initialization {
+    datastore_id = local.storage
     ip_config {
       ipv4 {
         address = "10.0.20.12/24"
@@ -150,6 +152,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   }
 
   initialization {
+    datastore_id = local.storage
     ip_config {
       ipv4 {
         address = "10.0.20.13/24"
