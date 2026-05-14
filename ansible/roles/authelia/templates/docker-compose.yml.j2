@@ -1,0 +1,9 @@
+services:
+  authelia:
+    image: authelia/authelia
+    container_name: authelia
+    restart: unless-stopped
+    volumes:
+      - /opt/docker/authelia/config:/config
+    ports:
+      - "9091:9091"
