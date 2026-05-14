@@ -1,24 +1,24 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: longhorn-ingress
-  namespace: longhorn-system
+  name: argocd-server-ingress
+  namespace: argocd
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
   ingressClassName: traefik
   rules:
-  - host: longhorn.woitzik.dev
+  - host: argo.woitzik.dev
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: longhorn-frontend
+            name: argocd-server
             port:
               number: 80
   tls:
   - hosts:
-    - longhorn.woitzik.dev
+    - argo.woitzik.dev
