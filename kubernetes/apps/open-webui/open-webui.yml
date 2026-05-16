@@ -34,7 +34,15 @@ spec:
         - name: OLLAMA_BASE_URL
           value: http://10.0.20.251:11434
         - name: WEBUI_AUTH
-          value: "True"
+          value: "true"
+        - name: ENABLE_OAUTH_SIGNUP
+          value: "false"
+        - name: ENABLE_SIGNUP
+          value: "false"
+        - name: WEBUI_AUTH_TRUSTED_EMAIL_HEADER
+          value: "Remote-Email"
+        - name: WEBUI_AUTH_TRUSTED_NAME_HEADER
+          value: "Remote-Name"
         volumeMounts:
         - name: data
           mountPath: /app/backend/data

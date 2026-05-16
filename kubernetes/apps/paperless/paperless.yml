@@ -42,7 +42,7 @@ spec:
         - name: PAPERLESS_URL
           value: https://docs.woitzik.dev
         - name: PAPERLESS_CSRF_TRUSTED_ORIGINS
-          value: https://docs.woitzik.dev
+          value: https://docs.woitzik.dev,https://auth.woitzik.dev
         - name: PAPERLESS_ENABLE_HTTP_REMOTE_USER
           value: "true"
         - name: PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME
