@@ -1,0 +1,46 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: infrastructure-kube-system
+  namespace: kube-system
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
+    traefik.ingress.kubernetes.io/service.serversscheme: https
+    traefik.ingress.kubernetes.io/service.serverstransport: insecure-transport@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: pve.woitzik.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: external-pve
+            port:
+              number: 8006
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-pve
+  namespace: kube-system
+spec:
+  ports:
+  - name: https
+    port: 8006
+    targetPort: 8006
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: external-pve
+  namespace: kube-system
+subsets:
+- addresses:
+  - ip: 10.0.10.10
+  ports:
+  - name: https
+    port: 8006
