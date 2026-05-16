@@ -8,11 +8,11 @@ data:
     - Infrastructure:
         - Proxmox:
             icon: proxmox.png
-            href: https://10.0.10.10:8006
+            href: https://pve.woitzik.dev
             description: Virtualization Platform
         - PBS:
             icon: proxmox.png
-            href: https://10.0.10.110:8007
+            href: https://backup.woitzik.dev
             description: Proxmox Backup Server
         - Router:
             icon: mikrotik.png
@@ -42,12 +42,8 @@ data:
             description: Identity Provider
         - AdGuard A:
             icon: adguard-home.png
-            href: http://10.0.20.2:3001
+            href: https://dns.woitzik.dev
             description: DNS Filter Node 01
-        - AdGuard B:
-            icon: adguard-home.png
-            href: http://10.0.20.3:3001
-            description: DNS Filter Node 02
     - Productivity:
         - Paperless:
             icon: paperless.png
@@ -92,7 +88,7 @@ data:
       columns: 3
     Core Apps:
       style: grid
-      columns: 4
+      columns: 3
     Productivity:
       style: grid
       columns: 3
@@ -101,9 +97,11 @@ data:
       columns: 2
   settings.yaml: |
     title: David's Homelab
-    background: https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=2850&q=80
-    cardBlur: sm
+    background: "#000000"
+    cardBlur: none
     theme: dark
+    base: black
+    accent: orange
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -128,8 +126,6 @@ spec:
         env:
         - name: HOMEPAGE_ALLOWED_HOSTS
           value: "home.woitzik.dev"
-        - name: HOMEPAGE_VAR_GRAFANA_ADMIN_PASSWORD
-          value: "REPLACE_ME"
         volumeMounts:
         - name: config
           mountPath: /app/config/services.yaml
