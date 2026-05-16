@@ -19,12 +19,18 @@ data:
         - ArgoCD:
             icon: argocd.png
             href: https://argo.woitzik.dev
+            widget:
+              type: argocd
+              url: http://argocd-server.argocd.svc.cluster.local
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
         - Traefik:
             icon: traefik.png
             href: https://traefik.woitzik.dev
+            widget:
+              type: traefik
+              url: http://traefik.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -81,7 +87,7 @@ data:
       columns: 2
   settings.yaml: |
     title: David's Homelab
-    background: "#0a0a0a"
+    background: "#050505"
     theme: dark
     layout:
       header:
@@ -90,17 +96,17 @@ data:
     colors:
       gray:
         50: "#000000"
-        100: "#050505"
-        200: "#0a0a0a"
-        300: "#111111"
-        400: "#1a1a1a"
-        500: "#222222"
-        600: "#333333"
-        700: "#444444"
-        800: "#666666"
-        900: "#999999"
+        100: "#000000"
+        200: "#050505"
+        300: "#0a0a0a"
+        400: "#111111"
+        500: "#1a1a1a"
+        600: "#222222"
+        700: "#333333"
+        800: "#444444"
+        900: "#666666"
       orange:
-        500: "#ff8c00"
+        500: "#FF8C00"
     base: black
     accent: orange
     hideHostname: true
@@ -151,3 +157,36 @@ spec:
           name: homepage-config
       - name: logs
         emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homepage
+  namespace: apps
+spec:
+  ports:
+  - port: 80
+    targetPort: 3000
+  selector:
+    app: homepage
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: homepage-ingress
+  namespace: apps
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: home.woitzik.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: homepage
+            port:
+              number: 80
