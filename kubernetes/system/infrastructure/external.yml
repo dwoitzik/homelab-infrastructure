@@ -93,7 +93,7 @@ subsets:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: infrastructure-https
+  name: infrastructure-router
   namespace: kube-system
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
@@ -112,6 +112,19 @@ spec:
             name: external-router
             port:
               name: https
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: infrastructure-pve
+  namespace: kube-system
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
+    traefik.ingress.kubernetes.io/service.serversscheme: https
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  rules:
   - host: pve.woitzik.dev
     http:
       paths:
@@ -122,6 +135,19 @@ spec:
             name: external-pve
             port:
               name: https
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: infrastructure-pbs
+  namespace: kube-system
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
+    traefik.ingress.kubernetes.io/service.serversscheme: https
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  rules:
   - host: backup.woitzik.dev
     http:
       paths:
@@ -136,7 +162,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: infrastructure-http
+  name: infrastructure-dns
   namespace: kube-system
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
