@@ -126,6 +126,8 @@ spec:
         ports:
         - containerPort: 3000
         env:
+        - name: HOMEPAGE_ALLOWED_HOSTS
+          value: "home.woitzik.dev"
         - name: HOMEPAGE_VAR_GRAFANA_ADMIN_PASSWORD
           value: "REPLACE_ME"
         volumeMounts:
