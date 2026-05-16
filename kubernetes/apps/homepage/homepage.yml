@@ -151,7 +151,17 @@ spec:
         - containerPort: 3000
         volumeMounts:
         - name: config
-          mountPath: /app/config
+          mountPath: /app/config/services.yaml
+          subPath: services.yaml
+        - name: config
+          mountPath: /app/config/widgets.yaml
+          subPath: widgets.yaml
+        - name: config
+          mountPath: /app/config/layout.yaml
+          subPath: layout.yaml
+        - name: config
+          mountPath: /app/config/settings.yaml
+          subPath: settings.yaml
       volumes:
       - name: config
         configMap:
