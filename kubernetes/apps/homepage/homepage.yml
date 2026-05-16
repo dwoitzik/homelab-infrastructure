@@ -9,76 +9,60 @@ data:
         - Proxmox:
             icon: proxmox.png
             href: https://pve.woitzik.dev
-            description: Virtualization Platform
         - PBS:
             icon: proxmox.png
             href: https://backup.woitzik.dev
-            description: Proxmox Backup Server
         - Router:
             icon: mikrotik.png
             href: https://router.woitzik.dev
-            description: MikroTik RB5009
     - Cloud Native:
         - ArgoCD:
             icon: argocd.png
             href: https://argo.woitzik.dev
-            description: GitOps Controller
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
-            description: Distributed Block Storage
         - Traefik:
             icon: traefik.png
             href: https://traefik.woitzik.dev
-            description: Edge Router
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
             href: https://vault.woitzik.dev
-            description: Password Manager
         - Authelia:
             icon: authelia.png
             href: https://auth.woitzik.dev
-            description: Identity Provider
-        - AdGuard A:
+        - AdGuard:
             icon: adguard-home.png
             href: https://dns.woitzik.dev
-            description: DNS Filter Node 01
     - Productivity:
         - Paperless:
             icon: paperless.png
             href: https://docs.woitzik.dev
-            description: Document Management
         - Minio:
             icon: minio.png
             href: https://minio.woitzik.dev
-            description: S3 Object Storage
         - Open WebUI:
             icon: open-webui.png
             href: https://ai.woitzik.dev
-            description: LLM Interface
     - Monitoring:
         - Grafana:
             icon: grafana.png
             href: https://monitoring.woitzik.dev
-            description: Cluster Metrics
         - Mikrodash:
             icon: mikrotik.png
             href: https://mikrodash.woitzik.dev
-            description: Router Dashboard
   widgets.yaml: |
     - kubernetes:
         cluster:
           show: true
           cpu: true
           memory: true
-          showNodes: true
-        nodes:
-          - name: vm-srv-k3s-11
-          - name: vm-srv-k3s-12
-          - name: vm-srv-k3s-13
-          - name: rpi-srv-01
-          - name: rpi-srv-02
+    - datetime:
+        text_size: xl
+        format:
+          timeStyle: short
+          dateStyle: long
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -97,9 +81,30 @@ data:
       columns: 2
   settings.yaml: |
     title: David's Homelab
-    background: "#000000"
+    background: "#0a0a0a"
     theme: dark
-    color: orange
+    layout:
+      header:
+        style: grid
+        columns: 4
+    colors:
+      gray:
+        50: "#000000"
+        100: "#050505"
+        200: "#0a0a0a"
+        300: "#111111"
+        400: "#1a1a1a"
+        500: "#222222"
+        600: "#333333"
+        700: "#444444"
+        800: "#666666"
+        900: "#999999"
+      orange:
+        500: "#ff8c00"
+    base: black
+    accent: orange
+    hideHostname: true
+    hideConfig: true
 ---
 apiVersion: apps/v1
 kind: Deployment

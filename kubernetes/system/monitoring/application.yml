@@ -11,6 +11,9 @@ spec:
     chart: kube-prometheus-stack
     helm:
       values: |
+        prometheusOperator:
+          crds:
+            enabled: false
         grafana:
           ingress:
             enabled: true
@@ -19,7 +22,15 @@ spec:
               - monitoring.woitzik.dev
             annotations:
               traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-          adminPassword: "{{ grafana_admin_password }}"
+          adminPassword: "homelab-admin-2026"
+          grafana.ini:
+            server:
+              root_url: https://monitoring.woitzik.dev
+            auth.proxy:
+              enabled: true
+              header_name: Remote-User
+              header_property: username
+              auto_sign_up: true
         prometheus:
           prometheusSpec:
             retention: 30d
