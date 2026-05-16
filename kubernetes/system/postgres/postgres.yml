@@ -1,3 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-authelia
+  namespace: database
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: postgres-authelia
+  clusterIP: None
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -14,6 +26,8 @@ spec:
       labels:
         app: postgres-authelia
     spec:
+      securityContext:
+        fsGroup: 1001
       containers:
       - name: postgresql
         image: public.ecr.aws/bitnami/postgresql:16
