@@ -11,10 +11,8 @@ spec:
     chart: traefik
     helm:
       values: |
-        additionalArguments:
-          - "--providers.kubernetesingress.allowcrossnamespace=true"
-          - "--providers.kubernetescrd.allowcrossnamespace=true"
-          - "--serverstransport.insecureskipverify=true"
+        serversTransport:
+          insecureSkipVerify: true
         ports:
           web:
             redirectTo:
