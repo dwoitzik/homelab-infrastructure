@@ -14,7 +14,7 @@ terraform {
     region = "main"
 
     endpoints = {
-      s3 = "http://10.0.20.252:9000"
+      s3 = "http://minio.apps.svc.cluster.local:9000"
     }
 
     skip_credentials_validation = true
