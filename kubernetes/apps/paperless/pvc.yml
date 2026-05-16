@@ -1,15 +1,26 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: paperless-data
+  name: paperless-db-data
   namespace: apps
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: [ "ReadWriteOnce" ]
   storageClassName: longhorn
   resources:
     requests:
-      storage: 10Gi
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-data
+  namespace: apps
+spec:
+  accessModes: [ "ReadWriteOnce" ]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -17,9 +28,8 @@ metadata:
   name: paperless-media
   namespace: apps
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: [ "ReadWriteOnce" ]
   storageClassName: longhorn
   resources:
     requests:
-      storage: 50Gi
+      storage: 10Gi
