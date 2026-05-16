@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperless
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paperless
+  template:
+    metadata:
+      labels:
+        app: paperless
+    spec:
+      containers:
+      - name: paperless
+        image: ghcr.io/paperless-ngx/paperless-ngx:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PAPERLESS_REDIS
+          value: redis://redis-paperless.apps.svc.cluster.local:6379
+        - name: PAPERLESS_DBHOST
+          value: postgres-paperless.apps.svc.cluster.local
+        # Add more env vars as needed from legacy setup
+        volumeMounts:
+        - name: data
+          mountPath: /usr/src/paperless/data
+        - name: media
+          mountPath: /usr/src/paperless/media
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: paperless-data
+      - name: media
+        persistentVolumeClaim:
+          claimName: paperless-media
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paperless
+  namespace: apps
+spec:
+  ports:
+  - port: 8000
+  selector:
+    app: paperless
