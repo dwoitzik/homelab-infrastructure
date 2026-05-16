@@ -49,8 +49,6 @@ spec:
           value: https://docs.woitzik.dev,https://auth.woitzik.dev
         - name: PAPERLESS_TRUSTED_PROXIES
           value: 10.42.0.0/16,10.43.0.0/16,10.0.20.0/24
-        - name: PAPERLESS_PROXY_SSL_HEADER
-          value: HTTP_X_FORWARDED_PROTO
         - name: PAPERLESS_ENABLE_HTTP_REMOTE_USER
           value: "true"
         - name: PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME
