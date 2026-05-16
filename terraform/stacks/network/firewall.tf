@@ -59,21 +59,21 @@ resource "routeros_ip_firewall_filter" "in_03_mgmt" {
 resource "routeros_ip_firewall_filter" "in_04_atlantis_rest" {
   action       = "accept"
   chain        = "input"
-  src_address  = "10.0.20.252"
+  src_address  = "10.0.20.0/24"
   protocol     = "tcp"
   dst_port     = "443"
   place_before = routeros_ip_firewall_filter.drop_all_input.id
-  comment      = "IN-04: Allow Atlantis REST API access from Docker LXC"
+  comment      = "IN-04: Allow Atlantis REST API access from K3s Nodes"
 }
 
 resource "routeros_ip_firewall_filter" "in_05_mikrodash" {
   action       = "accept"
   chain        = "input"
-  src_address  = "10.0.20.252"
+  src_address  = "10.0.20.0/24"
   protocol     = "tcp"
   dst_port     = "8728,8729"
   place_before = routeros_ip_firewall_filter.drop_all_input.id
-  comment      = "IN-05: Allow MikroDash API access from Docker LXC"
+  comment      = "IN-05: Allow MikroDash API access from K3s Nodes"
 }
 
 resource "routeros_ip_firewall_filter" "in_06_snmp" {
