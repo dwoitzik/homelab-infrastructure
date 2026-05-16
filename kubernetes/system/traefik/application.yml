@@ -12,9 +12,9 @@ spec:
     helm:
       values: |
         additionalArguments:
-          - "--providers.kubernetescrd.allowcrossnamespace=true"
-          - "--providers.kubernetesingress.allowcrossnamespace=true"
-          - "--serverstransport.insecureskipverify=true"
+          - "--providers.kubernetescrd.allowCrossNamespace=true"
+          - "--providers.kubernetesingress.allowCrossNamespace=true"
+          - "--serverstransport.insecureSkipVerify=true"
         ports:
           web:
             redirectTo:
