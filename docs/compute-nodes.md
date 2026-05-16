@@ -1,6 +1,7 @@
-# Compute Nodes & Performance Tuning
+# Compute Nodes & Architecture Strategy
 
 ## 1. Proxmox Host (`pve-mgmt-01`)
+**Role:** Main Hypervisor & Heavy Workload Compute
 
 | Component | Specification |
 | :--- | :--- |
@@ -11,14 +12,15 @@
 | **Storage B** | 2 TB External HDD (USB 3.0) — PBS backup datastore |
 | **OS** | Proxmox VE — Debian Trixie (13), Kernel `7.0.0-3-pve` |
 
-### Containers (`onboot`)
+### VMs & Containers (`onboot`)
 
-| CT ID | Hostname | Cores | RAM | Role |
+| ID | Hostname | Cores | RAM | Role |
 | :--- | :--- | :--- | :--- | :--- |
 | 110 | `ct-mgmt-pbs-01` | 2 | 2 GB | Proxmox Backup Server |
-| 200 | `ct-srv-docker-01` | 4 | 4 GB | Docker workloads |
-| 201 | `ct-srv-ai-01` | 8 | 32 GB | Ollama / LLM inference |
-| 301 | `ct-dmz-proxy-01` | 2 | 1 GB | DMZ reverse proxy |
+| 200 | `ct-srv-docker-01` | 4 | 4 GB | Legacy Docker workloads |
+| 201 | `ct-srv-ai-01` | 8 | 32 GB | Ollama / LLM inference (GPU Passthrough) |
+| 210 | `vm-srv-k3s-01` | 4 | 16 GB | K3s Primary Node (Core-Apps & Longhorn) |
+| 301 | `ct-dmz-proxy-01` | 2 | 1 GB | DMZ reverse proxy (Public Facing) |
 | 302 | `ct-dmz-games-01` | 4 | 4 GB | Game servers |
 
 ### Performance Tweaks
@@ -26,15 +28,16 @@
 | Setting | Value | Note |
 | :--- | :--- | :--- |
 | CPU Governor | `powersave` | Reduces idle consumption |
-| CPU C-States | Hardware default (C1/C2/C3) | `max_cstate=1` removed — caused PSU voltage spikes and hard power-loss on load |
+| CPU C-States | Hardware default (C1/C2/C3) | `max_cstate=1` removed — caused PSU voltage spikes |
 | IOMMU | Active (`amd_iommu=on`, `iommu=pt`) | GPU passthrough to LXC |
 | Swap | 8 GB ZFS zvol (`rpool/swap`) | Safety net for LLM inference |
 | ZFS ARC | Max ~6.2 GB (~10% RAM) | Default Proxmox cap |
-| USB Storage | `nofail, device-timeout=5s` | USB dropout must not block boot or crash host |
+| USB Storage | `nofail, device-timeout=5s` | USB dropout must not block boot/crash host |
 
 ---
 
-## 2. Raspberry Pi Cluster (High Availability)
+## 2. Raspberry Pi Cluster (High Availability & Gateway)
+**Role:** Out-of-Band Network Services & HA Ingress Layer
 
 | Component | Specification |
 | :--- | :--- |
@@ -44,14 +47,14 @@
 | **Network** | 1 GbE — MikroTik `ether6`/`ether7` (VLAN 20) |
 | **OS** | Raspberry Pi OS Lite 64-bit (Debian Bookworm) |
 
-### Services
+### Services (Gateway Strategy)
 
 | Service | Details |
 | :--- | :--- |
-| **Keepalived (VRRP)** | VIP `10.0.20.5` — fails over from `rpi-srv-01` to `rpi-srv-02` |
-| **AdGuard Home** | DNS sinkhole |
+| **Keepalived (VRRP)** | VIP `10.0.20.5` — Fails over from `rpi-srv-01` to `rpi-srv-02` |
+| **HAProxy / Traefik** | Ingress gateway routing TCP traffic to K3s backend |
+| **AdGuard Home** | Primary DNS sinkhole |
 | **Unbound** | Recursive DNS resolver |
-| **Nginx Proxy Manager** | Internal reverse proxy |
 
 ### Performance Tweaks
 
