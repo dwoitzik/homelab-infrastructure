@@ -69,3 +69,14 @@ spec:
         emptyDir: {}
       - name: consume
         emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paperless
+  namespace: apps
+spec:
+  ports:
+  - port: 8000
+  selector:
+    app: paperless
