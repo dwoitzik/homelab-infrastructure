@@ -11,8 +11,10 @@ spec:
     chart: traefik
     helm:
       values: |
-        serversTransport:
-          insecureSkipVerify: true
+        additionalArguments:
+          - "--providers.kubernetescrd.allowcrossnamespace=true"
+          - "--providers.kubernetesingress.allowcrossnamespace=true"
+          - "--serverstransport.insecureskipverify=true"
         ports:
           web:
             redirectTo:
