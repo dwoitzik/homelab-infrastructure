@@ -46,7 +46,7 @@ spec:
         - name: PAPERLESS_ALLOWED_HOSTS
           value: docs.woitzik.dev,auth.woitzik.dev,10.0.20.200
         - name: PAPERLESS_CSRF_TRUSTED_ORIGINS
-          value: https://docs.woitzik.dev,https://auth.woitzik.dev
+          value: https://docs.woitzik.dev,https://auth.woitzik.dev,http://10.0.20.200
         - name: PAPERLESS_ENABLE_HTTP_REMOTE_USER
           value: "true"
         - name: PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME
