@@ -5,7 +5,7 @@ metadata:
   namespace: apps
 spec:
   forwardAuth:
-    address: http://authelia:9091/api/verify?rd=https://auth.woitzik.dev/
+    address: http://authelia.apps.svc.cluster.local:9091/api/verify?rd=https://auth.woitzik.dev/
     trustForwardHeader: true
     authResponseHeaders:
       - Remote-User
