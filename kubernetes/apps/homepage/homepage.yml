@@ -53,10 +53,6 @@ data:
             icon: mikrotik.png
             href: https://mikrodash.woitzik.dev
   widgets.yaml: |
-    - kubernetes:
-        show: true
-        cpu: true
-        memory: true
     - datetime:
         text_size: xl
         format:
