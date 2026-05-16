@@ -9,22 +9,31 @@ data:
         - Proxmox:
             icon: proxmox.png
             href: https://pve.woitzik.dev
+            description: Virtualization Platform
         - PBS:
             icon: proxmox.png
             href: https://backup.woitzik.dev
+            description: Proxmox Backup Server
         - Router:
             icon: mikrotik.png
             href: https://router.woitzik.dev
+            description: MikroTik RB5009
     - Cloud Native:
         - ArgoCD:
             icon: argocd.png
             href: https://argo.woitzik.dev
+            widget:
+              type: argocd
+              url: http://argocd-server.argocd.svc.cluster.local
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
         - Traefik:
             icon: traefik.png
             href: https://traefik.woitzik.dev
+            widget:
+              type: traefik
+              url: http://traefik.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -76,34 +85,19 @@ data:
       columns: 2
   settings.yaml: |
     title: David's Homelab
-    background: "#000000"
     theme: dark
+    color: slate
     layout:
       header:
         style: grid
         columns: 4
-    colors:
-      gray:
-        50: "#000000"
-        100: "#000000"
-        200: "#000000"
-        300: "#000000"
-        400: "#050505"
-        500: "#0a0a0a"
-        600: "#111111"
-        700: "#1a1a1a"
-        800: "#222222"
-        900: "#333333"
-      orange:
-        500: "#FF8C00"
-    base: black
-    accent: orange
     hideHostname: true
     hideConfig: true
   custom.css: |
-    body { background-color: #000 !important; background-image: none !important; }
-    .card { background-color: #050505 !important; border-color: #111 !important; }
-    .text-orange-500 { color: #FF8C00 !important; }
+    body { background-color: #050505 !important; }
+    .card { background-color: #111 !important; border: 1px solid #222 !important; }
+    .card:hover { border-color: #FF8C00 !important; }
+    .text-slate-500 { color: #FF8C00 !important; }
 ---
 apiVersion: apps/v1
 kind: Deployment
