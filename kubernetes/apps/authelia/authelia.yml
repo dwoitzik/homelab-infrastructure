@@ -26,8 +26,7 @@ spec:
           mountPath: /config/secrets
           readOnly: true
         - name: users-db
-          mountPath: /config/users_database.yml
-          subPath: users_database.yml
+          mountPath: /config/users
           readOnly: true
         env:
         - name: AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE

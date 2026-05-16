@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-config
+  namespace: apps
+data:
+  configuration.yml: |
+    server:
+      address: 'tcp://0.0.0.0:9091/'
+    log:
+      level: 'debug'
+
+    identity_validation:
+      reset_password:
+        jwt_secret: '/config/secrets/jwt-secret'
+
+    default_redirection_url: 'https://auth.woitzik.dev'
+
+    authentication_backend:
+      file:
+        path: '/config/users/users_database.yml'
+
+    session:
+      name: 'authelia_session'
+      domain: 'woitzik.dev'
+      secret: '/config/secrets/session-secret'
+      same_site: 'lax'
+      expiration: '1h'
+      inactivity: '5m'
+      remember_me: '1M'
+      redis:
+        host: 'redis-authelia.database.svc.cluster.local'
+        port: 6379
+        database_index: 0
+
+    storage:
+      encryption_key: '/config/secrets/storage-key'
+      postgres:
+        address: 'tcp://postgres-authelia.database.svc.cluster.local:5432'
+        database: 'authelia'
+        username: 'authelia'
+
+    notifier:
+      filesystem:
+        filename: '/tmp/notification.txt'
+
+    access_control:
+      default_policy: 'one_factor'
+      rules:
+        - domain: 'auth.woitzik.dev'
+          policy: 'bypass'
