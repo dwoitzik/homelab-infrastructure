@@ -11,10 +11,13 @@ spec:
     chart: traefik
     helm:
       values: |
-        additionalArguments:
-          - "--providers.kubernetesingress.allowCrossNamespace=true"
-          - "--providers.kubernetescrd.allowCrossNamespace=true"
-          - "--serversTransport.insecureSkipVerify=true"
+        providers:
+          kubernetesIngress:
+            allowCrossNamespace: true
+          kubernetesCRD:
+            allowCrossNamespace: true
+        serversTransport:
+          insecureSkipVerify: true
         ports:
           web:
             redirectTo:
