@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-router
+  namespace: apps
+spec:
+  type: ExternalName
+  externalName: 10.0.10.1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-pve
+  namespace: apps
+spec:
+  type: ExternalName
+  externalName: 10.0.10.10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-pbs
+  namespace: apps
+spec:
+  type: ExternalName
+  externalName: 10.0.10.110
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-dns
+  namespace: apps
+spec:
+  type: ExternalName
+  externalName: 10.0.20.2
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: infrastructure-ingress
+  namespace: apps
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
+    traefik.ingress.kubernetes.io/service.serversscheme: https
+spec:
+  rules:
+  - host: router.woitzik.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: external-router
+            port:
+              number: 443
+  - host: pve.woitzik.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: external-pve
+            port:
+              number: 8006
+  - host: backup.woitzik.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: external-pbs
+            port:
+              number: 8007
+  - host: dns.woitzik.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: external-dns
+            port:
+              number: 80
