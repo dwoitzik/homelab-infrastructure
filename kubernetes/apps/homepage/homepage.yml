@@ -19,18 +19,12 @@ data:
         - ArgoCD:
             icon: argocd.png
             href: https://argo.woitzik.dev
-            widget:
-              type: argocd
-              url: http://argocd-server.argocd.svc.cluster.local
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
         - Traefik:
             icon: traefik.png
             href: https://traefik.woitzik.dev
-            widget:
-              type: traefik
-              url: http://traefik.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -60,10 +54,9 @@ data:
             href: https://mikrodash.woitzik.dev
   widgets.yaml: |
     - kubernetes:
-        cluster:
-          show: true
-          cpu: true
-          memory: true
+        show: true
+        cpu: true
+        memory: true
     - datetime:
         text_size: xl
         format:
@@ -87,28 +80,9 @@ data:
       columns: 2
   settings.yaml: |
     title: David's Homelab
-    background: "#050505"
+    background: "#000000"
     theme: dark
-    layout:
-      header:
-        style: grid
-        columns: 4
-    colors:
-      gray:
-        50: "#000000"
-        100: "#000000"
-        200: "#050505"
-        300: "#0a0a0a"
-        400: "#111111"
-        500: "#1a1a1a"
-        600: "#222222"
-        700: "#333333"
-        800: "#444444"
-        900: "#666666"
-      orange:
-        500: "#FF8C00"
-    base: black
-    accent: orange
+    color: orange
     hideHostname: true
     hideConfig: true
 ---
