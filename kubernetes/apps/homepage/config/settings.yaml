@@ -1,5 +1,28 @@
 ---
 title: David's Homelab
-background: https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=2850&q=80
-cardBlur: sm
+background: none
+backgroundOpacity: 1
+cardBlur: none
 theme: dark
+fontFamily: Inter
+colors:
+  gray:
+    50: "#000000"
+    100: "#000000"
+    200: "#111111"
+    300: "#222222"
+    400: "#333333"
+    500: "#444444"
+    600: "#555555"
+    700: "#666666"
+    800: "#888888"
+    900: "#AAAAAA"
+  orange:
+    500: "#FF8C00"
+layout:
+  header:
+    style: grid
+    columns: 4
+  content:
+    style: grid
+    columns: 4
