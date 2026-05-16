@@ -18,6 +18,11 @@ spec:
           websecure:
             tls:
               enabled: true
+        logs:
+          general:
+            level: DEBUG
+          access:
+            enabled: true
         ingressRoute:
           dashboard:
             enabled: false
