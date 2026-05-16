@@ -26,11 +26,16 @@ spec:
           grafana.ini:
             server:
               root_url: https://monitoring.woitzik.dev
+              serve_from_sub_path: false
             auth.proxy:
               enabled: true
               header_name: Remote-User
               header_property: username
               auto_sign_up: true
+              enable_login_token: true
+            security:
+              allow_embedding: true
+              cookie_samesite: lax
         prometheus:
           prometheusSpec:
             retention: 30d
