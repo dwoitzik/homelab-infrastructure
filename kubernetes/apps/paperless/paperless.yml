@@ -4,7 +4,7 @@ metadata:
   name: paperless
   namespace: apps
 spec:
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: paperless
@@ -20,15 +20,44 @@ spec:
         - containerPort: 8000
         env:
         - name: PAPERLESS_REDIS
-          value: redis://redis-paperless.apps.svc.cluster.local:6379
+          value: redis://redis-paperless:6379
         - name: PAPERLESS_DBHOST
-          value: postgres-paperless.apps.svc.cluster.local
-        # Add more env vars as needed from legacy setup
+          value: postgres-paperless
+        - name: PAPERLESS_DBNAME
+          value: paperless
+        - name: PAPERLESS_DBUSER
+          value: paperless
+        - name: PAPERLESS_DBPASS
+          value: TD3fAJ2s1cxJ
+        - name: PAPERLESS_OCR_LANGUAGE
+          value: deu+eng
+        - name: PAPERLESS_TIME_ZONE
+          value: Europe/Berlin
+        - name: PAPERLESS_TIKA_ENABLED
+          value: "1"
+        - name: PAPERLESS_TIKA_ENDPOINT
+          value: http://paperless-addons:9998
+        - name: PAPERLESS_TIKA_GOTENBERG_ENDPOINT
+          value: http://paperless-addons:3000
+        - name: PAPERLESS_URL
+          value: https://docs.woitzik.dev
+        - name: PAPERLESS_CSRF_TRUSTED_ORIGINS
+          value: https://docs.woitzik.dev
+        - name: PAPERLESS_ENABLE_HTTP_REMOTE_USER
+          value: "true"
+        - name: PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME
+          value: HTTP_REMOTE_USER
+        - name: PAPERLESS_ACCOUNT_ALLOW_SIGNUPS
+          value: "false"
         volumeMounts:
         - name: data
           mountPath: /usr/src/paperless/data
         - name: media
           mountPath: /usr/src/paperless/media
+        - name: export
+          mountPath: /usr/src/paperless/export
+        - name: consume
+          mountPath: /usr/src/paperless/consume
       volumes:
       - name: data
         persistentVolumeClaim:
@@ -36,14 +65,7 @@ spec:
       - name: media
         persistentVolumeClaim:
           claimName: paperless-media
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: paperless
-  namespace: apps
-spec:
-  ports:
-  - port: 8000
-  selector:
-    app: paperless
+      - name: export
+        emptyDir: {}
+      - name: consume
+        emptyDir: {}
