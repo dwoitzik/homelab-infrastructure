@@ -98,10 +98,8 @@ data:
   settings.yaml: |
     title: David's Homelab
     background: "#000000"
-    cardBlur: none
     theme: dark
-    base: black
-    accent: orange
+    color: orange
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -118,6 +116,7 @@ spec:
       labels:
         app: homepage
     spec:
+      serviceAccountName: homepage
       containers:
       - name: homepage
         image: ghcr.io/gethomepage/homepage:latest
@@ -147,36 +146,3 @@ spec:
           name: homepage-config
       - name: logs
         emptyDir: {}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: homepage
-  namespace: apps
-spec:
-  ports:
-  - port: 80
-    targetPort: 3000
-  selector:
-    app: homepage
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: homepage-ingress
-  namespace: apps
-  annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-spec:
-  ingressClassName: traefik
-  rules:
-  - host: home.woitzik.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: homepage
-            port:
-              number: 80

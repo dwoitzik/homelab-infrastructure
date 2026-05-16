@@ -1,86 +1,10 @@
-apiVersion: v1
-kind: Service
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
 metadata:
-  name: external-router
+  name: insecure-transport
   namespace: apps
 spec:
-  ports:
-  - port: 443
-    targetPort: 443
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-router
-  namespace: apps
-subsets:
-- addresses:
-  - ip: 10.0.10.1
-  ports:
-  - port: 443
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: external-pve
-  namespace: apps
-spec:
-  ports:
-  - port: 8006
-    targetPort: 8006
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-pve
-  namespace: apps
-subsets:
-- addresses:
-  - ip: 10.0.10.10
-  ports:
-  - port: 8006
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: external-pbs
-  namespace: apps
-spec:
-  ports:
-  - port: 8007
-    targetPort: 8007
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-pbs
-  namespace: apps
-subsets:
-- addresses:
-  - ip: 10.0.10.110
-  ports:
-  - port: 8007
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: external-dns
-  namespace: apps
-spec:
-  ports:
-  - port: 80
-    targetPort: 80
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-dns
-  namespace: apps
-subsets:
-- addresses:
-  - ip: 10.0.20.2
-  ports:
-  - port: 80
+  insecureSkipVerify: true
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -90,7 +14,9 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
     traefik.ingress.kubernetes.io/service.serversscheme: https
+    traefik.ingress.kubernetes.io/service.serverstransport: apps-insecure-transport@kubernetescrd
 spec:
+  ingressClassName: traefik
   rules:
   - host: router.woitzik.dev
     http:
@@ -131,6 +57,7 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
 spec:
+  ingressClassName: traefik
   rules:
   - host: dns.woitzik.dev
     http:
@@ -141,4 +68,4 @@ spec:
           service:
             name: external-dns
             port:
-              number: 80
+              number: 3001
