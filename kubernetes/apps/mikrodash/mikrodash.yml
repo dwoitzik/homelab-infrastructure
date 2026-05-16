@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mikrodash-data
+  namespace: apps
+spec:
+  accessModes: [ "ReadWriteOnce" ]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mikrodash
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mikrodash
+  template:
+    metadata:
+      labels:
+        app: mikrodash
+    spec:
+      containers:
+      - name: mikrodash
+        image: ghcr.io/secops-7/mikrodash:latest
+        ports:
+        - containerPort: 3081
+        env:
+        - name: ROUTER_HOST
+          value: "10.0.10.1"
+        - name: ROUTER_PORT
+          value: "8728"
+        - name: ROUTER_TLS
+          value: "false"
+        - name: ROUTER_USER
+          value: "mikrodash"
+        - name: ROUTER_PASS
+          value: "4nHRV1C8FNpX"
+        - name: PORT
+          value: "3081"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mikrodash-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mikrodash
+  namespace: apps
+spec:
+  ports:
+  - port: 3081
+  selector:
+    app: mikrodash
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mikrodash-ingress
+  namespace: apps
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
+spec:
+  rules:
+  - host: mikrodash.woitzik.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mikrodash
+            port:
+              number: 3081
