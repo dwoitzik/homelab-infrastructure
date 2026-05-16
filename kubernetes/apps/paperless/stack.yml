@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-paperless
+  namespace: apps
+spec:
+  serviceName: "postgres-paperless"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-paperless
+  template:
+    metadata:
+      labels:
+        app: postgres-paperless
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16
+        env:
+        - name: POSTGRES_DB
+          value: paperless
+        - name: POSTGRES_USER
+          value: paperless
+        - name: POSTGRES_PASSWORD
+          value: TD3fAJ2s1cxJ
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: paperless-db-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-paperless
+  namespace: apps
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: postgres-paperless
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-paperless
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-paperless
+  template:
+    metadata:
+      labels:
+        app: redis-paperless
+    spec:
+      containers:
+      - name: redis
+        image: redis:7
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-paperless
+  namespace: apps
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: redis-paperless
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperless-addons
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paperless-addons
+  template:
+    metadata:
+      labels:
+        app: paperless-addons
+    spec:
+      containers:
+      - name: gotenberg
+        image: gotenberg/gotenberg:8
+        command: ["gotenberg", "--chromium-allow-list=file:///tmp/.*"]
+        ports:
+        - containerPort: 3000
+      - name: tika
+        image: apache/tika:latest
+        ports:
+        - containerPort: 9998
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paperless-addons
+  namespace: apps
+spec:
+  ports:
+  - name: gotenberg
+    port: 3000
+  - name: tika
+    port: 9998
+  selector:
+    app: paperless-addons
