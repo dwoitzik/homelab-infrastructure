@@ -1,3 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-authelia
+  namespace: database
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: redis-authelia
+  clusterIP: None
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -14,6 +26,8 @@ spec:
       labels:
         app: redis-authelia
     spec:
+      securityContext:
+        fsGroup: 1001
       containers:
       - name: redis
         image: public.ecr.aws/bitnami/redis:7.4

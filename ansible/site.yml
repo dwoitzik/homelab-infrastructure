@@ -8,15 +8,22 @@
     - watchtower
     - monitoring_agent
 
-- name: Provision HA Core Services
+- name: Provision HA Core Services & Gateway
   hosts: rpi_nodes
   become: true
+  pre_tasks:
+    - name: Stop Nginx Proxy Manager Docker stack
+      community.docker.docker_compose_v2:
+        project_src: /opt/npm
+        state: absent
+      failed_when: false
+
   roles:
     - rpi_optimize
     - keepalived
     - adguard
     - unbound
-    - nginx_proxy_manager
+    - haproxy
 
 - name: Provision Management Services
   hosts: mgmt_nodes
