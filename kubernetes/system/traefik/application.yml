@@ -14,6 +14,7 @@ spec:
         additionalArguments:
           - "--providers.kubernetesingress.allowCrossNamespace=true"
           - "--providers.kubernetescrd.allowCrossNamespace=true"
+          - "--serversTransport.insecureSkipVerify=true"
         ports:
           web:
             redirectTo:
