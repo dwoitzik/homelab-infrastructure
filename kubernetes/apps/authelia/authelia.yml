@@ -14,6 +14,21 @@ spec:
         app: authelia
     spec:
       enableServiceLinks: false
+      tolerations:
+      - key: "storage"
+        operator: "Equal"
+        value: "sdcard"
+        effect: "NoSchedule"
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - rpi
       containers:
       - name: authelia
         image: ghcr.io/authelia/authelia:latest

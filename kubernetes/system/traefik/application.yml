@@ -25,6 +25,21 @@ spec:
           default:
             defaultCertificate:
               secretName: wildcard-woitzik-dev-tls
+        tolerations:
+        - key: "storage"
+          operator: "Equal"
+          value: "sdcard"
+          effect: "NoSchedule"
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                - key: node-type
+                  operator: In
+                  values:
+                  - rpi
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system
