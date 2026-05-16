@@ -1,0 +1,17 @@
+---
+layout:
+  Infrastructure:
+    style: grid
+    columns: 3
+  Cloud Native:
+    style: grid
+    columns: 3
+  Core Apps:
+    style: grid
+    columns: 4
+  Productivity:
+    style: grid
+    columns: 3
+  Monitoring:
+    style: grid
+    columns: 2
