@@ -25,6 +25,10 @@ spec:
         - name: secrets
           mountPath: /config/secrets
           readOnly: true
+        - name: users-db
+          mountPath: /config/users_database.yml
+          subPath: users_database.yml
+          readOnly: true
         env:
         - name: AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE
           value: /config/secrets/storage-password
@@ -37,6 +41,9 @@ spec:
       - name: secrets
         secret:
           secretName: authelia-secrets
+      - name: users-db
+        secret:
+          secretName: authelia-users-db
 ---
 apiVersion: v1
 kind: Service
