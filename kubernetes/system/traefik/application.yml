@@ -11,6 +11,9 @@ spec:
     chart: traefik
     helm:
       values: |
+        additionalArguments:
+          - "--providers.kubernetesingress.allowCrossNamespace=true"
+          - "--providers.kubernetescrd.allowCrossNamespace=true"
         ports:
           web:
             redirectTo:
