@@ -6,7 +6,7 @@ metadata:
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
     traefik.ingress.kubernetes.io/service.serversscheme: https
-    traefik.ingress.kubernetes.io/service.serverstransport: apps-insecure-transport@kubernetescrd
+    traefik.ingress.kubernetes.io/service.serverstransport: kube-system-insecure-transport@kubernetescrd
     traefik.ingress.kubernetes.io/router.tls: "true"
 spec:
   ingressClassName: traefik
@@ -41,24 +41,3 @@ spec:
             name: external-pbs
             port:
               name: https
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: infrastructure-http-ingress
-  namespace: apps
-  annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-spec:
-  ingressClassName: traefik
-  rules:
-  - host: dns.woitzik.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: external-dns
-            port:
-              name: http
