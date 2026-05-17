@@ -1,0 +1,160 @@
+apiVersion: v1
+data:
+  configuration.yml: |
+    server:
+      address: 'tcp://0.0.0.0:9091/'
+    log:
+      level: 'debug'
+
+    identity_validation:
+      reset_password:
+        jwt_secret: '/config/secrets/jwt-secret'
+
+    default_redirection_url: 'https://auth.woitzik.dev'
+
+    authentication_backend:
+      file:
+        path: '/config/users/users_database.yml'
+
+    session:
+      name: 'authelia_session'
+      domain: 'woitzik.dev'
+      secret: '/config/secrets/session-secret'
+      same_site: 'lax'
+      expiration: '1h'
+      inactivity: '5m'
+      remember_me: '1M'
+      redis:
+        host: 'redis-authelia.database.svc.cluster.local'
+        port: 6379
+        database_index: 0
+
+    storage:
+      encryption_key: '/config/secrets/storage-key'
+      postgres:
+        address: 'tcp://postgres-authelia.database.svc.cluster.local:5432'
+        database: 'authelia'
+        username: 'authelia'
+
+    notifier:
+      filesystem:
+        filename: '/tmp/notification.txt'
+
+    access_control:
+      default_policy: 'one_factor'
+      rules:
+        - domain: 'pve.woitzik.dev'
+          policy: 'two_factor'
+          subject:
+            - 'group:admins'
+        - domain: '*.woitzik.dev'
+          policy: 'two_factor'
+        - domain: 'auth.woitzik.dev'
+          policy: 'bypass'
+
+    identity_providers:
+      oidc:
+        hmac_secret: "***REMOVED-SHARED-OIDC-CLIENT-SECRET***"
+        issuer_private_key: |
+          ***REMOVED-AUTHELIA-OIDC-PRIVATE-KEY***
+        clients:
+          - client_id: 'proxmox'
+            client_name: 'Proxmox VE'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://pve.woitzik.dev'
+              - 'https://pve.woitzik.dev/api2/extjs/access/oidc/login'
+              - 'https://pve.woitzik.dev:8006/api2/extjs/access/oidc/login'
+              - 'https://pve.woitzik.dev:443/api2/extjs/access/oidc/login'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit
+          - client_id: 'pbs'
+            client_name: 'Proxmox Backup Server'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://backup.woitzik.dev'
+              - 'https://backup.woitzik.dev/api2/extjs/access/oidc/login'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit
+          - client_id: 'minio'
+            client_name: 'Minio'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://minio.woitzik.dev'
+              - 'https://minio.woitzik.dev/oauth_callback'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit
+          - client_id: 'argocd'
+            client_name: 'Argo CD'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://argo.woitzik.dev/auth/callback'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit
+          - client_id: 'grafana'
+            client_name: 'Grafana'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://monitoring.woitzik.dev/login/generic_oauth'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit
+  users_database.yml: |-
+    users:
+      david:
+        displayname: "David"
+        password: '$argon2id$v=19$m=65536,t=3,p=4$Ok2LbZZs78UYccB7sBJ7PQ$4NHttttACOUbTPL0CJPsYHzk+49aeY+U8+1aiSWaer8'
+        email: david@woitzik.dev
+        groups:
+          - admins
+          - dev
+kind: ConfigMap
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: authelia:/ConfigMap:apps/authelia-config
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"configuration.yml":"server:\n  address: 'tcp://0.0.0.0:9091/'\nlog:\n  level: 'debug'\n\nidentity_validation:\n  reset_password:\n    jwt_secret: '/config/secrets/jwt-secret'\n\ndefault_redirection_url: 'https://auth.woitzik.dev'\n\nauthentication_backend:\n  file:\n    path: '/config/users/users_database.yml'\n\nsession:\n  name: 'authelia_session'\n  domain: 'woitzik.dev'\n  secret: '/config/secrets/session-secret'\n  same_site: 'lax'\n  expiration: '1h'\n  inactivity: '5m'\n  remember_me: '1M'\n  redis:\n    host: 'redis-authelia.database.svc.cluster.local'\n    port: 6379\n    database_index: 0\n\nstorage:\n  encryption_key: '/config/secrets/storage-key'\n  postgres:\n    address: 'tcp://postgres-authelia.database.svc.cluster.local:5432'\n    database: 'authelia'\n    username: 'authelia'\n\nnotifier:\n  filesystem:\n    filename: '/tmp/notification.txt'\n\naccess_control:\n  default_policy: 'one_factor'\n  rules:\n    - domain: 'pve.woitzik.dev'\n      policy: 'two_factor'\n      subject:\n        - 'group:admins'\n    - domain: '*.woitzik.dev'\n      policy: 'two_factor'\n    - domain: 'auth.woitzik.dev'\n      policy: 'bypass'\n\nidentity_providers:\n  oidc:\n    hmac_secret: \"***REMOVED-SHARED-OIDC-CLIENT-SECRET***\"\n    issuer_private_key: |\n      ***REMOVED-AUTHELIA-OIDC-PRIVATE-KEY***\n    clients:\n      - client_id: 'proxmox'\n        client_name: 'Proxmox VE'\n        client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'\n        public: false\n        authorization_policy: two_factor\n        redirect_uris:\n          - 'https://pve.woitzik.dev'\n          - 'https://pve.woitzik.dev/api2/extjs/access/oidc/login'\n          - 'https://pve.woitzik.dev:8006/api2/extjs/access/oidc/login'\n          - 'https://pve.woitzik.dev:443/api2/extjs/access/oidc/login'\n        scopes:\n          - 'openid'\n          - 'profile'\n          - 'email'\n          - 'groups'\n        userinfo_signed_response_alg: 'none'\n        token_endpoint_auth_method: 'client_secret_post'\n        consent_mode: implicit\n      - client_id: 'pbs'\n        client_name: 'Proxmox Backup Server'\n        client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'\n        public: false\n        authorization_policy: two_factor\n        redirect_uris:\n          - 'https://backup.woitzik.dev'\n          - 'https://backup.woitzik.dev/api2/extjs/access/oidc/login'\n        scopes:\n          - 'openid'\n          - 'profile'\n          - 'email'\n          - 'groups'\n        userinfo_signed_response_alg: 'none'\n        token_endpoint_auth_method: 'client_secret_post'\n        consent_mode: implicit\n      - client_id: 'minio'\n        client_name: 'Minio'\n        client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'\n        public: false\n        authorization_policy: two_factor\n        redirect_uris:\n          - 'https://minio.woitzik.dev'\n          - 'https://minio.woitzik.dev/oauth_callback'\n        scopes:\n          - 'openid'\n          - 'profile'\n          - 'email'\n          - 'groups'\n        userinfo_signed_response_alg: 'none'\n        token_endpoint_auth_method: 'client_secret_post'\n        consent_mode: implicit\n      - client_id: 'argocd'\n        client_name: 'Argo CD'\n        client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'\n        public: false\n        authorization_policy: two_factor\n        redirect_uris:\n          - 'https://argo.woitzik.dev/auth/callback'\n        scopes:\n          - 'openid'\n          - 'profile'\n          - 'email'\n          - 'groups'\n        userinfo_signed_response_alg: 'none'\n        token_endpoint_auth_method: 'client_secret_post'\n        consent_mode: implicit\n      - client_id: 'grafana'\n        client_name: 'Grafana'\n        client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'\n        public: false\n        authorization_policy: two_factor\n        redirect_uris:\n          - 'https://monitoring.woitzik.dev/login/generic_oauth'\n        scopes:\n          - 'openid'\n          - 'profile'\n          - 'email'\n          - 'groups'\n        userinfo_signed_response_alg: 'none'\n        token_endpoint_auth_method: 'client_secret_post'\n        consent_mode: implicit\n"},"kind":"ConfigMap","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"authelia:/ConfigMap:apps/authelia-config"},"name":"authelia-config","namespace":"apps"}}
+  creationTimestamp: "2026-05-15T17:28:01Z"
+  name: authelia-config
+  namespace: apps
+  resourceVersion: "484362"
+  uid: f835b273-60be-452e-993d-75a6c2b79da6
