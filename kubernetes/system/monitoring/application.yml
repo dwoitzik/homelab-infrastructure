@@ -37,11 +37,16 @@ spec:
               auth_url: https://auth.woitzik.dev/api/oidc/authorization
               token_url: https://auth.woitzik.dev/api/oidc/token
               api_url: https://auth.woitzik.dev/api/oidc/userinfo
+              login_attribute_path: preferred_username
+              groups_attribute_path: groups
               role_attribute_path: contains(groups[*], 'admins') && 'Admin' || 'Viewer'
             security:
               allow_embedding: true
               cookie_samesite: lax
               cookie_secure: true
+            sessions:
+              cookie_secure: true
+              cookie_samesite: lax
         prometheus:
           prometheusSpec:
             retention: 30d
