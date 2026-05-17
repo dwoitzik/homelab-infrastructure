@@ -16,6 +16,8 @@ spec:
           - "--providers.kubernetesingress"
           - "--serverstransport.insecureskipverify=true"
           - "--api.dashboard=true"
+          - "--entrypoints.websecure.forwardedHeaders.trustedIPs=10.42.0.0/16,10.0.0.0/8"
+          - "--entrypoints.websecure.proxyProtocol.trustedIPs=10.42.0.0/16,10.0.0.0/8"
         ports:
           web:
             redirectTo:

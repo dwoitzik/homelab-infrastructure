@@ -1,0 +1,211 @@
+apiVersion: v1
+data:
+  configuration.yml: |
+    server:
+      address: 'tcp://0.0.0.0:9091/'
+    log:
+      level: 'debug'
+
+    identity_validation:
+      reset_password:
+        jwt_secret: '/config/secrets/jwt-secret'
+
+    default_redirection_url: 'https://auth.woitzik.dev'
+
+    authentication_backend:
+      file:
+        path: '/config/users/users_database.yml'
+
+    session:
+      name: 'authelia_session'
+      domain: 'woitzik.dev'
+      secret: '/config/secrets/session-secret'
+      same_site: 'lax'
+      expiration: '1h'
+      inactivity: '5m'
+      remember_me: '1M'
+      redis:
+        host: 'redis-authelia.database.svc.cluster.local'
+        port: 6379
+        database_index: 0
+
+    storage:
+      encryption_key: '/config/secrets/storage-key'
+      postgres:
+        address: 'tcp://postgres-authelia.database.svc.cluster.local:5432'
+        database: 'authelia'
+        username: 'authelia'
+
+    notifier:
+      filesystem:
+        filename: '/tmp/notification.txt'
+
+    access_control:
+      default_policy: 'one_factor'
+      rules:
+        - domain: 'pve.woitzik.dev'
+          policy: 'two_factor'
+          subject:
+            - 'group:admins'
+        - domain: '*.woitzik.dev'
+          policy: 'two_factor'
+        - domain: 'auth.woitzik.dev'
+          policy: 'bypass'
+
+    identity_providers:
+      oidc:
+        hmac_secret: "dubist1plebyakalb"
+        issuer_private_key: |
+          -----BEGIN PRIVATE KEY-----
+          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
+          iMdu6gGtCWWJ3BS2TQKeueJtw7dC6Jk=
+          -----END PRIVATE KEY-----
+        clients:
+          - client_id: 'proxmox'
+            client_name: 'Proxmox VE'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://pve.woitzik.dev'
+              - 'https://pve.woitzik.dev/api2/extjs/access/oidc/login'
+              - 'https://pve.woitzik.dev:8006/api2/extjs/access/oidc/login'
+              - 'https://pve.woitzik.dev:443/api2/extjs/access/oidc/login'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit
+          - client_id: 'pbs'
+            client_name: 'Proxmox Backup Server'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://backup.woitzik.dev'
+              - 'https://backup.woitzik.dev/api2/extjs/access/oidc/login'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit
+          - client_id: 'minio'
+            client_name: 'Minio'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://minio.woitzik.dev'
+              - 'https://minio.woitzik.dev/oauth_callback'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit
+          - client_id: 'argocd'
+            client_name: 'Argo CD'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://argo.woitzik.dev/auth/callback'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit
+          - client_id: 'grafana'
+            client_name: 'Grafana'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://monitoring.woitzik.dev/login/generic_oauth'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit
+  users_database.yml: |-
+    users:
+      david:
+        displayname: "David"
+        password: '$argon2id$v=19$m=65536,t=3,p=4$Ok2LbZZs78UYccB7sBJ7PQ$4NHttttACOUbTPL0CJPsYHzk+49aeY+U8+1aiSWaer8'
+        email: david@woitzik.dev
+        groups:
+          - admins
+          - dev
+kind: ConfigMap
+metadata:
+  annotations:
+    argocd.argoproj.io/tracking-id: authelia:/ConfigMap:apps/authelia-config
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"configuration.yml":"server:\n  address: 'tcp://0.0.0.0:9091/'\nlog:\n  level: 'debug'\n\nidentity_validation:\n  reset_password:\n    jwt_secret: '/config/secrets/jwt-secret'\n\ndefault_redirection_url: 'https://auth.woitzik.dev'\n\nauthentication_backend:\n  file:\n    path: '/config/users/users_database.yml'\n\nsession:\n  name: 'authelia_session'\n  domain: 'woitzik.dev'\n  secret: '/config/secrets/session-secret'\n  same_site: 'lax'\n  expiration: '1h'\n  inactivity: '5m'\n  remember_me: '1M'\n  redis:\n    host: 'redis-authelia.database.svc.cluster.local'\n    port: 6379\n    database_index: 0\n\nstorage:\n  encryption_key: '/config/secrets/storage-key'\n  postgres:\n    address: 'tcp://postgres-authelia.database.svc.cluster.local:5432'\n    database: 'authelia'\n    username: 'authelia'\n\nnotifier:\n  filesystem:\n    filename: '/tmp/notification.txt'\n\naccess_control:\n  default_policy: 'one_factor'\n  rules:\n    - domain: 'pve.woitzik.dev'\n      policy: 'two_factor'\n      subject:\n        - 'group:admins'\n    - domain: '*.woitzik.dev'\n      policy: 'two_factor'\n    - domain: 'auth.woitzik.dev'\n      policy: 'bypass'\n\nidentity_providers:\n  oidc:\n    hmac_secret: \"dubist1plebyakalb\"\n    issuer_private_key: |\n      -----BEGIN PRIVATE KEY-----\n      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\n      iMdu6gGtCWWJ3BS2TQKeueJtw7dC6Jk=\n      -----END PRIVATE KEY-----\n    clients:\n      - client_id: 'proxmox'\n        client_name: 'Proxmox VE'\n        client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'\n        public: false\n        authorization_policy: two_factor\n        redirect_uris:\n          - 'https://pve.woitzik.dev'\n          - 'https://pve.woitzik.dev/api2/extjs/access/oidc/login'\n          - 'https://pve.woitzik.dev:8006/api2/extjs/access/oidc/login'\n          - 'https://pve.woitzik.dev:443/api2/extjs/access/oidc/login'\n        scopes:\n          - 'openid'\n          - 'profile'\n          - 'email'\n          - 'groups'\n        userinfo_signed_response_alg: 'none'\n        token_endpoint_auth_method: 'client_secret_post'\n        consent_mode: implicit\n      - client_id: 'pbs'\n        client_name: 'Proxmox Backup Server'\n        client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'\n        public: false\n        authorization_policy: two_factor\n        redirect_uris:\n          - 'https://backup.woitzik.dev'\n          - 'https://backup.woitzik.dev/api2/extjs/access/oidc/login'\n        scopes:\n          - 'openid'\n          - 'profile'\n          - 'email'\n          - 'groups'\n        userinfo_signed_response_alg: 'none'\n        token_endpoint_auth_method: 'client_secret_post'\n        consent_mode: implicit\n      - client_id: 'minio'\n        client_name: 'Minio'\n        client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'\n        public: false\n        authorization_policy: two_factor\n        redirect_uris:\n          - 'https://minio.woitzik.dev'\n          - 'https://minio.woitzik.dev/oauth_callback'\n        scopes:\n          - 'openid'\n          - 'profile'\n          - 'email'\n          - 'groups'\n        userinfo_signed_response_alg: 'none'\n        token_endpoint_auth_method: 'client_secret_post'\n        consent_mode: implicit\n      - client_id: 'argocd'\n        client_name: 'Argo CD'\n        client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'\n        public: false\n        authorization_policy: two_factor\n        redirect_uris:\n          - 'https://argo.woitzik.dev/auth/callback'\n        scopes:\n          - 'openid'\n          - 'profile'\n          - 'email'\n          - 'groups'\n        userinfo_signed_response_alg: 'none'\n        token_endpoint_auth_method: 'client_secret_post'\n        consent_mode: implicit\n      - client_id: 'grafana'\n        client_name: 'Grafana'\n        client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'\n        public: false\n        authorization_policy: two_factor\n        redirect_uris:\n          - 'https://monitoring.woitzik.dev/login/generic_oauth'\n        scopes:\n          - 'openid'\n          - 'profile'\n          - 'email'\n          - 'groups'\n        userinfo_signed_response_alg: 'none'\n        token_endpoint_auth_method: 'client_secret_post'\n        consent_mode: implicit\n"},"kind":"ConfigMap","metadata":{"annotations":{"argocd.argoproj.io/tracking-id":"authelia:/ConfigMap:apps/authelia-config"},"name":"authelia-config","namespace":"apps"}}
+  creationTimestamp: "2026-05-15T17:28:01Z"
+  name: authelia-config
+  namespace: apps
+  resourceVersion: "484362"
+  uid: f835b273-60be-452e-993d-75a6c2b79da6

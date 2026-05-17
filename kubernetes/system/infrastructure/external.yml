@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: external-router
-  namespace: kube-system
+  namespace: apps
 spec:
   ports:
   - name: https
@@ -13,7 +13,7 @@ apiVersion: v1
 kind: Endpoints
 metadata:
   name: external-router
-  namespace: kube-system
+  namespace: apps
 subsets:
 - addresses:
   - ip: 10.0.10.1
@@ -25,7 +25,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: external-pve
-  namespace: kube-system
+  namespace: apps
 spec:
   ports:
   - name: https
@@ -36,7 +36,7 @@ apiVersion: v1
 kind: Endpoints
 metadata:
   name: external-pve
-  namespace: kube-system
+  namespace: apps
 subsets:
 - addresses:
   - ip: 10.0.10.10
@@ -48,7 +48,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: external-pbs
-  namespace: kube-system
+  namespace: apps
 spec:
   ports:
   - name: https
@@ -59,7 +59,7 @@ apiVersion: v1
 kind: Endpoints
 metadata:
   name: external-pbs
-  namespace: kube-system
+  namespace: apps
 subsets:
 - addresses:
   - ip: 10.0.10.110
@@ -71,7 +71,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: external-dns
-  namespace: kube-system
+  namespace: apps
 spec:
   ports:
   - name: http
@@ -82,7 +82,7 @@ apiVersion: v1
 kind: Endpoints
 metadata:
   name: external-dns
-  namespace: kube-system
+  namespace: apps
 subsets:
 - addresses:
   - ip: 10.0.20.2
@@ -90,92 +90,84 @@ subsets:
   - name: http
     port: 3001
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: infrastructure-router
-  namespace: kube-system
-  annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-    traefik.ingress.kubernetes.io/service.serversscheme: https
-    traefik.ingress.kubernetes.io/router.tls: "true"
+  namespace: apps
 spec:
-  ingressClassName: traefik
-  rules:
-  - host: router.woitzik.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: external-router
-            port:
-              name: https
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`router.woitzik.dev`) && PathPrefix(`/`)
+      kind: Rule
+      middlewares:
+        - name: authelia
+      services:
+        - name: external-router
+          port: 443
+          scheme: https
+          serversTransport: apps-insecure-transport@kubernetescrd
+  tls:
+    secretName: wildcard-woitzik-dev-tls
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: infrastructure-pve
-  namespace: kube-system
-  annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-    traefik.ingress.kubernetes.io/service.serversscheme: https
-    traefik.ingress.kubernetes.io/router.tls: "true"
+  namespace: apps
 spec:
-  ingressClassName: traefik
-  rules:
-  - host: pve.woitzik.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: external-pve
-            port:
-              name: https
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`pve.woitzik.dev`) && PathPrefix(`/`)
+      kind: Rule
+      services:
+        - name: external-pve
+          port: 8006
+          scheme: https
+          serversTransport: apps-insecure-transport@kubernetescrd
+  tls:
+    secretName: wildcard-woitzik-dev-tls
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: infrastructure-pbs
-  namespace: kube-system
-  annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-    traefik.ingress.kubernetes.io/service.serversscheme: https
-    traefik.ingress.kubernetes.io/router.tls: "true"
+  namespace: apps
 spec:
-  ingressClassName: traefik
-  rules:
-  - host: backup.woitzik.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: external-pbs
-            port:
-              name: https
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`backup.woitzik.dev`) && PathPrefix(`/`)
+      kind: Rule
+      services:
+        - name: external-pbs
+          port: 8007
+          scheme: https
+          serversTransport: apps-insecure-transport@kubernetescrd
+  tls:
+    secretName: wildcard-woitzik-dev-tls
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: infrastructure-dns
-  namespace: kube-system
-  annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
+  namespace: apps
 spec:
-  ingressClassName: traefik
-  rules:
-  - host: dns.woitzik.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: external-dns
-            port:
-              name: http
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`dns.woitzik.dev`) && PathPrefix(`/`)
+      kind: Rule
+      middlewares:
+        - name: authelia
+      services:
+        - name: external-dns
+          port: 3001
+  tls:
+    secretName: wildcard-woitzik-dev-tls
