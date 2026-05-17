@@ -26,13 +26,18 @@ spec:
             server:
               domain: monitoring.woitzik.dev
               root_url: https://monitoring.woitzik.dev
-              serve_from_sub_path: false
-            auth.proxy:
+            auth.generic_oauth:
               enabled: true
-              header_name: Remote-User
-              header_property: username
-              auto_sign_up: true
-              enable_login_token: true
+              name: Authelia
+              icon: signin
+              client_id: grafana
+              client_secret: dubist1plebyakalb
+              scopes: openid profile email groups
+              empty_scopes: false
+              auth_url: https://auth.woitzik.dev/api/oidc/authorization
+              token_url: https://auth.woitzik.dev/api/oidc/token
+              api_url: https://auth.woitzik.dev/api/oidc/userinfo
+              role_attribute_path: contains(groups[*], 'admins') && 'Admin' || 'Viewer'
             security:
               allow_embedding: true
               cookie_samesite: lax
