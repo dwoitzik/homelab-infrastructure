@@ -12,9 +12,10 @@ spec:
     helm:
       values: |
         additionalArguments:
-          - "--providers.kubernetescrd.allowcrossnamespace=true"
-          - "--providers.kubernetesingress.allowcrossnamespace=true"
+          - "--providers.kubernetescrd"
+          - "--providers.kubernetesingress"
           - "--serverstransport.insecureskipverify=true"
+          - "--api.dashboard=true"
         ports:
           web:
             redirectTo:
@@ -29,7 +30,7 @@ spec:
             enabled: true
         ingressRoute:
           dashboard:
-            enabled: false
+            enabled: true
         tlsStore:
           default:
             defaultCertificate:
