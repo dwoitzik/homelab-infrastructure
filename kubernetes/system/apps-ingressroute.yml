@@ -72,9 +72,6 @@ spec:
   routes:
     - match: Host(`monitoring.woitzik.dev`)
       kind: Rule
-      middlewares:
-        - name: authelia
-          namespace: apps
       services:
         - name: kube-prometheus-stack-grafana
           namespace: monitoring
