@@ -1,49 +1,4 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: external-pve
-  namespace: apps
-spec:
-  ports:
-  - name: https
-    port: 8006
-    targetPort: 8006
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-pve
-  namespace: apps
-subsets:
-- addresses:
-  - ip: 10.0.10.10
-  ports:
-  - name: https
-    port: 8006
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: external-pbs
-  namespace: apps
-spec:
-  ports:
-  - name: https
-    port: 8007
-    targetPort: 8007
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-pbs
-  namespace: apps
-subsets:
-- addresses:
-  - ip: 10.0.10.110
-  ports:
-  - name: https
-    port: 8007
----
+# PVE
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -52,7 +7,7 @@ metadata:
 spec:
   entryPoints: [websecure]
   routes:
-  - match: Host(`pve.woitzik.dev`)
+  - match: Host(`pve.woitzik.dev`) && PathPrefix(`/`)
     kind: Rule
     services:
     - name: external-pve
@@ -61,6 +16,7 @@ spec:
       serversTransport: insecure-transport
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
+# PBS
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -69,11 +25,26 @@ metadata:
 spec:
   entryPoints: [websecure]
   routes:
-  - match: Host(`backup.woitzik.dev`)
+  - match: Host(`backup.woitzik.dev`) && PathPrefix(`/`)
     kind: Rule
     services:
     - name: external-pbs
       port: 8007
       scheme: https
       serversTransport: insecure-transport
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Traefik Dash
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard
+  namespace: kube-system
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`traefik.woitzik.dev`) && PathPrefix(`/`)
+    kind: Rule
+    middlewares: [{name: authelia, namespace: apps}]
+    services: [{name: api@internal, kind: TraefikService}]
   tls: {secretName: wildcard-woitzik-dev-tls}
