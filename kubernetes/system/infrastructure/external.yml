@@ -1,77 +1,9 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: external-pve
-  namespace: apps
-spec:
-  ports:
-  - name: https
-    port: 8006
-    targetPort: 8006
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-pve
-  namespace: apps
-subsets:
-- addresses:
-  - ip: 10.0.10.10
-  ports:
-  - name: https
-    port: 8006
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: external-pbs
-  namespace: apps
-spec:
-  ports:
-  - name: https
-    port: 8007
-    targetPort: 8007
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-pbs
-  namespace: apps
-subsets:
-- addresses:
-  - ip: 10.0.10.110
-  ports:
-  - name: https
-    port: 8007
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: external-dns
-  namespace: apps
-spec:
-  ports:
-  - name: http
-    port: 3001
-    targetPort: 3001
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-dns
-  namespace: apps
-subsets:
-- addresses:
-  - ip: 10.0.20.2
-  ports:
-  - name: http
-    port: 3001
----
+# PVE
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: infrastructure-pve
-  namespace: apps
+  namespace: kube-system
 spec:
   entryPoints: [websecure]
   routes:
@@ -79,16 +11,18 @@ spec:
     kind: Rule
     services:
     - name: external-pve
+      namespace: kube-system
       port: 8006
       scheme: https
       serversTransport: insecure-transport
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
+# PBS
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: infrastructure-pbs
-  namespace: apps
+  namespace: kube-system
 spec:
   entryPoints: [websecure]
   routes:
@@ -96,64 +30,23 @@ spec:
     kind: Rule
     services:
     - name: external-pbs
+      namespace: kube-system
       port: 8007
       scheme: https
       serversTransport: insecure-transport
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
+# Traefik Dash
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: infrastructure-dns
-  namespace: apps
+  name: traefik-dashboard
+  namespace: kube-system
 spec:
   entryPoints: [websecure]
   routes:
-  - match: Host(`dns.woitzik.dev`)
+  - match: Host(`traefik.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
-    services:
-    - name: external-dns
-      port: 3001
-  tls: {secretName: wildcard-woitzik-dev-tls}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: external-router
-  namespace: apps
-spec:
-  ports:
-  - name: https
-    port: 443
-    targetPort: 443
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-router
-  namespace: apps
-subsets:
-- addresses:
-  - ip: 10.0.10.1
-  ports:
-  - name: https
-    port: 443
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: infrastructure-router
-  namespace: apps
-spec:
-  entryPoints: [websecure]
-  routes:
-  - match: Host(`router.woitzik.dev`)
-    kind: Rule
-    middlewares: [{name: authelia}]
-    services:
-    - name: external-router
-      port: 443
-      scheme: https
-      serversTransport: insecure-transport
+    middlewares: [{name: authelia, namespace: apps}]
+    services: [{name: api@internal, kind: TraefikService}]
   tls: {secretName: wildcard-woitzik-dev-tls}
