@@ -1,12 +1,13 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: authelia
+  name: homepage
   namespace: apps
 spec:
   entryPoints: [websecure]
   routes:
-  - match: Host(`auth.woitzik.dev`)
+  - match: Host(`home.woitzik.dev`)
     kind: Rule
-    services: [{name: authelia, port: 9091}]
+    middlewares: [{name: authelia}]
+    services: [{name: homepage, port: 80}]
   tls: {secretName: wildcard-woitzik-dev-tls}

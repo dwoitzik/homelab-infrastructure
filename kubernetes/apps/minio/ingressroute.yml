@@ -1,0 +1,26 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: minio-console
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`minio.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: minio, port: 9001}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: minio-s3
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`s3.woitzik.dev`)
+    kind: Rule
+    services: [{name: minio, port: 9000}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
