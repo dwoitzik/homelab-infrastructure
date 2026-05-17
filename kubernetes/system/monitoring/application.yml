@@ -15,9 +15,13 @@ spec:
           crds:
             enabled: false
         grafana:
+          enabled: true
           ingress:
             enabled: false
           adminPassword: "***REMOVED-GRAFANA-ADMIN-PASSWORD***"
+          sidecar:
+            datasources:
+              enabled: true
           grafana.ini:
             server:
               domain: monitoring.woitzik.dev
