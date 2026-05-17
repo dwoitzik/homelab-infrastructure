@@ -124,7 +124,6 @@ spec:
   routes:
   - match: Host(`minio.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
     services: [{name: minio, port: 9001}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
