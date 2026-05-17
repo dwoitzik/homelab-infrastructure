@@ -126,21 +126,21 @@ spec:
   - port: 4141
   selector:
     app: atlantis
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: atlantis-ingress
-  namespace: apps
-spec:
-  rules:
-  - host: atlantis.woitzik.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: atlantis
-            port:
-              number: 4141
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: atlantis-ingress
+#   namespace: apps
+# spec:
+#   rules:
+#   - host: atlantis.woitzik.dev
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: atlantis
+#             port:
+#               number: 4141
