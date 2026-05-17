@@ -23,7 +23,10 @@ spec:
         - name: POSTGRES_USER
           value: paperless
         - name: POSTGRES_PASSWORD
-          value: TD3fAJ2s1cxJ
+          valueFrom:
+            secretKeyRef:
+              name: paperless-secrets
+              key: postgres-password
         ports:
         - containerPort: 5432
         volumeMounts:
