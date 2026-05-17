@@ -26,7 +26,7 @@ spec:
         app: minio
     spec:
       hostAliases:
-      - ip: "10.43.98.177"
+      - ip: "10.0.20.5"
         hostnames:
         - "auth.woitzik.dev"
       containers:
@@ -37,8 +37,6 @@ spec:
         - containerPort: 9000
         - containerPort: 9001
         env:
-        - name: MINIO_IDENTITY_OPENID_ENABLE_authelia
-          value: "on"
         - name: MINIO_ROOT_USER
           value: "dwoitzik"
         - name: MINIO_ROOT_PASSWORD
@@ -46,20 +44,6 @@ spec:
             secretKeyRef:
               name: minio-secrets
               key: root-password
-        - name: MINIO_IDENTITY_OPENID_CONFIG_URL_authelia
-          value: "https://auth.woitzik.dev/.well-known/openid-configuration"
-        - name: MINIO_IDENTITY_OPENID_CLIENT_ID_authelia
-          value: "minio"
-        - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET_authelia
-          value: "dubist1plebyakalb"
-        - name: MINIO_IDENTITY_OPENID_SCOPES_authelia
-          value: "openid,profile,email,groups"
-        - name: MINIO_IDENTITY_OPENID_REDIRECT_URI_authelia
-          value: "https://minio.woitzik.dev/oauth_callback"
-        - name: MINIO_IDENTITY_OPENID_CLAIM_NAME_authelia
-          value: "groups"
-        - name: MINIO_IDENTITY_OPENID_DISPLAY_NAME_authelia
-          value: "Login with Authelia"
         - name: MINIO_SERVER_URL
           value: "https://s3.woitzik.dev"
         - name: MINIO_BROWSER_REDIRECT_URL
@@ -87,33 +71,3 @@ spec:
     port: 9001
   selector:
     app: minio
-# ---
-# apiVersion: networking.k8s.io/v1
-# kind: Ingress
-# metadata:
-#   name: minio-ingress
-#   namespace: apps
-#   annotations:
-#     traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-# spec:
-#   rules:
-#   - host: s3.woitzik.dev
-#     http:
-#       paths:
-#       - path: /
-#         pathType: Prefix
-#         backend:
-#           service:
-#             name: minio
-#             port:
-#               number: 9000
-#   - host: minio.woitzik.dev
-#     http:
-#       paths:
-#       - path: /
-#         pathType: Prefix
-#         backend:
-#           service:
-#             name: minio
-#             port:
-#               number: 9001

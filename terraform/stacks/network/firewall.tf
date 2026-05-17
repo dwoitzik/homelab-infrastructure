@@ -273,6 +273,17 @@ resource "routeros_ip_firewall_filter" "fwd_16_heimnetz_to_proxy" {
   comment      = "16: Heimnetz - Allow access to Nginx Proxy Manager (Core Services)"
 }
 
+resource "routeros_ip_firewall_filter" "fwd_17_mgmt_to_vip_oidc" {
+  action       = "accept"
+  chain        = "forward"
+  src_address  = "10.0.10.0/24"
+  dst_address  = "10.0.20.5"
+  protocol     = "tcp"
+  dst_port     = "443"
+  comment      = "17: MGMT - Allow OIDC traffic to HAProxy VIP"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+}
+
 # ===============================================
 # NAT CHAIN (Port Forwarding)
 # ===============================================
