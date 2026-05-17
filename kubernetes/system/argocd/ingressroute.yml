@@ -1,12 +1,12 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: authelia
-  namespace: apps
+  name: argocd-server
+  namespace: argocd
 spec:
   entryPoints: [websecure]
   routes:
-  - match: Host(`auth.woitzik.dev`)
+  - match: Host(`argo.woitzik.dev`)
     kind: Rule
-    services: [{name: authelia, port: 9091}]
+    services: [{name: argocd-server, port: 80}]
   tls: {secretName: wildcard-woitzik-dev-tls}
