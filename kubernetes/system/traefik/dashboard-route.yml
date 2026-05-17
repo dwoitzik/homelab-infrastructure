@@ -1,9 +1,9 @@
-# Authelia Middleware for Longhorn System
+# Authelia Middleware for Kube-System
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: authelia
-  namespace: longhorn-system
+  namespace: kube-system
 spec:
   forwardAuth:
     address: http://authelia.apps.svc.cluster.local:9091/api/verify?rd=https://auth.woitzik.dev/
@@ -14,17 +14,17 @@ spec:
       - Remote-Name
       - Remote-Email
 ---
-# Longhorn Dashboard
+# Traefik Dashboard (Must be in kube-system to access api@internal)
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: longhorn-dashboard
-  namespace: longhorn-system
+  name: traefik-dashboard
+  namespace: kube-system
 spec:
   entryPoints: [websecure]
   routes:
-  - match: Host(`longhorn.woitzik.dev`)
+  - match: Host(`traefik.woitzik.dev`)
     kind: Rule
     middlewares: [{name: authelia}]
-    services: [{name: longhorn-frontend, port: 80}]
+    services: [{name: api@internal, kind: TraefikService}]
   tls: {secretName: wildcard-woitzik-dev-tls}
