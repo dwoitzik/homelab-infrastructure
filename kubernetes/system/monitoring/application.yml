@@ -15,9 +15,13 @@ spec:
           crds:
             enabled: false
         grafana:
+          enabled: true
           ingress:
             enabled: false
           adminPassword: "homelab-admin-2026"
+          sidecar:
+            datasources:
+              enabled: true
           grafana.ini:
             server:
               domain: monitoring.woitzik.dev

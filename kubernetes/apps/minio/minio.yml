@@ -50,10 +50,16 @@ spec:
           value: "openid,profile,email,groups"
         - name: MINIO_IDENTITY_OPENID_REDIRECT_URI
           value: "https://minio.woitzik.dev/oauth_callback"
+        - name: MINIO_IDENTITY_OPENID_CLAIM_NAME
+          value: "groups"
+        - name: MINIO_IDENTITY_OPENID_DISPLAY_NAME
+          value: "Authelia"
         - name: MINIO_SERVER_URL
           value: "https://s3.woitzik.dev"
         - name: MINIO_BROWSER_REDIRECT_URL
           value: "https://minio.woitzik.dev"
+        - name: MINIO_BROWSER_LOGIN_ANIMATION
+          value: "off"
         volumeMounts:
         - name: data
           mountPath: /data
