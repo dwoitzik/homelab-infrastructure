@@ -52,19 +52,6 @@ data:
         - Grafana:
             icon: grafana.png
             href: https://monitoring.woitzik.dev
-        - Mikrodash:
-            icon: mikrotik.png
-            href: https://mikrodash.woitzik.dev
-  widgets.yaml: |
-    - search:
-        provider: google
-        target: _blank
-    - kubernetes:
-        cluster:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -80,7 +67,7 @@ data:
       columns: 3
     Monitoring:
       style: grid
-      columns: 2
+      columns: 1
   settings.yaml: |
     title: David's Homelab
     theme: dark
@@ -164,9 +151,6 @@ spec:
           mountPath: /app/config/services.yaml
           subPath: services.yaml
         - name: config
-          mountPath: /app/config/widgets.yaml
-          subPath: widgets.yaml
-        - name: config
           mountPath: /app/config/layout.yaml
           subPath: layout.yaml
         - name: config
@@ -195,24 +179,3 @@ spec:
     targetPort: 3000
   selector:
     app: homepage
-# ---
-# apiVersion: networking.k8s.io/v1
-# kind: Ingress
-# metadata:
-#   name: homepage-ingress
-#   namespace: apps
-#   annotations:
-#     traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-# spec:
-#   ingressClassName: traefik
-#   rules:
-#   - host: home.woitzik.dev
-#     http:
-#       paths:
-#       - path: /
-#         pathType: Prefix
-#         backend:
-#           service:
-#             name: homepage
-#             port:
-#               number: 80
