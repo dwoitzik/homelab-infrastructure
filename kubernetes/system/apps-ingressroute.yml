@@ -57,6 +57,20 @@ spec:
     services: [{name: open-webui, port: 8080}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
+# Atlantis
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: atlantis-main
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`atlantis.woitzik.dev`) && PathPrefix(`/`)
+    kind: Rule
+    services: [{name: atlantis, port: 4141}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
 # Minio Console
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -113,19 +127,4 @@ spec:
     kind: Rule
     middlewares: [{name: authelia}]
     services: [{name: longhorn-frontend, namespace: longhorn-system, port: 80}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
----
-# Traefik Dashboard (Internal)
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: traefik-dashboard-main
-  namespace: apps
-spec:
-  entryPoints: [websecure]
-  routes:
-  - match: Host(`traefik.woitzik.dev`) && PathPrefix(`/`)
-    kind: Rule
-    middlewares: [{name: authelia}]
-    services: [{name: api@internal, kind: TraefikService}]
   tls: {secretName: wildcard-woitzik-dev-tls}
