@@ -4,19 +4,13 @@ metadata:
   name: apps-home
   namespace: apps
 spec:
-  entryPoints:
-    - web
-    - websecure
+  entryPoints: [websecure]
   routes:
-    - match: Host(`home.woitzik.dev`) && PathPrefix(`/`)
-      kind: Rule
-      middlewares:
-        - name: authelia
-      services:
-        - name: homepage
-          port: 80
-  tls:
-    secretName: wildcard-woitzik-dev-tls
+  - match: Host(`home.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: homepage, port: 80}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -24,75 +18,50 @@ metadata:
   name: apps-paperless
   namespace: apps
 spec:
-  entryPoints:
-    - web
-    - websecure
+  entryPoints: [websecure]
   routes:
-    - match: Host(`docs.woitzik.dev`) && PathPrefix(`/`)
-      kind: Rule
-      middlewares:
-        - name: authelia
-      services:
-        - name: paperless
-          port: 8000
-  tls:
-    secretName: wildcard-woitzik-dev-tls
+  - match: Host(`docs.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: paperless, port: 8000}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: apps-ai
+  name: monitoring-grafana-route
   namespace: apps
 spec:
-  entryPoints:
-    - web
-    - websecure
+  entryPoints: [websecure]
   routes:
-    - match: Host(`ai.woitzik.dev`) && PathPrefix(`/`)
-      kind: Rule
-      middlewares:
-        - name: authelia
-      services:
-        - name: open-webui
-          port: 8080
-  tls:
-    secretName: wildcard-woitzik-dev-tls
+  - match: Host(`monitoring.woitzik.dev`)
+    kind: Rule
+    services: [{name: kube-prometheus-stack-grafana, namespace: monitoring, port: 80}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: monitoring-grafana
-  namespace: monitoring
+  name: argocd-server-route
+  namespace: apps
 spec:
-  entryPoints:
-    - web
-    - websecure
+  entryPoints: [websecure]
   routes:
-    - match: Host(`monitoring.woitzik.dev`) && PathPrefix(`/`)
-      kind: Rule
-      services:
-        - name: kube-prometheus-stack-grafana
-          port: 80
-  tls:
-    secretName: wildcard-woitzik-dev-tls
+  - match: Host(`argo.woitzik.dev`)
+    kind: Rule
+    services: [{name: argocd-server, namespace: argocd, port: 80}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: traefik-dashboard-public
-  namespace: kube-system
+  namespace: apps
 spec:
-  entryPoints:
-    - web
-    - websecure
+  entryPoints: [websecure]
   routes:
-    - match: Host(`traefik.woitzik.dev`) && PathPrefix(`/`)
-      kind: Rule
-      middlewares:
-        - name: authelia
-          namespace: apps
-      services:
-        - name: api@internal
-          kind: TraefikService
-  tls:
-    secretName: wildcard-woitzik-dev-tls
+  - match: Host(`traefik.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: api@internal, kind: TraefikService}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
