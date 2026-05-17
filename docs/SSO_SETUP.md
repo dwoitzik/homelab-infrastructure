@@ -10,7 +10,7 @@ To enable SSO for Proxmox VE and Proxmox Backup Server, you need to configure th
    - **Realm ID**: `authelia`
    - **Issuer URL**: `https://auth.woitzik.dev`
    - **Client ID**: `proxmox`
-   - **Client Key**: `dubist1plebyakalb`
+   - **Client Key**: `<YOUR_GENERATED_SECRET>`
    - **Autocreate Users**: Check this box.
    - **Username Claim**: `preferred_username` (or `email`)
    - **Scopes**: `openid profile email groups`
@@ -26,7 +26,7 @@ To enable SSO for Proxmox VE and Proxmox Backup Server, you need to configure th
    - **Realm ID**: `authelia`
    - **Issuer URL**: `https://auth.woitzik.dev`
    - **Client ID**: `pbs`
-   - **Client Key**: `dubist1plebyakalb`
+   - **Client Key**: `<YOUR_GENERATED_SECRET>`
    - **Autocreate Users**: Check this box.
    - **Username Claim**: `preferred_username`
    - **Scopes**: `openid profile email groups`

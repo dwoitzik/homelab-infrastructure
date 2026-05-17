@@ -22,18 +22,12 @@ data:
         - ArgoCD:
             icon: argocd.png
             href: https://argo.woitzik.dev
-            widget:
-              type: argocd
-              url: http://argocd-server.argocd.svc.cluster.local
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
         - Traefik:
             icon: traefik.png
             href: https://traefik.woitzik.dev
-            widget:
-              type: traefik
-              url: http://traefik.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -62,11 +56,15 @@ data:
             icon: mikrotik.png
             href: https://mikrodash.woitzik.dev
   widgets.yaml: |
-    - datetime:
-        text_size: xl
-        format:
-          timeStyle: short
-          dateStyle: long
+    - search:
+        provider: google
+        target: _blank
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
   layout.yaml: |
     Infrastructure:
       style: grid
