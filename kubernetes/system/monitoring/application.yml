@@ -15,6 +15,7 @@ spec:
           crds:
             enabled: false
         grafana:
+          assertNoLeakedSecrets: false
           enabled: true
           ingress:
             enabled: false
