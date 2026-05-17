@@ -40,7 +40,10 @@ spec:
         - name: ROUTER_USER
           value: "mikrodash"
         - name: ROUTER_PASS
-          value: "***REMOVED-MIKRODASH-PASSWORD***"
+          valueFrom:
+            secretKeyRef:
+              name: mikrodash-secrets
+              key: router-password
         - name: PORT
           value: "3081"
         volumeMounts:
