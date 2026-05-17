@@ -78,3 +78,23 @@ spec:
           port: 80
   tls:
     secretName: wildcard-woitzik-dev-tls
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard
+  namespace: kube-system
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`traefik.woitzik.dev`)
+      kind: Rule
+      middlewares:
+        - name: authelia
+          namespace: apps
+      services:
+        - name: api@internal
+          kind: TraefikService
+  tls:
+    secretName: wildcard-woitzik-dev-tls
