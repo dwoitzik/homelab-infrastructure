@@ -23,13 +23,14 @@ spec:
             datasources:
               enabled: true
           grafana.ini:
+            auth:
+              oauth_auto_login: true
             server:
               domain: monitoring.woitzik.dev
               root_url: https://monitoring.woitzik.dev
               serve_from_sub_path: false
             auth.generic_oauth:
               enabled: true
-              auto_login: true
               name: Authelia
               icon: signin
               client_id: grafana
