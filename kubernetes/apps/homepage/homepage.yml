@@ -94,10 +94,36 @@ data:
     hideHostname: true
     hideConfig: true
   custom.css: |
-    body { background-color: #050505 !important; }
-    .card { background-color: #111 !important; border: 1px solid #222 !important; }
-    .card:hover { border-color: #FF8C00 !important; }
-    .text-slate-500 { color: #FF8C00 !important; }
+    body {
+      background: radial-gradient(circle at top, #111 0%, #050505 100%) !important;
+      color: #e5e5e5 !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+    .card {
+      background: rgba(20, 20, 20, 0.6) !important;
+      backdrop-filter: blur(10px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.05) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    .card:hover {
+      border-color: rgba(230, 126, 34, 0.4) !important;
+      transform: translateY(-2px) !important;
+      background: rgba(30, 30, 30, 0.8) !important;
+    }
+    .group-title {
+      color: #999 !important;
+      font-size: 0.75rem !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.1em !important;
+      margin-bottom: 1rem !important;
+      border-left: 2px solid #e67e22 !important;
+      padding-left: 0.75rem !important;
+    }
+    .text-slate-500 { color: #666 !important; }
+    .icon { filter: grayscale(1) brightness(0.8) !important; transition: all 0.3s ease !important; }
+    .card:hover .icon { filter: grayscale(0) brightness(1) !important; }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -159,24 +185,24 @@ spec:
     targetPort: 3000
   selector:
     app: homepage
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: homepage-ingress
-  namespace: apps
-  annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-spec:
-  ingressClassName: traefik
-  rules:
-  - host: home.woitzik.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: homepage
-            port:
-              number: 80
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: homepage-ingress
+#   namespace: apps
+#   annotations:
+#     traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
+# spec:
+#   ingressClassName: traefik
+#   rules:
+#   - host: home.woitzik.dev
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: homepage
+#             port:
+#               number: 80

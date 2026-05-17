@@ -130,74 +130,14 @@ data:
               - 'groups'
             userinfo_signed_response_alg: 'none'
             consent_mode: implicit
-
-    identity_providers:
-      oidc:
-        hmac_secret: "dubist1plebyakalb"
-        issuer_private_key: |
-          -----BEGIN PRIVATE KEY-----
-          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
-          iMdu6gGtCWWJ3BS2TQKeueJtw7dC6Jk=
-          -----END PRIVATE KEY-----
-        clients:
-          - client_id: 'proxmox'
-            client_name: 'Proxmox VE'
+          - client_id: 'pbs'
+            client_name: 'Proxmox Backup Server'
             client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
             public: false
             authorization_policy: two_factor
             redirect_uris:
-              - 'https://pve.woitzik.dev'
-              - 'https://pve.woitzik.dev/api2/extjs/access/oidc/login'
-              - 'https://pve.woitzik.dev:8006/api2/extjs/access/oidc/login'
-              - 'https://pve.woitzik.dev:443/api2/extjs/access/oidc/login'
+              - 'https://backup.woitzik.dev'
+              - 'https://backup.woitzik.dev/api2/extjs/access/oidc/login'
             scopes:
               - 'openid'
               - 'profile'
@@ -205,3 +145,30 @@ data:
               - 'groups'
             userinfo_signed_response_alg: 'none'
             consent_mode: implicit
+          - client_id: 'minio'
+            client_name: 'Minio'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://minio.woitzik.dev'
+              - 'https://minio.woitzik.dev/oauth_callback'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+          - client_id: 'argocd'
+            client_name: 'Argo CD'
+            client_secret: '$pbkdf2-sha512$310000$Hk4bOREWPhMBgT47B89JeA$VcwSwRAO8un.LVMDsDvOjbd3GVeSgaZwc.2F47MxP6aDoM42ZmTSdgPIBwpEAiH0hvzI2nqKJMcXceAtfQpfXA'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://argo.woitzik.dev/auth/callback'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'

@@ -35,14 +35,20 @@
   hosts: app_nodes
   become: true
   roles:
-    - minio
-    - vaultwarden
-    - mikrodash
+    # - minio         # Migrated to K3s
+    # - vaultwarden   # Migrated to K3s
+    # - mikrodash      # Migrated to K3s
     - monitoring_core
     - atlantis
     - cloudflared
-    - paperless
-    - open_webui
+    # - paperless     # Migrated to K3s
+    # - open_webui    # Migrated to K3s
+
+# - name: Provision Authelia
+#   hosts: app_nodes
+#   become: true
+#   roles:
+#     - authelia      # Migrated to K3s
 
 - name: Provision DMZ External Proxy
   hosts: dmz_proxies

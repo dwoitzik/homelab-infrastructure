@@ -8,9 +8,9 @@ Goal: Move all "islands" of standalone Docker Compose stacks into the coordinate
 | :--- | :--- | :--- | :--- |
 | **Vaultwarden** | `vm-srv-k3s` | ✅ Migrated | K3s (with Longhorn) |
 | **Authelia** | `vm-srv-k3s` | ✅ Migrated | K3s |
-| **Paperless-ngx** | `ct-srv-docker-01` | ⏳ Pending | K3s |
-| **Minio** | `ct-srv-docker-01` | ⏳ Pending | K3s |
-| **Open-WebUI** | `ct-srv-docker-01` | ⏳ Pending | K3s |
+| **Paperless-ngx** | `ct-srv-docker-01` | ⏳ In Progress | K3s |
+| **Minio** | `ct-srv-docker-01` | ⏳ In Progress | K3s |
+| **Open-WebUI** | `ct-srv-docker-01` | ⏳ In Progress | K3s |
 | **AdGuard / Unbound** | `rpi-srv-01/02` | 🔒 Static | Keep on RPis (Core Net) |
 
 ## 2. Migration Procedure (Generic)

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  url: https://argo.woitzik.dev
+  oidc.config: |
+    name: Authelia
+    issuer: https://auth.woitzik.dev
+    clientID: argocd
+    clientSecret: dubist1plebyakalb
+    requestedScopes: ["openid", "profile", "email", "groups"]
