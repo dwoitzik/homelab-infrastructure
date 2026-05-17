@@ -1,13 +1,12 @@
-# PVE
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: infrastructure-pve
-  namespace: apps
+  name: pve
+  namespace: kube-system
 spec:
   entryPoints: [websecure]
   routes:
-  - match: Host(`pve.woitzik.dev`) && PathPrefix(`/`)
+  - match: Host(`pve.woitzik.dev`)
     kind: Rule
     services:
     - name: external-pve
@@ -16,16 +15,15 @@ spec:
       serversTransport: insecure-transport
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# PBS
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: infrastructure-pbs
-  namespace: apps
+  name: backup
+  namespace: kube-system
 spec:
   entryPoints: [websecure]
   routes:
-  - match: Host(`backup.woitzik.dev`) && PathPrefix(`/`)
+  - match: Host(`backup.woitzik.dev`)
     kind: Rule
     services:
     - name: external-pbs
@@ -34,16 +32,15 @@ spec:
       serversTransport: insecure-transport
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# Traefik Dash
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: traefik-dashboard
   namespace: kube-system
 spec:
-  entryPoints: [websecure]
+  entryPoints: [websecure, traefik]
   routes:
-  - match: Host(`traefik.woitzik.dev`) && PathPrefix(`/`)
+  - match: Host(`traefik.woitzik.dev`)
     kind: Rule
     middlewares: [{name: authelia, namespace: apps}]
     services: [{name: api@internal, kind: TraefikService}]

@@ -128,3 +128,17 @@ spec:
     middlewares: [{name: authelia}]
     services: [{name: longhorn-frontend, namespace: longhorn-system, port: 80}]
   tls: {secretName: wildcard-woitzik-dev-tls}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: longhorn-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`longhorn.woitzik.dev`) && PathPrefix(`/`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: longhorn-frontend, namespace: longhorn-system, port: 80}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
