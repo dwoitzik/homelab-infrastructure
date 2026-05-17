@@ -14,8 +14,6 @@ spec:
         additionalArguments:
           - "--providers.kubernetescrd"
           - "--providers.kubernetesingress"
-          - "--providers.kubernetescrd.allowcrossnamespace=true"
-          - "--providers.kubernetesingress.allowcrossnamespace=true"
           - "--serverstransport.insecureskipverify=true"
           - "--api.dashboard=true"
           - "--entrypoints.websecure.forwardedHeaders.trustedIPs=10.42.0.0/16,10.0.0.0/8"
