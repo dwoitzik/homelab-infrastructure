@@ -41,7 +41,7 @@ spec:
               name: minio-secrets
               key: root-password
         - name: MINIO_IDENTITY_OPENID_CONFIG_URL
-          value: "https://auth.woitzik.dev/.well-known/openid-configuration"
+          value: "http://authelia.apps.svc.cluster.local:9091/.well-known/openid-configuration"
         - name: MINIO_IDENTITY_OPENID_CLIENT_ID
           value: "minio"
         - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET
