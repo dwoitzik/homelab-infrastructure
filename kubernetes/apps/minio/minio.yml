@@ -25,6 +25,10 @@ spec:
       labels:
         app: minio
     spec:
+      hostAliases:
+      - ip: "10.43.98.177"
+        hostnames:
+        - "auth.woitzik.dev"
       containers:
       - name: minio
         image: quay.io/minio/minio:latest
@@ -33,6 +37,8 @@ spec:
         - containerPort: 9000
         - containerPort: 9001
         env:
+        - name: MINIO_IDENTITY_OPENID_ENABLE_authelia
+          value: "on"
         - name: MINIO_ROOT_USER
           value: "dwoitzik"
         - name: MINIO_ROOT_PASSWORD
@@ -40,20 +46,20 @@ spec:
             secretKeyRef:
               name: minio-secrets
               key: root-password
-        - name: MINIO_IDENTITY_OPENID_CONFIG_URL
+        - name: MINIO_IDENTITY_OPENID_CONFIG_URL_authelia
           value: "https://auth.woitzik.dev/.well-known/openid-configuration"
-        - name: MINIO_IDENTITY_OPENID_CLIENT_ID
+        - name: MINIO_IDENTITY_OPENID_CLIENT_ID_authelia
           value: "minio"
-        - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET
+        - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET_authelia
           value: "dubist1plebyakalb"
-        - name: MINIO_IDENTITY_OPENID_SCOPES
+        - name: MINIO_IDENTITY_OPENID_SCOPES_authelia
           value: "openid,profile,email,groups"
-        - name: MINIO_IDENTITY_OPENID_REDIRECT_URI
+        - name: MINIO_IDENTITY_OPENID_REDIRECT_URI_authelia
           value: "https://minio.woitzik.dev/oauth_callback"
-        - name: MINIO_IDENTITY_OPENID_CLAIM_NAME
+        - name: MINIO_IDENTITY_OPENID_CLAIM_NAME_authelia
           value: "groups"
-        - name: MINIO_IDENTITY_OPENID_DISPLAY_NAME
-          value: "Authelia"
+        - name: MINIO_IDENTITY_OPENID_DISPLAY_NAME_authelia
+          value: "Login with Authelia"
         - name: MINIO_SERVER_URL
           value: "https://s3.woitzik.dev"
         - name: MINIO_BROWSER_REDIRECT_URL
