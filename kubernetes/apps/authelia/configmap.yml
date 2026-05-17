@@ -121,8 +121,6 @@ data:
             redirect_uris:
               - 'https://pve.woitzik.dev'
               - 'https://pve.woitzik.dev/api2/extjs/access/oidc/login'
-              - 'https://pve.woitzik.dev:8006/api2/extjs/access/oidc/login'
-              - 'https://pve.woitzik.dev:443/api2/extjs/access/oidc/login'
             scopes: [openid, profile, email, groups]
             userinfo_signed_response_alg: 'none'
             token_endpoint_auth_method: 'client_secret_basic'
