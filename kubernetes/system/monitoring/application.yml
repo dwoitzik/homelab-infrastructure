@@ -23,6 +23,14 @@ spec:
           sidecar:
             datasources:
               enabled: true
+              searchNamespace: ALL
+          additionalDataSources:
+            - name: Loki
+              type: loki
+              access: proxy
+              url: http://loki.monitoring.svc.cluster.local:3100
+              jsonData:
+                maxLines: 1000
           grafana.ini:
             auth:
               oauth_auto_login: true
