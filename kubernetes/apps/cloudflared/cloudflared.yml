@@ -20,5 +20,9 @@ spec:
         - tunnel
         - "--no-autoupdate"
         - run
-        - "--token"
-        - "5JsuCGmNEvAJnOCVDnhofsPJvB7LzH1XmS2MFjFP"
+        env:
+        - name: TUNNEL_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: cloudflared-secrets
+              key: tunnel-token
