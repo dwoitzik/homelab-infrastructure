@@ -64,7 +64,7 @@ metadata:
   name: atlantis-final
   namespace: apps
 spec:
-  entryPoints: [web, websecure]
+  entryPoints: [websecure]
   routes:
   - match: Host(`atlantis.woitzik.dev`)
     kind: Rule
@@ -141,7 +141,6 @@ spec:
     kind: Rule
     middlewares:
       - name: websockets
-      - name: timeout
     services:
       - name: external-pve
         port: 8006
