@@ -38,6 +38,12 @@ spec:
                   period: 24h
         singleBinary:
           replicas: 1
+        read:
+          replicas: 0
+        write:
+          replicas: 0
+        backend:
+          replicas: 0
         deploymentMode: SingleBinary
         lokiCanary:
           enabled: false
