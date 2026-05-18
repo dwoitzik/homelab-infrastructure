@@ -327,3 +327,11 @@ resource "routeros_ip_firewall_nat" "masquerade" {
   action        = "masquerade"
   comment       = "Standard NAT for internet access"
 }
+
+resource "routeros_ip_firewall_nat" "mgmt_to_srv_masq" {
+  chain       = "srcnat"
+  action      = "masquerade"
+  src_address = "10.0.10.0/24"
+  dst_address = "10.0.20.0/24"
+  comment     = "NAT: Masquerade MGMT to SRV for return traffic"
+}

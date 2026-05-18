@@ -162,10 +162,10 @@ spec:
     kind: Rule
     middlewares:
       - name: websockets
-      - name: timeout
     services:
       - name: external-pbs
         port: 8007
         scheme: https
         serversTransport: insecure-transport
+        passHostHeader: true
   tls: {secretName: wildcard-woitzik-dev-tls}
