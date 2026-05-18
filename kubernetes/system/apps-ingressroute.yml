@@ -64,7 +64,7 @@ metadata:
   name: atlantis-final
   namespace: apps
 spec:
-  entryPoints: [websecure]
+  entryPoints: [web, websecure]
   routes:
   - match: Host(`atlantis.woitzik.dev`)
     kind: Rule
