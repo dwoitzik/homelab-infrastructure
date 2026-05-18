@@ -1,0 +1,82 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 6.6.2
+    chart: loki
+    helm:
+      values: |
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: s3
+            bucketNames:
+              chunks: loki-data
+              ruler: loki-data
+              admin: loki-data
+            s3:
+              endpoint: minio.apps.svc.cluster.local:9000
+              region: main
+              accessKeyId: dwoitzik
+              secretAccessKey: s0ZKe6W9g8LG
+              s3ForcePathStyle: true
+              insecure: true
+          schemaConfig:
+            configs:
+              - from: 2024-04-01
+                object_store: s3
+                store: tsdb
+                index:
+                  prefix: index_
+                  period: 24h
+        singleBinary:
+          replicas: 1
+        deploymentMode: SingleBinary
+        lokiCanary:
+          enabled: false
+        test:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: promtail
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 6.16.4
+    chart: promtail
+    helm:
+      values: |
+        config:
+          clients:
+            - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
