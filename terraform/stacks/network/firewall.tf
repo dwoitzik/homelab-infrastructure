@@ -112,6 +112,15 @@ resource "routeros_ip_firewall_filter" "drop_wan_input" {
 # FORWARD CHAIN (Traffic THROUGH the Router)
 # ===============================================
 
+resource "routeros_ip_firewall_filter" "fwd_00_mgmt_to_srv_allow" {
+  action       = "accept"
+  chain        = "forward"
+  src_address  = "10.0.10.0/24"
+  dst_address  = "10.0.20.0/24"
+  place_before = routeros_ip_firewall_filter.fwd_00_fasttrack.id
+  comment      = "00: DEBUG - Allow all traffic from MGMT to SRV (Troubleshooting)"
+}
+
 resource "routeros_ip_firewall_filter" "fwd_00_fasttrack" {
   action           = "fasttrack-connection"
   chain            = "forward"
