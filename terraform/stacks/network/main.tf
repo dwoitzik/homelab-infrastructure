@@ -77,6 +77,11 @@ resource "routeros_interface_vlan" "vlan10_mgmt" {
 
 resource "routeros_ip_firewall_addr_list" "mgmt_devices" {
   list    = "Mgmt_Devices"
+  address = "10.0.10.0/24"
+}
+
+resource "routeros_ip_firewall_addr_list" "mgmt_admin" {
+  list    = "Mgmt_Devices"
   address = "10.0.100.0/24"
 }
 
