@@ -168,3 +168,21 @@ spec:
         serversTransport: insecure-transport
         passHostHeader: true
   tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Uptime Kuma
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: status-final
+  namespace: monitoring
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`status.woitzik.dev`)
+    kind: Rule
+    middlewares:
+      - name: authelia
+      - name: websockets
+        namespace: apps
+    services: [{name: uptime-kuma, port: 3001}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
