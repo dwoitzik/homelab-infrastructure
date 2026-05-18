@@ -22,7 +22,6 @@ Configuration and automation for a highly available, secure homelab environment.
 | Security | CrowdSec firewall bouncer |
 | GitOps | Atlantis (self-hosted, Cloudflare Tunnel) |
 | Cloud governance | Microsoft Azure Arc |
-| Orchestration | K3s (managed via ArgoCD / GitOps) |
 
 ## 🗺️ Architecture
 
