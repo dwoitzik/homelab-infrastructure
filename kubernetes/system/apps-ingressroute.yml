@@ -127,3 +127,44 @@ spec:
     kind: Rule
     services: [{name: minio, port: 9000}]
   tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Proxmox (PVE)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: pve-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`pve.woitzik.dev`)
+    kind: Rule
+    middlewares:
+      - name: websockets
+    services:
+      - name: external-pve
+        port: 8006
+        scheme: https
+        serversTransport: insecure-transport
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Proxmox Backup (PBS)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: pbs-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`backup.woitzik.dev`)
+    kind: Rule
+    middlewares:
+      - name: websockets
+    services:
+      - name: external-pbs
+        port: 8007
+        scheme: https
+        serversTransport: insecure-transport
+        passHostHeader: true
+  tls: {secretName: wildcard-woitzik-dev-tls}
