@@ -47,29 +47,14 @@ resource "routeros_ip_firewall_filter" "in_02_icmp" {
   comment      = "IN-02: Allow ICMP from internal networks"
 }
 
-resource "routeros_ip_firewall_filter" "in_03_wg" {
+resource "routeros_ip_firewall_filter" "in_02_wg" {
   action       = "accept"
   chain        = "input"
   protocol     = "udp"
   dst_port     = local.vpn_config.port
+  in_interface = "ether1"
   place_before = routeros_ip_firewall_filter.drop_all_input.id
-  comment      = "IN-03: WireGuard handshake"
-}
-
-resource "routeros_ip_firewall_filter" "in_04_wg_traffic" {
-  action       = "accept"
-  chain        = "input"
-  src_address  = local.vpn_config.subnet
-  place_before = routeros_ip_firewall_filter.drop_all_input.id
-  comment      = "IN-04: WireGuard internal traffic to router"
-}
-
-resource "routeros_ip_firewall_filter" "fwd_04_wg_to_lan" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = local.vpn_config.subnet
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "04: VPN - Allow WireGuard access to internal networks"
+  comment      = "IN-02: WireGuard handshake"
 }
 
 resource "routeros_ip_firewall_filter" "in_03_mgmt" {
