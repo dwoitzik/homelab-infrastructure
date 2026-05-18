@@ -38,7 +38,16 @@ resource "routeros_ip_firewall_filter" "in_01_established" {
   comment          = "IN-01: Allow established/related"
 }
 
-resource "routeros_ip_firewall_filter" "in_02_wg" {
+resource "routeros_ip_firewall_filter" "in_02_icmp" {
+  action       = "accept"
+  chain        = "input"
+  protocol     = "icmp"
+  src_address  = "10.0.0.0/8"
+  place_before = routeros_ip_firewall_filter.drop_all_input.id
+  comment      = "IN-02: Allow ICMP from internal networks"
+}
+
+resource "routeros_ip_firewall_filter" "in_03_wg" {
   action       = "accept"
   chain        = "input"
   protocol     = "udp"
@@ -102,6 +111,15 @@ resource "routeros_ip_firewall_filter" "drop_wan_input" {
 # ===============================================
 # FORWARD CHAIN (Traffic THROUGH the Router)
 # ===============================================
+
+resource "routeros_ip_firewall_filter" "fwd_00_mgmt_to_srv_allow" {
+  action       = "accept"
+  chain        = "forward"
+  src_address  = "10.0.10.0/24"
+  dst_address  = "10.0.20.0/24"
+  place_before = routeros_ip_firewall_filter.fwd_00_fasttrack.id
+  comment      = "00: DEBUG - Allow all traffic from MGMT to SRV (Troubleshooting)"
+}
 
 resource "routeros_ip_firewall_filter" "fwd_00_fasttrack" {
   action           = "fasttrack-connection"
@@ -262,26 +280,26 @@ resource "routeros_ip_firewall_filter" "fwd_15_mgmt_to_proxy_oidc" {
   comment      = "15: MGMT - Allow Proxmox to reach internal Proxy for OIDC"
 }
 
-resource "routeros_ip_firewall_filter" "fwd_16_heimnetz_to_proxy" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = "192.168.178.0/24"
-  dst_address  = "10.0.20.5"
-  dst_port     = "80,443"
-  protocol     = "tcp"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "16: Heimnetz - Allow access to Nginx Proxy Manager (Core Services)"
-}
-
-resource "routeros_ip_firewall_filter" "fwd_17_mgmt_to_vip_oidc" {
+resource "routeros_ip_firewall_filter" "fwd_17_mgmt_to_k3s_oidc" {
   action       = "accept"
   chain        = "forward"
   src_address  = "10.0.10.0/24"
-  dst_address  = "10.0.20.5"
+  dst_address  = "10.0.20.200"
   protocol     = "tcp"
   dst_port     = "443"
-  comment      = "17: MGMT - Allow OIDC traffic to HAProxy VIP"
+  comment      = "17: MGMT - Allow OIDC traffic to K3s Traefik VIP"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+}
+
+resource "routeros_ip_firewall_filter" "fwd_18_heimnetz_to_proxy" {
+  action       = "accept"
+  chain        = "forward"
+  src_address  = "192.168.178.0/24"
+  dst_address  = "10.0.20.200"
+  dst_port     = "80,443"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "18: Heimnetz - Allow access to K3s Ingress (Core Services)"
 }
 
 # ===============================================
@@ -308,4 +326,12 @@ resource "routeros_ip_firewall_nat" "masquerade" {
   out_interface = "ether1"
   action        = "masquerade"
   comment       = "Standard NAT for internet access"
+}
+
+resource "routeros_ip_firewall_nat" "mgmt_to_srv_masq" {
+  chain       = "srcnat"
+  action      = "masquerade"
+  src_address = "10.0.10.0/24"
+  dst_address = "10.0.20.0/24"
+  comment     = "NAT: Masquerade MGMT to SRV for return traffic"
 }

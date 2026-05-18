@@ -115,7 +115,7 @@ data:
         clients:
           - client_id: 'proxmox'
             client_name: 'Proxmox VE'
-            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$6rwIWyq/ihf6trhTKDAZww$Q0kGAmo/sGiX/REDXY4L0/CeFiy8TlA7Zpqq963kzy8'
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$nOpz0/xTxXW5cR96U/SpJA$Yuv7aCmVstjRFVyMil0/cttvOdd01VPZq1vmFGBxHaI'
             public: false
             authorization_policy: two_factor
             redirect_uris:
@@ -123,11 +123,11 @@ data:
               - 'https://pve.woitzik.dev/api2/extjs/access/oidc/login'
             scopes: [openid, profile, email, groups]
             userinfo_signed_response_alg: 'none'
-            token_endpoint_auth_method: 'client_secret_basic'
+            token_endpoint_auth_method: 'client_secret_post'
             consent_mode: implicit
           - client_id: 'pbs'
             client_name: 'Proxmox Backup Server'
-            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$6rwIWyq/ihf6trhTKDAZww$Q0kGAmo/sGiX/REDXY4L0/CeFiy8TlA7Zpqq963kzy8'
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$nOpz0/xTxXW5cR96U/SpJA$Yuv7aCmVstjRFVyMil0/cttvOdd01VPZq1vmFGBxHaI'
             public: false
             authorization_policy: two_factor
             redirect_uris:
@@ -135,11 +135,11 @@ data:
               - 'https://backup.woitzik.dev/api2/extjs/access/oidc/login'
             scopes: [openid, profile, email, groups]
             userinfo_signed_response_alg: 'none'
-            token_endpoint_auth_method: 'client_secret_basic'
+            token_endpoint_auth_method: 'client_secret_post'
             consent_mode: implicit
           - client_id: 'minio'
             client_name: 'Minio'
-            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$6rwIWyq/ihf6trhTKDAZww$Q0kGAmo/sGiX/REDXY4L0/CeFiy8TlA7Zpqq963kzy8'
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$nOpz0/xTxXW5cR96U/SpJA$Yuv7aCmVstjRFVyMil0/cttvOdd01VPZq1vmFGBxHaI'
             public: false
             authorization_policy: two_factor
             redirect_uris:
@@ -150,7 +150,7 @@ data:
             consent_mode: implicit
           - client_id: 'argocd'
             client_name: 'Argo CD'
-            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$6rwIWyq/ihf6trhTKDAZww$Q0kGAmo/sGiX/REDXY4L0/CeFiy8TlA7Zpqq963kzy8'
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$nOpz0/xTxXW5cR96U/SpJA$Yuv7aCmVstjRFVyMil0/cttvOdd01VPZq1vmFGBxHaI'
             public: false
             authorization_policy: two_factor
             redirect_uris:
@@ -161,7 +161,7 @@ data:
             consent_mode: implicit
           - client_id: 'grafana'
             client_name: 'Grafana'
-            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$6rwIWyq/ihf6trhTKDAZww$Q0kGAmo/sGiX/REDXY4L0/CeFiy8TlA7Zpqq963kzy8'
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$nOpz0/xTxXW5cR96U/SpJA$Yuv7aCmVstjRFVyMil0/cttvOdd01VPZq1vmFGBxHaI'
             public: false
             authorization_policy: two_factor
             redirect_uris:
