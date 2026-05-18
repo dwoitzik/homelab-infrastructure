@@ -92,6 +92,14 @@ spec:
             secretKeyRef:
               name: atlantis-secrets
               key: aws-secret-access-key
+        - name: AWS_S3_ENDPOINT
+          value: http://minio.apps.svc.cluster.local:9000
+        - name: AWS_REGION
+          value: main
+        - name: AWS_EC2_METADATA_DISABLED
+          value: "true"
+        - name: AWS_STS_REGIONAL_ENDPOINTS
+          value: regional
         - name: TF_VAR_proxmox_api_url
           value: https://10.0.10.10:8006/api2/json
         - name: TF_VAR_proxmox_api_token_id
