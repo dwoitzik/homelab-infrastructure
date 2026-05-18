@@ -213,15 +213,7 @@ resource "routeros_ip_firewall_filter" "fwd_09_allow_dns" {
   comment      = "09: DNS - Allow internal DNS queries to AdGuard VIP"
 }
 
-resource "routeros_ip_firewall_filter" "fwd_01_established" {
-  action           = "accept"
-  chain            = "forward"
-  connection_state = "established,related,untracked"
-  place_before     = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment          = "01: Allow established/related (Return traffic)"
-}
-
-resource "routeros_ip_firewall_filter" "fwd_02_srv_to_dns" {
+resource "routeros_ip_firewall_filter" "fwd_10_srv_to_wan" {
   action        = "accept"
   chain         = "forward"
   src_address   = "10.0.20.0/24"
