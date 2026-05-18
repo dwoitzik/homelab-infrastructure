@@ -38,7 +38,16 @@ resource "routeros_ip_firewall_filter" "in_01_established" {
   comment          = "IN-01: Allow established/related"
 }
 
-resource "routeros_ip_firewall_filter" "in_02_wg" {
+resource "routeros_ip_firewall_filter" "in_02_icmp" {
+  action       = "accept"
+  chain        = "input"
+  protocol     = "icmp"
+  src_address  = "10.0.0.0/8"
+  place_before = routeros_ip_firewall_filter.drop_all_input.id
+  comment      = "IN-02: Allow ICMP from internal networks"
+}
+
+resource "routeros_ip_firewall_filter" "in_03_wg" {
   action       = "accept"
   chain        = "input"
   protocol     = "udp"
