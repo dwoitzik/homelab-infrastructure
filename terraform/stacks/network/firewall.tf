@@ -53,16 +53,54 @@ resource "routeros_ip_firewall_filter" "in_03_wg" {
   protocol     = "udp"
   dst_port     = local.vpn_config.port
   in_interface = "ether1"
-  place_before = routeros_ip_firewall_filter.in_04_mgmt.id
+  place_before = routeros_ip_firewall_filter.in_04_wg_traffic.id
   comment      = "IN-03: WireGuard handshake"
 }
 
-resource "routeros_ip_firewall_filter" "in_04_mgmt" {
+resource "routeros_ip_firewall_filter" "in_04_wg_traffic" {
+  action       = "accept"
+  chain        = "input"
+  src_address  = local.vpn_config.subnet
+  place_before = routeros_ip_firewall_filter.in_05_mgmt.id
+  comment      = "IN-04: WireGuard internal traffic to router"
+}
+
+resource "routeros_ip_firewall_filter" "in_05_mgmt" {
   action           = "accept"
   chain            = "input"
   src_address_list = "Mgmt_Devices"
-  place_before     = routeros_ip_firewall_filter.drop_wan_input.id
-  comment          = "IN-04: Allow Admin-VLAN access to Router-API"
+  place_before     = routeros_ip_firewall_filter.in_06_atlantis_rest.id
+  comment          = "IN-05: Allow Admin-VLAN access to Router-API"
+}
+
+resource "routeros_ip_firewall_filter" "in_06_atlantis_rest" {
+  action       = "accept"
+  chain        = "input"
+  src_address  = "10.0.20.0/24"
+  protocol     = "tcp"
+  dst_port     = "443"
+  place_before = routeros_ip_firewall_filter.in_07_mikrodash.id
+  comment      = "IN-06: Allow Atlantis REST API access from K3s Nodes"
+}
+
+resource "routeros_ip_firewall_filter" "in_07_mikrodash" {
+  action       = "accept"
+  chain        = "input"
+  src_address  = "10.0.20.0/24"
+  protocol     = "tcp"
+  dst_port     = "8728,8729"
+  place_before = routeros_ip_firewall_filter.in_08_snmp.id
+  comment      = "IN-07: Allow MikroDash API access from K3s Nodes"
+}
+
+resource "routeros_ip_firewall_filter" "in_08_snmp" {
+  action       = "accept"
+  chain        = "input"
+  src_address  = "10.0.20.0/24"
+  protocol     = "udp"
+  dst_port     = "161"
+  place_before = routeros_ip_firewall_filter.drop_wan_input.id
+  comment      = "IN-08: Allow SNMP from SRV-Net (Monitoring)"
 }
 
 # ===============================================
@@ -131,8 +169,16 @@ resource "routeros_ip_firewall_filter" "fwd_04_proxy_to_mgmt" {
   dst_address  = "10.0.10.0/24"
   dst_port     = "8006,8007"
   protocol     = "tcp"
-  place_before = routeros_ip_firewall_filter.fwd_05_srv_to_dmz_metrics.id
+  place_before = routeros_ip_firewall_filter.fwd_04_wg_to_lan.id
   comment      = "04: SRV - Internal Proxy access to MGMT Web GUIs"
+}
+
+resource "routeros_ip_firewall_filter" "fwd_04_wg_to_lan" {
+  action       = "accept"
+  chain        = "forward"
+  src_address  = local.vpn_config.subnet
+  place_before = routeros_ip_firewall_filter.fwd_05_srv_to_dmz_metrics.id
+  comment      = "04: VPN - Allow WireGuard access to internal networks"
 }
 
 resource "routeros_ip_firewall_filter" "fwd_05_srv_to_dmz_metrics" {
