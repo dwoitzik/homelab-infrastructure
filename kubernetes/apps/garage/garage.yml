@@ -75,6 +75,7 @@ spec:
         - name: secrets
           secret:
             secretName: garage-secrets
+            defaultMode: 384
         - name: data
           persistentVolumeClaim:
             claimName: garage-data
