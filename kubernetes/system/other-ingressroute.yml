@@ -40,3 +40,41 @@ spec:
     middlewares: [{name: authelia, namespace: apps}]
     services: [{name: longhorn-frontend, port: 80}]
   tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Router
+apiVersion: v1
+kind: Service
+metadata:
+  name: router-external
+  namespace: apps
+spec:
+  type: ExternalName
+  externalName: 10.0.10.1
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: router-main
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`router.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia, namespace: apps}]
+    services: [{name: router-external, port: 80}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Loki Ingestion
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: loki-main
+  namespace: monitoring
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`loki.woitzik.dev`)
+    kind: Rule
+    services: [{name: loki, port: 3100}]
+  tls: {secretName: wildcard-woitzik-dev-tls}

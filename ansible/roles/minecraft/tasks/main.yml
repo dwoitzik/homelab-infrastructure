@@ -13,19 +13,19 @@
     dest: /opt/minecraft/docker-compose.yml
     content: |
       services:
-        minecraft:
+        minecraft-2:
           image: itzg/minecraft-server
-          container_name: mc-server
+          container_name: mc-server-2
           environment:
             EULA: "TRUE"
             TYPE: "PAPER"
-            MEMORY: "3G"
+            MEMORY: "6G"
             VERSION: "LATEST"
             TZ: "Europe/Berlin"
           ports:
             - "25565:25565"
           volumes:
-            - ./data:/data
+            - ./data-2:/data
           restart: unless-stopped
     mode: '0644'
 
@@ -33,3 +33,4 @@
   community.docker.docker_compose_v2:
     project_src: /opt/minecraft
     state: present
+    remove_orphans: true
