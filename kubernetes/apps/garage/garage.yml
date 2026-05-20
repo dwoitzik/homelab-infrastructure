@@ -55,7 +55,7 @@ spec:
               containerPort: 3903
           volumeMounts:
             - name: config
-              mountPath: /etc/garage/config.toml
+              mountPath: /etc/garage.toml
               subPath: config.toml
               readOnly: true
             - name: data
