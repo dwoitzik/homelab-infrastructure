@@ -45,7 +45,10 @@ spec:
           args: ["/garage", "server"]
           env:
             - name: GARAGE_CONFIG
-              value: /etc/garage/config.toml
+              value: /etc/garage.toml
+            - name: GARAGE_ALLOW_WORLD_READABLE_SECRETS
+              value: "true"
+
           ports:
             - name: s3
               containerPort: 3900
