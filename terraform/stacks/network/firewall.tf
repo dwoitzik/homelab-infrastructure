@@ -43,26 +43,8 @@ resource "routeros_ip_firewall_filter" "in_02_icmp" {
   chain        = "input"
   protocol     = "icmp"
   src_address  = "10.0.0.0/8"
-  place_before = routeros_ip_firewall_filter.in_03_wg.id
-  comment      = "IN-02: Allow ICMP from internal networks"
-}
-
-resource "routeros_ip_firewall_filter" "in_03_wg" {
-  action       = "accept"
-  chain        = "input"
-  protocol     = "udp"
-  dst_port     = local.vpn_config.port
-  in_interface = "ether1"
-  place_before = routeros_ip_firewall_filter.in_04_wg_traffic.id
-  comment      = "IN-03: WireGuard handshake"
-}
-
-resource "routeros_ip_firewall_filter" "in_04_wg_traffic" {
-  action       = "accept"
-  chain        = "input"
-  src_address  = local.vpn_config.subnet
   place_before = routeros_ip_firewall_filter.in_05_mgmt.id
-  comment      = "IN-04: WireGuard internal traffic to router"
+  comment      = "IN-02: Allow ICMP from internal networks"
 }
 
 resource "routeros_ip_firewall_filter" "in_05_mgmt" {
@@ -169,16 +151,8 @@ resource "routeros_ip_firewall_filter" "fwd_04_proxy_to_mgmt" {
   dst_address  = "10.0.10.0/24"
   dst_port     = "8006,8007"
   protocol     = "tcp"
-  place_before = routeros_ip_firewall_filter.fwd_04_wg_to_lan.id
-  comment      = "04: SRV - Internal Proxy access to MGMT Web GUIs"
-}
-
-resource "routeros_ip_firewall_filter" "fwd_04_wg_to_lan" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = local.vpn_config.subnet
   place_before = routeros_ip_firewall_filter.fwd_05_monitoring_allow.id
-  comment      = "04: VPN - Allow WireGuard access to internal networks"
+  comment      = "04: SRV - Internal Proxy access to MGMT Web GUIs"
 }
 
 resource "routeros_ip_firewall_filter" "fwd_05_monitoring_allow" {
@@ -193,49 +167,13 @@ resource "routeros_ip_firewall_filter" "fwd_05_monitoring_allow" {
 }
 
 resource "routeros_ip_firewall_filter" "fwd_06_monitoring_icmp" {
-  chain        = "forward"
   action       = "accept"
+  chain        = "forward"
   src_address  = "10.0.20.0/24"
   dst_address  = "10.0.0.0/16"
   protocol     = "icmp"
-  place_before = routeros_ip_firewall_filter.fwd_06_vpn_laptop.id
-  comment      = "06: Monitoring - Allow ICMP checks from SRV nodes"
-}
-
-resource "routeros_ip_firewall_filter" "fwd_06_vpn_laptop" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = local.vpn_laptop_ip
-  dst_address  = "10.0.0.0/16"
-  place_before = routeros_ip_firewall_filter.fwd_07_vpn_handy_srv.id
-  comment      = "06: VPN - Laptop Full Access"
-  lifecycle {
-    ignore_changes = [src_address]
-  }
-}
-
-resource "routeros_ip_firewall_filter" "fwd_07_vpn_handy_srv" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = local.vpn_handy_ip
-  dst_address  = "10.0.20.0/24"
-  place_before = routeros_ip_firewall_filter.fwd_08_vpn_handy_dmz.id
-  comment      = "07: VPN - Mobile limited to internal services"
-  lifecycle {
-    ignore_changes = [src_address]
-  }
-}
-
-resource "routeros_ip_firewall_filter" "fwd_08_vpn_handy_dmz" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = local.vpn_handy_ip
-  dst_address  = "10.0.30.0/24"
   place_before = routeros_ip_firewall_filter.fwd_09_allow_dns.id
-  comment      = "08: VPN - Mobile access to DMZ (External Proxy)"
-  lifecycle {
-    ignore_changes = [src_address]
-  }
+  comment      = "06: Monitoring - Allow ICMP checks from SRV nodes"
 }
 
 resource "routeros_ip_firewall_filter" "fwd_09_allow_dns" {
@@ -282,17 +220,8 @@ resource "routeros_ip_firewall_filter" "fwd_13_wan_to_dmz_minecraft" {
   dst_port     = "25565"
   protocol     = "tcp"
   in_interface = "ether1"
-  place_before = routeros_ip_firewall_filter.fwd_14_vpn_to_wan.id
+  place_before = routeros_ip_firewall_filter.fwd_15_mgmt_to_proxy_oidc.id
   comment      = "13: WAN - Allow Internet traffic to DMZ Minecraft Server"
-}
-
-resource "routeros_ip_firewall_filter" "fwd_14_vpn_to_wan" {
-  action        = "accept"
-  chain         = "forward"
-  src_address   = local.vpn_config.subnet
-  out_interface = "ether1"
-  place_before  = routeros_ip_firewall_filter.fwd_15_mgmt_to_proxy_oidc.id
-  comment       = "14: VPN - Allow Internet Access for Full Tunnel"
 }
 
 resource "routeros_ip_firewall_filter" "fwd_15_mgmt_to_proxy_oidc" {
