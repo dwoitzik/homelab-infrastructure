@@ -1,7 +1,7 @@
 users:
   david:
     displayname: "David"
-    password: '$argon2id$v=19$m=65536,t=3,p=4$GzhZBhZFsvCnRxML5KSd+A$fgVSFUBB54Q44Bfd1vGo/4ZL8nmkRTzVNeKR8QSvnNU'
+    password: '$argon2id$v=19$m=65536,t=3,p=4$rhRH28qmJOR2fcwrUUCC6w$IX1HZJ+ilGOjQPPgQYq+rfM4YblurganTD4JoZh8q9g'
     email: david@woitzik.dev
     groups:
       - admins
