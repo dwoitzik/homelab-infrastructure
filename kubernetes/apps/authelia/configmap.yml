@@ -170,3 +170,14 @@ data:
             userinfo_signed_response_alg: 'none'
             token_endpoint_auth_method: 'client_secret_post'
             consent_mode: implicit
+          - client_id: 'headscale'
+            client_name: 'Headscale'
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$nOpz0/xTxXW5cR96U/SpJA$Yuv7aCmVstjRFVyMil0/cttvOdd01VPZq1vmFGBxHaI'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://headscale.woitzik.dev/oidc/callback'
+            scopes: [openid, profile, email, groups]
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'
+            consent_mode: implicit

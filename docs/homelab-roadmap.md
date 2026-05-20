@@ -11,13 +11,12 @@ This document tracks the planned expansion and enhancements for the homelab infr
 
 ## 📈 Phase 1: Observability & Security (In Progress)
 - [ ] **Uptime Kuma**: Monitoring all services with automated alerts.
-    - Target: Raspberry Pi node (VLAN 20).
-    - Status: Deployment complete, waiting for firewall apply and Cloudflare route.
+    - Status: Internal monitoring reachability being fixed via firewall.
+- [ ] **Headscale (Management VPN)**: Self-hosted Tailscale control plane for portless remote access.
+    - Status: Planning migration from Wireguard.
 - [x] **Centralized Logging (Loki + Promtail)**: Log aggregation in Grafana.
     - Status: Installed and connected to Grafana & Minio.
 - [ ] **Automated Updates (Renovate + Keel)**:
-    - **Renovate**: Automatically creates PRs for outdated Docker images and Terraform providers.
-    - **Keel**: Automatically restarts K3s pods when new image versions are pushed (the K8s equivalent of Watchtower).
 - [ ] **Velero**: Backup automation for K3s resources to Minio S3.
 
 ## 📂 Phase 2: Data & Cloud
