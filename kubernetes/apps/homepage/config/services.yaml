@@ -83,11 +83,3 @@
         icon: mikrotik.png
         href: https://mikrodash.woitzik.dev
         description: Router Dashboard
-    - Uptime Kuma:
-        icon: uptime-kuma.png
-        href: https://status.woitzik.dev
-        description: Service Monitoring
-        widget:
-          type: uptimekuma
-          url: http://uptime-kuma.monitoring.svc.cluster.local:3001
-          slug: default
