@@ -58,6 +58,9 @@ spec:
               mountPath: /etc/garage.toml
               subPath: config.toml
               readOnly: true
+            - name: secrets
+              mountPath: /etc/garage/secrets
+              readOnly: true
             - name: data
               mountPath: /var/lib/garage/data
             - name: meta
@@ -66,6 +69,9 @@ spec:
         - name: config
           configMap:
             name: garage-config
+        - name: secrets
+          secret:
+            secretName: garage-secrets
         - name: data
           persistentVolumeClaim:
             claimName: garage-data

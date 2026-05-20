@@ -13,7 +13,7 @@ data:
 
     rpc_bind_addr = "[::]:3901"
     rpc_public_addr = "garage.apps.svc.cluster.local:3901"
-    rpc_secret = "{{GARAGE_RPC_SECRET}}"
+    rpc_secret_file = "/etc/garage/secrets/rpc_secret"
 
     [s3_api]
     s3_region = "homelab"
@@ -26,4 +26,4 @@ data:
 
     [admin]
     admin_bind_addr = "[::]:3903"
-    admin_token = "{{GARAGE_ADMIN_TOKEN}}"
+    admin_token_file = "/etc/garage/secrets/admin_token"
