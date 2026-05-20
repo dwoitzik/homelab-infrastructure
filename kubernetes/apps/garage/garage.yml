@@ -41,8 +41,8 @@ spec:
     spec:
       containers:
         - name: garage
-          image: dxos/garage:0.9.0
-          args: ["/garage/garage", "server"]
+          image: garagehq/garage:v0.9.0
+          args: ["/garage", "server"]
           env:
             - name: GARAGE_CONFIG
               value: /etc/garage/config.toml
