@@ -55,16 +55,9 @@ data:
         - Mikrodash:
             icon: mikrotik.png
             href: https://mikrodash.woitzik.dev
-  widgets.yaml: |
-    - search:
-        provider: google
-        target: _blank
-    - kubernetes:
-        cluster:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
+        - Uptime Kuma:
+            icon: uptime-kuma.png
+            href: https://status.woitzik.dev
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -80,7 +73,7 @@ data:
       columns: 3
     Monitoring:
       style: grid
-      columns: 2
+      columns: 3
   settings.yaml: |
     title: David's Homelab
     theme: dark
@@ -91,6 +84,22 @@ data:
         columns: 4
     hideHostname: true
     hideConfig: true
+  bookmarks.yaml: |
+    - Developer:
+        - Github:
+            abbr: GH
+            href: https://github.com/
+            icon: github.png
+    - Social:
+        - Reddit:
+            abbr: RE
+            href: https://reddit.com/
+            icon: reddit.png
+    - Entertainment:
+        - YouTube:
+            abbr: YT
+            href: https://youtube.com/
+            icon: youtube.png
   custom.css: |
     body {
       background: radial-gradient(circle at top, #141414 0%, #050505 100%) !important;
@@ -151,11 +160,18 @@ spec:
         app: homepage
     spec:
       serviceAccountName: homepage
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: homepage
         image: ghcr.io/gethomepage/homepage:latest
         ports:
         - containerPort: 3000
+        envFrom:
+        - secretRef:
+            name: homepage-secrets
         env:
         - name: HOMEPAGE_ALLOWED_HOSTS
           value: "home.woitzik.dev"
@@ -164,14 +180,14 @@ spec:
           mountPath: /app/config/services.yaml
           subPath: services.yaml
         - name: config
-          mountPath: /app/config/widgets.yaml
-          subPath: widgets.yaml
-        - name: config
           mountPath: /app/config/layout.yaml
           subPath: layout.yaml
         - name: config
           mountPath: /app/config/settings.yaml
           subPath: settings.yaml
+        - name: config
+          mountPath: /app/config/bookmarks.yaml
+          subPath: bookmarks.yaml
         - name: config
           mountPath: /app/config/custom.css
           subPath: custom.css
@@ -195,24 +211,3 @@ spec:
     targetPort: 3000
   selector:
     app: homepage
-# ---
-# apiVersion: networking.k8s.io/v1
-# kind: Ingress
-# metadata:
-#   name: homepage-ingress
-#   namespace: apps
-#   annotations:
-#     traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-# spec:
-#   ingressClassName: traefik
-#   rules:
-#   - host: home.woitzik.dev
-#     http:
-#       paths:
-#       - path: /
-#         pathType: Prefix
-#         backend:
-#           service:
-#             name: homepage
-#             port:
-#               number: 80
