@@ -1,71 +1,92 @@
 ---
-- Infrastructure:
+- title: Infrastructure
+  items:
     - Proxmox:
         icon: proxmox.png
-        href: https://pve.woitzik.dev
+        href: https://10.0.10.10:8006
         description: Virtualization Platform
     - PBS:
         icon: proxmox.png
-        href: https://backup.woitzik.dev
+        href: https://10.0.10.110:8007
         description: Proxmox Backup Server
     - Router:
         icon: mikrotik.png
         href: https://router.woitzik.dev
         description: MikroTik RB5009
-- Cloud Native:
+
+- title: Cloud Native
+  items:
     - ArgoCD:
         icon: argocd.png
         href: https://argo.woitzik.dev
+        description: GitOps Controller
         widget:
           type: argocd
-          url: http://argocd-server.argocd.svc.cluster.local
-          key: "{{HOMEPAGE_VAR_ARGOCD_TOKEN}}"
+          url: https://argo.woitzik.dev
+          username: admin
     - Longhorn:
         icon: longhorn.png
         href: https://longhorn.woitzik.dev
+        description: Distributed Block Storage
     - Traefik:
         icon: traefik.png
         href: https://traefik.woitzik.dev
+        description: Edge Router
         widget:
           type: traefik
-          url: http://10.42.4.18:9000
-- Core Apps:
+          url: https://traefik.woitzik.dev
+
+- title: Core Apps
+  items:
     - Vaultwarden:
         icon: vaultwarden.png
         href: https://vault.woitzik.dev
+        description: Password Manager
     - Authelia:
         icon: authelia.png
         href: https://auth.woitzik.dev
-    - AdGuard:
+        description: Identity Provider
+    - AdGuard A:
         icon: adguard-home.png
-        href: https://dns.woitzik.dev
-        widget:
-          type: adguard
-          url: http://10.0.20.2:3001
-          username: dw
-          password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
-- Productivity:
+        href: http://10.0.20.2:3001
+        description: DNS Filter Node 01
+    - AdGuard B:
+        icon: adguard-home.png
+        href: http://10.0.20.3:3001
+        description: DNS Filter Node 02
+
+- title: Productivity
+  items:
     - Paperless:
         icon: paperless.png
         href: https://docs.woitzik.dev
+        description: Document Management
     - Minio:
         icon: minio.png
         href: https://minio.woitzik.dev
+        description: S3 Object Storage
     - Open WebUI:
         icon: open-webui.png
         href: https://ai.woitzik.dev
-- Monitoring:
+        description: LLM Interface
+
+- title: Monitoring
+  items:
     - Grafana:
         icon: grafana.png
         href: https://monitoring.woitzik.dev
+        description: Cluster Metrics
         widget:
           type: grafana
-          url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local
-          username: admin
-          password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+          url: https://monitoring.woitzik.dev
+    - Mikrodash:
+        icon: mikrotik.png
+        href: https://mikrodash.woitzik.dev
+        description: Router Dashboard
     - Uptime Kuma:
         icon: uptime-kuma.png
         href: https://status.woitzik.dev
+        description: Service Monitoring
         widget:
           type: uptimekuma
           url: http://uptime-kuma.monitoring.svc.cluster.local:3001
