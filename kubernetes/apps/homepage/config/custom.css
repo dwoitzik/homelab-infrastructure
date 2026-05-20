@@ -1,9 +1,0 @@
-:root {
-  --bg-color: #000000;
-  --card-bg-color: #0a0a0a;
-  --accent-color: #FF8C00;
-  --text-color: #E0E0E0;
-}
-body { background-color: var(--bg-color) !important; }
-.card { background-color: var(--card-bg-color) !important; border: 1px solid #222 !important; }
-.text-accent { color: var(--accent-color) !important; }
