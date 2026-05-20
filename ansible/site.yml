@@ -38,8 +38,8 @@
     # - minio         # Migrated to K3s
     # - vaultwarden   # Migrated to K3s
     # - mikrodash      # Migrated to K3s
-    - monitoring_core
-    - atlantis
+    # - monitoring_core # Migrated to K3s
+    # - atlantis       # Migrated to K3s
     - cloudflared
     # - paperless     # Migrated to K3s
     # - open_webui    # Migrated to K3s

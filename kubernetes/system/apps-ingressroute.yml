@@ -184,3 +184,17 @@ spec:
       - name: authelia
     services: [{name: uptime-kuma, port: 3001}]
   tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Headscale (Management VPN)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: headscale-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`headscale.woitzik.dev`)
+    kind: Rule
+    services: [{name: headscale, port: 8080}]
+  tls: {secretName: wildcard-woitzik-dev-tls}

@@ -12,9 +12,38 @@ spec:
     helm:
       values: |
         loki:
+          analytics:
+            reporting_enabled: false
           auth_enabled: false
           commonConfig:
             replication_factor: 1
+          compactor:
+            working_directory: /var/loki/compactor
+            compaction_interval: 10m
+            retention_enabled: true
+            retention_delete_delay: 2h
+            retention_delete_worker_count: 150
+            delete_request_store: s3
+          limits_config:
+            retention_period: 30d
+          ruler:
+            alertmanager_url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+            enable_api: true
+            ring:
+              kvstore:
+                store: memberlist
+            rule_path: /var/loki/rules
+            storage:
+              type: s3
+              s3:
+                bucketnames: loki-data
+                endpoint: http://minio.apps.svc.cluster.local:9000
+                region: main
+                s3_force_path_style: true
+                insecure: true
+          memberlist:
+            join_members:
+              - loki-memberlist.monitoring.svc.cluster.local
           storage:
             type: s3
             bucketNames:
@@ -22,29 +51,44 @@ spec:
               ruler: loki-data
               admin: loki-data
             s3:
-              endpoint: minio.apps.svc.cluster.local:9000
+              endpoint: http://minio.apps.svc.cluster.local:9000
               region: main
-              accessKeyId: dwoitzik
-              secretAccessKey: s0ZKe6W9g8LG
               s3ForcePathStyle: true
               insecure: true
           schemaConfig:
             configs:
-              - from: 2024-04-01
+              - from: "2024-04-01"
                 object_store: s3
                 store: tsdb
+                schema: v13
                 index:
                   prefix: index_
                   period: 24h
+        deploymentMode: SingleBinary
         singleBinary:
           replicas: 1
+          extraEnv:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: loki-s3-secrets
+                  key: access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: loki-s3-secrets
+                  key: secret-access-key
         read:
           replicas: 0
         write:
           replicas: 0
         backend:
           replicas: 0
-        deploymentMode: SingleBinary
+        chunksCache:
+          allocatedMemory: 512
+          maxItemSize: 5m
+        resultsCache:
+          allocatedMemory: 512
         lokiCanary:
           enabled: false
         test:

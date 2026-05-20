@@ -13,4 +13,5 @@ common_packages:
   - gnupg
   - ca-certificates
 
-monitoring_core_host: "10.0.20.252"
+monitoring_core_host: "loki.woitzik.dev" # Was 10.0.20.252, but Loki is now in k3s. Requires an Ingress or LoadBalancer to be set up.
+loki_push_url: "https://loki.woitzik.dev/loki/api/v1/push"
