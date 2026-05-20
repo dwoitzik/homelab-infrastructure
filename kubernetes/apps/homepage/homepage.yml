@@ -22,18 +22,12 @@ data:
         - ArgoCD:
             icon: argocd.png
             href: https://argo.woitzik.dev
-            widget:
-              type: argocd
-              url: http://argocd-server.argocd.svc.cluster.local
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
         - Traefik:
             icon: traefik.png
             href: https://traefik.woitzik.dev
-            widget:
-              type: traefik
-              url: http://traefik.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -62,11 +56,15 @@ data:
             icon: mikrotik.png
             href: https://mikrodash.woitzik.dev
   widgets.yaml: |
-    - datetime:
-        text_size: xl
-        format:
-          timeStyle: short
-          dateStyle: long
+    - search:
+        provider: google
+        target: _blank
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -94,10 +92,48 @@ data:
     hideHostname: true
     hideConfig: true
   custom.css: |
-    body { background-color: #050505 !important; }
-    .card { background-color: #111 !important; border: 1px solid #222 !important; }
-    .card:hover { border-color: #FF8C00 !important; }
-    .text-slate-500 { color: #FF8C00 !important; }
+    body {
+      background: radial-gradient(circle at top, #141414 0%, #050505 100%) !important;
+      color: #fafafa !important;
+      font-family: 'Inter', system-ui, sans-serif !important;
+    }
+    .grid { gap: 1.5rem !important; }
+    .card {
+      background: rgba(25, 25, 25, 0.4) !important;
+      backdrop-filter: blur(12px) saturate(180%) !important;
+      -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+      border-radius: 16px !important;
+      padding: 1.25rem !important;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    .card:hover {
+      border-color: rgba(230, 126, 34, 0.6) !important;
+      transform: scale(1.02) translateY(-4px) !important;
+      background: rgba(40, 40, 40, 0.6) !important;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1) !important;
+    }
+    .group-title {
+      color: #888 !important;
+      font-size: 0.8rem !important;
+      font-weight: 800 !important;
+      letter-spacing: 0.15em !important;
+      margin: 2rem 0 1rem 0 !important;
+      border-left: 3px solid #e67e22 !important;
+      padding-left: 1rem !important;
+      text-transform: uppercase !important;
+    }
+    .text-slate-500 { color: #777 !important; font-size: 0.85rem !important; }
+    .icon {
+      filter: grayscale(1) opacity(0.7) !important;
+      transition: all 0.4s ease !important;
+      width: 42px !important;
+      height: 42px !important;
+    }
+    .card:hover .icon {
+      filter: grayscale(0) opacity(1) !important;
+      transform: rotate(-5deg) scale(1.1) !important;
+    }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -159,24 +195,24 @@ spec:
     targetPort: 3000
   selector:
     app: homepage
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: homepage-ingress
-  namespace: apps
-  annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
-spec:
-  ingressClassName: traefik
-  rules:
-  - host: home.woitzik.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: homepage
-            port:
-              number: 80
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: homepage-ingress
+#   namespace: apps
+#   annotations:
+#     traefik.ingress.kubernetes.io/router.middlewares: apps-authelia@kubernetescrd
+# spec:
+#   ingressClassName: traefik
+#   rules:
+#   - host: home.woitzik.dev
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: homepage
+#             port:
+#               number: 80
