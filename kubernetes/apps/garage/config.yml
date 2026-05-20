@@ -13,7 +13,7 @@ data:
 
     rpc_bind_addr = "[::]:3901"
     rpc_public_addr = "garage.apps.svc.cluster.local:3901"
-    rpc_secret = "generate_this_locally_if_needed"
+    rpc_secret = "7a0ac5ff39700ea032f9c0c5c98e2b8addc902e989408c1bfe7274a931c88931"
 
     [s3_api]
     s3_region = "homelab"
@@ -26,4 +26,4 @@ data:
 
     [admin]
     admin_bind_addr = "[::]:3903"
-    admin_token = "homelab-admin-token"
+    admin_token = "jODiG8xCxHOHTM"
