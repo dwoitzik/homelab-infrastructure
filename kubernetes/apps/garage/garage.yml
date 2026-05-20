@@ -41,7 +41,7 @@ spec:
     spec:
       containers:
         - name: garage
-          image: garagehq/garage:v0.9.0
+          image: dxflrs/garage:v2.3.0
           args: ["/garage", "server"]
           env:
             - name: GARAGE_CONFIG
