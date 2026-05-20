@@ -75,10 +75,16 @@ data:
         - Uptime Kuma:
             icon: uptime-kuma.png
             href: https://status.woitzik.dev
-            widget:
-              type: uptimekuma
-              url: http://uptime-kuma.monitoring.svc.cluster.local:3001
-              slug: default
+  widgets.yaml: |
+    - search:
+        provider: google
+        target: _blank
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -200,6 +206,9 @@ spec:
         - name: config
           mountPath: /app/config/services.yaml
           subPath: services.yaml
+        - name: config
+          mountPath: /app/config/widgets.yaml
+          subPath: widgets.yaml
         - name: config
           mountPath: /app/config/layout.yaml
           subPath: layout.yaml
