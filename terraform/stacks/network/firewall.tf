@@ -177,19 +177,29 @@ resource "routeros_ip_firewall_filter" "fwd_04_wg_to_lan" {
   action       = "accept"
   chain        = "forward"
   src_address  = local.vpn_config.subnet
-  place_before = routeros_ip_firewall_filter.fwd_05_srv_to_dmz_metrics.id
+  place_before = routeros_ip_firewall_filter.fwd_05_monitoring_allow.id
   comment      = "04: VPN - Allow WireGuard access to internal networks"
 }
 
-resource "routeros_ip_firewall_filter" "fwd_05_srv_to_dmz_metrics" {
+resource "routeros_ip_firewall_filter" "fwd_05_monitoring_allow" {
   chain        = "forward"
   action       = "accept"
-  src_address  = "10.0.20.252"
-  dst_address  = "10.0.30.0/24"
-  dst_port     = "9100,9080"
+  src_address  = "10.0.20.0/24"
+  dst_address  = "10.0.0.0/16"
+  dst_port     = "80,443,9100,9080,25565" # Web, Exporters, Minecraft check
   protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_06_monitoring_icmp.id
+  comment      = "05: Monitoring - Allow SRV to reach all internal services for health checks"
+}
+
+resource "routeros_ip_firewall_filter" "fwd_06_monitoring_icmp" {
+  chain        = "forward"
+  action       = "accept"
+  src_address  = "10.0.20.0/24"
+  dst_address  = "10.0.0.0/16"
+  protocol     = "icmp"
   place_before = routeros_ip_firewall_filter.fwd_06_vpn_laptop.id
-  comment      = "05: Monitoring - Prometheus scrape DMZ node exporters"
+  comment      = "06: Monitoring - Allow ICMP checks from SRV nodes"
 }
 
 resource "routeros_ip_firewall_filter" "fwd_06_vpn_laptop" {
@@ -314,8 +324,19 @@ resource "routeros_ip_firewall_filter" "fwd_18_heimnetz_to_proxy" {
   dst_address  = "10.0.20.200"
   dst_port     = "80,443"
   protocol     = "tcp"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  place_before = routeros_ip_firewall_filter.fwd_19_dmz_to_loki.id
   comment      = "18: Heimnetz - Allow access to K3s Ingress (Core Services)"
+}
+
+resource "routeros_ip_firewall_filter" "fwd_19_dmz_to_loki" {
+  action       = "accept"
+  chain        = "forward"
+  src_address  = "10.0.30.0/24"
+  dst_address  = "10.0.20.200"
+  dst_port     = "443"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "19: DMZ - Allow log ingestion to Loki (via K3s Ingress)"
 }
 
 # ===============================================
