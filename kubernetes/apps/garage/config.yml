@@ -13,7 +13,7 @@ data:
 
     rpc_bind_addr = "[::]:3901"
     rpc_public_addr = "garage.apps.svc.cluster.local:3901"
-    rpc_secret_file = "/etc/garage/secrets/rpc_secret"
+    rpc_secret = "0d20c9191e9714d015190ad48b37659d4b5ac2604d9efe92f539ffd1b3fc390f"
 
     [s3_api]
     s3_region = "homelab"
