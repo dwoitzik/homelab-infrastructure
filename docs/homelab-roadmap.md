@@ -17,6 +17,7 @@ This document tracks the planned expansion and enhancements for the homelab infr
 - [x] **Centralized Logging (Loki + Promtail)**: Log aggregation in Grafana.
     - Status: Installed and connected to Grafana & Minio.
 - [ ] **Automated Updates (Renovate + Keel)**:
+    - Status: Keel deployed in cluster for automated image updates.
 - [ ] **Velero**: Backup automation for K3s resources to Minio S3.
 
 ## 📂 Phase 2: Data & Cloud
