@@ -22,12 +22,19 @@ data:
         - ArgoCD:
             icon: argocd.png
             href: https://argo.woitzik.dev
+            widget:
+              type: argocd
+              url: http://argocd-server.argocd.svc.cluster.local
+              key: "{{HOMEPAGE_VAR_ARGOCD_TOKEN}}"
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
         - Traefik:
             icon: traefik.png
             href: https://traefik.woitzik.dev
+            widget:
+              type: traefik
+              url: http://10.42.4.18:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -38,6 +45,11 @@ data:
         - AdGuard:
             icon: adguard-home.png
             href: https://dns.woitzik.dev
+            widget:
+              type: adguard
+              url: http://10.0.20.2:3001
+              username: dw
+              password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
     - Productivity:
         - Paperless:
             icon: paperless.png
@@ -52,6 +64,18 @@ data:
         - Grafana:
             icon: grafana.png
             href: https://monitoring.woitzik.dev
+            widget:
+              type: grafana
+              url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local
+              username: admin
+              password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+        - Uptime Kuma:
+            icon: uptime-kuma.png
+            href: https://status.woitzik.dev
+            widget:
+              type: uptimekuma
+              url: http://uptime-kuma.monitoring.svc.cluster.local:3001
+              slug: status
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -67,7 +91,7 @@ data:
       columns: 3
     Monitoring:
       style: grid
-      columns: 1
+      columns: 2
   settings.yaml: |
     title: David's Homelab
     theme: dark
@@ -78,6 +102,22 @@ data:
         columns: 4
     hideHostname: true
     hideConfig: true
+  bookmarks.yaml: |
+    - Developer:
+        - Github:
+            abbr: GH
+            href: https://github.com/
+            icon: github.png
+    - Social:
+        - Reddit:
+            abbr: RE
+            href: https://reddit.com/
+            icon: reddit.png
+    - Entertainment:
+        - YouTube:
+            abbr: YT
+            href: https://youtube.com/
+            icon: youtube.png
   custom.css: |
     body {
       background: radial-gradient(circle at top, #141414 0%, #050505 100%) !important;
@@ -138,11 +178,18 @@ spec:
         app: homepage
     spec:
       serviceAccountName: homepage
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: homepage
         image: ghcr.io/gethomepage/homepage:latest
         ports:
         - containerPort: 3000
+        envFrom:
+        - secretRef:
+            name: homepage-secrets
         env:
         - name: HOMEPAGE_ALLOWED_HOSTS
           value: "home.woitzik.dev"
@@ -156,6 +203,9 @@ spec:
         - name: config
           mountPath: /app/config/settings.yaml
           subPath: settings.yaml
+        - name: config
+          mountPath: /app/config/bookmarks.yaml
+          subPath: bookmarks.yaml
         - name: config
           mountPath: /app/config/custom.css
           subPath: custom.css
