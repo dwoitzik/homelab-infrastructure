@@ -22,12 +22,19 @@ data:
         - ArgoCD:
             icon: argocd.png
             href: https://argo.woitzik.dev
+            widget:
+              type: argocd
+              url: http://argocd-server.argocd.svc.cluster.local
+              key: "{{HOMEPAGE_VAR_ARGOCD_TOKEN}}"
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
         - Traefik:
             icon: traefik.png
             href: https://traefik.woitzik.dev
+            widget:
+              type: traefik
+              url: http://traefik.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -38,6 +45,11 @@ data:
         - AdGuard:
             icon: adguard-home.png
             href: https://dns.woitzik.dev
+            widget:
+              type: adguard
+              url: http://10.0.20.2:3001
+              username: dw
+              password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
     - Productivity:
         - Paperless:
             icon: paperless.png
@@ -52,12 +64,21 @@ data:
         - Grafana:
             icon: grafana.png
             href: https://monitoring.woitzik.dev
+            widget:
+              type: grafana
+              url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local
+              username: admin
+              password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
         - Mikrodash:
             icon: mikrotik.png
             href: https://mikrodash.woitzik.dev
         - Uptime Kuma:
             icon: uptime-kuma.png
             href: https://status.woitzik.dev
+            widget:
+              type: uptimekuma
+              url: http://uptime-kuma.monitoring.svc.cluster.local:3001
+              slug: default
   layout.yaml: |
     Infrastructure:
       style: grid
