@@ -38,7 +38,7 @@ data:
     oidc:
       issuer: "https://auth.woitzik.dev"
       client_id: "headscale"
-      client_secret: "***REMOVED-SHARED-OIDC-CLIENT-SECRET***"
+      client_secret: "***REMOVED-HEADSCALE-OIDC-SECRET***"
       scope: ["openid", "profile", "email", "groups"]
       strip_email_domain: true
 
