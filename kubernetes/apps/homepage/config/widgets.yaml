@@ -1,0 +1,13 @@
+---
+kubernetes:
+  cluster:
+    show: true
+    cpu: true
+    memory: true
+    showNodes: true
+  nodes:
+    - name: vm-srv-k3s-11
+    - name: vm-srv-k3s-12
+    - name: vm-srv-k3s-13
+    - name: rpi-srv-01
+    - name: rpi-srv-02
