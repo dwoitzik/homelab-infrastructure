@@ -38,7 +38,7 @@ data:
     oidc:
       issuer: "https://auth.woitzik.dev"
       client_id: "headscale"
-      client_secret: "dubist1plebyakalb"
+      client_secret: "headscale-secret-2026"
       scope: ["openid", "profile", "email", "groups"]
       strip_email_domain: true
 
