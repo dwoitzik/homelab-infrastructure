@@ -34,7 +34,7 @@ data:
             href: https://traefik.woitzik.dev
             widget:
               type: traefik
-              url: http://10.42.4.18:9000
+              url: http://traefik.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -69,13 +69,30 @@ data:
               url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local
               username: admin
               password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+        - Mikrodash:
+            icon: mikrotik.png
+            href: https://mikrodash.woitzik.dev
         - Uptime Kuma:
             icon: uptime-kuma.png
             href: https://status.woitzik.dev
             widget:
               type: uptimekuma
               url: http://uptime-kuma.monitoring.svc.cluster.local:3001
-              slug: status
+              slug: default
+  widgets.yaml: |
+    - resources:
+        cpu: true
+        memory: true
+        disk: /
+    - search:
+        provider: google
+        target: _blank
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -197,6 +214,9 @@ spec:
         - name: config
           mountPath: /app/config/services.yaml
           subPath: services.yaml
+        - name: config
+          mountPath: /app/config/widgets.yaml
+          subPath: widgets.yaml
         - name: config
           mountPath: /app/config/layout.yaml
           subPath: layout.yaml

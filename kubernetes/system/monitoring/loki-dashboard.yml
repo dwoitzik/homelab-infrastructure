@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  loki-logs.json: |
+    {
+      "title": "Loki: Kubernetes Logs",
+      "uid": "loki-kubernetes-logs",
+      "schemaVersion": 38,
+      "timezone": "browser",
+      "refresh": "10s",
+      "tags": ["loki", "logs", "kubernetes"],
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "type": "query",
+            "datasource": "Loki",
+            "query": "label_values(namespace)",
+            "label": "Namespace",
+            "includeAll": true,
+            "multi": true,
+            "allValue": ".+"
+          },
+          {
+            "name": "pod",
+            "type": "query",
+            "datasource": "Loki",
+            "query": "label_values({namespace=~\"$namespace\"}, pod)",
+            "label": "Pod",
+            "includeAll": true,
+            "multi": true,
+            "allValue": ".+"
+          },
+          {
+            "name": "container",
+            "type": "query",
+            "datasource": "Loki",
+            "query": "label_values({namespace=~\"$namespace\", pod=~\"$pod\"}, container)",
+            "label": "Container",
+            "includeAll": true,
+            "multi": true,
+            "allValue": ".+"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Log Stream",
+          "type": "logs",
+          "datasource": "Loki",
+          "gridPos": { "x": 0, "y": 0, "w": 24, "h": 20 },
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": true,
+            "enableLogDetails": true,
+            "sortOrder": "Descending"
+          },
+          "targets": [
+            {
+              "expr": "{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
+              "datasource": "Loki"
+            }
+          ]
+        }
+      ]
+    }

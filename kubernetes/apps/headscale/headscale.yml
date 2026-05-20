@@ -18,6 +18,8 @@ metadata:
   namespace: apps
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: headscale
@@ -28,7 +30,7 @@ spec:
     spec:
       containers:
         - name: headscale
-          image: headscale/headscale:0.22.3
+          image: ghcr.io/juanfont/headscale:0.22.3
           args:
             - headscale
             - serve
