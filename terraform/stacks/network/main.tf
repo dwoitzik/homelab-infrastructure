@@ -16,15 +16,6 @@ locals {
   }
 
   proxmox_port = "ether5"
-
-  vpn_config = {
-    subnet = "10.6.0.0/24"
-    port   = 51820
-    name   = "wg-roadwarrior"
-  }
-
-  vpn_handy_ip  = "10.6.0.2/32"
-  vpn_laptop_ip = "10.6.0.3/32"
 }
 
 ###############################################################################
