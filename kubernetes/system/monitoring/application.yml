@@ -24,6 +24,11 @@ spec:
             datasources:
               enabled: true
               searchNamespace: ALL
+            dashboards:
+              enabled: true
+              searchNamespace: ALL
+              label: grafana_dashboard
+              labelValue: "1"
           additionalDataSources:
             - name: Loki
               type: loki
@@ -32,6 +37,11 @@ spec:
               jsonData:
                 maxLines: 1000
           grafana.ini:
+            analytics:
+              check_for_updates: false
+              reporting_enabled: false
+            news:
+              news_feed_enabled: false
             auth:
               oauth_auto_login: true
             server:
@@ -59,8 +69,16 @@ spec:
             sessions:
               cookie_samesite: lax
               cookie_secure: false
+          dnsConfig:
+            options:
+              - name: ndots
+                value: "1"
         prometheus:
           prometheusSpec:
+            dnsConfig:
+              options:
+                - name: ndots
+                  value: "1"
             retention: 30d
             storageSpec:
               volumeClaimTemplate:
