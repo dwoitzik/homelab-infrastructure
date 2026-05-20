@@ -38,8 +38,8 @@ data:
     oidc:
       issuer: "https://auth.woitzik.dev"
       client_id: "headscale"
-      client_secret: "headscale-secret-2026"
-      scope: ["openid", "profile", "email", "groups"]
+      client_secret: "headscale-pass-2026"
+      scope: ["openid", "profile", "email"]
       strip_email_domain: true
 
     log:

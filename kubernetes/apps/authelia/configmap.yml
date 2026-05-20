@@ -172,12 +172,12 @@ data:
             consent_mode: implicit
           - client_id: 'headscale'
             client_name: 'Headscale'
-            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$+WkJWO24lwNBk2tBT2GURg$JrXBrQ3Oxhy+Jwwl+xxuOFsggF69u1l6OFRxz094UJM'
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$4SL81I6B3rAJT/YAqQoNxQ$fe0Cco+vMQ4lKnyEATtg3xkuvuoI9R7Sp04qooQacJA'
             public: false
-            authorization_policy: two_factor
+            authorization_policy: one_factor
             redirect_uris:
               - 'https://headscale.woitzik.dev/oidc/callback'
-            scopes: [openid, profile, email, groups]
+            scopes: [openid, profile, email]
             userinfo_signed_response_alg: 'none'
             token_endpoint_auth_method: 'client_secret_post'
             consent_mode: implicit
