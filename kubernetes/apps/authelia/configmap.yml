@@ -172,7 +172,7 @@ data:
             consent_mode: implicit
           - client_id: 'headscale'
             client_name: 'Headscale'
-            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$nOpz0/xTxXW5cR96U/SpJA$Yuv7aCmVstjRFVyMil0/cttvOdd01VPZq1vmFGBxHaI'
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$+WkJWO24lwNBk2tBT2GURg$JrXBrQ3Oxhy+Jwwl+xxuOFsggF69u1l6OFRxz094UJM'
             public: false
             authorization_policy: two_factor
             redirect_uris:
