@@ -31,8 +31,7 @@ data:
       magic_dns: true
       base_domain: headscale.net
       nameservers:
-        - 1.1.1.1
-        - 1.0.0.1
+        - 10.0.20.5
       extra_records: []
 
     oidc:
