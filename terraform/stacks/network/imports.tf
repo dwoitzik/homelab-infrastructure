@@ -229,6 +229,16 @@ import {
   id = "*1"
 }
 
+import {
+  to = routeros_ip_cloud.ddns
+  id = "ip.cloud"
+}
+
+import {
+  to = routeros_ip_firewall_mangle.mss_clamp
+  id = "*1"
+}
+
 # Firewall Core
 import {
   to = routeros_ip_firewall_filter.drop_all_input
