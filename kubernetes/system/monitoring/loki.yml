@@ -37,7 +37,7 @@ spec:
               type: s3
               s3:
                 bucketnames: loki-data
-                endpoint: http://minio.apps.svc.cluster.local:9000
+                endpoint: http://garage.apps.svc.cluster.local:3900
                 region: main
                 s3_force_path_style: true
                 insecure: true
@@ -51,7 +51,7 @@ spec:
               ruler: loki-data
               admin: loki-data
             s3:
-              endpoint: http://minio.apps.svc.cluster.local:9000
+              endpoint: http://garage.apps.svc.cluster.local:3900
               region: main
               s3ForcePathStyle: true
               insecure: true
