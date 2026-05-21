@@ -30,16 +30,6 @@ resource "routeros_ip_firewall_mangle" "mss_clamp" {
 # INPUT CHAIN (Traffic TO the Router)
 # ===============================================
 
-resource "routeros_ip_firewall_filter" "in_03_wg" {
-  action       = "accept"
-  chain        = "input"
-  protocol     = "udp"
-  dst_port     = local.vpn_config.port
-  in_interface = "ether1"
-  place_before = routeros_ip_firewall_filter.drop_all_input.id
-  comment      = "IN-03: WireGuard handshake"
-}
-
 resource "routeros_ip_firewall_filter" "in_01a_icmp" {
   action       = "accept"
   chain        = "input"
@@ -52,7 +42,7 @@ resource "routeros_ip_firewall_filter" "in_02a_srv_monitoring" {
   action       = "accept"
   chain        = "input"
   src_address  = "10.0.20.0/24"
-  place_before = routeros_ip_firewall_filter.in_03_wg.id
+  place_before = routeros_ip_firewall_filter.drop_all_input.id
   comment      = "IN-02a: Allow SRV (Monitoring) to Router"
 }
 
@@ -60,7 +50,7 @@ resource "routeros_ip_firewall_filter" "in_02_mgmt" {
   action           = "accept"
   chain            = "input"
   src_address_list = "Mgmt_Devices"
-  place_before     = routeros_ip_firewall_filter.in_03_wg.id
+  place_before     = routeros_ip_firewall_filter.drop_all_input.id
   comment          = "IN-02: Allow Admin-VLAN access to Router-API"
 }
 
@@ -115,33 +105,6 @@ resource "routeros_ip_firewall_filter" "fwd_08_allow_dns" {
   comment      = "08: DNS - Allow internal DNS queries to AdGuard VIP"
 }
 
-resource "routeros_ip_firewall_filter" "fwd_07_vpn_handy_dmz" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = local.vpn_handy_ip
-  dst_address  = "10.0.30.0/24"
-  place_before = routeros_ip_firewall_filter.fwd_08_allow_dns.id
-  comment      = "07: VPN - Mobile access to DMZ (External Proxy)"
-}
-
-resource "routeros_ip_firewall_filter" "fwd_06_vpn_handy_srv" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = local.vpn_handy_ip
-  dst_address  = "10.0.20.0/24"
-  place_before = routeros_ip_firewall_filter.fwd_07_vpn_handy_dmz.id
-  comment      = "06: VPN - Mobile limited to internal services"
-}
-
-resource "routeros_ip_firewall_filter" "fwd_05_vpn_laptop" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = local.vpn_laptop_ip
-  dst_address  = "10.0.0.0/16"
-  place_before = routeros_ip_firewall_filter.fwd_06_vpn_handy_srv.id
-  comment      = "05: VPN - Laptop Full Access"
-}
-
 resource "routeros_ip_firewall_filter" "fwd_01a_icmp" {
   action       = "accept"
   chain        = "forward"
@@ -155,7 +118,7 @@ resource "routeros_ip_firewall_filter" "fwd_04a_srv_monitoring" {
   chain        = "forward"
   src_address  = "10.0.20.0/24"
   dst_address  = "10.0.0.0/16"
-  place_before = routeros_ip_firewall_filter.fwd_05_vpn_laptop.id
+  place_before = routeros_ip_firewall_filter.fwd_08_allow_dns.id
   comment      = "04a: SRV - Allow monitoring to all internal VLANs"
 }
 
@@ -166,7 +129,7 @@ resource "routeros_ip_firewall_filter" "fwd_04_proxy_to_mgmt" {
   dst_address  = "10.0.10.0/24"
   dst_port     = "8006,8007"
   protocol     = "tcp"
-  place_before = routeros_ip_firewall_filter.fwd_05_vpn_laptop.id
+  place_before = routeros_ip_firewall_filter.fwd_04a_srv_monitoring.id
   comment      = "04: SRV - Internal Proxy access to MGMT Web GUIs"
 }
 
