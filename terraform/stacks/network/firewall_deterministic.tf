@@ -9,11 +9,10 @@ resource "routeros_ip_firewall_filter" "drop_all_input" {
 }
 
 resource "routeros_ip_firewall_filter" "fwd_99_drop_all" {
-  action     = "drop"
-  chain      = "forward"
-  log        = true
-  log_prefix = "FW_DROP"
-  comment    = "99: Global - Final Drop (Zero Trust Policy)"
+  action  = "drop"
+  chain   = "forward"
+  log     = false
+  comment = "99: Global - Final Drop (Zero Trust Policy)"
 }
 
 resource "routeros_ip_firewall_mangle" "mss_clamp" {
@@ -161,7 +160,6 @@ resource "routeros_ip_firewall_filter" "fwd_00_fasttrack" {
   action           = "fasttrack-connection"
   chain            = "forward"
   connection_state = "established,related"
-  hw_offload       = true
   place_before     = routeros_ip_firewall_filter.fwd_01_established.id
   comment          = "00: Global - Fasttrack for CPU efficiency"
 }
