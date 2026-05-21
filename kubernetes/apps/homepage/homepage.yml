@@ -238,6 +238,9 @@ spec:
         - name: config
           mountPath: /app/config/custom.css
           subPath: custom.css
+        - name: config
+          mountPath: /app/config/kubernetes.yaml
+          subPath: kubernetes.yaml
         - name: logs
           mountPath: /app/config/logs
       volumes:
