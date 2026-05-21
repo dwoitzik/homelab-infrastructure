@@ -73,7 +73,7 @@ data:
       style: grid
       columns: 2
   settings.yaml: |
-    title: ArgoCD REVERTED ME
+    title: FINAL ATTEMPT FIX
     theme: dark
     color: slate
     hideHostname: true
