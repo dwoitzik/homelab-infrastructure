@@ -12,8 +12,8 @@ This document tracks the planned expansion and enhancements for the homelab infr
 ## 📈 Phase 1: Observability & Security (In Progress)
 - [ ] **Uptime Kuma**: Monitoring all services with automated alerts.
     - Status: Internal monitoring reachability being fixed via firewall.
-- [ ] **Headscale (Management VPN)**: Self-hosted Tailscale control plane for portless remote access.
-    - Status: Planning migration from Wireguard.
+- [x] **Headscale (Management VPN)**: Self-hosted Tailscale control plane for portless remote access.
+    - Status: Deployed and configured with internal DNS (AdGuard).
 - [x] **Centralized Logging (Loki + Promtail)**: Log aggregation in Grafana.
     - Status: Installed and connected to Grafana & Minio.
 - [ ] **Automated Updates (Renovate + Keel)**:
