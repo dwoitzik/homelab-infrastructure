@@ -22,12 +22,19 @@ data:
         - ArgoCD:
             icon: argocd
             href: https://argo.woitzik.dev
+            widget:
+              type: argocd
+              url: http://argocd-server.argocd.svc.cluster.local:80
+              key: "{{HOMEPAGE_VAR_ARGOCD_TOKEN}}"
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
         - Traefik:
             icon: traefik
             href: https://traefik.woitzik.dev
+            widget:
+              type: traefik
+              url: http://traefik-api.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -38,6 +45,11 @@ data:
         - AdGuard:
             icon: adguard-home.png
             href: https://dns.woitzik.dev
+            widget:
+              type: adguard
+              url: http://10.0.20.2:3001
+              username: dw
+              password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
     - Productivity:
         - Paperless:
             icon: paperless.png
@@ -53,9 +65,26 @@ data:
         - Grafana:
             icon: grafana.png
             href: https://monitoring.woitzik.dev
+            widget:
+              type: grafana
+              url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
+              username: admin
+              password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
         - Uptime Kuma:
             icon: uptime-kuma
             href: https://status.woitzik.dev
+            widget:
+              type: uptimekuma
+              url: http://uptime-kuma-api.monitoring.svc.cluster.local:3001
+              slug: default
+  widgets.yaml: |
+    - resources:
+        cpu: true
+        memory: true
+        disk: /
+    - search:
+        provider: google
+        target: _blank
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -73,15 +102,15 @@ data:
       style: grid
       columns: 2
   settings.yaml: |
-    title: FINAL ATTEMPT FIX
+    title: David's Homelab
     theme: dark
     color: slate
+    layout:
+      header:
+        style: grid
+        columns: 4
     hideHostname: true
     hideConfig: true
-  widgets.yaml: |
-    - search:
-        provider: google
-        target: _blank
   bookmarks.yaml: |
     - Developer:
         - Github:
