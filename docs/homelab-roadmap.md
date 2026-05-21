@@ -10,15 +10,16 @@ This document tracks the planned expansion and enhancements for the homelab infr
 - [x] **Networking**: MikroTik RB5009 with VLAN isolation and Cloudflare Tunnels.
 
 ## 📈 Phase 1: Observability & Security (In Progress)
-- [ ] **Uptime Kuma**: Monitoring all services with automated alerts.
-    - Status: Internal monitoring reachability being fixed via firewall.
+- [x] **Uptime Kuma**: Monitoring all services with automated alerts.
+    - Status: Firewall rules `fwd_04a` and `in_02a` applied to allow monitoring reachability.
 - [x] **Headscale (Management VPN)**: Self-hosted Tailscale control plane for portless remote access.
     - Status: Deployed and configured with internal DNS (AdGuard).
 - [x] **Centralized Logging (Loki + Promtail)**: Log aggregation in Grafana.
-    - Status: Installed and connected to Grafana & Minio.
-- [ ] **Automated Updates (Renovate + Keel)**:
-    - Status: Keel deployed in cluster for automated image updates.
-- [ ] **Velero**: Backup automation for K3s resources to Minio S3.
+    - Status: Fully operational with 30d retention in Garage S3.
+- [x] **Automated Updates (Renovate + Keel)**:
+    - Status: Keel managing image updates; Renovate configured for repo-wide dependency tracking.
+- [x] **Velero**: Backup automation for K3s resources to Garage S3.
+    - Status: Manifests and Schedules defined in `kubernetes/system/velero/`.
 
 ## 📂 Phase 2: Data & Cloud
 - [ ] **Seafile**: Private cloud storage with Minio S3 backend.
