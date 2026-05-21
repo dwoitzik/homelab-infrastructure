@@ -27,9 +27,16 @@ spec:
               enabled: true
         logs:
           general:
-            level: DEBUG
+            level: INFO
           access:
-            enabled: true
+            enabled: false
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
         ingressRoute:
           dashboard:
             enabled: true
