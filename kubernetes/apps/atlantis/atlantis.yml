@@ -60,6 +60,8 @@ spec:
           value: github.com/dwoitzik/homelab-infrastructure
         - name: ATLANTIS_ALLOW_TF_VERSION_DOWNLOAD
           value: "false"
+        - name: ATLANTIS_ALLOW_COMMANDS
+          value: plan,apply,import,state
         - name: ATLANTIS_TERRAFORM_VERSION
           value: 1.10.0
         - name: ATLANTIS_GH_USER
