@@ -7,7 +7,7 @@ terraform {
     }
   }
   backend "s3" {
-    bucket = "8de1a93a0d33539b"
+    bucket = "terraform-state"
     key    = "proxmox/terraform.tfstate"
     region = "homelab"
     endpoints = {
