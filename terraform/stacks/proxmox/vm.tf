@@ -37,6 +37,10 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
     vlan_id = 20
   }
 
+  lifecycle {
+    ignore_changes = [clone]
+  }
+
   initialization {
     datastore_id = local.storage
     ip_config {
@@ -94,6 +98,10 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
     vlan_id = 20
   }
 
+  lifecycle {
+    ignore_changes = [clone]
+  }
+
   initialization {
     datastore_id = local.storage
     ip_config {
@@ -149,6 +157,10 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   network_device {
     bridge  = "vmbr0"
     vlan_id = 20
+  }
+
+  lifecycle {
+    ignore_changes = [clone]
   }
 
   initialization {
