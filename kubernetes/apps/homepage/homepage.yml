@@ -71,11 +71,11 @@ data:
               username: admin
               password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
         - Uptime Kuma:
-            icon: uptime-kuma.png
+            icon: uptime-kuma
             href: https://status.woitzik.dev
             widget:
               type: uptimekuma
-              url: http://uptime-kuma.monitoring.svc.cluster.local:3001
+              url: http://uptime-kuma-api.monitoring.svc.cluster.local:3001
               slug: default
   widgets.yaml: |
     - resources:
