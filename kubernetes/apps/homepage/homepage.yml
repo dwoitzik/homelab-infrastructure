@@ -20,7 +20,7 @@ data:
             description: MikroTik RB5009
     - Cloud Native:
         - ArgoCD:
-            icon: argocd.png
+            icon: argocd
             href: https://argo.woitzik.dev
             widget:
               type: argocd
@@ -30,8 +30,11 @@ data:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
         - Traefik:
-            icon: traefik.png
+            icon: traefik
             href: https://traefik.woitzik.dev
+            widget:
+              type: traefik
+              url: http://traefik-api.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -52,7 +55,7 @@ data:
             icon: paperless.png
             href: https://docs.woitzik.dev
         - Garage:
-            icon: storage.png
+            icon: garage
             href: https://s3.woitzik.dev
             description: S3 Object Storage
         - Open WebUI:
@@ -67,9 +70,6 @@ data:
               url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
               username: admin
               password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
-        - Mikrodash:
-            icon: mikrotik.png
-            href: https://mikrodash.woitzik.dev
         - Uptime Kuma:
             icon: uptime-kuma.png
             href: https://status.woitzik.dev
