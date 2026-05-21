@@ -38,7 +38,7 @@ spec:
               s3:
                 bucketnames: loki-data
                 endpoint: http://garage.apps.svc.cluster.local:3900
-                region: main
+                region: homelab
                 s3_force_path_style: true
                 insecure: true
           memberlist:
@@ -52,7 +52,7 @@ spec:
               admin: loki-data
             s3:
               endpoint: http://garage.apps.svc.cluster.local:3900
-              region: main
+              region: homelab
               s3ForcePathStyle: true
               insecure: true
           schemaConfig:
