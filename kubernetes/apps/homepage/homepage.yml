@@ -22,10 +22,6 @@ data:
         - ArgoCD:
             icon: argocd
             href: https://argo.woitzik.dev
-            widget:
-              type: argocd
-              url: http://argocd-server.argocd.svc.cluster.local:80
-              key: "{{HOMEPAGE_VAR_ARGOCD_TOKEN}}"
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
@@ -78,10 +74,6 @@ data:
               url: http://uptime-kuma-api.monitoring.svc.cluster.local:3001
               slug: default
   widgets.yaml: |
-    - resources:
-        cpu: true
-        memory: true
-        disk: /
     - search:
         provider: google
         target: _blank
@@ -105,10 +97,6 @@ data:
     title: David's Homelab
     theme: dark
     color: slate
-    layout:
-      header:
-        style: grid
-        columns: 4
     hideHostname: true
     hideConfig: true
   bookmarks.yaml: |
