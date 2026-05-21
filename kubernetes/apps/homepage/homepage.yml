@@ -73,7 +73,7 @@ data:
       style: grid
       columns: 2
   settings.yaml: |
-    title: Gemini CLI Fixed This
+    title: ArgoCD REVERTED ME
     theme: dark
     color: slate
     hideHostname: true
