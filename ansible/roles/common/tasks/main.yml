@@ -31,10 +31,23 @@
     name: unattended-upgrades
     state: present
 
-- name: Ensure unattended-upgrades is enabled and running
+- name: Install power management tools
+  ansible.builtin.apt:
+    name:
+      - cpufrequtils
+      - powertop
+    state: present
+
+- name: Set CPU governor to ondemand for power efficiency
   ansible.builtin.copy:
-    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    dest: /etc/default/cpufrequtils
     content: |
-      APT::Periodic::Update-Package-Lists "1";
-      APT::Periodic::Unattended-Upgrade "1";
+      GOVERNOR="ondemand"
     mode: '0644'
+  notify: Restart cpufrequtils
+
+- name: Ensure cpufrequtils is enabled and running
+  ansible.builtin.systemd:
+    name: cpufrequtils
+    state: started
+    enabled: true
