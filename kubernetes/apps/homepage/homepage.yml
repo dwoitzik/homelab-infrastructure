@@ -73,7 +73,7 @@ data:
       style: grid
       columns: 2
   settings.yaml: |
-    title: David's Homelab
+    title: Gemini CLI Fixed This
     theme: dark
     color: slate
     hideHostname: true
