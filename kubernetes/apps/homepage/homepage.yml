@@ -32,9 +32,6 @@ data:
         - Traefik:
             icon: traefik.png
             href: https://traefik.woitzik.dev
-            widget:
-              type: traefik
-              url: http://traefik.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -93,6 +90,8 @@ data:
           cpu: true
           memory: true
           showLabel: true
+        nodes:
+          show: false
   layout.yaml: |
     Infrastructure:
       style: grid
