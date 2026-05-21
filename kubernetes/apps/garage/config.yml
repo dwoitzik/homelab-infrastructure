@@ -12,7 +12,7 @@ data:
     replication_factor = 1
 
     rpc_bind_addr = "[::]:3901"
-    rpc_public_addr = "garage.apps.svc.cluster.local:3901"
+    rpc_public_addr = "127.0.0.1:3901"
     rpc_secret_file = "/etc/garage/secrets/rpc_secret"
 
     [s3_api]
