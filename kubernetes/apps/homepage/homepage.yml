@@ -22,6 +22,10 @@ data:
         - ArgoCD:
             icon: argocd.png
             href: https://argo.woitzik.dev
+            widget:
+              type: argocd
+              url: http://argocd-server.argocd.svc.cluster.local:80
+              key: "{{HOMEPAGE_VAR_ARGOCD_TOKEN}}"
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.woitzik.dev
@@ -38,10 +42,19 @@ data:
         - AdGuard:
             icon: adguard-home.png
             href: https://dns.woitzik.dev
+            widget:
+              type: adguard
+              url: http://10.0.20.2:3001
+              username: dw
+              password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
     - Productivity:
         - Paperless:
             icon: paperless.png
             href: https://docs.woitzik.dev
+        - Garage:
+            icon: storage.png
+            href: https://s3.woitzik.dev
+            description: S3 Object Storage
         - Open WebUI:
             icon: open-webui.png
             href: https://ai.woitzik.dev
@@ -49,12 +62,21 @@ data:
         - Grafana:
             icon: grafana.png
             href: https://monitoring.woitzik.dev
+            widget:
+              type: grafana
+              url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
+              username: admin
+              password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
         - Mikrodash:
             icon: mikrotik.png
             href: https://mikrodash.woitzik.dev
         - Uptime Kuma:
             icon: uptime-kuma.png
             href: https://status.woitzik.dev
+            widget:
+              type: uptimekuma
+              url: http://uptime-kuma.monitoring.svc.cluster.local:3001
+              slug: default
   widgets.yaml: |
     - resources:
         cpu: true
@@ -63,6 +85,14 @@ data:
     - search:
         provider: google
         target: _blank
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+        nodes:
+          show: false
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -92,19 +122,19 @@ data:
   bookmarks.yaml: |
     - Developer:
         - Github:
-            abbr: GH
-            href: https://github.com/
-            icon: github.png
+            - abbr: GH
+              href: https://github.com/
+              icon: github.png
     - Social:
         - Reddit:
-            abbr: RE
-            href: https://reddit.com/
-            icon: reddit.png
+            - abbr: RE
+              href: https://reddit.com/
+              icon: reddit.png
     - Entertainment:
         - YouTube:
-            abbr: YT
-            href: https://youtube.com/
-            icon: youtube.png
+            - abbr: YT
+              href: https://youtube.com/
+              icon: youtube.png
   custom.css: |
     body {
       background: radial-gradient(circle at top, #141414 0%, #050505 100%) !important;
