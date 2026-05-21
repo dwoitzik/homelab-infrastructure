@@ -104,7 +104,7 @@ data:
     layout:
       header:
         style: grid
-        columns: 1
+        columns: 4
     hideHostname: true
     hideConfig: true
   bookmarks.yaml: |
