@@ -11,7 +11,7 @@ terraform {
   backend "s3" {
     bucket = "terraform-state"
     key    = "network/terraform.tfstate"
-    region = "main"
+    region = "homelab"
     endpoints = {
       s3 = "http://garage.apps.svc.cluster.local:3900"
     }
