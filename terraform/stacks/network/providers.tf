@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "terraform-state"
+    bucket = "8de1a93a0d33539b"
     key    = "network/terraform.tfstate"
     region = "homelab"
     endpoints = {
