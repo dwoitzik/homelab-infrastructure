@@ -154,6 +154,10 @@ resource "routeros_ip_firewall_filter" "fwd_01_established" {
   connection_state = "established,related,untracked"
   place_before     = routeros_ip_firewall_filter.fwd_02_drop_invalid.id
   comment          = "01: Global - Allow established/related"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_00_fasttrack" {
@@ -162,4 +166,8 @@ resource "routeros_ip_firewall_filter" "fwd_00_fasttrack" {
   connection_state = "established,related"
   place_before     = routeros_ip_firewall_filter.fwd_01_established.id
   comment          = "00: Global - Fasttrack for CPU efficiency"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
