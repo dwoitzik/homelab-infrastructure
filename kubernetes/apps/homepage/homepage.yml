@@ -28,9 +28,6 @@ data:
         - Traefik:
             icon: traefik
             href: https://traefik.woitzik.dev
-            widget:
-              type: traefik
-              url: http://traefik-api.kube-system.svc.cluster.local:9000
     - Core Apps:
         - Vaultwarden:
             icon: vaultwarden.png
@@ -41,11 +38,6 @@ data:
         - AdGuard:
             icon: adguard-home.png
             href: https://dns.woitzik.dev
-            widget:
-              type: adguard
-              url: http://10.0.20.2:3001
-              username: dw
-              password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
     - Productivity:
         - Paperless:
             icon: paperless.png
@@ -61,22 +53,9 @@ data:
         - Grafana:
             icon: grafana.png
             href: https://monitoring.woitzik.dev
-            widget:
-              type: grafana
-              url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
-              username: admin
-              password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
         - Uptime Kuma:
             icon: uptime-kuma
             href: https://status.woitzik.dev
-            widget:
-              type: uptimekuma
-              url: http://uptime-kuma-api.monitoring.svc.cluster.local:3001
-              slug: default
-  widgets.yaml: |
-    - search:
-        provider: google
-        target: _blank
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -194,9 +173,6 @@ spec:
         - name: config
           mountPath: /app/config/services.yaml
           subPath: services.yaml
-        - name: config
-          mountPath: /app/config/widgets.yaml
-          subPath: widgets.yaml
         - name: config
           mountPath: /app/config/layout.yaml
           subPath: layout.yaml
