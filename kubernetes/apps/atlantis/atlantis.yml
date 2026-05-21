@@ -93,7 +93,7 @@ spec:
               name: atlantis-secrets
               key: aws-secret-access-key
         - name: AWS_S3_ENDPOINT
-          value: http://minio.apps.svc.cluster.local:9000
+          value: http://garage.apps.svc.cluster.local:3900
         - name: AWS_REGION
           value: main
         - name: AWS_EC2_METADATA_DISABLED

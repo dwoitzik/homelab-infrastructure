@@ -100,32 +100,18 @@ spec:
     services: [{name: external-dns, port: 3001}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# Minio Console
+# Garage API (S3)
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: minio-console-final
-  namespace: apps
-spec:
-  entryPoints: [websecure]
-  routes:
-  - match: Host(`minio.woitzik.dev`)
-    kind: Rule
-    services: [{name: minio, port: 9001}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
----
-# Minio API (S3)
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: minio-s3-final
+  name: garage-s3-final
   namespace: apps
 spec:
   entryPoints: [websecure]
   routes:
   - match: Host(`s3.woitzik.dev`)
     kind: Rule
-    services: [{name: minio, port: 9000}]
+    services: [{name: garage, port: 3900}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Proxmox (PVE)

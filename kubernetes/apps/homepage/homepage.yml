@@ -42,9 +42,6 @@ data:
         - Paperless:
             icon: paperless.png
             href: https://docs.woitzik.dev
-        - Minio:
-            icon: minio.png
-            href: https://minio.woitzik.dev
         - Open WebUI:
             icon: open-webui.png
             href: https://ai.woitzik.dev

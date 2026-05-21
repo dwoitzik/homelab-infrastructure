@@ -13,7 +13,7 @@ terraform {
     key    = "network/terraform.tfstate"
     region = "main"
     endpoints = {
-      s3 = "http://minio.apps.svc.cluster.local:9000"
+      s3 = "http://garage.apps.svc.cluster.local:3900"
     }
     skip_credentials_validation = true
     skip_metadata_api_check     = true
