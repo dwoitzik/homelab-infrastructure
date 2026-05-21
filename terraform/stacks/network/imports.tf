@@ -21,7 +21,7 @@ import {
 
 import {
   to = routeros_interface_vlan.vlans["vlan40-iot"]
-  id = "id-vlan40-iot" # This might be dynamic, check terraform plan
+  id = "vlan40-iot"
 }
 
 import {
@@ -29,18 +29,23 @@ import {
   id = "vlan100-admin"
 }
 
-# Firewall Core
+# Firewall Core (Using internal IDs found via REST API)
 import {
   to = routeros_ip_firewall_filter.drop_all_input
-  id = "input,drop,INPUT: Default drop"
+  id = "*12" # Comment: INPUT: Default drop
 }
 
 import {
-  to = routeros_ip_firewall_filter.fwd_00_fasttrack
-  id = "forward,fasttrack-connection,00: Global - Fasttrack for CPU efficiency"
+  to = routeros_ip_firewall_filter.fwd_99_drop_all
+  id = "*11" # Comment: 99: Global - Final Drop (Zero Trust Policy)
 }
 
 import {
   to = routeros_ip_firewall_filter.fwd_01_established
-  id = "forward,accept,01: Global - Allow established/related"
+  id = "*61" # Comment: 01: Global - Allow established/related
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_00_fasttrack
+  id = "*5C" # Comment: 00: Global - Fasttrack for CPU efficiency
 }
