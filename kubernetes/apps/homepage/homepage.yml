@@ -119,6 +119,15 @@ data:
         columns: 4
     hideHostname: true
     hideConfig: true
+  kubernetes.yaml: |
+    cluster:
+      show: true
+      cpu: true
+      memory: true
+    nodes:
+      show: true
+      cpu: true
+      memory: true
   bookmarks.yaml: |
     - Developer:
         - Github:
