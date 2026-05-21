@@ -85,14 +85,6 @@ data:
     - search:
         provider: google
         target: _blank
-    - kubernetes:
-        cluster:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
-        nodes:
-          show: false
   layout.yaml: |
     Infrastructure:
       style: grid
@@ -119,6 +111,15 @@ data:
         columns: 4
     hideHostname: true
     hideConfig: true
+  kubernetes.yaml: |
+    cluster:
+      show: true
+      cpu: true
+      memory: true
+    nodes:
+      show: true
+      cpu: true
+      memory: true
   bookmarks.yaml: |
     - Developer:
         - Github:
@@ -229,6 +230,9 @@ spec:
         - name: config
           mountPath: /app/config/custom.css
           subPath: custom.css
+        - name: config
+          mountPath: /app/config/kubernetes.yaml
+          subPath: kubernetes.yaml
         - name: logs
           mountPath: /app/config/logs
       volumes:
