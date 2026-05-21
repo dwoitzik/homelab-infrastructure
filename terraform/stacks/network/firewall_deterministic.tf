@@ -40,6 +40,22 @@ resource "routeros_ip_firewall_filter" "in_03_wg" {
   comment      = "IN-03: WireGuard handshake"
 }
 
+resource "routeros_ip_firewall_filter" "in_01a_icmp" {
+  action       = "accept"
+  chain        = "input"
+  protocol     = "icmp"
+  place_before = routeros_ip_firewall_filter.in_02_mgmt.id
+  comment      = "IN-01a: Allow ICMP"
+}
+
+resource "routeros_ip_firewall_filter" "in_02a_srv_monitoring" {
+  action       = "accept"
+  chain        = "input"
+  src_address  = "10.0.20.0/24"
+  place_before = routeros_ip_firewall_filter.in_03_wg.id
+  comment      = "IN-02a: Allow SRV (Monitoring) to Router"
+}
+
 resource "routeros_ip_firewall_filter" "in_02_mgmt" {
   action           = "accept"
   chain            = "input"
@@ -124,6 +140,23 @@ resource "routeros_ip_firewall_filter" "fwd_05_vpn_laptop" {
   dst_address  = "10.0.0.0/16"
   place_before = routeros_ip_firewall_filter.fwd_06_vpn_handy_srv.id
   comment      = "05: VPN - Laptop Full Access"
+}
+
+resource "routeros_ip_firewall_filter" "fwd_01a_icmp" {
+  action       = "accept"
+  chain        = "forward"
+  protocol     = "icmp"
+  place_before = routeros_ip_firewall_filter.fwd_02_drop_invalid.id
+  comment      = "01a: Global - Allow ICMP"
+}
+
+resource "routeros_ip_firewall_filter" "fwd_04a_srv_monitoring" {
+  action       = "accept"
+  chain        = "forward"
+  src_address  = "10.0.20.0/24"
+  dst_address  = "10.0.0.0/16"
+  place_before = routeros_ip_firewall_filter.fwd_05_vpn_laptop.id
+  comment      = "04a: SRV - Allow monitoring to all internal VLANs"
 }
 
 resource "routeros_ip_firewall_filter" "fwd_04_proxy_to_mgmt" {
