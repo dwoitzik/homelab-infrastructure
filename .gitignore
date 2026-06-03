@@ -38,3 +38,4 @@ terraform.rc
 
 # Ansible vault password
 .ansible_vault_pass
+.aider*

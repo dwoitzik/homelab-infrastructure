@@ -26,6 +26,10 @@ spec:
             delete_request_store: s3
           limits_config:
             retention_period: 30d
+            ingestion_rate_mb: 2
+            ingestion_burst_size_mb: 4
+            per_stream_rate_limit: 512k
+            per_stream_rate_limit_burst: 1M
           ruler:
             alertmanager_url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
             enable_api: true
