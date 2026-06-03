@@ -261,7 +261,7 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   }
 
   memory {
-    dedicated = 4096
+    dedicated = 8192
     swap      = 512
   }
 

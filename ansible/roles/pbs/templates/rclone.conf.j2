@@ -1,5 +1,8 @@
-[gdrive]
-type = drive
-scope = drive
-token = {{ pbs_rclone_gdrive_token }}
-team_drive =
+[storj]
+type = s3
+provider = Storj
+access_key_id = {{ pbs_rclone_storj_access_key }}
+secret_access_key = {{ pbs_rclone_storj_secret_key }}
+endpoint = {{ pbs_rclone_storj_endpoint | default('https://gateway.storjshare.io') }}
+region = {{ pbs_rclone_storj_region | default('us1') }}
+acl = private

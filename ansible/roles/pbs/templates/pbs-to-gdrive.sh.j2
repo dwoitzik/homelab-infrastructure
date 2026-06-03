@@ -1,15 +1,17 @@
 #!/bin/bash
-# Offsite backup sync — PBS to Google Drive
+# Offsite backup sync — PBS to Storj (S3)
 # Managed by Ansible — do not edit manually
 
-LOGFILE="/var/log/pbs-to-gdrive.log"
+LOGFILE="/var/log/pbs-offsite-sync.log"
+BUCKET="{{ pbs_rclone_storj_bucket | default('pbs-backups') }}"
 
-echo "$(date): Start GDrive Sync" >> "$LOGFILE"
+echo "$(date): Start Storj Sync" >> "$LOGFILE"
 
-/usr/bin/rclone sync /mnt/backups gdrive:Backup-Homelab/PBS \
+/usr/bin/rclone sync /mnt/backups storj:$BUCKET \
   --quiet \
   --transfers 8 \
-  --checkers 16
+  --checkers 16 \
+  --s3-chunk-size 64M
 
 if [ $? -eq 0 ]; then
     echo "$(date): Sync erfolgreich beendet" >> "$LOGFILE"

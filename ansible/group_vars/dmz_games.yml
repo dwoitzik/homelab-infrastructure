@@ -1,3 +1,4 @@
 ---
-mc_server_name: "survival_server"
-mc_memory: "3G"
+mc_server_name: "mc-server-2"
+mc_memory: "6G"
+mc_data_dir: "./data-2"

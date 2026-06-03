@@ -21,11 +21,18 @@ This document tracks the planned expansion and enhancements for the homelab infr
 - [x] **Velero**: Backup automation for K3s resources to Garage S3.
     - Status: Manifests and Schedules defined in `kubernetes/system/velero/`.
 
-## 📂 Phase 2: Data & Cloud
-- [ ] **Seafile**: Private cloud storage with Minio S3 backend.
-- [ ] **Kasm Workspaces**: Isolated browser/desktop environments for secure browsing.
+## 📂 Phase 2: Data & Cloud (Completed)
+- [x] **Seafile**: Private cloud storage with Garage S3 backend.
+- [x] **Kasm Workspaces**: Isolated browser/desktop environments for secure browsing.
 
-## 🎬 Phase 3: Media & Automation (The "Arr" Stack)
+## 🛠️ Phase 2.5: Infrastructure Hardening (Active)
+- [ ] **Backup Migration (Storj)**: Moving offsite backups from GDrive to Storj S3.
+    - Status: PBS role updated; awaiting credentials/sync verification.
+- [ ] **Network State Recovery**: Importing MikroTik configuration into Terraform.
+    - Status: Plan verified (56 imports pending); ready for execution.
+- [ ] **Cloudflared Stability**: Fixing tunnel token issues for remote access.
+
+## 🎬 Phase 3: Media & Automation (Next)
 - [ ] **Servarr Stack**: Radarr, Sonarr, Prowlarr, and SABnzbd.
 - [ ] **Overseerr**: Discovery and request management frontend.
 - [ ] **Jellyfin**: Media server (running on Proxmox LXC for GPU passthrough).
@@ -35,4 +42,4 @@ This document tracks the planned expansion and enhancements for the homelab infr
 - [ ] **Zigbee2MQTT / ESPHome**: Integrated into the K3s network.
 
 ---
-*Last Updated: May 18, 2026*
+*Last Updated: May 23, 2026*

@@ -81,7 +81,7 @@
 
 - name: Configure rclone sync cron job
   ansible.builtin.cron:
-    name: "PBS to GDrive offsite backup"
+    name: "PBS to Storj offsite backup"
     minute: "0"
     hour: "4"
     job: "/usr/local/bin/pbs-to-gdrive.sh >> /dev/null 2>&1"

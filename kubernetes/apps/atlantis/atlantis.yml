@@ -46,8 +46,13 @@ spec:
       labels:
         app: atlantis
     spec:
+      securityContext:
+        fsGroup: 1000
       containers:
       - name: atlantis
+        securityContext:
+          runAsUser: 100
+          runAsGroup: 1000
         image: ghcr.io/runatlantis/atlantis:v0.33.0
         ports:
         - containerPort: 4141

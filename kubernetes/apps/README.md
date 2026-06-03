@@ -20,4 +20,6 @@ Persistence is provided by **Longhorn**, allowing for distributed, replicated bl
 - **Minio**: S3-compatible object storage with OIDC integration.
 - **Vaultwarden**: Bitwarden-compatible password manager.
 - **Open-WebUI**: Local LLM interface.
+- **Seafile**: Private cloud storage with S3 backend.
+- **Kasm Workspaces**: Isolated browser/desktop environments.
 - **Mikrodash**: Monitoring dashboard for MikroTik routers.

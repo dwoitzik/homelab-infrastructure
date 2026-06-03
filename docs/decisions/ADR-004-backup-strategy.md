@@ -24,9 +24,9 @@ Implement the industry-standard **3-2-1 rule**:
 
 Proxmox Backup Server runs as an LXC (`ct-mgmt-pbs-01`, VLAN 10) on a dedicated 2TB HDD mounted at `/mnt/pbs-storage`. All LXCs are backed up daily at 03:00 via the Proxmox backup scheduler with a 7 daily / 4 weekly retention policy. PBS uses block-level deduplication — only changed chunks are stored, minimising disk usage.
 
-### Stage 2 — Offsite cloud backup (Google Drive via rclone)
+### Stage 2 — Offsite cloud backup (Storj S3 via rclone)
 
-A cron job runs daily at 04:00 syncing the PBS datastore to Google Drive (`gdrive:Backup-Homelab/PBS`) via rclone. PBS encrypts backup data at rest before it leaves the host — the Google Drive copy is encrypted client-side and cannot be read without the PBS encryption key. Only changed chunks are uploaded due to PBS deduplication, minimising bandwidth.
+A cron job runs daily at 04:00 syncing the PBS datastore to Storj S3 (`storj:pbs-backups`) via rclone. Storj provides 150GB of free, S3-compatible, distributed storage. PBS encrypts backup data at rest before it leaves the host — the Storj copy is encrypted client-side and cannot be read without the PBS encryption key. Only changed chunks are uploaded due to PBS deduplication, minimising bandwidth.
 
 A Healthchecks.io ping confirms successful completion — if the sync fails or doesn't run, an alert fires.
 

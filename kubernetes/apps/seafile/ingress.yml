@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: seafile
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`seafile.woitzik.dev`)
+    kind: Rule
+    middlewares:
+      - name: authelia
+    services:
+    - name: seafile
+      port: 80
+  tls:
+    secretName: wildcard-woitzik-dev-tls

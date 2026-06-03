@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: seafile-redis
+  namespace: apps
+spec:
+  ports:
+    - port: 6379
+  selector:
+    app: seafile-redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: seafile-redis
+  namespace: apps
+spec:
+  serviceName: "seafile-redis"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: seafile-redis
+  template:
+    metadata:
+      labels:
+        app: seafile-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: "longhorn"
+        resources:
+          requests:
+            storage: 2Gi

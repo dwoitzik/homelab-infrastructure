@@ -9,24 +9,9 @@
     - /opt/minecraft/data
 
 - name: Deploy Minecraft docker-compose.yml
-  ansible.builtin.copy:
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
     dest: /opt/minecraft/docker-compose.yml
-    content: |
-      services:
-        minecraft-2:
-          image: itzg/minecraft-server
-          container_name: mc-server-2
-          environment:
-            EULA: "TRUE"
-            TYPE: "PAPER"
-            MEMORY: "6G"
-            VERSION: "LATEST"
-            TZ: "Europe/Berlin"
-          ports:
-            - "25565:25565"
-          volumes:
-            - ./data-2:/data
-          restart: unless-stopped
     mode: '0644'
 
 - name: Start Minecraft server container

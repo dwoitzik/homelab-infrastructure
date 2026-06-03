@@ -1,0 +1,15 @@
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    container_name: {{ mc_server_name }}
+    environment:
+      EULA: "TRUE"
+      TYPE: "PAPER"
+      MEMORY: "{{ mc_memory }}"
+      VERSION: "LATEST"
+      TZ: "Europe/Berlin"
+    ports:
+      - "25565:25565"
+    volumes:
+      - {{ mc_data_dir }}:/data
+    restart: unless-stopped

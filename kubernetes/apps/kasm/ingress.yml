@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kasm
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`kasm.woitzik.dev`)
+    kind: Rule
+    services:
+    - name: kasm
+      port: 443
+      scheme: https
+      serversTransport: insecure-transport
+  tls:
+    secretName: wildcard-woitzik-dev-tls

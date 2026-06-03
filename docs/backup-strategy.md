@@ -10,10 +10,11 @@ We follow the industry-standard 3-2-1 rule: 3 copies of data, on 2 different med
 - **Hardware Efficiency:** Spin-down active (10 min) to reduce noise and mechanical wear.
 
 ## 2. Offsite Cloud Backup (Stage 2)
-- **Service:** Google Drive (via `rclone`).
+- **Service:** Storj (S3 via `rclone`).
+- **Storage:** 150 GB free tier (S3-compatible).
 - **Security Logic:** Client-side encrypted by PBS before upload. PBS block-level deduplication ensures only changed chunks are uploaded, minimizing bandwidth.
 - **Schedule:** `rclone sync` runs daily at 04:00 AM via Cron.
-- **Path:** `gdrive:Backup-Homelab/PBS`
+- **Path:** `storj:pbs-backups`
 
 ## 3. Disaster Recovery Protocol
 In the event of total local hardware failure:
