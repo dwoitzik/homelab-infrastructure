@@ -26,13 +26,6 @@ spec:
       labels:
         app: uptime-kuma
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: rpi-srv-01
-      tolerations:
-        - key: "storage"
-          operator: "Equal"
-          value: "sdcard"
-          effect: "NoSchedule"
       containers:
         - name: uptime-kuma
           image: louislam/uptime-kuma:1

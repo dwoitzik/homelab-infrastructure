@@ -25,6 +25,7 @@ spec:
           websecure:
             tls:
               enabled: true
+              secretName: traefik-tls-secret
         logs:
           general:
             level: INFO
@@ -42,8 +43,7 @@ spec:
             enabled: true
         tlsStore:
           default:
-            defaultCertificate:
-              secretName: wildcard-woitzik-dev-tls
+            secretName: traefik-tls-secret
         tolerations:
         - key: "storage"
           operator: "Equal"
