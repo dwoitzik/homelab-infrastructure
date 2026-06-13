@@ -26,7 +26,7 @@ data:
             description: VPN Mesh Controller
     - Platform:
         - ArgoCD:
-            icon: argocd.png
+            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/argo-cd.svg
             href: https://argo.woitzik.dev
             description: GitOps · homelab-infrastructure
             widget:
@@ -102,6 +102,8 @@ data:
             icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/loki.svg
             href: https://loki.woitzik.dev
             description: Log Aggregation · Promtail
+  kubernetes.yaml: |
+    mode: cluster
   widgets.yaml: |
     - kubernetes:
         cluster:
@@ -273,6 +275,9 @@ spec:
         - name: config
           mountPath: /app/config/custom.css
           subPath: custom.css
+        - name: config
+          mountPath: /app/config/kubernetes.yaml
+          subPath: kubernetes.yaml
         - name: logs
           mountPath: /app/config/logs
       volumes:
