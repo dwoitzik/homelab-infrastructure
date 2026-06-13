@@ -98,12 +98,8 @@ data:
             icon: uptime-kuma.png
             href: https://status.woitzik.dev
             description: Service Uptime Monitor
-            widget:
-              type: uptimekuma
-              url: http://uptime-kuma.monitoring.svc.cluster.local:3001
-              slug: default
         - Loki:
-            icon: grafana-loki.png
+            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/loki.svg
             href: https://loki.woitzik.dev
             description: Log Aggregation · Promtail
   widgets.yaml: |
