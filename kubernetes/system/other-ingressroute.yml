@@ -41,15 +41,29 @@ spec:
     services: [{name: longhorn-frontend, port: 80}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# Router
+# Router (MikroTik at 10.0.10.1:80) — headless Service + Endpoints
+# Note: ExternalName with raw IPs doesn't work reliably in k8s/Traefik
 apiVersion: v1
 kind: Service
 metadata:
   name: router-external
   namespace: apps
 spec:
-  type: ExternalName
-  externalName: 10.0.10.1
+  clusterIP: None
+  ports:
+  - port: 80
+    targetPort: 80
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: router-external
+  namespace: apps
+subsets:
+- addresses:
+  - ip: 10.0.10.1
+  ports:
+  - port: 80
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
