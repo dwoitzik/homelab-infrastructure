@@ -10,8 +10,8 @@ http:
   session_ttl: 720h
 
 users:
-  - name: admin
-    password: "{{ vault_adguard_ui_password | password_hash('bcrypt') }}"
+  - name: dw
+    password: "{{ adguard_ui_password | password_hash('bcrypt') }}"
 
 auth_attempts: 5
 block_auth_min: 15
