@@ -95,7 +95,7 @@ data:
               - 'https://argo.woitzik.dev/auth/callback'
             scopes: [openid, profile, email, groups]
             userinfo_signed_response_alg: 'none'
-            token_endpoint_auth_method: 'client_secret_post'
+            token_endpoint_auth_method: 'client_secret_basic'
             consent_mode: implicit
           - client_id: 'grafana'
             client_name: 'Grafana'
@@ -106,7 +106,7 @@ data:
               - 'https://monitoring.woitzik.dev/login/generic_oauth'
             scopes: [openid, profile, email, groups]
             userinfo_signed_response_alg: 'none'
-            token_endpoint_auth_method: 'client_secret_post'
+            token_endpoint_auth_method: 'client_secret_basic'
             consent_mode: implicit
           - client_id: 'headscale'
             client_name: 'Headscale'
@@ -117,5 +117,5 @@ data:
               - 'https://headscale.woitzik.dev/oidc/callback'
             scopes: [openid, profile, email]
             userinfo_signed_response_alg: 'none'
-            token_endpoint_auth_method: 'client_secret_post'
+            token_endpoint_auth_method: 'client_secret_basic'
             consent_mode: implicit
