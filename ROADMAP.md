@@ -1,82 +1,82 @@
 # Homelab Roadmap
 
-## Services — Geplante Deployments
+## Planned Services
 
-### Kurzfristig (nächste Wochen)
+### Short-term
 
-| Service | Namespace | Beschreibung | Prio |
+| Service | Namespace | Description | Priority |
 |---|---|---|---|
-| **Renovate Bot** | `apps` | Automatische Dependency-Updates via PRs auf GitHub | Hoch |
-| **Mealie** | `apps` | Rezept-Manager (klein, schnell deployed) | Mittel |
-| **Nextcloud** | `apps` | File Sync, CalDAV/CardDAV, Kontakte + Kalender | Mittel |
+| **Renovate Bot** | `apps` | Automatic dependency updates via PRs on GitHub | High |
+| **Mealie** | `apps` | Recipe manager (small footprint, quick to deploy) | Medium |
+| **Nextcloud** | `apps` | File sync, CalDAV/CardDAV, contacts & calendar | Medium |
 
-### Mittelfristig (nach 4TB SSD)
+### Mid-term (after 4TB SSD)
 
-| Service | Namespace | Beschreibung | Prio |
+| Service | Namespace | Description | Priority |
 |---|---|---|---|
-| **Immich** | `apps` | Foto-Backup + ML Gesichtserkennung (braucht Storage + RAM) | Hoch |
-| **Jellyfin** | `apps` | Media Server für Filme/Serien (braucht Storage) | Hoch |
-| **Navidrome** | `apps` | Musik Streaming (klein, braucht Storage) | Mittel |
+| **Immich** | `apps` | Photo backup with ML face recognition (requires storage + RAM) | High |
+| **Jellyfin** | `apps` | Media server for movies/series (requires storage) | High |
+| **Navidrome** | `apps` | Music streaming (small footprint, requires storage) | Medium |
 
-### Langfristig
+### Long-term
 
-| Service | Namespace | Beschreibung | Prio |
+| Service | Namespace | Description | Priority |
 |---|---|---|---|
-| **Home Assistant** | `apps` | Smart Home Hub | Mittel |
-| **Gitea / Forgejo** | `apps` | Privates Git für Azure Enterprise Module | Mittel |
-| **Uptime Kuma Monitors** | — | Alle Services monitoren (WebSocket API Setup nötig) | Niedrig |
+| **Home Assistant** | `apps` | Smart home hub | Medium |
+| **Gitea / Forgejo** | `apps` | Private git for Azure Enterprise modules | Medium |
+| **Uptime Kuma Monitors** | — | All services monitored (requires WebSocket API setup) | Low |
 
 ---
 
-## Hardware — Geplante Erweiterungen
+## Planned Hardware
 
-### Kurzfristig
+### Short-term
 
-- **4TB SSD** (M.2 NVMe oder SATA) am Proxmox Host
-  - Aktuell: lokaler ZFS-Pool (`local-zfs`) auf Systemplatte
-  - Ziel: extra Datastore für Immich-Fotos, Jellyfin-Medien, Garage S3
-  - Einbau: einfach, Proxmox erkennt automatisch
+- **4TB SSD** (M.2 NVMe or SATA) for Proxmox host
+  - Current: system drive only (local-zfs pool)
+  - Goal: dedicated datastore for Immich photos, Jellyfin media, Garage S3
+  - Installation: straightforward, Proxmox auto-detects
 
-### Langfristig
+### Long-term
 
-- **Silent SSD NAS** (z.B. Synology DS223j oder QNAP TS-233)
-  - Für Schlafzimmer — lautlos, passiv gekühlt
-  - SMB/NFS Share → Longhorn External Storage oder direkter Mount in k3s
-  - Für: Mediathek, Foto-Archiv, Backup-Ziel für Proxmox PBS
+- **Silent SSD NAS** (e.g., Synology DS223j or QNAP TS-233)
+  - Bedroom placement — fanless, passively cooled
+  - SMB/NFS share → Longhorn external storage or direct k3s mount
+  - Use case: media library, photo archive, PBS backup target
 
 ---
 
-## RAM-Plan (Proxmox Host — 64GB)
+## RAM Allocation (Proxmox Host — 64 GB)
 
-| VM / LXC | Aktuell | Geplant | Notiz |
+| VM / LXC | Current | Planned | Notes |
 |---|---|---|---|
-| k3s-11 (master) | 8 GB | **12 GB** (balloon: 4-12) | etcd + control plane |
-| k3s-12 (worker) | 8 GB | **16 GB** (balloon: 4-16) | App-Workloads |
-| k3s-13 (worker) | 8 GB | **16 GB** (balloon: 4-16) | App-Workloads |
+| k3s-11 (master) | 8 GB | **12 GB** (balloon: 4–12) | etcd + control plane overhead |
+| k3s-12 (worker) | 8 GB | **16 GB** (balloon: 4–16) | primary app workloads |
+| k3s-13 (worker) | 8 GB | **16 GB** (balloon: 4–16) | primary app workloads |
 | AI LXC (Ollama) | 32 GB | 32 GB | LLM inference |
 | Docker LXC | 4 GB | 4 GB | |
 | PBS | 2 GB | 2 GB | |
 | DMZ Proxy | 1 GB | 1 GB | |
 | DMZ Games | 4 GB | 4 GB | |
-| **Gesamt statisch** | **67 GB** | **87 GB** | Balloon erlaubt Overcommit |
+| **Total static** | **67 GB** | **87 GB** | Balloon enables overcommit |
 
-RAM-Update via Terraform → Atlantis PR bereits erstellt (`vm.tf`).
-
----
-
-## Monitoring-Ausbau (in Arbeit)
-
-- [ ] Ansible-Playbook ausführen: `ansible-playbook ansible/site.yml`
-      → deployt `node_exporter` auf RPi-01, RPi-02, Docker-LXC, AI-LXC
-- [ ] Proxmox API Token für `prometheus-pve-exporter` erstellen
-      → Proxmox UI → API Tokens → `prometheus@pve!prometheus` → Rolle `PVEAuditor`
-      → `kubectl edit secret pve-exporter-config -n monitoring`
+RAM update submitted as Terraform change → Atlantis PR (`terraform/stacks/proxmox/vm.tf`).
 
 ---
 
-## Notizen
+## Monitoring Expansion (Completed)
 
-- Velero Backups → Garage S3 (`velero`-Bucket auf `s3.woitzik.dev`)
-- Atlantis: Terraform-Changes nur via PR → `atlantis apply` Kommentar
-- MikroTik Firewall: Alle Regeln via Terraform — keine manuellen RouterOS-Änderungen
-- Authelia OIDC: Proxmox/PBS/Grafana/Headscale = `client_secret_basic`, ArgoCD = `client_secret_post`
+- [x] Prometheus scrapes `node_exporter` from RPi-01, RPi-02, Docker LXC, AI LXC
+- [x] `prometheus-pve-exporter` deployed in monitoring namespace
+- [x] Proxmox API token `prometheus@pve!prometheus` created with `PVEAuditor` role
+- [x] Grafana dashboards: Proxmox via Prometheus (10347, 19022), Node Exporter Full (1860)
+- [ ] Run `ansible-playbook ansible/site.yml` to verify monitoring on all nodes
+
+---
+
+## Notes
+
+- Velero backups target Garage S3 (`velero` bucket on `s3.woitzik.dev`)
+- Atlantis handles all Terraform changes — PRs only, never `terraform apply` locally
+- MikroTik firewall: all rules are Terraform-managed — no manual RouterOS changes
+- Authelia OIDC: Proxmox/PBS/Grafana/Headscale use `client_secret_basic`; ArgoCD uses `client_secret_post`
