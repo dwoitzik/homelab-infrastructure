@@ -80,6 +80,22 @@ data:
             icon: open-webui.png
             href: https://ai.woitzik.dev
             description: Local LLM Interface
+        - Nextcloud:
+            icon: nextcloud.png
+            href: https://nextcloud.woitzik.dev
+            description: Files · Calendar · Contacts
+        - Mealie:
+            icon: mealie.png
+            href: https://mealie.woitzik.dev
+            description: Recipe Manager
+        - Home Assistant:
+            icon: home-assistant.png
+            href: https://ha.woitzik.dev
+            description: Smart Home Hub
+        - Gitea:
+            icon: gitea.png
+            href: https://git.woitzik.dev
+            description: Private Git · Azure Modules
         - Garage S3:
             icon: minio.png
             href: https://s3.woitzik.dev
@@ -137,7 +153,7 @@ data:
       columns: 4
     Apps:
       style: grid
-      columns: 3
+      columns: 4
     Monitoring:
       style: grid
       columns: 3
