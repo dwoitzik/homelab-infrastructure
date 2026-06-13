@@ -22,7 +22,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   }
 
   memory {
-    dedicated = 8192
+    dedicated = 12288
+    floating  = 4096
   }
 
   disk {
@@ -79,7 +80,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   }
 
   memory {
-    dedicated = 8192
+    dedicated = 16384
+    floating  = 4096
   }
 
   disk {
@@ -136,7 +138,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   }
 
   memory {
-    dedicated = 8192
+    dedicated = 16384
+    floating  = 4096
   }
 
   disk {
