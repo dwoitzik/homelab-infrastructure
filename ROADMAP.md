@@ -2,29 +2,29 @@
 
 ## Planned Services
 
-### Short-term
+### Deployed
 
-| Service | Namespace | Description | Priority |
-|---|---|---|---|
-| **Renovate Bot** | `apps` | Automatic dependency updates via PRs on GitHub | High |
-| **Mealie** | `apps` | Recipe manager (small footprint, quick to deploy) | Medium |
-| **Nextcloud** | `apps` | File sync, CalDAV/CardDAV, contacts & calendar | Medium |
+| Service | URL | Notes |
+|---|---|---|
+| **Renovate Bot** | — | CronJob, every 2h — apply GitHub PAT secret before first run |
+| **Mealie** | mealie.woitzik.dev | SQLite, 5Gi PVC, Authelia-protected |
+| **Nextcloud** | nextcloud.woitzik.dev | PostgreSQL + Redis, 20Gi PVC — apply secrets before first sync |
+| **Gitea** | git.woitzik.dev | SQLite, 10Gi PVC — apply secrets before first sync |
+| **Home Assistant** | ha.woitzik.dev | IP-based integrations, 5Gi PVC |
 
-### Mid-term (after 4TB SSD)
+### Pending (requires 4TB SSD)
 
-| Service | Namespace | Description | Priority |
-|---|---|---|---|
-| **Immich** | `apps` | Photo backup with ML face recognition (requires storage + RAM) | High |
-| **Jellyfin** | `apps` | Media server for movies/series (requires storage) | High |
-| **Navidrome** | `apps` | Music streaming (small footprint, requires storage) | Medium |
+| Service | Namespace | Description |
+|---|---|---|
+| **Immich** | `apps` | Photo backup with ML face recognition |
+| **Jellyfin** | `apps` | Media server for movies/series |
+| **Navidrome** | `apps` | Music streaming |
 
-### Long-term
+### Pending (other)
 
-| Service | Namespace | Description | Priority |
-|---|---|---|---|
-| **Home Assistant** | `apps` | Smart home hub | Medium |
-| **Gitea / Forgejo** | `apps` | Private git for Azure Enterprise modules | Medium |
-| **Uptime Kuma Monitors** | — | All services monitored (requires WebSocket API setup) | Low |
+| Service | Notes |
+|---|---|
+| **Uptime Kuma Monitors** | WebSocket API setup required via web UI at status.woitzik.dev |
 
 ---
 
