@@ -29,8 +29,7 @@
   hosts: mgmt_nodes
   become: true
   roles:
-    - docker
-    - monitoring_agent
+    - node_exporter_native
     - pbs
 
 - name: Provision DMZ External Proxy
@@ -50,6 +49,5 @@
   hosts: ai_nodes
   become: true
   roles:
-    - docker
-    - monitoring_agent
+    - node_exporter_native
     - ollama
