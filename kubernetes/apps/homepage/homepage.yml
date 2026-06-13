@@ -6,92 +6,130 @@ metadata:
 data:
   services.yaml: |
     - Infrastructure:
-        - Proxmox:
+        - Proxmox VE:
             icon: proxmox.png
             href: https://pve.woitzik.dev
-            description: Virtualization Platform
+            description: Hypervisor · 3 VMs, 5 LXC
+            siteMonitor: https://pve.woitzik.dev
         - PBS:
             icon: proxmox.png
             href: https://backup.woitzik.dev
             description: Proxmox Backup Server
-        - Router:
+            siteMonitor: https://backup.woitzik.dev
+        - MikroTik:
             icon: mikrotik.png
             href: https://router.woitzik.dev
-            description: MikroTik RB5009
-    - Cloud Native:
+            description: RB5009 · Core Router
+        - Headscale:
+            icon: tailscale.png
+            href: https://headscale.woitzik.dev
+            description: VPN Mesh Controller
+    - Platform:
         - ArgoCD:
-            icon: argocd
+            icon: argocd.png
             href: https://argo.woitzik.dev
+            description: GitOps · homelab-infrastructure
             widget:
               type: argocd
-              url: http://argocd-server.argocd.svc.cluster.local:80
+              url: http://argocd-server.argocd.svc.cluster.local
               key: "{{HOMEPAGE_VAR_ARGOCD_TOKEN}}"
-        - Longhorn:
-            icon: longhorn.png
-            href: https://longhorn.woitzik.dev
         - Traefik:
-            icon: traefik
+            icon: traefik.png
             href: https://traefik.woitzik.dev
+            description: Edge Router · 35+ Routes
             widget:
               type: traefik
               url: http://traefik-api.kube-system.svc.cluster.local:9000
-    - Core Apps:
-        - Vaultwarden:
-            icon: vaultwarden.png
-            href: https://vault.woitzik.dev
+        - Longhorn:
+            icon: longhorn.png
+            href: https://longhorn.woitzik.dev
+            description: Distributed Block Storage
+    - Security:
         - Authelia:
             icon: authelia.png
             href: https://auth.woitzik.dev
-        - AdGuard:
+            description: SSO · 2FA Identity Provider
+        - Vaultwarden:
+            icon: vaultwarden.png
+            href: https://vault.woitzik.dev
+            description: Password Manager
+        - AdGuard A:
             icon: adguard-home.png
-            href: https://dns.woitzik.dev
+            href: http://10.0.20.2:3001
+            description: DNS Filter · rpi-srv-01
             widget:
               type: adguard
               url: http://10.0.20.2:3001
-              username: dw
+              username: admin
               password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
-    - Productivity:
-        - Paperless:
-            icon: paperless.png
+        - AdGuard B:
+            icon: adguard-home.png
+            href: http://10.0.20.3:3001
+            description: DNS Filter · rpi-srv-02
+            widget:
+              type: adguard
+              url: http://10.0.20.3:3001
+              username: admin
+              password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
+    - Apps:
+        - Paperless-ngx:
+            icon: paperless-ngx.png
             href: https://docs.woitzik.dev
-        - Garage:
-            icon: garage
-            href: https://s3.woitzik.dev
-            description: S3 Object Storage
+            description: Document Management
         - Open WebUI:
             icon: open-webui.png
             href: https://ai.woitzik.dev
+            description: Local LLM Interface
+        - Garage S3:
+            icon: minio.png
+            href: https://garage-s3.woitzik.dev
+            description: S3 Object Storage · Velero / TF State
     - Monitoring:
         - Grafana:
             icon: grafana.png
             href: https://monitoring.woitzik.dev
+            description: Metrics · k3s Cluster
             widget:
               type: grafana
-              url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
+              url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local
               username: admin
               password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
-        - Uptime Kuma:
-            icon: uptime-kuma
-            href: https://status.woitzik.dev
-            widget:
-              type: uptimekuma
-              url: http://uptime-kuma-api.monitoring.svc.cluster.local:3001
-              slug: default
+        - Loki:
+            icon: grafana-loki.png
+            href: https://loki.woitzik.dev
+            description: Log Aggregation · Promtail
   widgets.yaml: |
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showNodes: true
+        nodes:
+          show: true
+          cpu: true
+          memory: true
     - search:
         provider: google
         target: _blank
+    - datetime:
+        text_size: xl
+        format:
+          dateStyle: short
+          timeStyle: short
+          hour12: false
+          locale: de-DE
   layout.yaml: |
     Infrastructure:
       style: grid
-      columns: 3
-    Cloud Native:
+      columns: 4
+    Platform:
       style: grid
       columns: 3
-    Core Apps:
+    Security:
       style: grid
-      columns: 3
-    Productivity:
+      columns: 4
+    Apps:
       style: grid
       columns: 3
     Monitoring:
@@ -101,6 +139,7 @@ data:
     title: David's Homelab
     theme: dark
     color: slate
+    fontFamily: Inter
     layout:
       header:
         style: grid
@@ -109,20 +148,32 @@ data:
     hideConfig: true
   bookmarks.yaml: |
     - Developer:
-        - Github:
-            - abbr: GH
-              href: https://github.com/
-              icon: github.png
-    - Social:
-        - Reddit:
-            - abbr: RE
-              href: https://reddit.com/
-              icon: reddit.png
-    - Entertainment:
+        - GitHub:
+            - icon: si-github
+              href: https://github.com
+        - Docker Hub:
+            - icon: si-docker
+              href: https://hub.docker.com
+        - Artifact Hub:
+            - icon: si-helm
+              href: https://artifacthub.io
+    - Media:
         - YouTube:
-            - abbr: YT
-              href: https://youtube.com/
-              icon: youtube.png
+            - icon: si-youtube
+              href: https://youtube.com
+        - Reddit:
+            - icon: si-reddit
+              href: https://reddit.com
+    - Cloud:
+        - Cloudflare:
+            - icon: si-cloudflare
+              href: https://dash.cloudflare.com
+        - Azure Portal:
+            - icon: si-microsoftazure
+              href: https://portal.azure.com
+        - Lemon Squeezy:
+            - icon: si-lemonsqueezy
+              href: https://app.lemonsqueezy.com
   custom.css: |
     body {
       background: radial-gradient(circle at top, #141414 0%, #050505 100%) !important;
@@ -131,41 +182,42 @@ data:
     }
     .grid { gap: 1.5rem !important; }
     .card {
-      background: rgba(25, 25, 25, 0.4) !important;
+      background: rgba(20, 20, 20, 0.5) !important;
       backdrop-filter: blur(12px) saturate(180%) !important;
       -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
-      border: 1px solid rgba(255, 255, 255, 0.08) !important;
-      border-radius: 16px !important;
+      border: 1px solid rgba(255, 255, 255, 0.06) !important;
+      border-radius: 14px !important;
       padding: 1.25rem !important;
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
     .card:hover {
-      border-color: rgba(230, 126, 34, 0.6) !important;
-      transform: scale(1.02) translateY(-4px) !important;
-      background: rgba(40, 40, 40, 0.6) !important;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1) !important;
+      border-color: rgba(255, 140, 0, 0.55) !important;
+      transform: scale(1.02) translateY(-3px) !important;
+      background: rgba(35, 35, 35, 0.65) !important;
+      box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 140, 0, 0.1) !important;
     }
-    .group-title {
-      color: #888 !important;
-      font-size: 0.8rem !important;
+    .group-title, #services-header span {
+      color: #777 !important;
+      font-size: 0.75rem !important;
       font-weight: 800 !important;
-      letter-spacing: 0.15em !important;
-      margin: 2rem 0 1rem 0 !important;
-      border-left: 3px solid #e67e22 !important;
-      padding-left: 1rem !important;
+      letter-spacing: 0.12em !important;
       text-transform: uppercase !important;
+      border-left: 3px solid #FF8C00 !important;
+      padding-left: 0.75rem !important;
     }
-    .text-slate-500 { color: #777 !important; font-size: 0.85rem !important; }
+    .text-slate-500 { color: #666 !important; font-size: 0.82rem !important; }
     .icon {
-      filter: grayscale(1) opacity(0.7) !important;
-      transition: all 0.4s ease !important;
-      width: 42px !important;
-      height: 42px !important;
+      filter: grayscale(1) opacity(0.65) !important;
+      transition: filter 0.3s ease, transform 0.3s ease !important;
+      width: 40px !important;
+      height: 40px !important;
     }
     .card:hover .icon {
       filter: grayscale(0) opacity(1) !important;
-      transform: rotate(-5deg) scale(1.1) !important;
+      transform: scale(1.08) !important;
     }
+    /* Widget stats — orange accent */
+    .widget-stats span { color: #FF8C00 !important; }
 ---
 apiVersion: apps/v1
 kind: Deployment
