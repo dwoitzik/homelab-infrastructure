@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/part-of: argocd
 data:
   url: https://argo.woitzik.dev
+  accounts.admin: apiKey, login
   oidc.config: |
     name: Authelia
     issuer: https://auth.woitzik.dev
