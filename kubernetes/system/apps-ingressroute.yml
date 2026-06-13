@@ -85,6 +85,29 @@ spec:
     services: [{name: vaultwarden, port: 80}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
+# AdGuard Home external service (primary RPi at 10.0.20.2:3001)
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-dns
+  namespace: apps
+spec:
+  clusterIP: None
+  ports:
+  - port: 3001
+    targetPort: 3001
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: external-dns
+  namespace: apps
+subsets:
+- addresses:
+  - ip: 10.0.20.2
+  ports:
+  - port: 3001
+---
 # DNS (AdGuard)
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
