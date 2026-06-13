@@ -29,6 +29,32 @@ spec:
               searchNamespace: ALL
               label: grafana_dashboard
               labelValue: "1"
+          dashboardProviders:
+            dashboardproviders.yaml:
+              apiVersion: 1
+              providers:
+                - name: 'grafana-com'
+                  orgId: 1
+                  folder: 'Infrastructure'
+                  type: file
+                  disableDeletion: false
+                  editable: true
+                  options:
+                    path: /var/lib/grafana/dashboards/grafana-com
+          dashboards:
+            grafana-com:
+              proxmox-pve:
+                gnetId: 10347
+                revision: 9
+                datasource: Prometheus
+              node-exporter-full:
+                gnetId: 1860
+                revision: 37
+                datasource: Prometheus
+              proxmox-summary:
+                gnetId: 19022
+                revision: 5
+                datasource: Prometheus
           additionalDataSources:
             - name: Loki
               type: loki
@@ -88,6 +114,51 @@ spec:
                   resources:
                     requests:
                       storage: 20Gi
+            additionalScrapeConfigs:
+              - job_name: 'node-exporter-rpi'
+                static_configs:
+                  - targets:
+                      - '10.0.20.2:9100'
+                      - '10.0.20.3:9100'
+                    labels:
+                      group: 'rpi_nodes'
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: instance
+              - job_name: 'node-exporter-app'
+                static_configs:
+                  - targets:
+                      - '10.0.20.252:9100'
+                    labels:
+                      group: 'app_nodes'
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: instance
+              - job_name: 'node-exporter-ai'
+                static_configs:
+                  - targets:
+                      - '10.0.20.251:9100'
+                    labels:
+                      group: 'ai_nodes'
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: instance
+              - job_name: 'proxmox-pve'
+                metrics_path: /pve
+                params:
+                  module: [default]
+                  cluster: ['1']
+                  node: ['pve']
+                static_configs:
+                  - targets:
+                      - 'pve-exporter.monitoring.svc.cluster.local:9221'
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - source_labels: [__param_target]
+                    target_label: instance
+                  - target_label: __address__
+                    replacement: 'pve-exporter.monitoring.svc.cluster.local:9221'
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
