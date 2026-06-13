@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pve-exporter-config
+  namespace: monitoring
+type: Opaque
+stringData:
+  pve.yml: |
+    default:
+      user: prometheus@pve
+      token_name: prometheus
+      token_value: REPLACE_WITH_TOKEN_VALUE
+      verify_ssl: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pve-exporter
+  namespace: monitoring
+  labels:
+    app: pve-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pve-exporter
+  template:
+    metadata:
+      labels:
+        app: pve-exporter
+    spec:
+      containers:
+      - name: pve-exporter
+        image: prompve/prometheus-pve-exporter:latest
+        ports:
+        - containerPort: 9221
+        args:
+          - --config.file=/etc/pve/pve.yml
+        volumeMounts:
+        - name: config
+          mountPath: /etc/pve
+          readOnly: true
+        env:
+        - name: PVE_URL
+          value: "https://10.0.10.10:8006"
+      volumes:
+      - name: config
+        secret:
+          secretName: pve-exporter-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pve-exporter
+  namespace: monitoring
+  labels:
+    app: pve-exporter
+spec:
+  ports:
+  - port: 9221
+    targetPort: 9221
+  selector:
+    app: pve-exporter
