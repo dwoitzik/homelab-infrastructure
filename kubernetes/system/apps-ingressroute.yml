@@ -191,6 +191,7 @@ spec:
     kind: Rule
     middlewares:
       - name: authelia
+        namespace: apps
     services: [{name: uptime-kuma, port: 3001}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---

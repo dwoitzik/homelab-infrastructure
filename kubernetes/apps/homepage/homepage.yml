@@ -60,7 +60,7 @@ data:
             widget:
               type: adguard
               url: http://10.0.20.2:3001
-              username: admin
+              username: dw
               password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
         - AdGuard B:
             icon: adguard-home.png
@@ -69,7 +69,7 @@ data:
             widget:
               type: adguard
               url: http://10.0.20.3:3001
-              username: admin
+              username: dw
               password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
     - Apps:
         - Paperless-ngx:
@@ -82,7 +82,7 @@ data:
             description: Local LLM Interface
         - Garage S3:
             icon: minio.png
-            href: https://garage-s3.woitzik.dev
+            href: https://s3.woitzik.dev
             description: S3 Object Storage · Velero / TF State
     - Monitoring:
         - Grafana:
@@ -94,6 +94,14 @@ data:
               url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local
               username: admin
               password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+        - Uptime Kuma:
+            icon: uptime-kuma.png
+            href: https://status.woitzik.dev
+            description: Service Uptime Monitor
+            widget:
+              type: uptimekuma
+              url: http://uptime-kuma.monitoring.svc.cluster.local:3001
+              slug: default
         - Loki:
             icon: grafana-loki.png
             href: https://loki.woitzik.dev
@@ -134,7 +142,7 @@ data:
       columns: 3
     Monitoring:
       style: grid
-      columns: 2
+      columns: 3
   settings.yaml: |
     title: David's Homelab
     theme: dark
