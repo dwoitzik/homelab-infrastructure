@@ -251,3 +251,17 @@ spec:
     kind: Rule
     services: [{name: gitea, port: 3000}]
   tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Home Assistant
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ha-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`ha.woitzik.dev`)
+    kind: Rule
+    services: [{name: home-assistant, port: 8123}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
