@@ -4,149 +4,211 @@
 
 # Homelab Infrastructure as Code
 
-Configuration and automation for a highly available, secure homelab environment. This project manages the full lifecycle of local hardware, network routing, and integrated cloud services entirely through automated Infrastructure as Code workflows — from bare metal provisioning to application deployment.
+Full-stack homelab managed entirely through Infrastructure as Code — from MikroTik firewall rules to Kubernetes application deployments. All changes flow through pull requests; nothing is applied manually.
 
-> All infrastructure changes flow through **Atlantis** (self-hosted GitOps) via pull requests. No manual `terraform apply` or ad-hoc changes.
-
-## 🛠️ Infrastructure Stack
+## Stack Overview
 
 | Layer | Technology |
 |---|---|
-| Hypervisor | Proxmox VE (Ryzen 7 5825U) |
-| Networking | MikroTik RB5009 (RouterOS) |
-| Edge nodes | 2× Raspberry Pi 4B (Debian) |
-| Reverse proxy & SSL | Nginx Proxy Manager + Let's Encrypt wildcard |
-| DNS & ad-blocking | AdGuard Home + Unbound (recursive) |
-| Monitoring | Prometheus + Grafana + node exporter + SNMP |
-| Secrets | Ansible Vault + Vaultwarden |
-| Security | CrowdSec firewall bouncer |
-| GitOps | Atlantis (self-hosted, Cloudflare Tunnel) |
-| Cloud governance | Microsoft Azure Arc |
+| Hypervisor | Proxmox VE (Ryzen 7 5825U, 64 GB RAM) |
+| Networking | MikroTik RB5009 (Terraform-managed firewall) |
+| Edge DNS | 2× Raspberry Pi 4B — AdGuard Home + Unbound |
+| Kubernetes | k3s v1.31 — 3-node cluster (1 control-plane + 2 workers) |
+| Ingress + TLS | Traefik + cert-manager (wildcard `*.woitzik.dev` via DNS-01) |
+| Storage | Longhorn (distributed block storage, 3× replication) |
+| GitOps (k8s) | ArgoCD — ApplicationSet watching `kubernetes/apps/*` |
+| GitOps (TF) | Atlantis — self-hosted, exposed via Cloudflare Tunnel |
+| Auth | Authelia — SSO/OIDC for all protected services |
+| VPN | Headscale (self-hosted Tailscale control plane) |
+| Secrets | Ansible Vault (Ansible) + Kubernetes Secrets (cluster) |
+| Backups | Velero → Garage S3 (k8s) + PBS → rclone → Google Drive (VMs) |
 
-## 🗺️ Architecture
+## Architecture
 
 ```mermaid
 graph TB
-    subgraph cloud["☁️ Cloud & External"]
+    subgraph cloud["Cloud & External"]
         NET([Internet])
-        CF["Cloudflare\nDNS-01 · Tunnel · *.woitzik.dev"]
-        AZ["Microsoft Azure\nArc-enabled governance"]
+        CF["Cloudflare\nDNS · Tunnel · *.woitzik.dev"]
     end
 
-    subgraph router["🔀 Network Layer"]
-        MK["MikroTik RB5009\nVLAN isolation · zero-trust firewall · hairpin NAT"]
-        VLAN["VLAN Zones\nMgmt · DMZ · Server · IoT"]
+    subgraph router["Network Layer"]
+        MK["MikroTik RB5009\nVLAN 10/20/30 · Default-drop firewall"]
     end
 
-    subgraph compute["🖥️ Compute — Proxmox VE"]
-        PVE["Proxmox VE\nRyzen 7 5825U"]
-        DOCKER["Docker LXC\nAtlantis · Grafana · Vaultwarden · MikroDash"]
+    subgraph k3s["k3s Cluster — 10.0.20.11-13"]
+        LB["MetalLB\n10.0.20.200"]
+        TR["Traefik\nEdge router · TLS termination"]
+        ARGO["ArgoCD\nGitOps · kubernetes/apps/*"]
+        APPS["Applications\nNextcloud · Paperless · Vaultwarden\nMealie · Gitea · Home Assistant\nOpen WebUI · Uptime Kuma · Garage S3"]
+        MON["Monitoring\nPrometheus · Grafana · Loki"]
+        ATL["Atlantis\nTerraform GitOps"]
     end
 
-    subgraph edge["🍓 Edge Cluster — Keepalived VIP"]
-        RPI1["RPi 4B — primary\nAdGuard · Unbound · NPM"]
-        RPI2["RPi 4B — replica\nAdGuard sync · standby"]
-        VIP(["Virtual IP · Active/Passive failover"])
+    subgraph edge["RPi Edge Cluster — Keepalived VIP"]
+        RPI1["RPi 4B — primary\nAdGuard · Unbound"]
+        RPI2["RPi 4B — replica\nAdGuard standby"]
     end
 
-    subgraph gitops["⚙️ GitOps Pipeline"]
-        GH["GitHub PR"]
-        ATL["Atlantis\nterraform plan/apply"]
-        CFT["Cloudflare Tunnel\nzero inbound ports"]
-    end
-
-    subgraph iac["🔧 IaC & Automation"]
-        TF["Terraform\nMikroTik · Proxmox · Cloudflare"]
-        AN["Ansible\nRoles · Vault · HA cluster"]
-        GHA["GitHub Actions\ntflint · ansible-lint"]
+    subgraph infra["Infrastructure VMs/LXC"]
+        PBS["PBS (LXC 110)\nProxmox Backup Server"]
+        AI["AI LXC (LXC 201)\nOllama LLM inference"]
+        DMZ["DMZ Proxy (LXC 301)\nNginx Proxy Manager"]
     end
 
     NET --> MK
-    CF -. "wildcard cert + tunnel" .-> DOCKER
-    AZ -. "Arc agent" .-> PVE
-    MK --> VLAN
-    MK --> PVE
+    CF -. "DNS-01 + Tunnel" .-> LB
+    MK --> LB
+    LB --> TR
+    TR --> ARGO
+    TR --> APPS
+    TR --> MON
+    TR --> ATL
     MK --> RPI1
-    PVE --> DOCKER
     RPI1 -. "sync" .-> RPI2
-    RPI1 --> VIP
-    RPI2 --> VIP
-    GH --> CFT --> ATL --> TF
-    iac -. "provisions" .-> compute
-    iac -. "configures" .-> edge
-    iac -. "manages" .-> router
+    MK --> PBS
+    MK --> AI
+    MK --> DMZ
 ```
 
-## 📊 Monitoring
-
-| Dashboard | Description |
-|---|---|
-| Node Exporter Full | CPU, memory, disk, network for all 5 hosts |
-| MikroTik Network | Interface traffic, errors, discards per VLAN |
-
-![Node Exporter Dashboard](docs/images/grafana-node-exporter.png)
-![MikroTik Dashboard](docs/images/grafana-mikrotik.png)
-
-## 📁 Repository Layout
+## Repository Layout
 
 ```
+├── kubernetes/
+│   ├── apps/                # ArgoCD-managed workloads (ApplicationSet)
+│   │   ├── atlantis/        # Terraform GitOps runner
+│   │   ├── authelia/        # SSO / OIDC identity provider
+│   │   ├── cloudflared/     # Cloudflare Tunnel
+│   │   ├── garage/          # S3-compatible object storage
+│   │   ├── gitea/           # Private git instance
+│   │   ├── headscale/       # Tailscale control plane
+│   │   ├── home-assistant/  # Smart home hub
+│   │   ├── homepage/        # Dashboard
+│   │   ├── mealie/          # Recipe manager
+│   │   ├── nextcloud/       # Files · CalDAV · CardDAV
+│   │   ├── open-webui/      # Local LLM interface (Ollama)
+│   │   ├── paperless/       # Document management
+│   │   ├── renovate/        # Dependency update bot
+│   │   ├── uptime-kuma/     # Uptime monitoring
+│   │   └── vaultwarden/     # Password manager
+│   └── system/              # Manually-applied system components
+│       ├── argocd/          # ArgoCD config (RBAC, OIDC)
+│       ├── cert-manager/    # TLS certificate automation
+│       ├── longhorn/        # Distributed storage
+│       ├── metallb/         # LoadBalancer IPs
+│       ├── monitoring/      # kube-prometheus-stack + Loki + PVE exporter
+│       ├── postgres/        # Authelia PostgreSQL
+│       ├── redis/           # Authelia Redis
+│       ├── traefik/         # Traefik ingress
+│       ├── velero/          # Cluster backup to Garage S3
+│       ├── apps-ingressroute.yml   # All app IngressRoutes
+│       └── other-ingressroute.yml  # System IngressRoutes (ArgoCD, Grafana, Longhorn)
 ├── terraform/
 │   └── stacks/
-│       ├── network/          # MikroTik firewall, VLANs, NAT
-│       └── proxmox/          # LXC container definitions
+│       ├── network/         # MikroTik — VLANs, firewall, DHCP, NAT
+│       └── proxmox/         # VMs and LXC containers
 ├── ansible/
-│   ├── roles/                # One role per service (18 roles)
-│   ├── group_vars/           # Variables + Ansible Vault secrets
+│   ├── roles/               # One role per service (14 roles)
+│   ├── group_vars/          # Variables + Ansible Vault secrets
+│   ├── k3s-cluster/         # k3s provisioning (install, upgrade, reset)
 │   └── inventory.ini
+├── docker/                  # Docker Compose for DMZ services
+│   ├── crafty/              # Minecraft server manager (dmz_games LXC)
+│   └── npmplus/             # Nginx Proxy Manager Plus (dmz_proxies LXC)
 ├── docs/
-│   ├── decisions/            # ADR-001 through ADR-004
-│   └── images/               # Screenshots
-├── atlantis.yaml             # GitOps — manages network + proxmox stacks
-└── .github/workflows/ci.yml  # Terraform lint + Ansible lint
+│   ├── decisions/           # ADR-001 through ADR-004
+│   └── *.md                 # Architecture, naming, topology, VLAN docs
+├── network/
+│   └── scripts/bootstrap.rsc  # MikroTik initial bootstrap (RouterOS script)
+├── atlantis.yaml            # Atlantis — stack definitions
+└── .github/workflows/ci.yml # Terraform lint + Ansible lint
 ```
 
-## 🚀 Core Architectural Concepts
+## Kubernetes Services
 
-### 1. GitOps with Atlantis
-All Terraform changes are applied exclusively through pull requests. Atlantis runs `terraform plan` automatically on every PR and posts the diff as a comment. Applying requires an explicit `atlantis apply` comment — no direct CLI access to production. Atlantis is exposed via Cloudflare Tunnel with zero inbound ports open.
+| Service | URL | Auth |
+|---|---|---|
+| Homepage | home.woitzik.dev | Authelia |
+| ArgoCD | argo.woitzik.dev | Authelia OIDC |
+| Grafana | monitoring.woitzik.dev | Authelia OIDC |
+| Longhorn | longhorn.woitzik.dev | Authelia |
+| Traefik | traefik.woitzik.dev | Authelia |
+| Uptime Kuma | status.woitzik.dev | Authelia |
+| Paperless-ngx | docs.woitzik.dev | Authelia |
+| Open WebUI | ai.woitzik.dev | Authelia |
+| Vaultwarden | vault.woitzik.dev | Built-in |
+| Nextcloud | nextcloud.woitzik.dev | Built-in |
+| Mealie | mealie.woitzik.dev | Authelia |
+| Gitea | git.woitzik.dev | Built-in |
+| Home Assistant | ha.woitzik.dev | Built-in |
+| Headscale | headscale.woitzik.dev | Built-in |
+| Atlantis | atlantis.woitzik.dev | GitHub HMAC |
+| AdGuard Home | dns.woitzik.dev | Authelia |
+| Proxmox VE | pve.woitzik.dev | Authelia OIDC |
+| PBS | backup.woitzik.dev | Authelia OIDC |
+| MikroTik | router.woitzik.dev | Authelia |
+| Garage S3 | s3.woitzik.dev | Key auth |
 
-### 2. High Availability & Clustering
-Active/Passive failover across both Raspberry Pi edge nodes using Keepalived with a shared Virtual IP. AdGuard Home configuration is continuously replicated from primary to replica via `adguardhome-sync`. Failover is transparent to clients — no reconfiguration needed.
+## VLAN Layout
 
-### 3. Privacy-First DNS Resolution
-Unbound runs as a full recursive resolver, querying root DNS servers directly with no upstream provider. AdGuard Home sits in front for filtering and ad-blocking. Kernel network buffers are tuned via Ansible for high-volume UDP throughput.
+| VLAN | Zone | Subnet | Key Hosts |
+|---|---|---|---|
+| 10 | Management | 10.0.10.0/24 | Proxmox (10.0.10.10), PBS (10.0.10.110), MikroTik API (10.0.10.1) |
+| 20 | Server | 10.0.20.0/24 | k3s (10.0.20.11-13), RPi (10.0.20.2-3), MetalLB (10.0.20.200) |
+| 30 | DMZ | 10.0.30.0/24 | Proxy (10.0.30.2), Games (10.0.30.3) |
 
-### 4. Zero-Trust Network Security
-Strict VLAN segmentation across Management, DMZ, Server, and IoT zones. MikroTik forward/input chains default-drop with explicit accept rules per flow. CrowdSec firewall bouncer runs on DMZ nodes. All firewall rules are managed as Terraform resources — no manual RouterOS changes.
+## Terraform Workflow
 
-### 5. Observability
-Prometheus scrapes node exporter metrics from all hosts and SNMP metrics from the MikroTik router. Grafana provides dashboards for host health, network traffic, and DNS query rates.
+All Terraform changes go through Atlantis (self-hosted GitOps):
 
-### 6. Secrets Management
-Ansible Vault encrypts all credentials at rest. Vaultwarden provides a self-hosted password manager for operational secrets. No secrets committed to the repository in plaintext.
-
-## 🔄 Making Changes
-
-### Infrastructure (Terraform)
 ```bash
 git checkout -b feature/my-change
-# edit terraform/stacks/network/*.tf
-git push origin feature/my-change
-# open PR → Atlantis posts terraform plan automatically
-# comment "atlantis apply" to apply
+# edit terraform/stacks/network/*.tf or terraform/stacks/proxmox/*.tf
+git push && gh pr create
+# Atlantis auto-plans on PR open
+# comment "atlantis apply" on the PR to apply
+# merge after apply succeeds
 ```
 
-### Configuration (Ansible)
+Never run `terraform apply` locally — all applies go through Atlantis.
+
+## Ansible Workflow
+
 ```bash
-# dry run
-ansible-playbook ansible/playbooks/site.yml --check --vault-password-file ansible/.ansible_vault_pass
+# Dry run
+ansible-playbook ansible/playbooks/site.yml --check
 
-# apply to specific hosts
-ansible-playbook ansible/playbooks/site.yml --limit app_nodes --vault-password-file ansible/.ansible_vault_pass
+# Apply to specific group
+ansible-playbook ansible/playbooks/site.yml --limit rpi_nodes
+
+# Edit secrets
+ansible-vault edit ansible/group_vars/all/vault.yml
 ```
 
-## 📖 Documentation
+## Adding a New k8s Service
+
+1. Create `kubernetes/apps/<service>/<service>.yml` with Deployment + Service + PVC
+2. ArgoCD ApplicationSet auto-detects the new directory and deploys it
+3. Add IngressRoute to `kubernetes/system/apps-ingressroute.yml`
+4. Run `kubectl apply -f kubernetes/system/apps-ingressroute.yml`
+
+## Monitoring
+
+Prometheus scrapes metrics from all hosts:
+- k3s nodes: DaemonSet node_exporter (10.0.20.11-13)
+- Raspberry Pis: node_exporter Docker container (10.0.20.2-3)
+- Docker LXC: node_exporter Docker container (10.0.20.252)
+- AI LXC + PBS: node_exporter native binary (10.0.20.251, 10.0.10.110)
+- Proxmox host: prometheus-pve-exporter in-cluster (10.0.10.10)
+
+Grafana dashboards: Node Exporter Full (1860), Proxmox PVE (10347, 19022).
+
+## Documentation
 
 - [Architecture Decision Records](docs/decisions/)
-- [Ansible roles](ansible/README.md)
-- [Terraform stacks](terraform/README.md)
+- [k3s Cluster Architecture](docs/k3s-architecture.md)
+- [VLAN Segmentation](docs/vlan-segmentation.md)
+- [Backup Strategy](docs/backup-strategy.md)
+- [SSO Setup (Proxmox/PBS)](docs/SSO_SETUP.md)
+- [Naming Convention](docs/naming-convention.md)
+- [Roadmap](ROADMAP.md)
