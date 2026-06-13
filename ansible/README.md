@@ -1,29 +1,52 @@
-# 🛠️ My Ansible Configuration
+# Ansible
 
-I use Ansible to manage the base OS and core services that aren't (yet) in the K3s cluster.
+Manages the base OS and services that run outside the k3s cluster.
 
-## 🏗️ Deployment Status
+## What Ansible manages
 
-I've started migrating my primary applications to K3s. To avoid conflicts, I've commented out the following roles in `site.yml`:
-- `authelia`: Now running as a high-availability deployment in K3s.
-- `paperless`: Migrated to gain distributed storage via Longhorn.
-- `minio`: Moved to the cluster for better resource management.
-- `vaultwarden`: My password manager is now cluster-native.
-- `open_webui`: Migrated to the cluster.
+| Host group | Hosts | Roles |
+|---|---|---|
+| `rpi_nodes` | rpi-srv-01 (10.0.20.2), rpi-srv-02 (10.0.20.3) | common, docker, watchtower, monitoring_agent, rpi_optimize, keepalived, adguard, unbound, haproxy |
+| `app_nodes` | ct-srv-docker-01 (10.0.20.252) | common, docker, watchtower, monitoring_agent |
+| `dmz_proxies` | ct-dmz-proxy-01 (10.0.30.2) | common, docker, watchtower, monitoring_agent, nginx_proxy_manager, crowdsec_bouncer |
+| `dmz_games` | ct-dmz-games-01 (10.0.30.3) | common, docker, watchtower, monitoring_agent, minecraft |
+| `mgmt_nodes` | ct-mgmt-pbs-01 (10.0.10.110) | node_exporter_native, pbs |
+| `ai_nodes` | ct-srv-ai-01 (10.0.20.251) | node_exporter_native, ollama |
 
-## 🍓 Raspberry Pi Edge Cluster
-The RPis still run natively for now to handle core network services:
-- **Keepalived**: High-availability VIP for DNS.
-- **AdGuard Home**: DNS filtering and blocking.
-- **Unbound**: Recursive DNS resolution.
-- **HAProxy**: Load balancing for the Edge.
+Services that previously ran via Ansible (authelia, vaultwarden, paperless, open_webui, minio, monitoring) have been migrated to k3s and are now managed by ArgoCD.
 
-## 🚀 How I Run It
+## Running playbooks
 
 ```bash
-# I run this when I want to update the base nodes
-ansible-playbook playbooks/site.yml --vault-password-file .ansible_vault_pass
+# Dry run (check mode)
+ansible-playbook playbooks/site.yml --check
+
+# Apply to all hosts
+ansible-playbook playbooks/site.yml
+
+# Apply to a single group
+ansible-playbook playbooks/site.yml --limit rpi_nodes
+
+# Apply to a single host
+ansible-playbook playbooks/site.yml --limit rpi-srv-01
 ```
 
-## 🔐 Secrets Management
-I store all my credentials in `group_vars/all/vault.yml`. I use Ansible Vault to keep them encrypted.
+The vault password file must exist at `ansible/.ansible_vault_pass` before running.
+
+## Secrets
+
+All secrets are encrypted in `group_vars/all/vault.yml` with Ansible Vault.
+
+```bash
+ansible-vault edit group_vars/all/vault.yml
+```
+
+## k3s provisioning
+
+`ansible/k3s-cluster/` contains the k3s installation playbook (based on k3s-ansible).
+Use this to provision a fresh cluster or upgrade existing nodes.
+
+```bash
+cd ansible/k3s-cluster
+ansible-playbook playbooks/site.yml -i inventory.yml
+```
