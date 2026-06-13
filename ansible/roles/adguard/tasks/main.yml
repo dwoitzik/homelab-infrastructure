@@ -10,6 +10,15 @@
     - /opt/adguardhome/work
     - /opt/adguardhome/conf
 
+- name: Deploy AdGuardHome configuration
+  ansible.builtin.template:
+    src: AdGuardHome.yaml.j2
+    dest: /opt/adguardhome/conf/AdGuardHome.yaml
+    mode: '0600'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  notify: Restart AdGuard Home
+
 - name: Deploy AdGuard Home Docker Compose file
   ansible.builtin.copy:
     dest: /opt/adguardhome/docker-compose.yml
