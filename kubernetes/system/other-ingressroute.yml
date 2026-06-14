@@ -94,7 +94,18 @@ spec:
     port: 9000
     targetPort: traefik
 ---
-# Loki Ingestion
+# Loki — redirect browser traffic to Grafana Explore, keep API path for Promtail
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: loki-to-grafana-redirect
+  namespace: monitoring
+spec:
+  redirectRegex:
+    regex: "^https://loki\\.woitzik\\.dev/?$"
+    replacement: "https://monitoring.woitzik.dev/explore"
+    permanent: false
+---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -103,7 +114,11 @@ metadata:
 spec:
   entryPoints: [websecure]
   routes:
+  - match: Host(`loki.woitzik.dev`) && PathPrefix(`/loki`)
+    kind: Rule
+    services: [{name: loki, port: 3100}]
   - match: Host(`loki.woitzik.dev`)
     kind: Rule
+    middlewares: [{name: loki-to-grafana-redirect}]
     services: [{name: loki, port: 3100}]
   tls: {secretName: wildcard-woitzik-dev-tls}
