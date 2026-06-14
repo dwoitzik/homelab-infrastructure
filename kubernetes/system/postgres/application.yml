@@ -14,9 +14,6 @@ spec:
       labels:
         app: postgres-authelia
     spec:
-      securityContext:
-        fsGroup: 1001
-        runAsUser: 1001
       containers:
       - name: postgresql
         image: postgres:16-alpine
@@ -31,12 +28,12 @@ spec:
               name: postgres-secret
               key: password
         - name: PGDATA
-          value: /bitnami/postgresql/data
+          value: /var/lib/postgresql/data/pgdata
         ports:
         - containerPort: 5432
         volumeMounts:
         - name: data
-          mountPath: /bitnami/postgresql
+          mountPath: /var/lib/postgresql/data
   volumeClaimTemplates:
   - metadata:
       name: data
