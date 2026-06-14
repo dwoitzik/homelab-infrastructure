@@ -1,51 +1,72 @@
 server:
-    # Basic Settings
+    # Network
     interface: 0.0.0.0
     port: 53
     do-ip4: yes
+    do-ip6: no
     do-udp: yes
     do-tcp: yes
-
-    # IPv6 Tuning
-    do-ip6: no
     prefer-ip4: yes
 
-    # Security: Access Control
+    # Access control
     access-control: 127.0.0.0/8 allow
     access-control: 10.0.0.0/8 allow
     access-control: 172.16.0.0/12 allow
     access-control: 192.168.0.0/16 allow
 
-    # Privacy & Security
+    # Privacy & hardening
     hide-identity: yes
     hide-version: yes
     harden-glue: yes
     harden-dnssec-stripped: yes
-    use-caps-for-id: yes # Minimalistic 0x20 encoding for extra security
+    harden-below-nxdomain: yes
+    harden-referral-path: yes
+    use-caps-for-id: yes
+    qname-minimisation: yes
 
-    # Performance: Prefetching & Caching
+    # Performance — RPi 4B has 4 cores, use them
+    num-threads: 4
+    msg-cache-slabs: 8
+    rrset-cache-slabs: 8
+    infra-cache-slabs: 8
+    key-cache-slabs: 8
+
+    # Cache — enlarged for better hit rate
+    msg-cache-size: 128m
+    rrset-cache-size: 256m
+    key-cache-size: 32m
+    cache-min-ttl: 300
+    cache-max-ttl: 86400
+
+    # Prefetching — refresh popular records before they expire
     prefetch: yes
     prefetch-key: yes
+
+    # Serve stale — answer from cache while refreshing in background
     serve-expired: yes
-    serve-expired-ttl: 3600
-    cache-min-ttl: 300 # Forces 5min cache for stability
-    msg-cache-size: 64m
-    rrset-cache-size: 128m
+    serve-expired-ttl: 86400
+    serve-expired-client-timeout: 1800
 
-    # Multi-threading (Optimized for Raspberry Pi / LXC Cores)
-    num-threads: 2
-    msg-cache-slabs: 4
-    rrset-cache-slabs: 4
-    infra-cache-slabs: 4
-    key-cache-slabs: 4
+    # Aggressive NSEC — reduces upstream queries for non-existent domains
+    aggressive-nsec: yes
 
-    # System Integration
+    # Outgoing connections
+    outgoing-range: 8192
+    num-queries-per-thread: 4096
+    so-rcvbuf: 4m
+    so-sndbuf: 4m
+    so-reuseport: yes
+
+    # Reduce RTT to root servers
+    infra-cache-numhosts: 10000
+
+    # System
     do-daemonize: no
     username: "unbound"
     chroot: ""
-    so-rcvbuf: 1m
-    so-sndbuf: 1m
-    so-reuseport: yes
+
+    # Root hints
+    root-hints: "/etc/unbound/root.hints"
 
 stub-zone:
     name: "fritz.box"
