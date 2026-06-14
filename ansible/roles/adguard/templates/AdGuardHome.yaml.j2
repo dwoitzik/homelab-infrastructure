@@ -171,7 +171,9 @@ filtering:
   blocking_mode: default
   parental_block_host: family-block.dns.adguard.com
   safebrowsing_block_host: standard-block.dns.adguard.com
-  rewrites: []
+  rewrites:
+    - domain: "*.woitzik.dev"
+      answer: "10.0.20.200"
   safebrowsing_cache_size: 1048576
   safeguard_cache_size: 1048576
   safe_search_cache_size: 1048576
