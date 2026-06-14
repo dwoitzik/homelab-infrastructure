@@ -42,6 +42,21 @@ spec:
     services: [{name: paperless, port: 8000}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
+# Paperless-AI
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: paperless-ai-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`paperless-ai.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: paperless-ai, port: 3000}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
 # AI
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
