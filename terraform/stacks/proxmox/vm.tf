@@ -29,7 +29,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
 
   memory {
     dedicated = 12288
-    floating  = 4096
+    floating  = 8192
   }
 
   disk {
