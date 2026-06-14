@@ -1,0 +1,102 @@
+# Kyverno cluster policies — all in audit mode initially.
+# To move a policy to enforce: change validationFailureAction to Enforce.
+# Use PolicyReport (kubectl get policyreport -A) to view current violations before enforcing.
+
+---
+# Warn when pods are missing resource limits.
+# Fix violations first, then switch to Enforce.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require Resource Limits
+    policies.kyverno.io/description: >
+      Pods without resource limits can starve other workloads on the same node.
+      Run `kubectl get policyreport -A` to see violations before enforcing.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: check-container-limits
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [apps, monitoring, database]
+      validate:
+        message: "Container '{{ request.object.spec.containers[0].name }}' must define resources.limits (cpu and memory)."
+        foreach:
+          - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.resources.limits | length(@) }}"
+                    operator: Equals
+                    value: 0
+---
+# Block privileged containers outright.
+# This is safe to enforce immediately — no homelab service needs privileged mode.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged-containers
+  annotations:
+    policies.kyverno.io/title: Disallow Privileged Containers
+    policies.kyverno.io/description: >
+      Privileged containers have host-level access and should never run in this cluster.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: check-privileged
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [apps, monitoring, database, external-secrets]
+      validate:
+        message: "Privileged containers are not allowed."
+        foreach:
+          - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.privileged || false }}"
+                    operator: Equals
+                    value: true
+---
+# Audit use of :latest or untagged images — do not enforce until all manifests are pinned.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow :latest Image Tag
+    policies.kyverno.io/description: >
+      Images pinned to :latest are non-deterministic and make rollbacks impossible.
+      Currently in Audit mode. Check PolicyReports, pin all images to semver tags,
+      then switch to Enforce.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: check-image-tag
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [apps, monitoring, database]
+      validate:
+        message: "Image '{{ element.image }}' must use a specific tag, not :latest or untagged."
+        foreach:
+          - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.image }}"
+                    operator: Equals
+                    value: "*:latest"
+                  - key: "{{ element.image | contains(@, ':') }}"
+                    operator: Equals
+                    value: false
