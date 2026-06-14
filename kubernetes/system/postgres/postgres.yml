@@ -28,24 +28,22 @@ spec:
     spec:
       securityContext:
         fsGroup: 1001
+        runAsUser: 1001
       containers:
       - name: postgresql
-        image: bitnami/postgresql:16
+        image: postgres:16-alpine
         env:
-        - name: POSTGRESQL_USERNAME
+        - name: POSTGRES_USER
           value: "authelia"
-        - name: POSTGRESQL_DATABASE
+        - name: POSTGRES_DB
           value: "authelia"
-        - name: POSTGRESQL_PASSWORD
+        - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: postgres-secret
               key: password
-        - name: POSTGRESQL_POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: postgres-secret
-              key: password
+        - name: PGDATA
+          value: /bitnami/postgresql/data
         ports:
         - containerPort: 5432
         volumeMounts:
