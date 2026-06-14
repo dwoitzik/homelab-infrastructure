@@ -114,9 +114,13 @@ data:
             icon: uptime-kuma.png
             href: https://status.woitzik.dev
             description: Service Uptime Monitor
+            widget:
+              type: uptimekuma
+              url: http://uptime-kuma.monitoring.svc.cluster.local:3001
+              slug: status
         - Loki:
             icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/loki.svg
-            href: https://loki.woitzik.dev
+            href: https://monitoring.woitzik.dev/explore?schemaVersion=1&panes=%7B%22logs%22:%7B%22datasource%22:%22loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bjob%3D~%22.%2B%22%7D%22%7D%5D%7D%7D
             description: Log Aggregation · Promtail
   kubernetes.yaml: |
     mode: cluster
