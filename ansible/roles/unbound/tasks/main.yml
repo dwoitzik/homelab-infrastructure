@@ -4,6 +4,13 @@
     state: directory
     mode: '0755'
 
+- name: Copy root hints
+  ansible.builtin.copy:
+    src: root.hints
+    dest: /opt/unbound/conf/root.hints
+    mode: '0644'
+  notify: Restart Unbound
+
 - name: Deploy Unbound configuration
   ansible.builtin.template:
     src: unbound.conf.j2
@@ -33,6 +40,7 @@
             - "autoheal=true"
           volumes:
             - /opt/unbound/conf/unbound.conf:/etc/unbound/unbound.conf
+            - /opt/unbound/conf/root.hints:/etc/unbound/root.hints
 
         autoheal:
           image: willfarrell/autoheal:latest
