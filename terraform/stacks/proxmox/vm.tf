@@ -7,6 +7,12 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   tags      = ["k3s", "master", "kubernetes"]
   started   = true
 
+  # disk and clone/initialization are creation-time only; ignore prevents Atlantis
+  # from stopping the VM (and killing itself) on subsequent plans.
+  lifecycle {
+    ignore_changes = [clone, initialization, disk]
+  }
+
   clone {
     vm_id = 9000
     full  = true
@@ -29,7 +35,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
-    size         = 40
+    size         = 120
     file_format  = "raw"
   }
 
@@ -65,6 +71,10 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   tags      = ["k3s", "worker", "kubernetes"]
   started   = true
 
+  lifecycle {
+    ignore_changes = [clone, initialization, disk]
+  }
+
   clone {
     vm_id = 9000
     full  = true
@@ -87,7 +97,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
-    size         = 40
+    size         = 120
     file_format  = "raw"
   }
 
@@ -123,6 +133,10 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   tags      = ["k3s", "worker", "kubernetes"]
   started   = true
 
+  lifecycle {
+    ignore_changes = [clone, initialization, disk]
+  }
+
   clone {
     vm_id = 9000
     full  = true
@@ -145,7 +159,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
-    size         = 40
+    size         = 120
     file_format  = "raw"
   }
 
