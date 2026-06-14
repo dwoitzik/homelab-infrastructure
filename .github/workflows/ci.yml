@@ -89,3 +89,32 @@ jobs:
       - name: ansible-lint
         run: ansible-lint
         working-directory: ansible
+
+  security-scan:
+    name: Security / Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan k8s manifests for misconfigurations
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: kubernetes/
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+
+      - name: Scan k8s manifests (SARIF for GitHub Security tab)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: kubernetes/
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
