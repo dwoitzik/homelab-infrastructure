@@ -16,6 +16,9 @@ kind: Deployment
 metadata:
   name: uptime-kuma
   namespace: monitoring
+  annotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
 spec:
   replicas: 1
   selector:

@@ -53,6 +53,10 @@ data:
             icon: vaultwarden.png
             href: https://vault.woitzik.dev
             description: Password Manager
+        - HashiCorp Vault:
+            icon: vault.png
+            href: https://secrets.woitzik.dev
+            description: Secrets Management · ESO Backend
         - AdGuard A:
             icon: adguard-home.png
             href: http://10.0.20.2:3001
@@ -96,6 +100,16 @@ data:
             icon: gitea.png
             href: https://git.woitzik.dev
             description: Private Git · Azure Modules
+        - Jellyfin:
+            icon: jellyfin.png
+            href: https://media.woitzik.dev
+            description: Media Server · Movies & TV
+            widget:
+              type: jellyfin
+              url: http://jellyfin.apps.svc.cluster.local:8096
+              key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
+              enableBlocks: true
+              enableNowPlaying: true
         - Garage S3:
             icon: minio.png
             href: https://s3.woitzik.dev
