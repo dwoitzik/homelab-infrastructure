@@ -1,0 +1,98 @@
+# SLO definitions for woitzik.dev homelab services.
+# Target: 99.9% availability (43.2 min/month error budget).
+#
+# Multi-window multi-burn-rate alerting (Google SRE Workbook approach):
+#   - Page (2h+1h): burn rate ≥30x → exhausts 99.9% budget in ~50min → immediate action
+#   - Ticket (6h+30m): burn rate ≥6x → exhausts budget in ~4h → fix within shift
+#   - Warning (24h+6h): burn rate ≥1x → fire early to catch slow burns
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-slo-recording-rules
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: slo.availability.1m
+      interval: 1m
+      rules:
+        # SLI: fraction of successful HTTP probes in the last 5 minutes
+        - record: job_instance:probe_success:rate5m
+          expr: avg_over_time(probe_success[5m])
+
+        # Error rate per instance (1 - success rate)
+        - record: job_instance:probe_error:rate5m
+          expr: 1 - avg_over_time(probe_success[5m])
+
+    - name: slo.availability.windows
+      interval: 1m
+      rules:
+        # Short windows (for fast-burn detection)
+        - record: job_instance:probe_success:rate1h
+          expr: avg_over_time(probe_success[1h])
+        - record: job_instance:probe_success:rate2h
+          expr: avg_over_time(probe_success[2h])
+
+        # Medium windows
+        - record: job_instance:probe_success:rate6h
+          expr: avg_over_time(probe_success[6h])
+        - record: job_instance:probe_success:rate30m
+          expr: avg_over_time(probe_success[30m])
+
+        # Long windows (for slow-burn detection)
+        - record: job_instance:probe_success:rate24h
+          expr: avg_over_time(probe_success[24h])
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-slo-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: slo.burn-rate.page
+      rules:
+        # Fast burn: ≥30x error budget consumption over 2h + 1h window
+        # Fires when ~3.33% of monthly budget is gone in 2 hours
+        - alert: SLOAvailabilityFastBurn
+          expr: |
+            (1 - job_instance:probe_success:rate2h) > (30 * (1 - 0.999))
+            and
+            (1 - job_instance:probe_success:rate1h) > (30 * (1 - 0.999))
+          for: 2m
+          labels:
+            severity: critical
+            slo: availability
+          annotations:
+            summary: "SLO fast burn: {{ $labels.instance }}"
+            description: >
+              {{ $labels.instance }} error rate is burning through the monthly error budget
+              at ≥30x the allowed rate. At this pace the 99.9% budget is exhausted in ~50min.
+              Current 2h error rate: {{ printf "%.2f" $value }}%
+
+    - name: slo.burn-rate.ticket
+      rules:
+        # Slow-medium burn: ≥6x over 6h + 30m window
+        - alert: SLOAvailabilitySlowBurn
+          expr: |
+            (1 - job_instance:probe_success:rate6h) > (6 * (1 - 0.999))
+            and
+            (1 - job_instance:probe_success:rate30m) > (6 * (1 - 0.999))
+          for: 15m
+          labels:
+            severity: warning
+            slo: availability
+          annotations:
+            summary: "SLO slow burn: {{ $labels.instance }}"
+            description: >
+              {{ $labels.instance }} error rate is burning through the monthly error budget
+              at ≥6x the allowed rate. At this pace the 99.9% budget is exhausted in ~4h.
+              Current 6h error rate: {{ printf "%.2f" $value }}%
