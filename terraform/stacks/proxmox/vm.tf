@@ -7,6 +7,10 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   tags      = ["k3s", "master", "kubernetes"]
   started   = true
 
+  lifecycle {
+    ignore_changes = [clone, initialization]
+  }
+
   clone {
     vm_id = 9000
     full  = true
@@ -65,6 +69,10 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   tags      = ["k3s", "worker", "kubernetes"]
   started   = true
 
+  lifecycle {
+    ignore_changes = [clone, initialization]
+  }
+
   clone {
     vm_id = 9000
     full  = true
@@ -122,6 +130,10 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   node_name = local.target_node
   tags      = ["k3s", "worker", "kubernetes"]
   started   = true
+
+  lifecycle {
+    ignore_changes = [clone, initialization]
+  }
 
   clone {
     vm_id = 9000
