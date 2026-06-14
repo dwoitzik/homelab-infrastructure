@@ -1,5 +1,8 @@
 ---
-# SABnzbd - Usenet downloader
+# SABnzbd - Usenet downloader with Mullvad WireGuard VPN via gluetun sidecar.
+# All SABnzbd traffic exits through Mullvad; 10.0.0.0/8 is whitelisted so
+# Sonarr/Radarr can reach SABnzbd on the cluster network without the VPN.
+# Before enabling: create the mullvad-vpn secret (see mullvad-vpn-secret.yml).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +22,37 @@ spec:
         app: sabnzbd
     spec:
       containers:
+        - name: gluetun
+          image: qmcgaw/gluetun:latest
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          env:
+            - name: VPN_SERVICE_PROVIDER
+              value: mullvad
+            - name: VPN_TYPE
+              value: wireguard
+            - name: WIREGUARD_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mullvad-vpn
+                  key: private-key
+            - name: WIREGUARD_ADDRESSES
+              valueFrom:
+                secretKeyRef:
+                  name: mullvad-vpn
+                  key: addresses
+            - name: SERVER_COUNTRIES
+              value: Germany
+            - name: FIREWALL_OUTBOUND_SUBNETS
+              value: "10.0.0.0/8"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
         - name: sabnzbd
           image: lscr.io/linuxserver/sabnzbd:latest
           env:

@@ -100,6 +100,11 @@ data:
             icon: gitea.png
             href: https://git.woitzik.dev
             description: Private Git · Azure Modules
+        - Garage S3:
+            icon: minio.png
+            href: https://s3.woitzik.dev
+            description: S3 Object Storage · Velero / TF State
+    - Media:
         - Jellyfin:
             icon: jellyfin.png
             href: https://media.woitzik.dev
@@ -110,10 +115,34 @@ data:
               key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
               enableBlocks: true
               enableNowPlaying: true
-        - Garage S3:
-            icon: minio.png
-            href: https://s3.woitzik.dev
-            description: S3 Object Storage · Velero / TF State
+        - SABnzbd:
+            icon: sabnzbd.png
+            href: https://sabnzbd.woitzik.dev
+            description: Usenet Downloader · Mullvad VPN
+            widget:
+              type: sabnzbd
+              url: http://sabnzbd.apps.svc.cluster.local:8080
+              key: "{{HOMEPAGE_VAR_SABNZBD_API_KEY}}"
+        - Sonarr:
+            icon: sonarr.png
+            href: https://sonarr.woitzik.dev
+            description: TV Show Management
+            widget:
+              type: sonarr
+              url: http://sonarr.apps.svc.cluster.local:8989
+              key: "{{HOMEPAGE_VAR_SONARR_API_KEY}}"
+        - Radarr:
+            icon: radarr.png
+            href: https://radarr.woitzik.dev
+            description: Movie Management
+            widget:
+              type: radarr
+              url: http://radarr.apps.svc.cluster.local:7878
+              key: "{{HOMEPAGE_VAR_RADARR_API_KEY}}"
+        - Bazarr:
+            icon: bazarr.png
+            href: https://bazarr.woitzik.dev
+            description: Subtitle Management
     - Monitoring:
         - Grafana:
             icon: grafana.png
@@ -136,6 +165,10 @@ data:
             icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/loki.svg
             href: https://monitoring.woitzik.dev/explore?schemaVersion=1&panes=%7B%22logs%22:%7B%22datasource%22:%22loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bjob%3D~%22.%2B%22%7D%22%7D%5D%7D%7D
             description: Log Aggregation · Promtail
+        - Tempo:
+            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/grafana-tempo.svg
+            href: https://monitoring.woitzik.dev/explore?schemaVersion=1&panes=%7B%22traces%22:%7B%22datasource%22:%22tempo%22%7D%7D
+            description: Distributed Tracing
   kubernetes.yaml: |
     mode: cluster
   widgets.yaml: |
@@ -168,13 +201,16 @@ data:
       columns: 3
     Security:
       style: grid
-      columns: 4
+      columns: 5
     Apps:
       style: grid
       columns: 4
+    Media:
+      style: grid
+      columns: 5
     Monitoring:
       style: grid
-      columns: 3
+      columns: 4
   settings.yaml: |
     title: David's Homelab
     theme: dark
