@@ -51,3 +51,9 @@
   roles:
     - node_exporter_native
     - ollama
+
+- name: Proxmox Host — Power Management
+  hosts: pve_hosts
+  become: true
+  roles:
+    - pve_power
