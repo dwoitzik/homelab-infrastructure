@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.external-secrets.io
+    targetRevision: 0.10.3
+    chart: external-secrets
+    helm:
+      values: |
+        installCRDs: true
+        serviceMonitor:
+          enabled: true
+          namespace: monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
