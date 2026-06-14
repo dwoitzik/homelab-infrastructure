@@ -29,7 +29,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
-    size         = 40
+    size         = 120
     file_format  = "raw"
   }
 
@@ -87,7 +87,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
-    size         = 40
+    size         = 120
     file_format  = "raw"
   }
 
@@ -145,7 +145,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
-    size         = 40
+    size         = 120
     file_format  = "raw"
   }
 
