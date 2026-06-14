@@ -77,7 +77,8 @@ spec:
       - name: export
         emptyDir: {}
       - name: consume
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: paperless-consume
 ---
 apiVersion: v1
 kind: Service
