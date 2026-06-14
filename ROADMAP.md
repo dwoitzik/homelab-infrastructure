@@ -51,7 +51,7 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 
 | Item | Why it matters |
 |---|---|
-| **CloudNativePG operator** | Replace bare postgres StatefulSet with a Kubernetes-native operator. Shows operator pattern knowledge, gives automated failover, PITR backups. |
+| ~~**CloudNativePG operator**~~ ✅ | CNPG 0.23.0 operator + Cluster resource for postgres-authelia — WAL archiving to Garage S3, PodMonitor, Grafana dashboard. Migration: dump/restore (see cluster.yml comments). |
 | ~~**Trivy in CI**~~ ✅ | `aquasecurity/trivy-action` in GitHub Actions — misconfig scan + SARIF to GitHub Security tab |
 | ~~**PodDisruptionBudgets**~~ ✅ | PDBs for Authelia (2 replicas), cloudflared (2 replicas), Vaultwarden, Nextcloud, Home Assistant |
 | **Chaos Mesh** | Scheduled fault injection (pod kill, network partition) — validates the alerting and recovery path. Impressive for SRE roles. |
