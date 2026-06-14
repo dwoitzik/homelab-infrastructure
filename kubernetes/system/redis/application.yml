@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: redis
-        image: public.ecr.aws/bitnami/redis:7.4
+        image: bitnami/redis:7.4
         env:
         - name: REDIS_PASSWORD
           valueFrom:
