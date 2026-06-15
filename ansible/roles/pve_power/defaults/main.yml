@@ -1,0 +1,4 @@
+---
+pve_cpu_governor: schedutil
+pve_energy_perf_pref: balance_power
+pve_amd_pstate: active

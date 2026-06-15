@@ -3,3 +3,17 @@
   ansible.builtin.systemd:
     name: zramswap
     state: restarted
+
+- name: Restart cpufrequtils
+  ansible.builtin.service:
+    name: cpufrequtils
+    state: restarted
+  failed_when: false
+
+- name: Reboot RPi (config.txt changed)
+  ansible.builtin.reboot:
+    msg: "Rebooting for headless power optimizations (WiFi/BT/GPU/HDMI config.txt changes)"
+    connect_timeout: 5
+    reboot_timeout: 120
+    post_reboot_delay: 15
+  when: rpi_reboot | bool
