@@ -36,7 +36,7 @@ data:
     storage:
       encryption_key: '/config/secrets/storage-key'
       postgres:
-        address: 'tcp://postgres-authelia.database.svc.cluster.local:5432'
+        address: 'tcp://postgres-authelia-rw.database.svc.cluster.local:5432'
         database: 'authelia'
         username: 'authelia'
 
