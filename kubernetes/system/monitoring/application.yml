@@ -14,6 +14,30 @@ spec:
         prometheusOperator:
           crds:
             enabled: false
+
+        prometheus-blackbox-exporter:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+          config:
+            modules:
+              http_2xx:
+                prober: http
+                timeout: 5s
+                http:
+                  valid_status_codes: []
+                  method: GET
+                  follow_redirects: true
+                  preferred_ip_protocol: ip4
+              http_2xx_skip_tls:
+                prober: http
+                timeout: 5s
+                http:
+                  valid_status_codes: []
+                  follow_redirects: true
+                  tls_config:
+                    insecure_skip_verify: true
+
         grafana:
           assertNoLeakedSecrets: false
           enabled: true
@@ -228,6 +252,27 @@ spec:
                     replacement: 'pve-exporter.monitoring.svc.cluster.local:9221'
                   - source_labels: [__param_target]
                     target_label: instance
+              - job_name: 'blackbox-http'
+                metrics_path: /probe
+                params:
+                  module: [http_2xx]
+                static_configs:
+                  - targets:
+                      - https://auth.woitzik.dev
+                      - https://home.woitzik.dev
+                      - https://monitoring.woitzik.dev
+                      - https://vault.woitzik.dev
+                      - https://status.woitzik.dev
+                      - https://nextcloud.woitzik.dev
+                      - https://ha.woitzik.dev
+                      - https://argo.woitzik.dev
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - source_labels: [__param_target]
+                    target_label: instance
+                  - target_label: __address__
+                    replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
