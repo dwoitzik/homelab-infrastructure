@@ -52,8 +52,12 @@ resource "routeros_ipv6_settings" "global" {
 # on the FritzBox LAN. FritzBox WiFi clients then use MikroTik as their IPv6
 # gateway, but the FORWARD chain only allows fd00::/8 sources → GUA clients
 # are dropped → IPv6 broken on FritzBox WiFi.
-# Explicitly disable RA on ether1 to fix this.
-resource "routeros_ipv6_neighbor_discovery" "ether1_no_ra" {
-  interface = "ether1"
-  advertise = false
+# Block RA output on ether1 to prevent MikroTik from acting as IPv6 router on WAN.
+resource "routeros_ipv6_firewall_filter" "block_ra_wan" {
+  chain         = "output"
+  out_interface = "ether1"
+  protocol      = "icmpv6"
+  icmp_options  = "134:0"
+  action        = "drop"
+  comment       = "Block rogue RA on WAN — prevents FritzBox WiFi clients using MikroTik as IPv6 gateway"
 }
