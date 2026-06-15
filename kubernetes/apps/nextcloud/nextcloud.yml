@@ -211,6 +211,13 @@ spec:
       template:
         spec:
           restartPolicy: OnFailure
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app: nextcloud
+                  topologyKey: kubernetes.io/hostname
           containers:
             - name: nextcloud-cron
               image: nextcloud:30-apache
