@@ -58,6 +58,16 @@ spec:
       labels:
         app: atlantis
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - vm-srv-k3s-11
+                - vm-srv-k3s-12
       containers:
       - name: atlantis
         image: ghcr.io/runatlantis/atlantis:v0.33.0
@@ -74,6 +84,8 @@ spec:
           value: "false"
         - name: ATLANTIS_TERRAFORM_VERSION
           value: 1.10.0
+        - name: ATLANTIS_REPO_CONFIG
+          value: /etc/atlantis/repos.yaml
         - name: ATLANTIS_GH_USER
           value: dwoitzik
         - name: ATLANTIS_GH_TOKEN
