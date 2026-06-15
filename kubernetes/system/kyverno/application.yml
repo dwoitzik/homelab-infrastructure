@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://kyverno.github.io/kyverno/
-    targetRevision: 3.2.6
+    targetRevision: 3.5.3
     chart: kyverno
     helm:
       values: |
@@ -17,32 +17,6 @@ spec:
           enabled: true
         reportsController:
           enabled: true
-        cleanupJobs:
-          admissionReports:
-            image:
-              registry: registry.k8s.io
-              repository: kubectl
-              tag: v1.28.5
-          clusterAdmissionReports:
-            image:
-              registry: registry.k8s.io
-              repository: kubectl
-              tag: v1.28.5
-          ephemeralReports:
-            image:
-              registry: registry.k8s.io
-              repository: kubectl
-              tag: v1.28.5
-          clusterEphemeralReports:
-            image:
-              registry: registry.k8s.io
-              repository: kubectl
-              tag: v1.28.5
-          updateRequests:
-            image:
-              registry: registry.k8s.io
-              repository: kubectl
-              tag: v1.28.5
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno
