@@ -53,7 +53,7 @@ resource "routeros_ipv6_settings" "global" {
 # gateway, but the FORWARD chain only allows fd00::/8 sources → GUA clients
 # are dropped → IPv6 broken on FritzBox WiFi.
 # Explicitly disable RA on ether1 to fix this.
-resource "routeros_ipv6_nd" "ether1_no_ra" {
+resource "routeros_ipv6_neighbor_discovery" "ether1_no_ra" {
   interface = "ether1"
   advertise = false
 }
