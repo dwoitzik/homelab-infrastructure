@@ -36,3 +36,10 @@ resource "routeros_ipv6_firewall_nat" "nat66_masquerade" {
   out_interface = "ether1"
   comment       = "NAT66: ULA → WAN GUA (FritzBox upstream)"
 }
+
+# MikroTik defaults to not accepting RA when forwarding is enabled.
+# Set to "yes" so ether1 can receive a GUA prefix via SLAAC from FritzBox.
+resource "routeros_ipv6_settings" "global" {
+  accept_router_advertisements = "yes"
+  forward                      = true
+}
