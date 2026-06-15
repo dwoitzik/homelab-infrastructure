@@ -8,7 +8,6 @@ on:
 
 env:
   TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
-  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
 
 jobs:
   terraform-network:
@@ -26,27 +25,26 @@ jobs:
         with:
           terraform_version: "1.10.5"
 
-      - name: Cache Terraform providers
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
-          key: ${{ runner.os }}-terraform-providers-${{ hashFiles('terraform/stacks/network/.terraform.lock.hcl') }}
-          restore-keys: ${{ runner.os }}-terraform-providers-
-
-      - name: Install routeros provider from GitHub Releases
+      - name: Configure local provider mirror
         run: |
-          DIR="/tmp/tf-plugins/registry.terraform.io/terraform-routeros/routeros/1.99.1/linux_amd64"
-          mkdir -p "$DIR"
-          curl -fsSL "https://github.com/terraform-routeros/terraform-provider-routeros/releases/download/v1.99.1/terraform-provider-routeros_1.99.1_linux_amd64.zip" \
-            -o /tmp/routeros.zip
-          unzip -j /tmp/routeros.zip "terraform-provider-routeros_v1.99.1" -d "$DIR"
-          chmod +x "$DIR/terraform-provider-routeros_v1.99.1"
+          cat > /tmp/tf-mirror.rc << EOF
+          provider_installation {
+            filesystem_mirror {
+              path    = "${{ github.workspace }}/terraform/providers"
+              include = ["registry.terraform.io/*/*"]
+            }
+            direct {
+              exclude = ["registry.terraform.io/*/*"]
+            }
+          }
+          EOF
+          echo "TF_CLI_CONFIG_FILE=/tmp/tf-mirror.rc" >> $GITHUB_ENV
 
       - name: Terraform fmt
         run: terraform fmt -check
 
       - name: Terraform init
-        run: terraform init -backend=false -plugin-dir=/tmp/tf-plugins
+        run: terraform init -backend=false
 
       - name: Terraform validate
         run: terraform validate
@@ -72,27 +70,26 @@ jobs:
         with:
           terraform_version: "1.10.5"
 
-      - name: Cache Terraform providers
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
-          key: ${{ runner.os }}-terraform-providers-${{ hashFiles('terraform/stacks/proxmox/.terraform.lock.hcl') }}
-          restore-keys: ${{ runner.os }}-terraform-providers-
-
-      - name: Install proxmox provider from GitHub Releases
+      - name: Configure local provider mirror
         run: |
-          DIR="/tmp/tf-plugins/registry.terraform.io/bpg/proxmox/0.100.0/linux_amd64"
-          mkdir -p "$DIR"
-          curl -fsSL "https://github.com/bpg/terraform-provider-proxmox/releases/download/v0.100.0/terraform-provider-proxmox_0.100.0_linux_amd64.zip" \
-            -o /tmp/proxmox.zip
-          unzip -j /tmp/proxmox.zip "terraform-provider-proxmox_v0.100.0" -d "$DIR"
-          chmod +x "$DIR/terraform-provider-proxmox_v0.100.0"
+          cat > /tmp/tf-mirror.rc << EOF
+          provider_installation {
+            filesystem_mirror {
+              path    = "${{ github.workspace }}/terraform/providers"
+              include = ["registry.terraform.io/*/*"]
+            }
+            direct {
+              exclude = ["registry.terraform.io/*/*"]
+            }
+          }
+          EOF
+          echo "TF_CLI_CONFIG_FILE=/tmp/tf-mirror.rc" >> $GITHUB_ENV
 
       - name: Terraform fmt
         run: terraform fmt -check
 
       - name: Terraform init
-        run: terraform init -backend=false -plugin-dir=/tmp/tf-plugins
+        run: terraform init -backend=false
 
       - name: Terraform validate
         run: terraform validate

@@ -1,0 +1,10 @@
+{
+  "archives": {
+    "linux_amd64": {
+      "hashes": [
+        "h1:slX5FrpPj7cboNLs4mb8UULrEqO18Q41SleUc2SaaXg="
+      ],
+      "url": "terraform-provider-routeros_1.99.1_linux_amd64.zip"
+    }
+  }
+}
