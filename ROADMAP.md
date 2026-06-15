@@ -42,9 +42,9 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 
 | Item | Why it matters |
 |---|---|
-| **External Secrets Operator + Infisical** | Replace raw k8s Secrets with a pull-based secrets store. ESO is the industry standard for secrets management in k8s. Currently biggest gap vs. production-grade setups. |
-| **Kyverno policy engine** | Policy-as-Code: block `latest` image tags in prod, require resource limits on all pods, deny privileged containers. Shows security-first mindset. |
-| **Grafana Tempo** | Completes the LGTM observability stack (Loki + Grafana + Tempo + Mimir). Distributed tracing is the missing piece — metrics and logs are already done. |
+| ~~**External Secrets Operator + HashiCorp Vault**~~ ✅ | ESO 0.10.3 + Vault 0.28.1 deployed — ClusterSecretStore backed by Vault KV v2 |
+| ~~**Kyverno policy engine**~~ ✅ | Three ClusterPolicies deployed: require-resource-limits (Audit), disallow-privileged (Enforce), disallow-latest-tag (Audit) |
+| ~~**Grafana Tempo**~~ ✅ | Tempo deployed, linked to Loki (trace→log correlation) and Prometheus (service map). LGTM stack complete. |
 | **Renovate GitHub PAT** | Apply the actual token so Renovate creates digest-pinning PRs — links the GitOps loop closed for image updates. |
 
 ### Tier 2 — Solid Engineering
@@ -52,8 +52,8 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 | Item | Why it matters |
 |---|---|
 | **CloudNativePG operator** | Replace bare postgres StatefulSet with a Kubernetes-native operator. Shows operator pattern knowledge, gives automated failover, PITR backups. |
-| **Trivy in CI** | Add `aquasecurity/trivy-action` to GitHub Actions — scans container images for CVEs on every PR. Signals security-in-CI awareness. |
-| **PodDisruptionBudgets** | Add PDBs for Authelia, Vaultwarden, Nextcloud — prevents drain-caused downtime. Shows HA operational thinking. |
+| ~~**Trivy in CI**~~ ✅ | `aquasecurity/trivy-action` in GitHub Actions — misconfig scan + SARIF to GitHub Security tab |
+| ~~**PodDisruptionBudgets**~~ ✅ | PDBs for Authelia (2 replicas), cloudflared (2 replicas), Vaultwarden, Nextcloud, Home Assistant |
 | **Chaos Mesh** | Scheduled fault injection (pod kill, network partition) — validates the alerting and recovery path. Impressive for SRE roles. |
 | **SLO definitions** | Define Prometheus recording rules + Grafana dashboards for error budget / SLO burn rate on key services (Authelia, Vaultwarden, Nextcloud). |
 
