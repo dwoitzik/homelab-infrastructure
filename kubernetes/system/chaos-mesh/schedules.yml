@@ -1,0 +1,47 @@
+---
+# Weekly pod-kill chaos for non-critical apps — validates PDBs and restart policies.
+# Runs Sunday 03:00 UTC when user traffic is minimal.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: weekly-pod-kill
+  namespace: chaos-mesh
+spec:
+  schedule: "0 3 * * 0"
+  concurrencyPolicy: Forbid
+  type: PodChaos
+  podChaos:
+    action: pod-kill
+    mode: one
+    selector:
+      namespaces:
+        - apps
+      labelSelectors:
+        "chaos-kill": "enabled"
+    gracePeriod: 0
+---
+# Weekly network latency injection — 100ms latency on ingress to apps namespace.
+# Runs Sunday 03:30 UTC, lasts 5 minutes.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: weekly-network-latency
+  namespace: chaos-mesh
+spec:
+  schedule: "30 3 * * 0"
+  concurrencyPolicy: Forbid
+  type: NetworkChaos
+  networkChaos:
+    action: delay
+    mode: all
+    selector:
+      namespaces:
+        - apps
+      labelSelectors:
+        "chaos-network": "enabled"
+    delay:
+      latency: "100ms"
+      correlation: "25"
+      jitter: "10ms"
+    duration: "5m"
+    direction: to
