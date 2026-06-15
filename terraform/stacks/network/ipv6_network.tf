@@ -29,10 +29,13 @@ resource "routeros_ipv6_address" "vlan_ula" {
   comment   = "ULA gateway for ${each.key}"
 }
 
-# NAT66: masquerade internal ULA sources to the WAN GUA when leaving ether1
+# NAT66: masquerade internal ULA sources to the WAN GUA when leaving ether1.
+# src_address is mandatory — without it, ALL IPv6 leaving ether1 is masqueraded,
+# including traffic from FritzBox WiFi clients that use MikroTik as IPv6 gateway.
 resource "routeros_ipv6_firewall_nat" "nat66_masquerade" {
   chain         = "srcnat"
   action        = "masquerade"
+  src_address   = "fd00::/8"
   out_interface = "ether1"
   comment       = "NAT66: ULA → WAN GUA (FritzBox upstream)"
 }
@@ -42,4 +45,15 @@ resource "routeros_ipv6_firewall_nat" "nat66_masquerade" {
 resource "routeros_ipv6_settings" "global" {
   accept_router_advertisements = "yes"
   forward                      = true
+}
+
+# RouterOS 7 enables RA advertisement on ALL interfaces by default — including
+# ether1 (WAN). Once ether1 gets a GUA via SLAAC, MikroTik starts sending RAs
+# on the FritzBox LAN. FritzBox WiFi clients then use MikroTik as their IPv6
+# gateway, but the FORWARD chain only allows fd00::/8 sources → GUA clients
+# are dropped → IPv6 broken on FritzBox WiFi.
+# Explicitly disable RA on ether1 to fix this.
+resource "routeros_ipv6_nd" "ether1_no_ra" {
+  interface = "ether1"
+  advertise = false
 }

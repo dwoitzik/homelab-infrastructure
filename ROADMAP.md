@@ -31,6 +31,7 @@
 | **NFS Server on Proxmox** | Required before Jellyfin goes live — share `/mnt/media` via NFS v4.2 |
 | **Ollama GPU passthrough** | AMD Radeon iGPU → AI LXC via IOMMU — enables ROCm acceleration for paperless-ai |
 | **Paperless → Nextcloud consume** | Mount Nextcloud shared folder as Paperless consume PVC |
+| **Remote Dev Environment (code-server)** | VS Code Server auf k3s oder Docker LXC — ermöglicht Arbeit an Repos / k3s / GitHub ohne den Heim-PC anschalten zu müssen. Kandidaten: `coder/code-server` als k8s Deployment, erreichbar über Authelia-geschütztes IngressRoute. Alternativ: Headscale-Client auf Mobile + SSH+tmux. |
 
 ---
 
@@ -111,6 +112,14 @@ RAM update: submit as Terraform change → Atlantis PR (`terraform/stacks/proxmo
 - [x] Grafana dashboards: Proxmox (10347, 19022), Node Exporter Full (1860)
 - [x] AlertManager → Discord webhooks (critical + warning routes, 12h repeat interval)
 - [ ] Run `ansible-playbook ansible/site.yml` to verify node_exporter on all nodes
+
+---
+
+## Known Bugs / Blockers
+
+| Bug | Status | Root Cause |
+|---|---|---|
+| **IPv6 broken auf FritzBox WiFi** | ✅ Fix committed | RouterOS 7 sendet standardmäßig RA auf ALLEN Interfaces inkl. ether1 (WAN). Nachdem ether1 via SLAAC eine GUA vom FritzBox erhielt, trat MikroTik als IPv6-Gateway auf dem FritzBox-LAN auf. WLAN-Clients routeten IPv6 über MikroTik, wurden aber vom FORWARD chain gedropt (nur `fd00::/8` erlaubt). Fix: `routeros_ipv6_nd.ether1_no_ra` deaktiviert RA auf ether1. NAT66-Regel um `src_address = "fd00::/8"` ergänzt. |
 
 ---
 
