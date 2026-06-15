@@ -55,7 +55,7 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 | ~~**Trivy in CI**~~ ✅ | `aquasecurity/trivy-action` in GitHub Actions — misconfig scan + SARIF to GitHub Security tab |
 | ~~**PodDisruptionBudgets**~~ ✅ | PDBs for Authelia (2 replicas), cloudflared (2 replicas), Vaultwarden, Nextcloud, Home Assistant |
 | **Chaos Mesh** | Scheduled fault injection (pod kill, network partition) — validates the alerting and recovery path. Impressive for SRE roles. |
-| **SLO definitions** | Define Prometheus recording rules + Grafana dashboards for error budget / SLO burn rate on key services (Authelia, Vaultwarden, Nextcloud). |
+| ~~**SLO definitions**~~ ✅ | PrometheusRules deployed: 99.9% availability + p95≤2s latency SLOs with error budget dashboard in Grafana. Blackbox exporter probing all public services. |
 
 ### Tier 3 — Nice to Have
 
