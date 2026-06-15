@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tempo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 1.10.3
+    chart: tempo
+    helm:
+      values: |
+        tempo:
+          storage:
+            trace:
+              backend: local
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          retention: 72h
+        persistence:
+          enabled: true
+          storageClassName: longhorn
+          size: 10Gi
+        serviceMonitor:
+          enabled: true
+          namespace: monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

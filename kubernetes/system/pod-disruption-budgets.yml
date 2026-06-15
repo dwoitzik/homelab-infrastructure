@@ -1,0 +1,61 @@
+# PodDisruptionBudgets — prevent involuntary disruptions during node drains.
+#
+# Authelia + cloudflared run 2 replicas → minAvailable:1 allows drain while keeping 1 alive.
+# Vaultwarden + Nextcloud run 1 replica → minAvailable:1 BLOCKS drain by design.
+# To drain a node with single-replica services: kubectl delete pdb <name> -n <ns>, drain, restore.
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: authelia-pdb
+  namespace: apps
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: authelia
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cloudflared-pdb
+  namespace: apps
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: cloudflared
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vaultwarden-pdb
+  namespace: apps
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: vaultwarden
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nextcloud-pdb
+  namespace: apps
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: nextcloud
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: home-assistant-pdb
+  namespace: apps
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: home-assistant

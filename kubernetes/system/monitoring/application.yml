@@ -62,6 +62,25 @@ spec:
               url: http://loki.monitoring.svc.cluster.local:3100
               jsonData:
                 maxLines: 1000
+                derivedFields:
+                  - datasourceUid: tempo
+                    matcherRegex: "traceID=(\\w+)"
+                    name: TraceID
+                    url: "$${__value.raw}"
+            - name: Tempo
+              type: tempo
+              uid: tempo
+              access: proxy
+              url: http://tempo.monitoring.svc.cluster.local:3100
+              jsonData:
+                serviceMap:
+                  datasourceUid: prometheus
+                nodeGraph:
+                  enabled: true
+                search:
+                  hide: false
+                lokiSearch:
+                  datasourceUid: loki
           grafana.ini:
             analytics:
               check_for_updates: false
