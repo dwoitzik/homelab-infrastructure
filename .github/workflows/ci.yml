@@ -8,6 +8,7 @@ on:
 
 env:
   TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
 
 jobs:
   terraform-network:
@@ -23,7 +24,17 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_version: "1.10.5"
+
+      - name: Cache Terraform providers
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: ${{ runner.os }}-terraform-providers-${{ hashFiles('terraform/stacks/network/.terraform.lock.hcl') }}
+          restore-keys: ${{ runner.os }}-terraform-providers-
+
+      - name: Create provider cache dir
+        run: mkdir -p ${{ env.TF_PLUGIN_CACHE_DIR }}
 
       - name: Terraform fmt
         run: terraform fmt -check
@@ -46,10 +57,24 @@ jobs:
     defaults:
       run:
         working-directory: terraform/stacks/proxmox
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+
+      - name: Cache Terraform providers
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: ${{ runner.os }}-terraform-providers-${{ hashFiles('terraform/stacks/proxmox/.terraform.lock.hcl') }}
+          restore-keys: ${{ runner.os }}-terraform-providers-
+
+      - name: Create provider cache dir
+        run: mkdir -p ${{ env.TF_PLUGIN_CACHE_DIR }}
 
       - name: Terraform fmt
         run: terraform fmt -check
