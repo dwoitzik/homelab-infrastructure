@@ -47,3 +47,59 @@
     name: log2ram
     state: present
     update_cache: true
+
+# ─── Headless power optimizations ─────────────────────────────────────────────
+
+- name: Detect config.txt location (RPi OS Bookworm vs. older)
+  ansible.builtin.stat:
+    path: /boot/firmware/config.txt
+  register: _firmware_config
+
+- name: Set config.txt path fact
+  ansible.builtin.set_fact:
+    _rpi_config_txt: "{{ '/boot/firmware/config.txt' if _firmware_config.stat.exists else '/boot/config.txt' }}"
+
+- name: Install cpufrequtils for persistent governor configuration
+  ansible.builtin.apt:
+    name: cpufrequtils
+    state: present
+
+- name: Set CPU governor to ondemand (responsive idle, no wasted turbo at rest)
+  ansible.builtin.copy:
+    dest: /etc/default/cpufrequtils
+    content: |
+      GOVERNOR="ondemand"
+    mode: '0644'
+  notify: Restart cpufrequtils
+
+- name: Disable WiFi (not used — wired Ethernet only)
+  ansible.builtin.lineinfile:
+    path: "{{ _rpi_config_txt }}"
+    line: "dtoverlay=disable-wifi"
+    regexp: "^#?dtoverlay=disable-wifi"
+    state: present
+  notify: Reboot RPi (config.txt changed)
+
+- name: Disable Bluetooth (not used — reduces idle power and CPU overhead)
+  ansible.builtin.lineinfile:
+    path: "{{ _rpi_config_txt }}"
+    line: "dtoverlay=disable-bt"
+    regexp: "^#?dtoverlay=disable-bt"
+    state: present
+  notify: Reboot RPi (config.txt changed)
+
+- name: Set GPU memory to minimum (16 MB — headless, no display needed)
+  ansible.builtin.lineinfile:
+    path: "{{ _rpi_config_txt }}"
+    line: "gpu_mem=16"
+    regexp: "^#?gpu_mem="
+    state: present
+  notify: Reboot RPi (config.txt changed)
+
+- name: Enable HDMI blanking to reduce port power draw
+  ansible.builtin.lineinfile:
+    path: "{{ _rpi_config_txt }}"
+    line: "hdmi_blanking=2"
+    regexp: "^#?hdmi_blanking="
+    state: present
+  notify: Reboot RPi (config.txt changed)
