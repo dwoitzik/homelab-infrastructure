@@ -25,8 +25,20 @@ data:
       default:
         plan:
           steps:
-            - init
-            - plan
+            - run: |
+                cat > /tmp/tf-mirror.rc << TFEOF
+                provider_installation {
+                  filesystem_mirror {
+                    path    = "$(pwd)/../../providers"
+                    include = ["registry.terraform.io/*/*"]
+                  }
+                  direct {
+                    exclude = ["registry.terraform.io/*/*"]
+                  }
+                }
+                TFEOF
+                TF_CLI_CONFIG_FILE=/tmp/tf-mirror.rc terraform init -input=false
+            - run: TF_CLI_CONFIG_FILE=/tmp/tf-mirror.rc terraform plan -input=false -out=$PLANFILE
         apply:
           steps:
             - apply
