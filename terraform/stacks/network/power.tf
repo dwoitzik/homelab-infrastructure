@@ -1,5 +1,5 @@
 ###############################################################################
-# Power Efficiency — MikroTik RB5009
+# Power Efficiency — MikroTik RB5009 (v1.0)
 ###############################################################################
 #
 # Active ports:  ether1 (WAN), ether2 (Admin), ether5 (Proxmox),
