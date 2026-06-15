@@ -51,10 +51,10 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 
 | Item | Why it matters |
 |---|---|
-| **CloudNativePG operator** | Replace bare postgres StatefulSet with a Kubernetes-native operator. Shows operator pattern knowledge, gives automated failover, PITR backups. |
+| ~~**CloudNativePG operator**~~ ✅ | CNPG 0.23.0 deployed; postgres-authelia migrated from bare StatefulSet. WAL archiving to Garage S3, 7-day PITR, PodMonitor + Grafana dashboard. |
 | ~~**Trivy in CI**~~ ✅ | `aquasecurity/trivy-action` in GitHub Actions — misconfig scan + SARIF to GitHub Security tab |
 | ~~**PodDisruptionBudgets**~~ ✅ | PDBs for Authelia (2 replicas), cloudflared (2 replicas), Vaultwarden, Nextcloud, Home Assistant |
-| **Chaos Mesh** | Scheduled fault injection (pod kill, network partition) — validates the alerting and recovery path. Impressive for SRE roles. |
+| ~~**Chaos Mesh**~~ ✅ | Weekly schedules: pod-kill Sunday 03:00 UTC + 100ms network latency Sunday 03:30 UTC on labelled apps namespace pods. |
 | ~~**SLO definitions**~~ ✅ | PrometheusRules deployed: 99.9% availability + p95≤2s latency SLOs with error budget dashboard in Grafana. Blackbox exporter probing all public services. |
 
 ### Tier 3 — Nice to Have
@@ -64,7 +64,7 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 | **Backup offsite → Oracle Cloud S3** | Velero daily snapshot of critical PVCs (Paperless, Vaultwarden, Nextcloud) pushed to Oracle Cloud free-tier 20GB bucket. |
 | **k3s multi-master HA** | Add a second control plane node — etcd goes from single-point to quorum. Currently 1 master + 2 workers. |
 | **Cilium as CNI** | Replace default flannel with Cilium — enables eBPF-based NetworkPolicies, Hubble network observability UI, service mesh layer. |
-| **Unbound performance tuning** | Increase to 4 threads, add root-hints file, tune cache-max-negative-ttl and prefetch. |
+| ~~**Unbound performance tuning**~~ ✅ | 4 threads, root-hints, prefetch + prefetch-key, serve-expired, aggressive-nsec, cache-max-negative-ttl=300, 8MB socket buffers. |
 | **Disaster Recovery runbook** | Step-by-step doc: how to rebuild from zero (Proxmox → k3s → ArgoCD bootstrap → secrets inject). Interviewers love seeing this. |
 
 ---
