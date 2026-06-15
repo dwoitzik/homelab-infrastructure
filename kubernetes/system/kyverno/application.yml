@@ -17,6 +17,32 @@ spec:
           enabled: true
         reportsController:
           enabled: true
+        cleanupJobs:
+          admissionReports:
+            image:
+              registry: registry.k8s.io
+              repository: kubectl
+              tag: v1.28.5
+          clusterAdmissionReports:
+            image:
+              registry: registry.k8s.io
+              repository: kubectl
+              tag: v1.28.5
+          ephemeralReports:
+            image:
+              registry: registry.k8s.io
+              repository: kubectl
+              tag: v1.28.5
+          clusterEphemeralReports:
+            image:
+              registry: registry.k8s.io
+              repository: kubectl
+              tag: v1.28.5
+          updateRequests:
+            image:
+              registry: registry.k8s.io
+              repository: kubectl
+              tag: v1.28.5
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno
