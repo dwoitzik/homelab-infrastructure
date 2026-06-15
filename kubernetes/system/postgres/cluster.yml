@@ -1,0 +1,72 @@
+# CloudNativePG Cluster replacing the bare postgres StatefulSet.
+#
+# Migration steps (one-time, after operator is Running):
+#   1. Dump from old StatefulSet:
+#      kubectl exec postgres-authelia-0 -n database -- \
+#        pg_dump -U authelia authelia > /tmp/authelia.sql
+#   2. Wait for CNPG cluster to be Ready:
+#      kubectl get cluster postgres-authelia -n database
+#   3. Restore into CNPG primary:
+#      kubectl exec -n database postgres-authelia-1 -c postgres -- \
+#        psql -U authelia -d authelia < /tmp/authelia.sql
+#   4. Delete old StatefulSet and its PVC:
+#      kubectl delete statefulset postgres-authelia -n database
+#      kubectl delete pvc data-postgres-authelia-0 -n database
+#
+# Prerequisites:
+#   kubectl create secret generic postgres-authelia-user -n database \
+#     --from-literal=username=authelia \
+#     --from-literal=password=<same password as in authelia-secrets/storage-password>
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-authelia
+  namespace: database
+spec:
+  instances: 1
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "64MB"
+
+  bootstrap:
+    initdb:
+      database: authelia
+      owner: authelia
+      secret:
+        name: postgres-authelia-user
+
+  storage:
+    size: 8Gi
+    storageClass: longhorn
+
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+  monitoring:
+    enablePodMonitor: true
+
+  backup:
+    retentionPolicy: "7d"
+    barmanObjectStore:
+      destinationPath: s3://velero/cnpg-postgres-authelia
+      endpointURL: http://garage.apps.svc.cluster.local:3900
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-garage-backup
+          key: access-key-id
+        secretAccessKey:
+          name: cnpg-garage-backup
+          key: secret-access-key
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
