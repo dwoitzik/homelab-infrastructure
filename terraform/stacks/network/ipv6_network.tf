@@ -52,8 +52,5 @@ resource "routeros_ipv6_settings" "global" {
 # on the FritzBox LAN. FritzBox WiFi clients then use MikroTik as their IPv6
 # gateway, but the FORWARD chain only allows fd00::/8 sources → GUA clients
 # are dropped → IPv6 broken on FritzBox WiFi.
-# Explicitly disable RA on ether1 to fix this.
-resource "routeros_ipv6_nd" "ether1_no_ra" {
-  interface = "ether1"
-  advertise = false
-}
+# RA on ether1 is disabled in RouterOS: /ipv6/nd set [find interface=ether1] advertise=no
+# routeros_ipv6_nd is not exposed in terraform-routeros/routeros ≤ 1.99.1 (latest as of 2026-06).
