@@ -23,7 +23,22 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_version: "1.10.5"
+
+      - name: Configure local provider mirror
+        run: |
+          cat > /tmp/tf-mirror.rc << EOF
+          provider_installation {
+            filesystem_mirror {
+              path    = "${{ github.workspace }}/terraform/providers"
+              include = ["registry.terraform.io/*/*"]
+            }
+            direct {
+              exclude = ["registry.terraform.io/*/*"]
+            }
+          }
+          EOF
+          echo "TF_CLI_CONFIG_FILE=/tmp/tf-mirror.rc" >> $GITHUB_ENV
 
       - name: Terraform fmt
         run: terraform fmt -check
@@ -46,10 +61,29 @@ jobs:
     defaults:
       run:
         working-directory: terraform/stacks/proxmox
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+
+      - name: Configure local provider mirror
+        run: |
+          cat > /tmp/tf-mirror.rc << EOF
+          provider_installation {
+            filesystem_mirror {
+              path    = "${{ github.workspace }}/terraform/providers"
+              include = ["registry.terraform.io/*/*"]
+            }
+            direct {
+              exclude = ["registry.terraform.io/*/*"]
+            }
+          }
+          EOF
+          echo "TF_CLI_CONFIG_FILE=/tmp/tf-mirror.rc" >> $GITHUB_ENV
 
       - name: Terraform fmt
         run: terraform fmt -check
