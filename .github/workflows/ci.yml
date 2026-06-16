@@ -25,21 +25,6 @@ jobs:
         with:
           terraform_version: "1.10.5"
 
-      - name: Configure local provider mirror
-        run: |
-          cat > /tmp/tf-mirror.rc << EOF
-          provider_installation {
-            filesystem_mirror {
-              path    = "${{ github.workspace }}/terraform/providers"
-              include = ["registry.terraform.io/*/*"]
-            }
-            direct {
-              exclude = ["registry.terraform.io/*/*"]
-            }
-          }
-          EOF
-          echo "TF_CLI_CONFIG_FILE=/tmp/tf-mirror.rc" >> $GITHUB_ENV
-
       - name: Terraform fmt
         run: terraform fmt -check
 
@@ -69,21 +54,6 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.10.5"
-
-      - name: Configure local provider mirror
-        run: |
-          cat > /tmp/tf-mirror.rc << EOF
-          provider_installation {
-            filesystem_mirror {
-              path    = "${{ github.workspace }}/terraform/providers"
-              include = ["registry.terraform.io/*/*"]
-            }
-            direct {
-              exclude = ["registry.terraform.io/*/*"]
-            }
-          }
-          EOF
-          echo "TF_CLI_CONFIG_FILE=/tmp/tf-mirror.rc" >> $GITHUB_ENV
 
       - name: Terraform fmt
         run: terraform fmt -check
@@ -127,6 +97,9 @@ jobs:
   security-scan:
     name: Security / Trivy
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -148,7 +121,8 @@ jobs:
           output: trivy-results.sarif
 
       - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
+        continue-on-error: true
         with:
           sarif_file: trivy-results.sarif
