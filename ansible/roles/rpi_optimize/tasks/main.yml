@@ -63,6 +63,7 @@
   ansible.builtin.apt:
     name: cpufrequtils
     state: present
+  failed_when: false
 
 - name: Set CPU governor to ondemand (responsive idle, no wasted turbo at rest)
   ansible.builtin.copy:
@@ -71,6 +72,7 @@
       GOVERNOR="ondemand"
     mode: '0644'
   notify: Restart cpufrequtils
+  failed_when: false
 
 - name: Disable WiFi (not used — wired Ethernet only)
   ansible.builtin.lineinfile:
