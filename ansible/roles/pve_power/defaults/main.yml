@@ -1,4 +1,4 @@
 ---
-pve_cpu_governor: schedutil
-pve_energy_perf_pref: balance_power
-pve_amd_pstate: active
+pve_power_cpu_governor: schedutil
+pve_power_energy_perf_pref: balance_power
+pve_power_amd_pstate: active

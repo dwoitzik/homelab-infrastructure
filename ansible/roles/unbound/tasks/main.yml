@@ -1,3 +1,4 @@
+---
 - name: Create Unbound configuration directory
   ansible.builtin.file:
     path: /opt/unbound/conf
@@ -32,7 +33,7 @@
             - "5335:53/udp"
             - "5335:53/tcp"
           healthcheck:
-            test: ["CMD", "dig", "+short", "@127.0.0.1", "-p", "5335", "google.com"]
+            test: ["CMD", "dig", "@127.0.0.1", "google.com"]
             interval: 30s
             timeout: 10s
             retries: 3
@@ -64,5 +65,5 @@
     state: present
     sysctl_set: true
   loop:
-    - { name: "net.core.rmem_max", value: "4194304" }
-    - { name: "net.core.wmem_max", value: "4194304" }
+    - {name: "net.core.rmem_max", value: "4194304"}
+    - {name: "net.core.wmem_max", value: "4194304"}

@@ -1,2 +1,2 @@
 ---
-rpi_reboot: false
+rpi_optimize_reboot: false
