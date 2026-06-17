@@ -1,0 +1,33 @@
+---
+- name: Install packages
+  ansible.builtin.apt:
+    name: [nfs-kernel-server, nfs-common, prometheus-node-exporter]
+    state: present
+    update_cache: true
+
+- name: Create NFS share directories
+  ansible.builtin.file:
+    path: "{{ nfs_data_dir }}/{{ item.name }}"
+    state: directory
+    owner: nobody
+    group: nogroup
+    mode: "0777"
+  loop: "{{ nfs_shares }}"
+
+- name: Write /etc/exports
+  ansible.builtin.template:
+    src: exports.j2
+    dest: /etc/exports
+    owner: root
+    group: root
+    mode: "0644"
+  notify: exportfs reload
+
+- name: Enable and start services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - nfs-kernel-server
+    - prometheus-node-exporter

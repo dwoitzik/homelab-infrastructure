@@ -1,0 +1,6 @@
+# /etc/exports — managed by Ansible (role: nfs_server)
+# NFS exports for Kubernetes cluster
+{% for share in nfs_shares %}
+{{ nfs_data_dir }}/{{ share.name }} {% for client in nfs_export_clients %}{{ client }}({{ nfs_export_options }}){% if not loop.last %} {% endif %}{% endfor %}
+
+{% endfor %}
