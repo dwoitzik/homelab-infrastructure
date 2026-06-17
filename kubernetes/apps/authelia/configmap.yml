@@ -8,7 +8,7 @@ data:
     server:
       address: 'tcp://0.0.0.0:9091/'
     log:
-      level: 'debug'
+      level: 'info'
 
     identity_validation:
       reset_password:
@@ -47,14 +47,14 @@ data:
     access_control:
       default_policy: 'one_factor'
       rules:
+        - domain: 'auth.woitzik.dev'
+          policy: 'bypass'
         - domain: 'pve.woitzik.dev'
           policy: 'two_factor'
           subject:
             - 'group:admins'
         - domain: '*.woitzik.dev'
           policy: 'two_factor'
-        - domain: 'auth.woitzik.dev'
-          policy: 'bypass'
 
     identity_providers:
       oidc:

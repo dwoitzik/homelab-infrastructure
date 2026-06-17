@@ -49,7 +49,7 @@ dns:
   trusted_proxies:
     - 127.0.0.0/8
     - ::1/128
-  cache_size: 4194304
+  cache_size: 33554432
   cache_ttl_min: 0
   cache_ttl_max: 0
   cache_optimistic: false
@@ -60,7 +60,7 @@ dns:
     custom_ip: ""
     enabled: false
     use_custom: false
-  max_goroutines: 300
+  max_goroutines: 100
   handle_ddr: true
   ipset: []
   ipset_file: ""
@@ -96,15 +96,15 @@ tls:
 querylog:
   dir_path: ""
   ignored: []
-  interval: 2160h
-  size_memory: 1000
+  interval: 168h
+  size_memory: 500
   enabled: true
   file_enabled: true
 
 statistics:
   dir_path: ""
   ignored: []
-  interval: 2160h
+  interval: 168h
   enabled: true
   limit: 0
 
@@ -121,14 +121,6 @@ filters:
     url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt
     name: "HaGeZi's Pro DNS Blocklist"
     id: 3
-  - enabled: true
-    url: https://big.oisd.nl/
-    name: OISD Full
-    id: 4
-  - enabled: true
-    url: https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/tif.txt
-    name: HaGeZi Threat Intelligence Feeds
-    id: 5
 
 whitelist_filters: []
 user_rules: []
