@@ -27,11 +27,11 @@
 
 | Service | Notes |
 |---|---|
-| **Uptime Kuma Monitors** | WebSocket API setup required via web UI at status.woitzik.dev |
-| **NFS Server on Proxmox** | Required before Jellyfin goes live — share `/mnt/media` via NFS v4.2 |
-| **Ollama GPU passthrough** | AMD Radeon iGPU → AI LXC via IOMMU — enables ROCm acceleration for paperless-ai |
-| **Paperless → Nextcloud consume** | Mount Nextcloud shared folder as Paperless consume PVC |
-| **Remote Dev Environment (code-server)** | VS Code Server auf k3s oder Docker LXC — ermöglicht Arbeit an Repos / k3s / GitHub ohne den Heim-PC anschalten zu müssen. Kandidaten: `coder/code-server` als k8s Deployment, erreichbar über Authelia-geschütztes IngressRoute. Alternativ: Headscale-Client auf Mobile + SSH+tmux. |
+| **Uptime Kuma Monitors** | WebSocket API setup required via web UI at status.woitzik.dev — Script `ansible/add_kuma_monitors.py` liegt bereit, benötigt API-Token aus Kuma UI. |
+| **NFS Server on Proxmox** | Required before Jellyfin goes live — share `/mnt/media` via NFS v4.2 auf `10.0.10.10`. Proxmox Host selbst als NFS-Server (kein extra LXC nötig): `apt install nfs-kernel-server`, Export `/mnt/media 10.0.20.0/24(ro,no_root_squash)`. |
+| **Ollama GPU passthrough** | AMD Radeon iGPU → AI LXC via IOMMU — enables ROCm acceleration for paperless-ai. Proxmox: IOMMU in Grub aktivieren (`amd_iommu=on iommu=pt`), LXC Device-Mapping für `/dev/dri`. Ollama benötigt ROCm-fähiges Image (`ollama/ollama:rocm`). |
+| **Paperless → Nextcloud consume** | Mount Nextcloud shared folder als Paperless consume PVC: Nextcloud External Storage App → lokales Filesystem, dann NFS-PV in k3s für Paperless `consume` mounten. Alternativ: Paperless WebDAV-Consume direkt auf Nextcloud-WebDAV. |
+| **Remote Dev Environment (code-server)** | VS Code Server auf k3s — `coder/code-server:latest` als k8s Deployment, 2Gi PVC für Workspace, Authelia-geschütztes IngressRoute. Benötigt: gepinntes Image, ResourceLimits (Kyverno), PVC mit ReadWriteOnce. Alternativ: Headscale-Client auf Mobile + SSH+tmux gegen Docker LXC. |
 
 ---
 
@@ -46,7 +46,9 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 | ~~**External Secrets Operator + HashiCorp Vault**~~ ✅ | ESO 0.10.3 + Vault 0.28.1 deployed — ClusterSecretStore backed by Vault KV v2 |
 | ~~**Kyverno policy engine**~~ ✅ | Three ClusterPolicies deployed: require-resource-limits (Audit), disallow-privileged (Enforce), disallow-latest-tag (Audit) |
 | ~~**Grafana Tempo**~~ ✅ | Tempo deployed, linked to Loki (trace→log correlation) and Prometheus (service map). LGTM stack complete. |
-| **Renovate GitHub PAT** | Apply the actual token so Renovate creates digest-pinning PRs — links the GitOps loop closed for image updates. |
+| **Renovate GitHub PAT** | Apply the actual token so Renovate creates digest-pinning PRs — links the GitOps loop closed for image updates. `kubectl create secret generic renovate-secret --from-literal=token=<PAT> -n system` — token must have `repo` + `read:packages` scopes. |
+| **Authelia OIDC `hmac_secret` in Vault** | `hmac_secret` ist aktuell Plaintext in der ConfigMap. In Vault KV v2 unter `secret/authelia/oidc` ablegen, ExternalSecret anlegen, in configmap als Datei-Referenz einbinden (`/config/secrets/hmac-secret`). |
+| **Authelia auf 2 Replicas skalieren** | Deployment auf `replicas: 2` erhöhen — PDB existiert bereits (`minAvailable: 1`). Voraussetzung: Redis-Session-Store (bereits vorhanden), PostgreSQL-Backend (bereits vorhanden via CNPG). Beide Replicas teilen Session-State über Redis. |
 
 ### Tier 2 — Solid Engineering
 
@@ -62,11 +64,13 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 
 | Item | Why it matters |
 |---|---|
-| **Backup offsite → Oracle Cloud S3** | Velero daily snapshot of critical PVCs (Paperless, Vaultwarden, Nextcloud) pushed to Oracle Cloud free-tier 20GB bucket. |
-| **k3s multi-master HA** | Add a second control plane node — etcd goes from single-point to quorum. Currently 1 master + 2 workers. |
-| **Cilium as CNI** | Replace default flannel with Cilium — enables eBPF-based NetworkPolicies, Hubble network observability UI, service mesh layer. |
+| **Backup offsite → Oracle Cloud S3** | Velero daily snapshot of critical PVCs (Paperless, Vaultwarden, Nextcloud) pushed to Oracle Cloud free-tier 20GB bucket. Velero bereits deployed, Garage S3 als primäres Target. Oracle als zweites Ziel per `BackupStorageLocation`. |
+| **k3s multi-master HA** | Add a second control plane node — etcd goes from single-point to quorum. Currently 1 master + 2 workers. Proxmox VM klonen, k3s-cluster Ansible-Playbook mit `--server` Flag joinen. Atlantis PR für Proxmox VM-Definition. |
+| **Cilium as CNI** | Replace default flannel with Cilium — enables eBPF-based NetworkPolicies, Hubble network observability UI, service mesh layer. **Achtung**: CNI-Wechsel erfordert k3s Neuinstallation oder Rolling-Replace — kein Live-Swap möglich. |
 | ~~**Unbound performance tuning**~~ ✅ | 4 threads, root-hints, prefetch + prefetch-key, serve-expired, aggressive-nsec, cache-max-negative-ttl=300, 8MB socket buffers. |
-| **Disaster Recovery runbook** | Step-by-step doc: how to rebuild from zero (Proxmox → k3s → ArgoCD bootstrap → secrets inject). Interviewers love seeing this. |
+| **Disaster Recovery runbook** | Step-by-step doc: how to rebuild from zero (Proxmox → k3s → ArgoCD bootstrap → secrets inject from Vault). Ablegen unter `docs/disaster-recovery.md`. Interviewers love seeing this. |
+| **NetworkPolicies für apps namespace** | Kyverno kann Policies enforzen, aber konkrete NetworkPolicy-Manifeste fehlen noch. Jedes Deployment sollte nur mit seinen direkten Backends kommunizieren dürfen (egress whitelist). Besonders Authelia → Redis/PostgreSQL only. |
+| **Authelia-Health in Blackbox Exporter** | `/api/health` Endpoint von Authelia aktuell nicht in Blackbox-Probing. SLO-Regel greift nur auf HTTP 200 der geschützten Domains — wenn Authelia down ist aber Traefik noch antwortet, feuert kein Alert. Probe direkt auf `https://auth.woitzik.dev/api/health` ergänzen. |
 
 ---
 
@@ -120,6 +124,10 @@ RAM update: submit as Terraform change → Atlantis PR (`terraform/stacks/proxmo
 | Bug | Status | Root Cause |
 |---|---|---|
 | **IPv6 broken auf FritzBox WiFi** | ✅ Fix committed | RouterOS 7 sendet standardmäßig RA auf ALLEN Interfaces inkl. ether1 (WAN). Nachdem ether1 via SLAAC eine GUA vom FritzBox erhielt, trat MikroTik als IPv6-Gateway auf dem FritzBox-LAN auf. WLAN-Clients routeten IPv6 über MikroTik, wurden aber vom FORWARD chain gedropt (nur `fd00::/8` erlaubt). Fix: `routeros_ipv6_nd.ether1_no_ra` deaktiviert RA auf ether1. NAT66-Regel um `src_address = "fd00::/8"` ergänzt. |
+| **Authelia Infinite Redirect Loop auf auth.woitzik.dev** | ✅ Fix committed | `access_control`-Regeln in falscher Reihenfolge: `*.woitzik.dev → two_factor` Catch-All stand VOR `auth.woitzik.dev → bypass`. Authelia matcht top-down, bypass-Regel wurde nie erreicht → Loop. Fix: `auth.woitzik.dev bypass` als erste Regel. |
+| **AdGuard immer neugestartet bei Ansible-Run** | ✅ Fix committed | `docker_compose_v2: state: restarted` startet Container bei JEDEM Playbook-Run neu, unabhängig von Änderungen. Fix: `state: present` + Handler-basierter Restart nur bei Config-Änderung. |
+| **AdGuard DNS Überlast auf RPi** | ✅ Fix committed | Kombination aus HaGeZi TIF (Millionen Einträge) + OISD Full + 4MB Cache + 300 goroutines + 90-Tage Query-Log. TIF + OISD entfernt (redundant zu HaGeZi Pro), Cache auf 32MB erhöht, goroutines auf 100, Log-Retention auf 7 Tage. |
+| **Authelia `latest` Image-Tag** | ✅ Fix committed | `ghcr.io/authelia/authelia:latest` verletzt Kyverno-Policy `disallow-latest-tag`. Gepinnt auf `4.38.18`. |
 
 ---
 
