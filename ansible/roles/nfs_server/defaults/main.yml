@@ -1,0 +1,44 @@
+---
+nfs_data_dir: /nfs-data
+nfs_export_clients:
+  - "10.0.20.0/24"   # Server VLAN (K3s nodes)
+  - "10.42.0.0/16"   # K3s pod CIDR
+  - "10.43.0.0/16"   # K3s service CIDR
+
+nfs_export_options: "rw,sync,no_subtree_check,no_root_squash"
+
+nfs_shares:
+  - name: k8s-general
+    description: General Kubernetes PVCs
+  - name: garage-meta
+    description: Garage S3 metadata
+  - name: jellyfin
+    description: Jellyfin media config
+  - name: nextcloud
+    description: Nextcloud data
+  - name: home-assistant
+    description: Home Assistant config
+  - name: paperless
+    description: Paperless-ngx data
+  - name: sabnzbd
+    description: SABnzbd downloads config
+  - name: sonarr
+    description: Sonarr config
+  - name: radarr
+    description: Radarr config
+  - name: bazarr
+    description: Bazarr config
+  - name: open-webui
+    description: Open WebUI data
+  - name: vaultwarden
+    description: Vaultwarden data
+  - name: mealie
+    description: Mealie data
+  - name: headscale
+    description: Headscale data
+  - name: gitea
+    description: Gitea data
+  - name: atlantis
+    description: Atlantis workspace
+  - name: loki
+    description: Loki storage

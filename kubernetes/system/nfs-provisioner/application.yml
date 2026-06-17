@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nfs-provisioner
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
+    chart: nfs-subdir-external-provisioner
+    targetRevision: 4.0.18
+    helm:
+      values: |
+        nfs:
+          server: 10.0.20.100
+          path: /nfs-data/k8s-general
+          mountOptions:
+            - nfsvers=4.1
+            - hard
+            - timeo=600
+            - retrans=3
+        storageClass:
+          name: nfs-client
+          defaultClass: false
+          reclaimPolicy: Retain
+          volumeBindingMode: Immediate
+          pathPattern: "${.PVC.namespace}/${.PVC.name}"
+          onDelete: retain
+        replicaCount: 2
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nfs-provisioner
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
