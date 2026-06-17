@@ -57,7 +57,7 @@ metadata:
   namespace: apps
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: longhorn
+  storageClassName: nfs-client
   resources:
     requests:
       storage: 2Gi
@@ -132,7 +132,7 @@ metadata:
   namespace: apps
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: longhorn
+  storageClassName: nfs-client
   resources:
     requests:
       storage: 2Gi
@@ -207,7 +207,7 @@ metadata:
   namespace: apps
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: longhorn
+  storageClassName: nfs-client
   resources:
     requests:
       storage: 2Gi
@@ -282,7 +282,7 @@ metadata:
   namespace: apps
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: longhorn
+  storageClassName: nfs-client
   resources:
     requests:
       storage: 2Gi

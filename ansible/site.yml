@@ -52,6 +52,12 @@
     - node_exporter_native
     - ollama
 
+- name: Provision NFS Storage Server
+  hosts: nfs_nodes
+  become: true
+  roles:
+    - nfs_server
+
 - name: Proxmox Host — Power Management
   hosts: pve_hosts
   become: true
