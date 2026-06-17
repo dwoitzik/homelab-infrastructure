@@ -128,6 +128,13 @@ RAM update: submit as Terraform change → Atlantis PR (`terraform/stacks/proxmo
 | **AdGuard immer neugestartet bei Ansible-Run** | ✅ Fix committed | `docker_compose_v2: state: restarted` startet Container bei JEDEM Playbook-Run neu, unabhängig von Änderungen. Fix: `state: present` + Handler-basierter Restart nur bei Config-Änderung. |
 | **AdGuard DNS Überlast auf RPi** | ✅ Fix committed | Kombination aus HaGeZi TIF (Millionen Einträge) + OISD Full + 4MB Cache + 300 goroutines + 90-Tage Query-Log. TIF + OISD entfernt (redundant zu HaGeZi Pro), Cache auf 32MB erhöht, goroutines auf 100, Log-Retention auf 7 Tage. |
 | **Authelia `latest` Image-Tag** | ✅ Fix committed | `ghcr.io/authelia/authelia:latest` verletzt Kyverno-Policy `disallow-latest-tag`. Gepinnt auf `4.38.18`. |
+| **k3s-12 NotReady (kubelet Lease verloren)** | ✅ Fix live | k3s-agent auf k3s-12 hatte Verbindungsabbruch zur API-Server. `systemctl restart k3s-agent` auf k3s-12 behoben. Root cause: unbekannt, möglicherweise transient. Monitoring: AlertManager sollte NodeNotReady binnen 5min alerten. |
+| **k3s-13 kubectl exec/logs 502** | ✅ Fix live | Kubelet-Proxy auf k3s-13 nach k3s-12-Ausfall beschädigt. `systemctl restart k3s-agent` auf k3s-13 behoben. |
+| **Redis AOF I/O-Fehler → Authelia Down** | ✅ Fix live | Redis-AOF-Persistenz fehlschlug mit I/O-Error (nach k3s-12 Cascade). Fix: `CONFIG SET appendonly no/yes` + `BGREWRITEAOF` via crictl exec direkt auf Node. |
+| **postgres-paperless I/O-Error nach k3s-12-Ausfall** | ✅ Fix live | Longhorn-Volume war healthy, aber Mount im Pod hatte stale I/O-State. Pod-Delete erzwang frischen Mount. |
+| **Jellyfin CrashLoop — inotify limit** | ✅ Fix live + committed | `fs.inotify.max_user_instances=128` (Default) ausgeschöpft. Erhöht auf 512 auf allen Nodes via sysctl, persistiert in `/etc/sysctl.d/99-inotify.conf`. Ansible-common-Rolle aktualisiert. |
+| **paperless-ai OOMKilled** | ✅ Fix committed | Memory-Limit 512Mi zu niedrig für AI-Workload. Erhöht auf 1536Mi, Request auf 512Mi, CPU-Limit auf 500m. Image auf `2.8.2` gepinnt. |
+| **k3s-11 (Master) intermittent unreachable** | 🔴 Active | k3s-11 verliert mehrfach Netzwerkkonnektivität (kurze Aussetzer, "no route to host"). Ursache unklar — könnte memory pressure, VM-Freeze oder MikroTik-FW sein. Single-master-Risiko: bei Absturz stirbt gesamter k3s-API. Mitigation: k3s multi-master HA (Tier 3 Roadmap). Workaround: AlertManager NodeNotReady-Alert aktiv. |
 
 ---
 

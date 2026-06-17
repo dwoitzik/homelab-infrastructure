@@ -29,14 +29,14 @@ spec:
     spec:
       containers:
       - name: paperless-ai
-        image: clusterzx/paperless-ai:latest
+        image: clusterzx/paperless-ai:2.8.2
         resources:
           requests:
             cpu: 50m
-            memory: 256Mi
-          limits:
-            cpu: 200m
             memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1536Mi
         ports:
         - containerPort: 3000
         env:
