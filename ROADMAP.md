@@ -48,7 +48,7 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 | ~~**Grafana Tempo**~~ ✅ | Tempo deployed, linked to Loki (trace→log correlation) and Prometheus (service map). LGTM stack complete. |
 | **Renovate GitHub PAT** | Apply the actual token so Renovate creates digest-pinning PRs — links the GitOps loop closed for image updates. `kubectl create secret generic renovate-secret --from-literal=token=<PAT> -n system` — token must have `repo` + `read:packages` scopes. |
 | **Authelia OIDC `hmac_secret` in Vault** | `hmac_secret` ist aktuell Plaintext in der ConfigMap. In Vault KV v2 unter `secret/authelia/oidc` ablegen, ExternalSecret anlegen, in configmap als Datei-Referenz einbinden (`/config/secrets/hmac-secret`). |
-| **Authelia auf 2 Replicas skalieren** | Deployment auf `replicas: 2` erhöhen — PDB existiert bereits (`minAvailable: 1`). Voraussetzung: Redis-Session-Store (bereits vorhanden), PostgreSQL-Backend (bereits vorhanden via CNPG). Beide Replicas teilen Session-State über Redis. |
+| ~~**Authelia auf 2 Replicas skalieren**~~ ✅ | Deployment auf `replicas: 2` erhöht. PDB (`minAvailable: 1`) existierte bereits. Redis-Session-Store + CNPG-Backend waren ready. |
 
 ### Tier 2 — Solid Engineering
 
@@ -70,7 +70,7 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 | ~~**Unbound performance tuning**~~ ✅ | 4 threads, root-hints, prefetch + prefetch-key, serve-expired, aggressive-nsec, cache-max-negative-ttl=300, 8MB socket buffers. |
 | **Disaster Recovery runbook** | Step-by-step doc: how to rebuild from zero (Proxmox → k3s → ArgoCD bootstrap → secrets inject from Vault). Ablegen unter `docs/disaster-recovery.md`. Interviewers love seeing this. |
 | **NetworkPolicies für apps namespace** | Kyverno kann Policies enforzen, aber konkrete NetworkPolicy-Manifeste fehlen noch. Jedes Deployment sollte nur mit seinen direkten Backends kommunizieren dürfen (egress whitelist). Besonders Authelia → Redis/PostgreSQL only. |
-| **Authelia-Health in Blackbox Exporter** | `/api/health` Endpoint von Authelia aktuell nicht in Blackbox-Probing. SLO-Regel greift nur auf HTTP 200 der geschützten Domains — wenn Authelia down ist aber Traefik noch antwortet, feuert kein Alert. Probe direkt auf `https://auth.woitzik.dev/api/health` ergänzen. |
+| ~~**Authelia-Health in Blackbox Exporter**~~ ✅ | `/api/health` Endpoint ergänzt als separater Prometheus-Job `blackbox-authelia-health`. Vorher wurde nur der Root-Redirect geprobt — Traefik konnte 200 liefern während Authelia down war. Jetzt wird der Authelia-Prozess direkt überwacht. |
 
 ---
 
@@ -134,7 +134,11 @@ RAM update: submit as Terraform change → Atlantis PR (`terraform/stacks/proxmo
 | **postgres-paperless I/O-Error nach k3s-12-Ausfall** | ✅ Fix live | Longhorn-Volume war healthy, aber Mount im Pod hatte stale I/O-State. Pod-Delete erzwang frischen Mount. |
 | **Jellyfin CrashLoop — inotify limit** | ✅ Fix live + committed | `fs.inotify.max_user_instances=128` (Default) ausgeschöpft. Erhöht auf 512 auf allen Nodes via sysctl, persistiert in `/etc/sysctl.d/99-inotify.conf`. Ansible-common-Rolle aktualisiert. |
 | **paperless-ai OOMKilled** | ✅ Fix committed | Memory-Limit 512Mi zu niedrig für AI-Workload. Erhöht auf 1536Mi, Request auf 512Mi, CPU-Limit auf 500m. Image auf `2.8.2` gepinnt. |
-| **k3s-11 (Master) intermittent unreachable** | 🔴 Active | k3s-11 verliert mehrfach Netzwerkkonnektivität (kurze Aussetzer, "no route to host"). Ursache unklar — könnte memory pressure, VM-Freeze oder MikroTik-FW sein. Single-master-Risiko: bei Absturz stirbt gesamter k3s-API. Mitigation: k3s multi-master HA (Tier 3 Roadmap). Workaround: AlertManager NodeNotReady-Alert aktiv. |
+| **k3s-11 (Master) intermittent unreachable** | ✅ Root cause identified + mitigated | Root cause: load average 48–90 auf 4 CPUs durch 16+ App-Pods + Longhorn-Replicas + Controlplane gleichzeitig. Fix: k3s-11 mit `node-role.kubernetes.io/control-plane:NoSchedule` getaintet, alle App-Workloads auf k3s-12/13 evakuiert, Longhorn-Replicas nach k3s-12/13 migriert. Load sank von 90 → 1.04. Systemd-Override für k3s-agent Auto-Restart auf k3s-12/13 hinzugefügt. |
+| **Garage stuck Pending nach k3s-11 Taint** | ✅ Fix committed | Garage hatte `requiredDuringSchedulingIgnoredDuringExecution` NodeAffinity auf `vm-srv-k3s-11`. Nach Taint konnte Scheduler Garage nirgendwo platzieren. Fix: nodeAffinity entfernt — Longhorn verwaltet PVC-Placement unabhängig. |
+| **k3s-12/k3s-13 worker nur 3.8GB Allocatable** | 🟡 PR open → Atlantis pending | Proxmox balloon minimum (`floating`) war 4096 MB, Nodes zeigten nur ~3.8GB allocatable. K8s Scheduler lehnte Pods mit "Insufficient memory" ab (z.B. home-assistant Pending). Fix: `floating` für k3s-12 und k3s-13 auf 8192 MB erhöht. PR #37 offen — `atlantis apply` ausstehend. |
+| **SABnzbd config PVC faulted nach k3s Chaos** | ✅ Fix live | Longhorn-Volume `pvc-6476c76f` (sabnzbd-config) als faulted markiert nach Node-Ausfällen. Einzige Replica war stopped. Fix: `spec.failedAt` und `spec.lastFailedAt` auf leer gesetzt via kubectl patch — Volume wechselte von `faulted detached` zu `attaching`. Daten erhalten. |
+| **Authelia auf 2 Replicas + Health Probe** | ✅ Fix committed | Authelia lief mit 1 Replica (PDB existierte bereits). Auf 2 Replicas skaliert. Blackbox-Probe auf `/api/health` Endpoint ergänzt (zuvor nur `auth.woitzik.dev` mit Redirect → Traefik-Level). |
 
 ---
 
