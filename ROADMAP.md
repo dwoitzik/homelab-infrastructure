@@ -23,15 +23,22 @@
 | **Immich** | `apps` | Self-hosted Google Photos — ML face recognition, mobile backup |
 | **Navidrome** | `apps` | Music streaming (Subsonic-compatible) |
 
+### In Progress
+
+| Service | Status | Notes |
+|---|---|---|
+| **NFS Storage Migration** | 🔄 Running | Alle PVC-Manifeste auf `storageClassName: nfs-client` umgestellt. Datenmigration per kubectl Job (rsync Longhorn → NFS). Kritische Apps (vaultwarden, home-assistant, headscale) zuerst, dann restliche Apps. NFS-Server: `ct-srv-nfs-01` (10.0.20.100, VMID 220), ZFS rpool/nfs-data 200GB. |
+
 ### Pending (other)
 
 | Service | Notes |
 |---|---|
 | **Uptime Kuma Monitors** | WebSocket API setup required via web UI at status.woitzik.dev — Script `ansible/add_kuma_monitors.py` liegt bereit, benötigt API-Token aus Kuma UI. |
-| **NFS Server on Proxmox** | Required before Jellyfin goes live — share `/mnt/media` via NFS v4.2 auf `10.0.10.10`. Proxmox Host selbst als NFS-Server (kein extra LXC nötig): `apt install nfs-kernel-server`, Export `/mnt/media 10.0.20.0/24(ro,no_root_squash)`. |
+| **NFS Media Share** | ~~NFS Server on Proxmox Host~~ → `ct-srv-nfs-01` übernimmt jetzt auch Media-Shares. Export `/nfs-data/jellyfin` bereits konfiguriert. Jellyfin-PVC auf NFS migrieren sobald Storage-Migration abgeschlossen. |
 | **Ollama GPU passthrough** | AMD Radeon iGPU → AI LXC via IOMMU — enables ROCm acceleration for paperless-ai. Proxmox: IOMMU in Grub aktivieren (`amd_iommu=on iommu=pt`), LXC Device-Mapping für `/dev/dri`. Ollama benötigt ROCm-fähiges Image (`ollama/ollama:rocm`). |
 | **Paperless → Nextcloud consume** | Mount Nextcloud shared folder als Paperless consume PVC: Nextcloud External Storage App → lokales Filesystem, dann NFS-PV in k3s für Paperless `consume` mounten. Alternativ: Paperless WebDAV-Consume direkt auf Nextcloud-WebDAV. |
-| **Remote Dev Environment (code-server)** | VS Code Server auf k3s — `coder/code-server:latest` als k8s Deployment, 2Gi PVC für Workspace, Authelia-geschütztes IngressRoute. Benötigt: gepinntes Image, ResourceLimits (Kyverno), PVC mit ReadWriteOnce. Alternativ: Headscale-Client auf Mobile + SSH+tmux gegen Docker LXC. |
+| **Claude Code Web Terminal** | Claude Code CLI + `ttyd` als Web-Terminal im Homelab — sodass du ohne lokalen PC weiterarbeiten kannst. Deployment: neuer CT `ct-srv-claude-01` (VMID 222) oder k3s Deployment mit `ttyd` + Claude Code CLI. Zugriff über `claude.woitzik.dev` (Authelia-geschützt). Benötigt Anthropic API-Key in Vault. ttyd: `ttyd --port 7681 --credential user:pass claude` oder direkt als k8s Deployment mit NFS PVC für Workspace-Persistenz. |
+| **Remote Dev Environment (code-server)** | VS Code Server auf k3s — `coder/code-server:latest` als k8s Deployment, 2Gi PVC für Workspace, Authelia-geschütztes IngressRoute. Benötigt: gepinntes Image, ResourceLimits (Kyverno), PVC mit ReadWriteOnce. |
 
 ---
 
@@ -127,18 +134,19 @@ RAM update: submit as Terraform change → Atlantis PR (`terraform/stacks/proxmo
 | **Authelia Infinite Redirect Loop auf auth.woitzik.dev** | ✅ Fix committed | `access_control`-Regeln in falscher Reihenfolge: `*.woitzik.dev → two_factor` Catch-All stand VOR `auth.woitzik.dev → bypass`. Authelia matcht top-down, bypass-Regel wurde nie erreicht → Loop. Fix: `auth.woitzik.dev bypass` als erste Regel. |
 | **AdGuard immer neugestartet bei Ansible-Run** | ✅ Fix committed | `docker_compose_v2: state: restarted` startet Container bei JEDEM Playbook-Run neu, unabhängig von Änderungen. Fix: `state: present` + Handler-basierter Restart nur bei Config-Änderung. |
 | **AdGuard DNS Überlast auf RPi** | ✅ Fix committed | Kombination aus HaGeZi TIF (Millionen Einträge) + OISD Full + 4MB Cache + 300 goroutines + 90-Tage Query-Log. TIF + OISD entfernt (redundant zu HaGeZi Pro), Cache auf 32MB erhöht, goroutines auf 100, Log-Retention auf 7 Tage. |
-| **Authelia `latest` Image-Tag** | ✅ Fix committed | `ghcr.io/authelia/authelia:latest` verletzt Kyverno-Policy `disallow-latest-tag`. Gepinnt auf `4.38.18`. |
-| **k3s-12 NotReady (kubelet Lease verloren)** | ✅ Fix live | k3s-agent auf k3s-12 hatte Verbindungsabbruch zur API-Server. `systemctl restart k3s-agent` auf k3s-12 behoben. Root cause: unbekannt, möglicherweise transient. Monitoring: AlertManager sollte NodeNotReady binnen 5min alerten. |
-| **k3s-13 kubectl exec/logs 502** | ✅ Fix live | Kubelet-Proxy auf k3s-13 nach k3s-12-Ausfall beschädigt. `systemctl restart k3s-agent` auf k3s-13 behoben. |
-| **Redis AOF I/O-Fehler → Authelia Down** | ✅ Fix live | Redis-AOF-Persistenz fehlschlug mit I/O-Error (nach k3s-12 Cascade). Fix: `CONFIG SET appendonly no/yes` + `BGREWRITEAOF` via crictl exec direkt auf Node. |
-| **postgres-paperless I/O-Error nach k3s-12-Ausfall** | ✅ Fix live | Longhorn-Volume war healthy, aber Mount im Pod hatte stale I/O-State. Pod-Delete erzwang frischen Mount. |
-| **Jellyfin CrashLoop — inotify limit** | ✅ Fix live + committed | `fs.inotify.max_user_instances=128` (Default) ausgeschöpft. Erhöht auf 512 auf allen Nodes via sysctl, persistiert in `/etc/sysctl.d/99-inotify.conf`. Ansible-common-Rolle aktualisiert. |
-| **paperless-ai OOMKilled** | ✅ Fix committed | Memory-Limit 512Mi zu niedrig für AI-Workload. Erhöht auf 1536Mi, Request auf 512Mi, CPU-Limit auf 500m. Image auf `2.8.2` gepinnt. |
-| **k3s-11 (Master) intermittent unreachable** | ✅ Root cause identified + mitigated | Root cause: load average 48–90 auf 4 CPUs durch 16+ App-Pods + Longhorn-Replicas + Controlplane gleichzeitig. Fix: k3s-11 mit `node-role.kubernetes.io/control-plane:NoSchedule` getaintet, alle App-Workloads auf k3s-12/13 evakuiert, Longhorn-Replicas nach k3s-12/13 migriert. Load sank von 90 → 1.04. Systemd-Override für k3s-agent Auto-Restart auf k3s-12/13 hinzugefügt. |
-| **Garage stuck Pending nach k3s-11 Taint** | ✅ Fix committed | Garage hatte `requiredDuringSchedulingIgnoredDuringExecution` NodeAffinity auf `vm-srv-k3s-11`. Nach Taint konnte Scheduler Garage nirgendwo platzieren. Fix: nodeAffinity entfernt — Longhorn verwaltet PVC-Placement unabhängig. |
-| **k3s-12/k3s-13 worker nur 3.8GB Allocatable** | 🟡 PR open → Atlantis pending | Proxmox balloon minimum (`floating`) war 4096 MB, Nodes zeigten nur ~3.8GB allocatable. K8s Scheduler lehnte Pods mit "Insufficient memory" ab (z.B. home-assistant Pending). Fix: `floating` für k3s-12 und k3s-13 auf 8192 MB erhöht. PR #37 offen — `atlantis apply` ausstehend. |
-| **SABnzbd config PVC faulted nach k3s Chaos** | ✅ Fix live | Longhorn-Volume `pvc-6476c76f` (sabnzbd-config) als faulted markiert nach Node-Ausfällen. Einzige Replica war stopped. Fix: `spec.failedAt` und `spec.lastFailedAt` auf leer gesetzt via kubectl patch — Volume wechselte von `faulted detached` zu `attaching`. Daten erhalten. |
-| **Authelia auf 2 Replicas + Health Probe** | ✅ Fix committed | Authelia lief mit 1 Replica (PDB existierte bereits). Auf 2 Replicas skaliert. Blackbox-Probe auf `/api/health` Endpoint ergänzt (zuvor nur `auth.woitzik.dev` mit Redirect → Traefik-Level). |
+| **Authelia `latest` Image-Tag** | ✅ Fix committed | `ghcr.io/authelia/authelia:latest` verletzt Kyverno-Policy `disallow-latest-tag`. Gepinnt auf `4.39.20`. |
+| **k3s-12 NotReady (kubelet Lease verloren)** | ✅ Fix live | k3s-agent auf k3s-12 hatte Verbindungsabbruch zur API-Server. `systemctl restart k3s-agent` auf k3s-12 behoben. |
+| **Redis AOF I/O-Fehler → Authelia Down** | ✅ Fix live | Redis-AOF-Persistenz fehlschlug mit I/O-Error nach k3s-12 Cascade. Fix: `CONFIG SET appendonly no/yes` + `BGREWRITEAOF`. |
+| **Jellyfin CrashLoop — inotify limit** | ✅ Fix committed | `fs.inotify.max_user_instances=128` erschöpft. Erhöht auf 512 auf allen Nodes, persistiert via Ansible-common-Rolle. |
+| **paperless-ai OOMKilled** | ✅ Fix committed | Memory-Limit 512Mi zu niedrig. Erhöht auf 1536Mi, CPU-Limit auf 500m. Image auf `2.8.2` gepinnt. |
+| **k3s-11 (Master) intermittent unreachable** | ✅ Fixed + mitigated | Load average 48–90 durch App-Pods + Longhorn-Replicas + Controlplane. Fix: k3s-11 getaintet (`NoSchedule`), App-Workloads auf k3s-12/13 evakuiert. Load sank von 90 → 1.04. |
+| **Garage SQLite Corruption** | ✅ Partially recovered | Unclean shutdown durch OOM. `db.sqlite` Pages 169–184 korrupt. Recovery: `.recover`-Befehl in SQLite. terraform-state Bucket verloren → neu erstellt, Atlantis-Secret aktualisiert. |
+| **Authelia Schema-Mismatch (DB v24 vs Image v15)** | ✅ Fix committed | DB hatte Schema v24 (geschrieben von v4.39.20), Deployment nutzte v4.38.18 (max v15). Fix: Image auf `4.39.20` angehoben. |
+| **k3s-12/k3s-13 worker nur 3.8GB Allocatable** | ✅ Fix live | Proxmox balloon minimum war 4096 MB. Via Proxmox Monitor-API direkt auf 8192 MB aufgeblasen — sofort ohne Reboot. Terraform-PR #37 wurde obsolet. |
+| **Longhorn cross-node attach Dauerschleife** | 🔄 In Arbeit | RWO-Volumes wurden bei OOM auf Node A attached, Pods aber auf Node B neu gestartet → `Multi-Attach error`. Root cause: Longhorn taugt nicht für volatile Node-Umgebungen. **Fix: Migration aller PVCs von Longhorn → NFS (ct-srv-nfs-01)**. In Progress — siehe Storage Migration. |
+| **SABnzbd config PVC faulted** | 🟡 Data loss | Longhorn-Volume `pvc-6476c76f` faulted+detached nach multiplen Node-Ausfällen. Nur noch fresh-start möglich. Neue NFS-PVC wird erstellt. |
+| **Authelia auf 2 Replicas + Health Probe** | ✅ Fix committed | Auf 2 Replicas skaliert. Blackbox-Probe auf `/api/health` ergänzt. |
+| **NFS CT falsches Namensschema** | ✅ Fix committed | CT hieß `vm-srv-nfs-01` — muss `ct-srv-nfs-01` sein (LXC = `ct` Prefix). Terraform-Ressource + Import ergänzt, Tags gesetzt, Hostname auf CT korrigiert. |
 
 ---
 
