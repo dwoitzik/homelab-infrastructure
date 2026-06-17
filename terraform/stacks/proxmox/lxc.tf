@@ -236,6 +236,70 @@ resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
   }
 }
 
+# --- NFS Storage Stack ---
+
+resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
+  vm_id        = 220
+  node_name    = local.target_node
+  tags         = ["nfs", "server", "storage"]
+  started      = true
+  unprivileged = false
+
+  initialization {
+    hostname = "ct-srv-nfs-01"
+    ip_config {
+      ipv4 {
+        address = "10.0.20.100/24"
+        gateway = "10.0.20.1"
+      }
+    }
+    dns {
+      servers = ["10.0.20.5", "10.0.20.2"]
+    }
+  }
+
+  cpu {
+    cores = 2
+  }
+
+  memory {
+    dedicated = 1024
+    swap      = 512
+  }
+
+  features {
+    nesting = true
+  }
+
+  disk {
+    datastore_id = local.storage
+    size         = 8
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr0"
+    mac_address = "bc:24:11:95:b8:f3"
+    vlan_id     = 20
+    firewall    = true
+  }
+
+  operating_system {
+    template_file_id = local.template
+    type             = "debian"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      description,
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+      network_interface[0].mac_address,
+      features,
+    ]
+  }
+}
+
 resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   vm_id        = 302
   node_name    = local.target_node
