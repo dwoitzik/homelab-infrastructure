@@ -15,7 +15,7 @@ Full-stack homelab managed entirely through Infrastructure as Code — from Mikr
 | Edge DNS | 2× Raspberry Pi 4B — AdGuard Home + Unbound |
 | Kubernetes | k3s v1.31 — 3-node cluster (1 control-plane + 2 workers) |
 | Ingress + TLS | Traefik + cert-manager (wildcard `*.woitzik.dev` via DNS-01) |
-| Storage | Longhorn (distributed block storage, 3× replication) |
+| Storage | NFS (ct-srv-nfs-01, ZFS 200GB) + Longhorn (being phased out) |
 | GitOps (k8s) | ArgoCD — ApplicationSet watching `kubernetes/apps/*` |
 | GitOps (TF) | Atlantis — self-hosted, exposed via Cloudflare Tunnel |
 | Auth | Authelia — SSO/OIDC for all protected services |
