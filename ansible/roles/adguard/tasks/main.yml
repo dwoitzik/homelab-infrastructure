@@ -39,7 +39,7 @@
 - name: Start AdGuard Home container
   community.docker.docker_compose_v2:
     project_src: /opt/adguardhome
-    state: restarted
+    state: present
 
 - name: Deploy AdGuardHome-Sync on replica node
   when: inventory_hostname == 'rpi-srv-02'
@@ -66,7 +66,7 @@
                 - REPLICA_URL=http://10.0.20.3:3001
                 - REPLICA_USERNAME=dw
                 - REPLICA_PASSWORD={{ adguard_ui_password }}
-                - CRON=*/5 * * * * # Sync every 5 minutes
+                - CRON=*/15 * * * *
         mode: '0644'
 
     - name: Start AdGuardHome-Sync

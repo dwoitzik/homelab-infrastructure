@@ -31,7 +31,7 @@ spec:
                 - rpi
       containers:
       - name: authelia
-        image: ghcr.io/authelia/authelia:latest
+        image: ghcr.io/authelia/authelia:4.38.18
         ports:
         - containerPort: 9091
         volumeMounts:
