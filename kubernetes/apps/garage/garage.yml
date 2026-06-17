@@ -41,15 +41,6 @@ spec:
       labels:
         app: garage
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: kubernetes.io/hostname
-                operator: In
-                values:
-                - vm-srv-k3s-11
       containers:
         - name: garage
           image: dxflrs/garage:v2.3.0
