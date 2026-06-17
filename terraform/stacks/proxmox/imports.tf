@@ -24,6 +24,11 @@ import {
 }
 
 import {
+  to = proxmox_virtual_environment_container.ct_srv_nfs_01
+  id = "pve-mgmt-01/220"
+}
+
+import {
   to = proxmox_virtual_environment_vm.vm_srv_k3s_11_master
   id = "pve-mgmt-01/211"
 }
