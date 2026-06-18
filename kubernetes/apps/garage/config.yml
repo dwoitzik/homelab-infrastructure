@@ -25,5 +25,5 @@ data:
     root_domain = ".web.s3.woitzik.dev"
 
     [admin]
-    admin_bind_addr = "[::]:3903"
+    api_bind_addr = "0.0.0.0:3903"
     admin_token_file = "/etc/garage/secrets/admin_token"

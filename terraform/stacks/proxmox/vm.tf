@@ -91,7 +91,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
 
   memory {
     dedicated = 16384
-    floating  = 4096
+    floating  = 8192
   }
 
   disk {
@@ -153,7 +153,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
 
   memory {
     dedicated = 16384
-    floating  = 4096
+    floating  = 8192
   }
 
   disk {

@@ -59,11 +59,12 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
 # --- Server Stack ---
 
 resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
-  vm_id        = 200
-  node_name    = local.target_node
-  tags         = ["docker", "server", "services"]
-  started      = true
-  unprivileged = true
+  vm_id                 = 200
+  node_name             = local.target_node
+  tags                  = ["docker", "server", "services"]
+  started               = true
+  unprivileged          = true
+  environment_variables = {}
 
   initialization {
     hostname = "ct-srv-docker-01"
@@ -114,11 +115,12 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
 # --- AI & LLM Stack ---
 
 resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
-  vm_id        = 201
-  node_name    = local.target_node
-  tags         = ["ai", "llm", "server"]
-  started      = true
-  unprivileged = true
+  vm_id                 = 201
+  node_name             = local.target_node
+  tags                  = ["ai", "llm", "server"]
+  started               = true
+  unprivileged          = true
+  environment_variables = {}
 
   initialization {
     hostname = "ct-srv-ai-01"
@@ -175,11 +177,12 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
 # --- DMZ Stack ---
 
 resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
-  vm_id        = 301
-  node_name    = local.target_node
-  tags         = ["dmz", "proxy", "network"]
-  started      = true
-  unprivileged = true
+  vm_id                 = 301
+  node_name             = local.target_node
+  tags                  = ["dmz", "proxy", "network"]
+  started               = true
+  unprivileged          = true
+  environment_variables = {}
 
   initialization {
     hostname = "ct-dmz-proxy-01"
@@ -289,23 +292,19 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
     type             = "debian"
   }
 
+  # NFS CT holds live PVC data — ignore all drift to prevent accidental destroy
   lifecycle {
-    ignore_changes = [
-      description,
-      initialization[0].user_account,
-      operating_system[0].template_file_id,
-      network_interface[0].mac_address,
-      features,
-    ]
+    ignore_changes = all
   }
 }
 
 resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
-  vm_id        = 302
-  node_name    = local.target_node
-  tags         = ["dmz", "gaming"]
-  started      = true
-  unprivileged = true
+  vm_id                 = 302
+  node_name             = local.target_node
+  tags                  = ["dmz", "gaming"]
+  started               = true
+  unprivileged          = true
+  environment_variables = {}
 
   initialization {
     hostname = "ct-dmz-games-01"
