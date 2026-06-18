@@ -43,6 +43,12 @@ spec:
     size: 8Gi
     storageClass: nfs-client
 
+  affinity:
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
   resources:
     requests:
       memory: 256Mi
