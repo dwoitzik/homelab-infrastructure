@@ -58,7 +58,7 @@ data:
 
     identity_providers:
       oidc:
-        hmac_secret: "***REMOVED-SHARED-OIDC-CLIENT-SECRET***"
+        hmac_secret: '/config/secrets/hmac-secret'
         issuer_private_key: |
           ***REMOVED-AUTHELIA-OIDC-PRIVATE-KEY***
         clients:
