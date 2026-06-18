@@ -54,7 +54,7 @@ spec:
         - name: PAPERLESS_URL
           value: https://docs.woitzik.dev
         - name: PAPERLESS_ALLOWED_HOSTS
-          value: docs.woitzik.dev,auth.woitzik.dev,10.0.20.200,10.0.20.11,10.0.20.12,10.0.20.13
+          value: docs.woitzik.dev,auth.woitzik.dev,10.0.20.200,10.0.20.11,10.0.20.12,10.0.20.13,paperless.apps.svc.cluster.local
         - name: PAPERLESS_CSRF_TRUSTED_ORIGINS
           value: https://docs.woitzik.dev,https://auth.woitzik.dev
         - name: PAPERLESS_TRUSTED_PROXIES
