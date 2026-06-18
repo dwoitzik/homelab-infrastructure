@@ -1,0 +1,6 @@
+---
+- name: Deploy Tailscale subnet router
+  hosts: rpi_nodes
+  become: true
+  roles:
+    - tailscale
