@@ -56,3 +56,16 @@ spec:
       targetPort: 3001
   selector:
     app: uptime-kuma
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: status-main
+  namespace: monitoring
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`status.woitzik.dev`)
+    kind: Rule
+    services: [{name: uptime-kuma, port: 3001}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
