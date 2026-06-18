@@ -136,6 +136,10 @@ spec:
       labels:
         app: nextcloud
     spec:
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
       containers:
         - name: nextcloud
           image: nextcloud:30-apache
@@ -211,6 +215,10 @@ spec:
       template:
         spec:
           restartPolicy: OnFailure
+          tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
           affinity:
             podAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
