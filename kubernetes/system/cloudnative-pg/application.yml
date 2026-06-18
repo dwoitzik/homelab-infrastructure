@@ -11,6 +11,10 @@ spec:
     chart: cloudnative-pg
     helm:
       values: |
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
         monitoring:
           podMonitorEnabled: true
           grafanaDashboard:
