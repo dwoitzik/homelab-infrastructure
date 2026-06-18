@@ -4,16 +4,12 @@
     name:
       - curl
       - git
-      - libwebsockets-dev
-      - libjson-c-dev
-      - cmake
-      - build-essential
     state: present
     update_cache: true
 
 - name: Download NodeSource setup script
   ansible.builtin.get_url:
-    url: "https://deb.nodesource.com/setup_{{ node_version }}.x"
+    url: "https://deb.nodesource.com/setup_{{ claude_terminal_node_version }}.x"
     dest: /tmp/nodesource_setup.sh
     mode: "0755"
 
@@ -22,7 +18,7 @@
     cmd: /bin/bash /tmp/nodesource_setup.sh
     creates: /etc/apt/sources.list.d/nodesource.list
 
-- name: Install Node.js {{ node_version }}
+- name: Install Node.js {{ claude_terminal_node_version }}
   ansible.builtin.apt:
     name: nodejs
     state: present
@@ -38,25 +34,24 @@
 
 - name: Download ttyd binary
   ansible.builtin.get_url:
-    url: "https://github.com/tsl0922/ttyd/releases/download/{{ ttyd_version }}/ttyd.x86_64"
+    url: "https://github.com/tsl0922/ttyd/releases/download/{{ claude_terminal_ttyd_version }}/ttyd.x86_64"
     dest: /usr/local/bin/ttyd
     mode: "0755"
-    checksum: "sha256:https://github.com/tsl0922/ttyd/releases/download/{{ ttyd_version }}/ttyd.x86_64.sha256"
 
 - name: Create claude system user
   ansible.builtin.user:
-    name: "{{ ttyd_user }}"
+    name: "{{ claude_terminal_user }}"
     system: true
     shell: /bin/bash
-    home: "/home/{{ ttyd_user }}"
+    home: "/home/{{ claude_terminal_user }}"
     create_home: true
 
 - name: Create claude config directory
   ansible.builtin.file:
-    path: "/home/{{ ttyd_user }}/.claude"
+    path: "/home/{{ claude_terminal_user }}/.claude"
     state: directory
-    owner: "{{ ttyd_user }}"
-    group: "{{ ttyd_user }}"
+    owner: "{{ claude_terminal_user }}"
+    group: "{{ claude_terminal_user }}"
     mode: "0700"
 
 - name: Deploy ttyd systemd service

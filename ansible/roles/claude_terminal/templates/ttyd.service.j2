@@ -4,16 +4,15 @@ After=network.target
 
 [Service]
 Type=simple
-User={{ ttyd_user }}
-WorkingDirectory=/home/{{ ttyd_user }}
-Environment="HOME=/home/{{ ttyd_user }}"
-Environment="ANTHROPIC_API_KEY={{ vault_anthropic_api_key }}"
-Environment="CLAUDE_CONFIG_DIR=/home/{{ ttyd_user }}/.claude"
+User={{ claude_terminal_user }}
+WorkingDirectory=/home/{{ claude_terminal_user }}
+Environment="HOME=/home/{{ claude_terminal_user }}"
+Environment="CLAUDE_CONFIG_DIR=/home/{{ claude_terminal_user }}/.claude"
 ExecStart=/usr/local/bin/ttyd \
-    --port {{ ttyd_port }} \
-    --credential {{ ttyd_credential_user }}:{{ vault_ttyd_password }} \
+    --port {{ claude_terminal_ttyd_port }} \
+    --credential {{ claude_terminal_credential_user }}:{{ vault_claude_ttyd_password }} \
     --writable \
-    /usr/bin/claude \
+    /usr/local/bin/claude \
     --dangerously-skip-permissions
 Restart=always
 RestartSec=5

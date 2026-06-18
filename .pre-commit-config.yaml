@@ -24,7 +24,7 @@ repos:
         description: Enforces Ansible best practices and fully qualified collection names.
         entry: bash -c 'cd ansible && ansible-lint'
         language: system
-        files: ^ansible/.*\.(yml|yaml)$
+        always_run: true
         pass_filenames: false
 
       - id: tflint
