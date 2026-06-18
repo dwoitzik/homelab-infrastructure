@@ -27,6 +27,10 @@ spec:
       labels:
         app: paperless-ai
     spec:
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
       containers:
       - name: paperless-ai
         image: clusterzx/paperless-ai:2.8.2
