@@ -115,6 +115,14 @@ data:
               key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
               enableBlocks: true
               enableNowPlaying: true
+        - Jellyseerr:
+            icon: jellyseerr.png
+            href: https://requests.woitzik.dev
+            description: Film & Serien Anfragen
+            widget:
+              type: jellyseerr
+              url: http://jellyseerr.apps.svc.cluster.local:5055
+              key: "{{HOMEPAGE_VAR_JELLYSEERR_API_KEY}}"
         - SABnzbd:
             icon: sabnzbd.png
             href: https://sabnzbd.woitzik.dev
@@ -207,7 +215,7 @@ data:
       columns: 4
     Media:
       style: grid
-      columns: 5
+      columns: 6
     Monitoring:
       style: grid
       columns: 3

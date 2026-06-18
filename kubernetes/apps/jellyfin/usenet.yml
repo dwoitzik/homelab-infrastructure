@@ -1,4 +1,86 @@
 ---
+# Jellyseerr - Request management (Jellyfin + Sonarr + Radarr)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyseerr
+  namespace: apps
+  annotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jellyseerr
+  template:
+    metadata:
+      labels:
+        app: jellyseerr
+    spec:
+      containers:
+        - name: jellyseerr
+          image: fallenbagel/jellyseerr:latest
+          env:
+            - name: TZ
+              value: "Europe/Berlin"
+            - name: LOG_LEVEL
+              value: "info"
+          ports:
+            - containerPort: 5055
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: jellyseerr-config
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jellyseerr-config
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jellyseerr
+  namespace: apps
+spec:
+  selector:
+    app: jellyseerr
+  ports:
+    - port: 5055
+      targetPort: 5055
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: jellyseerr-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`requests.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia, namespace: apps}]
+    services: [{name: jellyseerr, port: 5055}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
 # SABnzbd - Usenet downloader
 apiVersion: apps/v1
 kind: Deployment
