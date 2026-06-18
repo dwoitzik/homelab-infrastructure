@@ -108,16 +108,42 @@ spec:
             - sh
             - -c
             - |
-              apk add --no-cache wireguard-tools iproute2
-              # Bring up the VPN tunnel
+              set -e
+              apk add --no-cache wireguard-tools iproute2 iptables ip6tables
+
+              # Bring up VPN tunnel
               wg-quick up /etc/wireguard/wg0.conf
-              # Allow cluster-internal traffic to bypass VPN (pod + service CIDRs)
-              GW=$(ip route | awk '/default/{print $3}')
+
+              # Save gateway before we kill the default route
+              GW=$(ip route | awk '/default/{print $3; exit}')
+
+              # KILL SWITCH: block all non-VPN external traffic via iptables
+              # Allow loopback and established connections
+              iptables -A OUTPUT -o lo -j ACCEPT
+              iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+              # Allow traffic on VPN tunnel
+              iptables -A OUTPUT -o wg0 -j ACCEPT
+              # Allow cluster-internal CIDRs via eth0 (k3s pod + service + homelab)
+              iptables -A OUTPUT -o eth0 -d 10.0.0.0/8 -j ACCEPT
+              iptables -A OUTPUT -o eth0 -d 172.16.0.0/12 -j ACCEPT
+              iptables -A OUTPUT -o eth0 -d 192.168.0.0/16 -j ACCEPT
+              # Allow WireGuard handshake to Mullvad endpoint via eth0
+              iptables -A OUTPUT -o eth0 -p udp --dport 51820 -j ACCEPT
+              # DROP everything else (kill switch — no VPN = no traffic)
+              iptables -A OUTPUT -o eth0 -j DROP
+
+              # IPv6 kill switch (Mullvad is IPv4-only on most servers)
+              ip6tables -A OUTPUT -o lo -j ACCEPT
+              ip6tables -A OUTPUT -o wg0 -j ACCEPT
+              ip6tables -A OUTPUT -j DROP
+
+              # Ensure cluster routes go via eth0 (not through wg0)
               ip route add 10.42.0.0/16 via $GW dev eth0 2>/dev/null || true
               ip route add 10.43.0.0/16 via $GW dev eth0 2>/dev/null || true
-              ip route add 10.0.0.0/8   via $GW dev eth0 2>/dev/null || true
-              echo "WireGuard up — external traffic routed through Mullvad"
+
+              echo "=== Kill switch active — external traffic only via Mullvad ==="
               wg show
+              iptables -L OUTPUT --line-numbers -n
           securityContext:
             capabilities:
               add: [NET_ADMIN, SYS_MODULE]
