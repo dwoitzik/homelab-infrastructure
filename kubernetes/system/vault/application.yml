@@ -43,6 +43,10 @@ spec:
           readinessProbe:
             enabled: true
             path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
         ui:
           enabled: true
         injector:

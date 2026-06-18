@@ -15,6 +15,20 @@ spec:
         extraArgs:
           - --dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53
           - --dns01-recursive-nameservers-only
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+        webhook:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+        cainjector:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager
