@@ -15,3 +15,7 @@ common_packages:
 
 monitoring_core_host: "loki.woitzik.dev"  # Was 10.0.20.252, but Loki is now in k3s. Requires an Ingress or LoadBalancer to be set up.
 loki_push_url: "https://loki.woitzik.dev/loki/api/v1/push"
+
+tailscale_authkey: "{{ vault_tailscale_authkey }}"
+tailscale_login_server: "https://headscale.woitzik.dev"
+tailscale_advertise_routes: "10.0.0.0/8"

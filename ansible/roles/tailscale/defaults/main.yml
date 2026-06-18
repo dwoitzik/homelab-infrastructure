@@ -1,0 +1,5 @@
+---
+tailscale_authkey: ""
+tailscale_login_server: "https://headscale.woitzik.dev"
+tailscale_advertise_routes: "10.0.0.0/8"
+tailscale_accept_dns: false
