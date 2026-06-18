@@ -58,6 +58,12 @@
   roles:
     - nfs_server
 
+- name: Provision Claude Code Web Terminal
+  hosts: claude_nodes
+  become: true
+  roles:
+    - claude_terminal
+
 - name: Proxmox Host — Power Management
   hosts: pve_hosts
   become: true

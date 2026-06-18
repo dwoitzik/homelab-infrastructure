@@ -1,0 +1,6 @@
+---
+- name: Restart ttyd
+  ansible.builtin.systemd:
+    name: ttyd
+    state: restarted
+    daemon_reload: true

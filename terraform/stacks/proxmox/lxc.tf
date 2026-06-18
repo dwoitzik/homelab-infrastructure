@@ -300,6 +300,70 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
   }
 }
 
+# --- Claude Code Web Terminal ---
+
+resource "proxmox_virtual_environment_container" "ct_srv_claude_01" {
+  vm_id        = 221
+  node_name    = local.target_node
+  tags         = ["claude", "server", "terminal"]
+  started      = true
+  unprivileged = true
+
+  initialization {
+    hostname = "ct-srv-claude-01"
+    ip_config {
+      ipv4 {
+        address = "10.0.20.120/24"
+        gateway = "10.0.20.1"
+      }
+    }
+    dns {
+      servers = ["10.0.20.5", "10.0.20.2"]
+    }
+  }
+
+  cpu {
+    cores = 2
+  }
+
+  memory {
+    dedicated = 2048
+    swap      = 1024
+  }
+
+  features {
+    nesting = true
+  }
+
+  disk {
+    datastore_id = local.storage
+    size         = 16
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr0"
+    mac_address = "bc:24:11:c1:6a:e3"
+    vlan_id     = 20
+    firewall    = true
+  }
+
+  operating_system {
+    template_file_id = local.template
+    type             = "debian"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      description,
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+      network_interface[0].mac_address,
+      features,
+    ]
+  }
+}
+
 resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   vm_id        = 302
   node_name    = local.target_node
