@@ -33,7 +33,7 @@ spec:
         effect: NoSchedule
       containers:
       - name: paperless-ai
-        image: clusterzx/paperless-ai:2.8.2
+        image: clusterzx/paperless-ai:latest
         resources:
           requests:
             cpu: 50m
