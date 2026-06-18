@@ -194,6 +194,10 @@ spec:
                       {{ end }}
         prometheus:
           prometheusSpec:
+            tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
             dnsConfig:
               options:
                 - name: ndots
