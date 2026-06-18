@@ -161,22 +161,24 @@ spec:
               group_by: [alertname, namespace]
               group_wait: 30s
               group_interval: 5m
-              repeat_interval: 12h
-              receiver: discord
+              repeat_interval: 24h
+              # Default: silence everything (only explicit critical routes fire)
+              receiver: "null"
               routes:
+                # Always silence these
                 - receiver: "null"
                   matchers:
-                    - alertname =~ "InfoInhibitor|Watchdog"
+                    - alertname =~ "InfoInhibitor|Watchdog|TestAlert"
+                # k3s false positives — components are embedded, never expose metrics
+                - receiver: "null"
+                  matchers:
+                    - alertname =~ "KubeProxyDown|KubeSchedulerDown|KubeControllerManagerDown"
+                # Only critical alerts go to Discord, with 2h repeat to avoid spam
                 - receiver: discord
                   matchers:
                     - severity = critical
-                  group_wait: 10s
-                  repeat_interval: 1h
-                - receiver: discord
-                  matchers:
-                    - severity = warning
-                  group_wait: 5m
-                  repeat_interval: 4h
+                  group_wait: 30s
+                  repeat_interval: 2h
             receivers:
               - name: "null"
               - name: discord
