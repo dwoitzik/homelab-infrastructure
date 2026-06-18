@@ -31,7 +31,7 @@ spec:
           dataStorage:
             enabled: true
             size: 5Gi
-            storageClass: longhorn
+            storageClass: nfs-client
             accessMode: ReadWriteOnce
           resources:
             requests:
