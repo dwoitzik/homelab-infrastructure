@@ -215,6 +215,9 @@ spec:
       template:
         spec:
           restartPolicy: OnFailure
+          securityContext:
+            runAsUser: 33
+            runAsGroup: 33
           tolerations:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
