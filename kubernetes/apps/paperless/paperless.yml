@@ -22,11 +22,11 @@ spec:
         image: ghcr.io/paperless-ngx/paperless-ngx:latest
         resources:
           requests:
-            cpu: 100m
-            memory: 256Mi
+            cpu: 200m
+            memory: 512Mi
           limits:
-            cpu: 500m
-            memory: 1Gi
+            cpu: 2000m
+            memory: 3Gi
         ports:
         - containerPort: 8000
         env:
@@ -69,6 +69,10 @@ spec:
           value: HTTP_REMOTE_USER
         - name: PAPERLESS_ACCOUNT_ALLOW_SIGNUPS
           value: "false"
+        - name: PAPERLESS_TASK_WORKERS
+          value: "2"
+        - name: PAPERLESS_THREADS_PER_WORKER
+          value: "2"
         volumeMounts:
         - name: data
           mountPath: /usr/src/paperless/data
