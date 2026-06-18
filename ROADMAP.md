@@ -27,7 +27,8 @@
 
 | Service | Status | Notes |
 |---|---|---|
-| **NFS Storage Migration** | 🔄 Running | Alle PVC-Manifeste auf `storageClassName: nfs-client` umgestellt. Datenmigration per kubectl Job (rsync Longhorn → NFS). Kritische Apps (vaultwarden, home-assistant, headscale) zuerst, dann restliche Apps. NFS-Server: `ct-srv-nfs-01` (10.0.20.100, VMID 220), ZFS rpool/nfs-data 200GB. |
+| **Claude Code Web Terminal** | 🔄 PR #38 offen | CT `ct-srv-claude-01` (VMID 221, 10.0.20.120). Ansible-Rolle `claude_terminal` bereit. `vault_claude_ttyd_password` in Vault eintragen, dann `ansible-playbook` laufen lassen. Nach Provisioning: `claude login` als `claude`-User einmalig ausführen (OAuth, kein API-Key nötig). |
+| **NFS Storage Migration** | ✅ Abgeschlossen | Alle PVCs auf `storageClassName: nfs-client` migriert. Longhorn entfernt. NFS-Server: `ct-srv-nfs-01` (10.0.20.100, VMID 220). |
 
 ### Pending (other)
 
@@ -54,7 +55,7 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 | ~~**Kyverno policy engine**~~ ✅ | Three ClusterPolicies deployed: require-resource-limits (Audit), disallow-privileged (Enforce), disallow-latest-tag (Audit) |
 | ~~**Grafana Tempo**~~ ✅ | Tempo deployed, linked to Loki (trace→log correlation) and Prometheus (service map). LGTM stack complete. |
 | **Renovate GitHub PAT** | Apply the actual token so Renovate creates digest-pinning PRs — links the GitOps loop closed for image updates. `kubectl create secret generic renovate-secret --from-literal=token=<PAT> -n system` — token must have `repo` + `read:packages` scopes. |
-| **Authelia OIDC `hmac_secret` in Vault** | `hmac_secret` ist aktuell Plaintext in der ConfigMap. In Vault KV v2 unter `secret/authelia/oidc` ablegen, ExternalSecret anlegen, in configmap als Datei-Referenz einbinden (`/config/secrets/hmac-secret`). |
+| ~~**Authelia OIDC `hmac_secret` in Vault**~~ ✅ | `hmac_secret` aus ConfigMap entfernt, in Vault KV v2 unter `secret/authelia` abgelegt. ExternalSecret mit `creationPolicy: Merge` synct den Key in `authelia-secrets`. ConfigMap referenziert `/config/secrets/hmac-secret`. |
 | ~~**Authelia auf 2 Replicas skalieren**~~ ✅ | Deployment auf `replicas: 2` erhöht. PDB (`minAvailable: 1`) existierte bereits. Redis-Session-Store + CNPG-Backend waren ready. |
 
 ### Tier 2 — Solid Engineering
