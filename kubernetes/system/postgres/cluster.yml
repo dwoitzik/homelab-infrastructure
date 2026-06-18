@@ -41,7 +41,7 @@ spec:
 
   storage:
     size: 8Gi
-    storageClass: longhorn
+    storageClass: nfs-client
 
   resources:
     requests:
