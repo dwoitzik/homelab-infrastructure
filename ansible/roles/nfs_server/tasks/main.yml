@@ -7,12 +7,12 @@
 
 - name: Create NFS share directories
   ansible.builtin.file:
-    path: "{{ nfs_data_dir }}/{{ item.name }}"
+    path: "{{ nfs_server_data_dir }}/{{ item.name }}"
     state: directory
     owner: nobody
     group: nogroup
     mode: "0777"
-  loop: "{{ nfs_shares }}"
+  loop: "{{ nfs_server_shares }}"
 
 - name: Write /etc/exports
   ansible.builtin.template:
