@@ -242,12 +242,11 @@ resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
 # --- NFS Storage Stack ---
 
 resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
-  vm_id                 = 220
-  node_name             = local.target_node
-  tags                  = ["nfs", "server", "storage"]
-  started               = true
-  unprivileged          = false
-  environment_variables = {}
+  vm_id        = 220
+  node_name    = local.target_node
+  tags         = ["nfs", "server", "storage"]
+  started      = true
+  unprivileged = false
 
   initialization {
     hostname = "ct-srv-nfs-01"
@@ -293,14 +292,9 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
     type             = "debian"
   }
 
+  # NFS CT holds live PVC data — ignore all drift to prevent accidental destroy
   lifecycle {
-    ignore_changes = [
-      description,
-      initialization[0].user_account,
-      operating_system[0].template_file_id,
-      network_interface[0].mac_address,
-      features,
-    ]
+    ignore_changes = all
   }
 }
 
