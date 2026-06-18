@@ -81,7 +81,7 @@ spec:
     services: [{name: jellyseerr, port: 5055}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# SABnzbd - Usenet downloader
+# SABnzbd - Usenet downloader (routes all traffic through Mullvad WireGuard)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -100,6 +100,31 @@ spec:
       labels:
         app: sabnzbd
     spec:
+      # Init container sets up WireGuard tunnel; kernel interface persists for main container
+      initContainers:
+        - name: mullvad-setup
+          image: alpine:3
+          command:
+            - sh
+            - -c
+            - |
+              apk add --no-cache wireguard-tools iproute2
+              # Bring up the VPN tunnel
+              wg-quick up /etc/wireguard/wg0.conf
+              # Allow cluster-internal traffic to bypass VPN (pod + service CIDRs)
+              GW=$(ip route | awk '/default/{print $3}')
+              ip route add 10.42.0.0/16 via $GW dev eth0 2>/dev/null || true
+              ip route add 10.43.0.0/16 via $GW dev eth0 2>/dev/null || true
+              ip route add 10.0.0.0/8   via $GW dev eth0 2>/dev/null || true
+              echo "WireGuard up — external traffic routed through Mullvad"
+              wg show
+          securityContext:
+            capabilities:
+              add: [NET_ADMIN, SYS_MODULE]
+          volumeMounts:
+            - name: mullvad-config
+              mountPath: /etc/wireguard/wg0.conf
+              subPath: wg0.conf
       containers:
         - name: sabnzbd
           image: lscr.io/linuxserver/sabnzbd:latest
@@ -131,6 +156,9 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: media
+        - name: mullvad-config
+          secret:
+            secretName: mullvad-wg-config
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -380,3 +408,73 @@ spec:
   ports:
     - port: 6767
       targetPort: 6767
+---
+# NZBHydra2 - Usenet indexer proxy (aggregates NZBIndexer, DrunkenSlug, etc.)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nzbhydra2
+  namespace: apps
+  annotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nzbhydra2
+  template:
+    metadata:
+      labels:
+        app: nzbhydra2
+    spec:
+      containers:
+        - name: nzbhydra2
+          image: lscr.io/linuxserver/nzbhydra2:latest
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "Europe/Berlin"
+          ports:
+            - containerPort: 5076
+          volumeMounts:
+            - name: config
+              mountPath: /config
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: nzbhydra2-config
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nzbhydra2-config
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nzbhydra2
+  namespace: apps
+spec:
+  selector:
+    app: nzbhydra2
+  ports:
+    - port: 5076
+      targetPort: 5076
