@@ -58,7 +58,7 @@ data:
 
     identity_providers:
       oidc:
-        hmac_secret: "dubist1plebyakalb"
+        hmac_secret: '/config/secrets/hmac-secret'
         issuer_private_key: |
           -----BEGIN PRIVATE KEY-----
           MIIJQwIBADANBgkqhkiG9w0BAQEFAASCCS0wggkpAgEAAoICAQDSbHd2BIra2jgE
