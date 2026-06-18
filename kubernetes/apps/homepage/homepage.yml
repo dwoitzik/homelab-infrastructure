@@ -40,19 +40,15 @@ data:
             widget:
               type: traefik
               url: http://traefik-api.kube-system.svc.cluster.local:9000
-        - Longhorn:
-            icon: longhorn.png
-            href: https://longhorn.woitzik.dev
-            description: Distributed Block Storage
+        - Atlantis:
+            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/atlantis.svg
+            href: https://atlantis.woitzik.dev
+            description: Terraform GitOps · Proxmox & Network
     - Security:
         - Authelia:
             icon: authelia.png
             href: https://auth.woitzik.dev
             description: SSO · 2FA Identity Provider
-        - Vaultwarden:
-            icon: vaultwarden.png
-            href: https://vault.woitzik.dev
-            description: Password Manager
         - HashiCorp Vault:
             icon: vault.png
             href: https://secrets.woitzik.dev
@@ -83,7 +79,7 @@ data:
         - Open WebUI:
             icon: open-webui.png
             href: https://ai.woitzik.dev
-            description: Local LLM Interface
+            description: Local LLM · gemma2:27b
         - Nextcloud:
             icon: nextcloud.png
             href: https://nextcloud.woitzik.dev
@@ -100,20 +96,57 @@ data:
             icon: gitea.png
             href: https://git.woitzik.dev
             description: Private Git · Azure Modules
+        - Vaultwarden:
+            icon: vaultwarden.png
+            href: https://vault.woitzik.dev
+            description: Password Manager
+        - Garage S3:
+            icon: minio.png
+            href: https://s3.woitzik.dev
+            description: S3 Object Storage · Velero / TF State
+    - Media:
         - Jellyfin:
             icon: jellyfin.png
             href: https://media.woitzik.dev
-            description: Media Server · Movies & TV
+            description: Media Server
             widget:
               type: jellyfin
               url: http://jellyfin.apps.svc.cluster.local:8096
               key: "{{HOMEPAGE_VAR_JELLYFIN_API_KEY}}"
               enableBlocks: true
               enableNowPlaying: true
-        - Garage S3:
-            icon: minio.png
-            href: https://s3.woitzik.dev
-            description: S3 Object Storage · Velero / TF State
+        - SABnzbd:
+            icon: sabnzbd.png
+            href: https://sabnzbd.woitzik.dev
+            description: Usenet Downloader
+            widget:
+              type: sabnzbd
+              url: http://sabnzbd.apps.svc.cluster.local:8080
+              key: "{{HOMEPAGE_VAR_SABNZBD_API_KEY}}"
+        - Sonarr:
+            icon: sonarr.png
+            href: https://sonarr.woitzik.dev
+            description: TV Shows Automation
+            widget:
+              type: sonarr
+              url: http://sonarr.apps.svc.cluster.local:8989
+              key: "{{HOMEPAGE_VAR_SONARR_API_KEY}}"
+        - Radarr:
+            icon: radarr.png
+            href: https://radarr.woitzik.dev
+            description: Movies Automation
+            widget:
+              type: radarr
+              url: http://radarr.apps.svc.cluster.local:7878
+              key: "{{HOMEPAGE_VAR_RADARR_API_KEY}}"
+        - Bazarr:
+            icon: bazarr.png
+            href: https://bazarr.woitzik.dev
+            description: Subtitle Management
+            widget:
+              type: bazarr
+              url: http://bazarr.apps.svc.cluster.local:6767
+              key: "{{HOMEPAGE_VAR_BAZARR_API_KEY}}"
     - Monitoring:
         - Grafana:
             icon: grafana.png
@@ -168,10 +201,13 @@ data:
       columns: 3
     Security:
       style: grid
-      columns: 4
+      columns: 3
     Apps:
       style: grid
       columns: 4
+    Media:
+      style: grid
+      columns: 5
     Monitoring:
       style: grid
       columns: 3
