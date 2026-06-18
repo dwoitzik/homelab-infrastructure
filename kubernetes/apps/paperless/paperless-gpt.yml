@@ -26,7 +26,7 @@ spec:
         env:
         - name: PAPERLESS_BASE_URL
           value: http://paperless.apps.svc.cluster.local:8000
-        - name: PAPERLESS_API_TOKEN
+        - name: PAPERLESS_TOKEN
           valueFrom:
             secretKeyRef:
               name: paperless-secrets
