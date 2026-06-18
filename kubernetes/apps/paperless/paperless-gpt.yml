@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperless-gpt
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paperless-gpt
+  template:
+    metadata:
+      labels:
+        app: paperless-gpt
+    spec:
+      containers:
+      - name: paperless-gpt
+        image: icereed/paperless-gpt:latest
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        env:
+        - name: PAPERLESS_BASE_URL
+          value: http://paperless.apps.svc.cluster.local:8000
+        - name: PAPERLESS_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: paperless-secrets
+              key: ai-api-token
+        - name: LLM_PROVIDER
+          value: ollama
+        - name: OLLAMA_HOST
+          value: http://10.0.20.251:11434
+        - name: LLM_MODEL
+          value: gemma2:27b
+        - name: VISION_LLM_PROVIDER
+          value: ollama
+        - name: VISION_LLM_MODEL
+          value: gemma2:27b
+        - name: AUTO_TAG
+          value: paperless-gpt-to-process
+        - name: LANGUAGE
+          value: deu
+        - name: LOG_LEVEL
+          value: info

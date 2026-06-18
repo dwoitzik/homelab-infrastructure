@@ -69,6 +69,20 @@ spec:
           value: "2"
         - name: PAPERLESS_THREADS_PER_WORKER
           value: "2"
+        - name: PAPERLESS_OCR_ROTATE_PAGES
+          value: "true"
+        - name: PAPERLESS_OCR_ROTATE_PAGES_THRESHOLD
+          value: "12"
+        - name: PAPERLESS_OCR_USER_ARGS
+          value: '{"optimize": 1, "pdfa_image_compression": "lossless"}'
+        - name: PAPERLESS_CONSUMER_RECURSIVE
+          value: "true"
+        - name: PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS
+          value: "true"
+        - name: PAPERLESS_FILENAME_FORMAT
+          value: "{created_year}/{correspondent}/{title}"
+        - name: PAPERLESS_FILENAME_FORMAT_REMOVE_NONE
+          value: "true"
         volumeMounts:
         - name: data
           mountPath: /usr/src/paperless/data
