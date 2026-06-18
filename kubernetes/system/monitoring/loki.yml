@@ -71,6 +71,8 @@ spec:
         deploymentMode: SingleBinary
         singleBinary:
           replicas: 1
+          persistence:
+            storageClass: nfs-client
           extraEnv:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
