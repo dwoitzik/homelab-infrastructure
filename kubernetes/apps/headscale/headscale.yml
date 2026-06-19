@@ -32,7 +32,6 @@ spec:
         - name: headscale
           image: ghcr.io/juanfont/headscale:0.29.1
           args:
-            - headscale
             - serve
           ports:
             - name: http
