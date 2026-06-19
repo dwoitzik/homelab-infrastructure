@@ -59,5 +59,4 @@ data:
       level: info
 
     policy:
-      mode: file
-      path: /var/lib/headscale/policy.hujson
+      mode: database
