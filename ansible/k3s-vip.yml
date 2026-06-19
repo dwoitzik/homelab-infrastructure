@@ -1,0 +1,39 @@
+---
+# Deploys Keepalived VIP 10.0.20.10 on k3s server nodes for HA API endpoint.
+# Run after k3s HA migration:
+#   ansible-playbook ansible/k3s-vip.yml
+#
+# After this runs, update kubeconfig to use 10.0.20.10:6443 instead of 10.0.20.11:6443:
+#   sed -i 's/10.0.20.11:6443/10.0.20.10:6443/' ~/.kube/config
+- name: Provision Keepalived VIP for k3s API HA
+  hosts: k3s_nodes
+  become: true
+  vars:
+    keepalived_vip: "10.0.20.10"
+    keepalived_interface: "eth0"
+    keepalived_virtual_router_id: 52
+  tasks:
+    - name: Install Keepalived
+      ansible.builtin.apt:
+        name: keepalived
+        state: present
+        update_cache: false
+
+    - name: Deploy Keepalived config for k3s VIP
+      ansible.builtin.template:
+        src: roles/keepalived/templates/k3s-vip.conf.j2
+        dest: /etc/keepalived/keepalived.conf
+        mode: "0644"
+      notify: Restart Keepalived
+
+    - name: Enable and start Keepalived
+      ansible.builtin.service:
+        name: keepalived
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart Keepalived
+      ansible.builtin.service:
+        name: keepalived
+        state: restarted

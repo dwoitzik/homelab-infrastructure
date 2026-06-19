@@ -1,0 +1,26 @@
+vrrp_script chk_k3s {
+    script "/bin/bash -c 'systemctl is-active k3s > /dev/null'"
+    interval 2
+    weight -20
+}
+
+vrrp_instance VI_K3S {
+    state {{ "MASTER" if inventory_hostname == 'vm-srv-k3s-11' else "BACKUP" }}
+    interface {{ keepalived_interface }}
+    virtual_router_id {{ keepalived_virtual_router_id }}
+    priority {{ 150 if inventory_hostname == 'vm-srv-k3s-11' else (120 if inventory_hostname == 'vm-srv-k3s-12' else 100) }}
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ keepalived_auth_pass }}
+    }
+
+    track_script {
+        chk_k3s
+    }
+
+    virtual_ipaddress {
+        {{ keepalived_vip }}/24
+    }
+}
