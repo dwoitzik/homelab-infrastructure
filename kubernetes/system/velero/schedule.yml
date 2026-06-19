@@ -16,3 +16,7 @@ spec:
     storageLocation: default
     volumeSnapshotLocations:
       - default
+    # nfs-client storage class has no native CSI snapshotter, so PVC data is
+    # only captured via filesystem backup (kopia, deployed by velero node-agent).
+    # Without this, backups only contain k8s manifests, not actual volume data.
+    defaultVolumesToFsBackup: true
