@@ -1,0 +1,22 @@
+# Offsite backup to Cloudflare R2 — critical data only, compressed via kopia/zstd.
+# Large volumes (media 1TB, prometheus, loki, tempo) are excluded via label.
+# TTL: 7 days. Runs 04:00, one hour after local backup.
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-offsite
+  namespace: velero
+spec:
+  schedule: "0 4 * * *"
+  template:
+    ttl: 168h0m0s
+    storageLocation: r2-offsite
+    defaultVolumesToFsBackup: true
+    includedNamespaces:
+      - apps
+      - vault
+      - database
+      - argocd
+    excludedNamespaces: []
+    volumeSnapshotLocations:
+      - default

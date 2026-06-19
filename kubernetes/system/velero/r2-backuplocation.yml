@@ -1,0 +1,17 @@
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: r2-offsite
+  namespace: velero
+spec:
+  provider: aws
+  objectStorage:
+    bucket: velero-offsite
+  config:
+    region: auto
+    s3ForcePathStyle: "false"
+    s3Url: https://ACCOUNT_ID.r2.cloudflarestorage.com
+    checksumAlgorithm: ""
+  credential:
+    name: velero-r2-credentials
+    key: cloud
