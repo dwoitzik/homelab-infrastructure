@@ -1,0 +1,25 @@
+---
+# HA-Zielzustand: alle drei Nodes als Server mit embedded etcd.
+# VIP 10.0.20.10 via Keepalived als API-Endpoint (noch konfigurieren).
+#
+# MIGRATION benötigt Maintenance-Window:
+#   1. Velero-Backup triggern: velero backup create pre-ha-migration
+#   2. Alle Workloads drainieren
+#   3. k3s auf k3s-11 mit --cluster-init neu installieren
+#   4. k3s-12 + k3s-13 als Server joinen (--server https://10.0.20.11:6443)
+#   5. kubeconfig aktualisieren auf VIP
+#   6. Bei Problemen: Velero-Restore
+#
+# Playbook: cd ansible/k3s-cluster && ansible-playbook playbooks/site.yml -i inventory-ha.yml
+k3s_cluster:
+  children:
+    server:
+      hosts:
+        10.0.20.11:
+        10.0.20.12:
+        10.0.20.13:
+  vars:
+    ansible_user: dw
+    k3s_version: v1.31.12+k3s1
+    api_endpoint: "10.0.20.10"         # Keepalived VIP (noch anlegen)
+    extra_server_args: "--disable servicelb --disable traefik --cluster-init"
