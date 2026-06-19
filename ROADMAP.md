@@ -15,6 +15,21 @@
 | **Sonarr** | sonarr.woitzik.dev | TV automation, Authelia-protected |
 | **Radarr** | radarr.woitzik.dev | Movie automation, Authelia-protected |
 | **Bazarr** | bazarr.woitzik.dev | Subtitle management, Authelia-protected |
+| **Authelia** | auth.woitzik.dev | SSO/OIDC, 2 Replicas, CNPG Postgres + Redis backend |
+| **ArgoCD** | argo.woitzik.dev | GitOps — `kubernetes/apps/*` ApplicationSet + manuelle `kubernetes/system/*` Apps |
+| **Atlantis** | atlantis.woitzik.dev | Terraform GitOps für MikroTik + Proxmox, exposed via Cloudflare Tunnel |
+| **Gitea** | git.woitzik.dev | Privates Git für Azure-Module |
+| **Vaultwarden** | vault.woitzik.dev | Passwortmanager |
+| **HashiCorp Vault** | secrets.woitzik.dev | Secrets-Backend für ESO, Auto-Unseal aktiv |
+| **Garage S3** | s3.woitzik.dev | S3-kompatibler Object Storage — Velero + Terraform State Backend |
+| **Headscale** | headscale.woitzik.dev | Selbst-gehostetes Tailscale-Control-Plane, OIDC-Login via Authelia |
+| **Open WebUI** | ai.woitzik.dev | LLM-Frontend für Ollama (AI LXC) |
+| **Uptime Kuma** | status.woitzik.dev | Service-Uptime-Monitoring, 25 Monitore |
+| **Paperless-ngx + paperless-gpt** | docs.woitzik.dev | Dokumentenverwaltung, GPT-Modell: `qwen2.5:7b` (Ollama) |
+| **Jellyseerr** | requests.woitzik.dev | Film/Serien-Anfragen, mit Radarr/Sonarr verbunden |
+| **NZBHydra2** | — | Usenet-Indexer-Meta-Suche |
+| **Homepage** | woitzik.dev (root) | Dashboard mit Live-Widgets (ArgoCD, Traefik, Uptime Kuma, Grafana, *arr-Stack) |
+| **Grafana / Prometheus / Loki / Tempo** | monitoring.woitzik.dev | LGTM-Stack komplett, SLOs + Error-Budget-Dashboard |
 
 ### Pending (requires 4TB SSD)
 
@@ -72,13 +87,15 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 
 | Item | Why it matters |
 |---|---|
-| **Backup offsite → Oracle Cloud S3** | Velero daily snapshot of critical PVCs (Paperless, Vaultwarden, Nextcloud) pushed to Oracle Cloud free-tier 20GB bucket. Velero bereits deployed, Garage S3 als primäres Target. Oracle als zweites Ziel per `BackupStorageLocation`. |
-| **k3s multi-master HA** | Add a second control plane node — etcd goes from single-point to quorum. Currently 1 master + 2 workers. Proxmox VM klonen, k3s-cluster Ansible-Playbook mit `--server` Flag joinen. Atlantis PR für Proxmox VM-Definition. |
+| **Backup offsite → Cloudflare R2** | 🔄 In Vorbereitung — `kubernetes/system/velero/r2-backuplocation.yml` + `offsite-schedule.yml` committed (daily 04:00, TTL 7d, nur apps/vault/database/argocd, große PVCs wie `media` per Label ausgeschlossen). Wartet auf R2 Account ID + API Token von David. |
+| ~~**k3s multi-master HA**~~ ✅ | Alle 3 Nodes (k3s-11/12/13) sind jetzt `control-plane,etcd,master` — Live-Migration von SQLite zu embedded etcd via `--cluster-init`, kein Rebuild nötig. API HA-VIP `10.0.20.10` via Keepalived. Siehe `docs/k3s-architecture.md`. |
 | **Cilium as CNI** | Replace default flannel with Cilium — enables eBPF-based NetworkPolicies, Hubble network observability UI, service mesh layer. **Achtung**: CNI-Wechsel erfordert k3s Neuinstallation oder Rolling-Replace — kein Live-Swap möglich. |
 | ~~**Unbound performance tuning**~~ ✅ | 4 threads, root-hints, prefetch + prefetch-key, serve-expired, aggressive-nsec, cache-max-negative-ttl=300, 8MB socket buffers. |
 | **Disaster Recovery runbook** | Step-by-step doc: how to rebuild from zero (Proxmox → k3s → ArgoCD bootstrap → secrets inject from Vault). Ablegen unter `docs/disaster-recovery.md`. Interviewers love seeing this. |
-| **NetworkPolicies für apps namespace** | Kyverno kann Policies enforzen, aber konkrete NetworkPolicy-Manifeste fehlen noch. Jedes Deployment sollte nur mit seinen direkten Backends kommunizieren dürfen (egress whitelist). Besonders Authelia → Redis/PostgreSQL only. |
+| ~~**NetworkPolicies für apps namespace**~~ ✅ | Default-deny + explicit allow in `apps` und `monitoring` deployed (`kubernetes/apps/network-policies.yml`, `kubernetes/system/monitoring/network-policies.yml`). **Lesson learned 2026-06-19**: Rollout brach zwei Cross-Namespace-Verbindungen stillschweigend (Velero→Garage, Homepage→Uptime Kuma) — beide erst Tage später durch Symptome entdeckt. Bei neuen Cross-Namespace-Abhängigkeiten immer zuerst die NetworkPolicy-Dateien prüfen. |
 | ~~**Authelia-Health in Blackbox Exporter**~~ ✅ | `/api/health` Endpoint ergänzt als separater Prometheus-Job `blackbox-authelia-health`. Vorher wurde nur der Root-Redirect geprobt — Traefik konnte 200 liefern während Authelia down war. Jetzt wird der Authelia-Prozess direkt überwacht. |
+| ~~**Vault Auto-Unseal**~~ ✅ | `vault-unseal` Deployment pollt alle 30s und unsealt automatisch mit Keys aus k8s Secret `vault-unseal-keys`. Kein manueller Eingriff mehr nach Vault-Neustart nötig. Siehe `docs/secrets-inventory.md`. |
+| ~~**Velero PVC-Daten-Backup**~~ ✅ | **Kritischer Fund 2026-06-19**: `daily-backup` fehlte `defaultVolumesToFsBackup` — Backups liefen "erfolgreich" durch, sicherten aber nur k8s-Manifeste, keine echten PVC-Daten (Postgres, Vaultwarden, Paperless, Nextcloud). Gefixt und mit Testlauf verifiziert (Kopia Pod Volume Backup). |
 
 ---
 

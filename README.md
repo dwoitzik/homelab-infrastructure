@@ -6,6 +6,8 @@
 
 Full-stack homelab managed entirely through Infrastructure as Code — from MikroTik firewall rules to Kubernetes application deployments. All changes flow through pull requests; nothing is applied manually.
 
+**→ [docs/OPERATIONS.md](docs/OPERATIONS.md)** — start here for "where do I look first," secrets locations, and known failure modes.
+
 ## Stack Overview
 
 | Layer | Technology |
@@ -13,15 +15,15 @@ Full-stack homelab managed entirely through Infrastructure as Code — from Mikr
 | Hypervisor | Proxmox VE (Ryzen 7 5825U, 64 GB RAM) |
 | Networking | MikroTik RB5009 (Terraform-managed firewall) |
 | Edge DNS | 2× Raspberry Pi 4B — AdGuard Home + Unbound |
-| Kubernetes | k3s v1.31 — 3-node cluster (1 control-plane + 2 workers) |
+| Kubernetes | k3s v1.31 — 3-node HA cluster, embedded etcd, all nodes control-plane (VIP `10.0.20.10`) |
 | Ingress + TLS | Traefik + cert-manager (wildcard `*.woitzik.dev` via DNS-01) |
-| Storage | NFS (ct-srv-nfs-01, ZFS 200GB) + Longhorn (being phased out) |
+| Storage | NFS (`ct-srv-nfs-01`, ZFS-backed) — Longhorn fully removed |
 | GitOps (k8s) | ArgoCD — ApplicationSet watching `kubernetes/apps/*` |
 | GitOps (TF) | Atlantis — self-hosted, exposed via Cloudflare Tunnel |
 | Auth | Authelia — SSO/OIDC for all protected services |
-| VPN | Headscale (self-hosted Tailscale control plane) |
-| Secrets | Ansible Vault (Ansible) + Kubernetes Secrets (cluster) |
-| Backups | Velero → Garage S3 (k8s) + PBS → rclone → Google Drive (VMs) |
+| VPN | Headscale (self-hosted Tailscale control plane), OIDC login via Authelia |
+| Secrets | Ansible Vault (host-level) + HashiCorp Vault w/ auto-unseal (k8s, via ExternalSecrets) — see `docs/secrets-inventory.md` |
+| Backups | Velero → Garage S3 (k8s, incl. PVC data via Kopia) + PBS → rclone → Google Drive (VMs). Offsite (Cloudflare R2) configured, pending credentials. |
 
 ## Architecture
 
