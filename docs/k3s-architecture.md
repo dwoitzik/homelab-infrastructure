@@ -2,24 +2,36 @@
 
 ## 1. Cluster Topology
 
-3-node k3s v1.31 cluster on Proxmox VMs (Debian 13 trixie).
+3-node k3s v1.31 cluster on Proxmox VMs (Debian 13 trixie). **HA since 2026-06-19**: all
+three nodes run as servers with embedded etcd (migrated live from single-node SQLite via
+`--cluster-init`, no downtime beyond a ~60s API restart).
 
 | Node | IP | Role | vCPU | RAM (dedicated/balloon) |
 |---|---|---|---|---|
-| `vm-srv-k3s-11` | 10.0.20.11 | Control Plane + Worker | 4 | 12 GB (balloon 4–12) |
-| `vm-srv-k3s-12` | 10.0.20.12 | Worker | 4 | 16 GB (balloon 4–16) |
-| `vm-srv-k3s-13` | 10.0.20.13 | Worker | 4 | 16 GB (balloon 4–16) |
+| `vm-srv-k3s-11` | 10.0.20.11 | Control Plane + etcd + Worker | 4 | 12 GB (balloon 4–12) |
+| `vm-srv-k3s-12` | 10.0.20.12 | Control Plane + etcd + Worker | 4 | 16 GB (balloon 4–16) |
+| `vm-srv-k3s-13` | 10.0.20.13 | Control Plane + etcd + Worker | 4 | 16 GB (balloon 4–16) |
 
 Balloon memory enables overcommit — nodes start at 4 GB and scale up to their max as workloads demand.
 
-## 2. Storage (Longhorn)
+**API HA endpoint**: `10.0.20.10` — Keepalived VIP (VRRP, router-id 52) across all three
+nodes. MASTER priority: k3s-11 (150) > k3s-12 (120) > k3s-13 (100), tracked via a
+`chk_k3s` vrrp_script that checks `systemctl is-active k3s`. kubeconfig and all
+Ansible/CI access should target the VIP, not a specific node IP.
 
-Longhorn provides distributed block storage with 3× replication across all nodes.
+- Ansible: `ansible/k3s-vip.yml` (Keepalived setup), `ansible/k3s-cluster/inventory-ha.yml` (target inventory for the etcd migration, kept for reference/rebuilds)
+- If the VIP itself is ever unreachable: any single node IP (`.11`/`.12`/`.13`) still serves the API directly.
 
-- Replication factor: 3
-- Over-provisioning: 200%
-- Reserved space per node: 10%
-- Storage class: `longhorn` (default for all PVCs)
+## 2. Storage (NFS)
+
+Longhorn was removed (2026-06 migration, see ROADMAP.md). All PVCs use the `nfs-client`
+storage class, backed by `ct-srv-nfs-01` (10.0.20.100, ZFS-backed export). There is no
+in-cluster replication for PV data — durability relies entirely on the NFS server's ZFS
+redundancy plus Velero backups (see `docs/backup-strategy.md`).
+
+- Storage class: `nfs-client` (default for all PVCs)
+- NFS server: `ct-srv-nfs-01` (10.0.20.100)
+- Exception: `media` PVC (Jellyfin) is a direct NFS mount, not provisioned via the nfs-client provisioner
 
 ## 3. Ingress & Traffic Flow
 
@@ -55,8 +67,16 @@ Sync policy: automated with `prune: true` and `selfHeal: true` — manual change
 | `database` | Authelia PostgreSQL + Redis |
 | `monitoring` | Prometheus, Grafana, Loki, Alertmanager, PVE exporter |
 | `argocd` | ArgoCD |
-| `longhorn-system` | Longhorn |
-| `kube-system` | Traefik, MetalLB, cert-manager, wildcard TLS cert |
+| `vault` | HashiCorp Vault + `vault-unseal` auto-unseal sidecar |
+| `velero` | Velero + node-agent (kopia) |
+| `kube-system` | Traefik, MetalLB, cert-manager, wildcard TLS cert, `sysctl-fix` DaemonSet |
+
+NetworkPolicies (default-deny + explicit allow) are deployed in `apps` and `monitoring`
+(`kubernetes/apps/network-policies.yml`, `kubernetes/system/monitoring/network-policies.yml`).
+`kube-system` and `vault`/`velero` have no default-deny — cross-namespace traffic there is
+unrestricted. When adding a new cross-namespace dependency into `apps` or `monitoring`,
+check these files first; a missing allow-rule here was the cause of two outages on
+2026-06-19 (Velero → Garage S3, Homepage → Uptime Kuma).
 
 ## 6. Monitoring
 

@@ -12,6 +12,7 @@ Manages the base OS and services that run outside the k3s cluster.
 | `dmz_games` | ct-dmz-games-01 (10.0.30.3) | common, docker, watchtower, monitoring_agent, minecraft |
 | `mgmt_nodes` | ct-mgmt-pbs-01 (10.0.10.110) | node_exporter_native, pbs |
 | `ai_nodes` | ct-srv-ai-01 (10.0.20.251) | node_exporter_native, ollama |
+| `k3s_nodes` | vm-srv-k3s-11/12/13 (10.0.20.11-13) | Not in `site.yml` — used only by the standalone `k3s-vip.yml` playbook (Keepalived HA VIP). k3s itself is provisioned separately, see "k3s provisioning" below. |
 
 Services that previously ran via Ansible (authelia, vaultwarden, paperless, open_webui, minio, monitoring) have been migrated to k3s and are now managed by ArgoCD.
 
@@ -50,3 +51,17 @@ Use this to provision a fresh cluster or upgrade existing nodes.
 cd ansible/k3s-cluster
 ansible-playbook playbooks/site.yml -i inventory.yml
 ```
+
+The cluster is HA (3 server nodes, embedded etcd) as of 2026-06-19. `inventory-ha.yml` in
+that directory documents the HA target state/migration steps if a node ever needs to be
+rebuilt from scratch — see `docs/k3s-architecture.md` for the full picture.
+
+## Standalone playbooks (top-level `ansible/*.yml`)
+
+These aren't part of `site.yml` — run them individually when needed:
+
+| Playbook | Purpose |
+|---|---|
+| `k3s-vip.yml` | Deploys Keepalived VIP `10.0.20.10` for k3s API HA across all 3 server nodes |
+| `vault-unseal-secret.yml` | (Re-)creates the `vault-unseal-keys` k8s Secret from the Ansible Vault unseal keys — run after key rotation |
+| `tailscale.yml` | Connects RPi nodes to Headscale + sets up the MetalLB DNAT workaround |
