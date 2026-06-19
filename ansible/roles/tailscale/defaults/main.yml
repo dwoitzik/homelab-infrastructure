@@ -5,6 +5,6 @@ tailscale_advertise_routes: "10.0.0.0/8"
 tailscale_accept_dns: false
 # MetalLB VIP workaround: RPi's kube-proxy flannel can't reach VIP directly,
 # so we DNAT VIP:443 → the k3s node currently running Traefik (discovered at runtime)
-traefik_metallb_vip: "10.0.20.200"
+tailscale_traefik_metallb_vip: "10.0.20.200"
 # k3s master node used to run kubectl and discover the Traefik NodePort/node dynamically
-traefik_k3s_api_host: "10.0.20.11"
+tailscale_traefik_k3s_api_host: "10.0.20.11"
