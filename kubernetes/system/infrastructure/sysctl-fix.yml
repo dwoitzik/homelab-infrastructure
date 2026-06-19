@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: sysctl-fix
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: sysctl-fix
+  template:
+    metadata:
+      labels:
+        app: sysctl-fix
+    spec:
+      tolerations:
+        - operator: Exists
+      hostNetwork: true
+      hostPID: true
+      containers:
+        - name: sysctl
+          image: alpine:3
+          command:
+            - sh
+            - -c
+            - |
+              sysctl -w net.ipv4.conf.all.send_redirects=0
+              sysctl -w net.ipv4.conf.default.send_redirects=0
+              sysctl -w net.ipv4.conf.eth0.send_redirects=0 2>/dev/null || true
+              echo done && sleep infinity
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 1m
+              memory: 8Mi
+            limits:
+              cpu: 10m
+              memory: 16Mi
