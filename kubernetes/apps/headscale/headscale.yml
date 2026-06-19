@@ -30,7 +30,7 @@ spec:
     spec:
       containers:
         - name: headscale
-          image: ghcr.io/juanfont/headscale:0.22.3
+          image: ghcr.io/juanfont/headscale:0.29.1
           args:
             - headscale
             - serve

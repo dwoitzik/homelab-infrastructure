@@ -8,30 +8,44 @@ data:
     server_url: https://headscale.woitzik.dev
     listen_addr: 0.0.0.0:8080
     metrics_listen_addr: 0.0.0.0:9090
-    grpc_listen_addr: 0.0.0.0:50443
-    grpc_allow_insecure: false
 
     private_key_path: /var/lib/headscale/private.key
     noise:
       private_key_path: /var/lib/headscale/noise_private.key
 
-    db_type: sqlite3
-    db_path: /var/lib/headscale/db.sqlite
+    database:
+      type: sqlite3
+      sqlite:
+        path: /var/lib/headscale/db.sqlite
+
+    prefixes:
+      v4: 100.64.0.0/10
+      v6: fd7a:115c:a1e0::/48
+      allocation: sequential
 
     derp:
       server:
         enabled: false
+        region_id: 999
+        region_code: homelab
+        region_name: Homelab
+        stun_listen_addr: 0.0.0.0:3478
+        private_key_path: /var/lib/headscale/derp_server_private.key
+        automatically_add_embedded_derp_region: true
+        ipv4: ""
+        ipv6: ""
       urls:
         - https://controlplane.tailscale.com/derpmap/default
       paths: []
       auto_update_enabled: true
       update_frequency: 24h
 
-    dns_config:
+    dns:
       magic_dns: true
       base_domain: headscale.net
       nameservers:
-        - 10.0.20.5
+        global:
+          - 10.0.20.5
       extra_records: []
 
     oidc:
@@ -45,7 +59,6 @@ data:
       format: text
       level: info
 
-    policy_path: /var/lib/headscale/policy.hujson
-
-    ip_prefixes:
-      - 100.64.0.0/10
+    policy:
+      mode: file
+      path: /var/lib/headscale/policy.hujson

@@ -221,6 +221,7 @@ spec:
   routes:
   - match: Host(`headscale.woitzik.dev`)
     kind: Rule
+    middlewares: [{name: websockets}]
     services: [{name: headscale, port: 8080}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---

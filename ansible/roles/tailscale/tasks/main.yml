@@ -49,7 +49,7 @@
   ansible.builtin.command: >
     tailscale up
     --login-server={{ tailscale_login_server }}
-    --authkey={{ tailscale_authkey }}
+    --auth-key={{ tailscale_authkey }}
     --advertise-routes={{ tailscale_advertise_routes }}
     --accept-dns={{ tailscale_accept_dns | lower }}
     --advertise-exit-node=false
