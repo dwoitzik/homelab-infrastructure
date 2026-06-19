@@ -10,7 +10,7 @@ spec:
     targetRevision: main
     path: kubernetes/system/velero
     directory:
-      include: '{secrets,schedule}.yml'
+      include: '{secrets,schedule,offsite-schedule,r2-backuplocation}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: velero
