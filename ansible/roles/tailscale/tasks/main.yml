@@ -79,34 +79,34 @@
     kubectl get svc traefik -n kube-system
     -o jsonpath={.spec.ports[?(@.name=="websecure")].nodePort}
     --kubeconfig /etc/rancher/k3s/k3s.yaml
-  register: traefik_nodeport_discovered
-  delegate_to: "{{ traefik_k3s_api_host }}"
+  register: tailscale_traefik_nodeport_discovered
+  delegate_to: "{{ tailscale_traefik_k3s_api_host }}"
   changed_when: false
-  failed_when: traefik_nodeport_discovered.stdout == ""
+  failed_when: tailscale_traefik_nodeport_discovered.stdout == ""
 
 - name: Discover Traefik pod node IP from k3s API
   ansible.builtin.shell: >
     kubectl get pod -n kube-system -l app.kubernetes.io/name=traefik
     -o jsonpath='{.items[0].status.hostIP}'
     --kubeconfig /etc/rancher/k3s/k3s.yaml
-  register: traefik_node_ip_discovered
-  delegate_to: "{{ traefik_k3s_api_host }}"
+  register: tailscale_traefik_node_ip_discovered
+  delegate_to: "{{ tailscale_traefik_k3s_api_host }}"
   changed_when: false
-  failed_when: traefik_node_ip_discovered.stdout == ""
+  failed_when: tailscale_traefik_node_ip_discovered.stdout == ""
 
 - name: Set Traefik target facts
   ansible.builtin.set_fact:
-    traefik_nodeport_target_dynamic: "{{ traefik_node_ip_discovered.stdout }}:{{ traefik_nodeport_discovered.stdout }}"
+    tailscale_traefik_nodeport_target_dynamic: "{{ tailscale_traefik_node_ip_discovered.stdout }}:{{ tailscale_traefik_nodeport_discovered.stdout }}"
 
 - name: DNAT Traefik VIP:443 → NodePort on k3s node (workaround for MetalLB L2 flannel issue)
   ansible.builtin.iptables:
     table: nat
     chain: "{{ item }}"
-    destination: "{{ traefik_metallb_vip }}"
+    destination: "{{ tailscale_traefik_metallb_vip }}"
     protocol: tcp
     destination_port: "443"
     jump: DNAT
-    to_destination: "{{ traefik_nodeport_target_dynamic }}"
+    to_destination: "{{ tailscale_traefik_nodeport_target_dynamic }}"
     state: present
   loop:
     - OUTPUT
