@@ -16,6 +16,7 @@ spec:
           - "--providers.kubernetesingress"
           - "--serverstransport.insecureskipverify=true"
           - "--api.dashboard=true"
+          - "--api.insecure=true"
           - "--entrypoints.websecure.forwardedHeaders.trustedIPs=10.42.0.0/16,10.0.0.0/8"
           - "--entrypoints.websecure.proxyProtocol.trustedIPs=10.42.0.0/16,10.0.0.0/8"
         ports:
@@ -43,7 +44,8 @@ spec:
             enabled: true
         tlsStore:
           default:
-            secretName: traefik-tls-secret
+            defaultCertificate:
+              secretName: traefik-tls-secret
         tolerations:
         - key: "storage"
           operator: "Equal"
