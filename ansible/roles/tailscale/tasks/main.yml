@@ -68,3 +68,26 @@
     (tailscale_status.stdout | from_json).BackendState | default('') == 'Running'
   changed_when: false
   failed_when: false
+
+- name: Install iptables-persistent for rule persistence
+  ansible.builtin.apt:
+    name: iptables-persistent
+    state: present
+
+- name: DNAT Traefik VIP:443 → NodePort on k3s node (workaround for MetalLB L2 flannel issue)
+  ansible.builtin.iptables:
+    table: nat
+    chain: "{{ item }}"
+    destination: "{{ traefik_metallb_vip }}"
+    protocol: tcp
+    destination_port: "443"
+    jump: DNAT
+    to_destination: "{{ traefik_nodeport_target }}"
+    state: present
+  loop:
+    - OUTPUT
+    - PREROUTING
+
+- name: Persist iptables rules
+  ansible.builtin.shell: iptables-save > /etc/iptables/rules.v4
+  changed_when: false
