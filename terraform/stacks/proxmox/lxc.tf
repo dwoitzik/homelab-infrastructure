@@ -13,6 +13,11 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
   started      = true
   unprivileged = true
 
+  startup {
+    order    = 5
+    up_delay = 10
+  }
+
   initialization {
     hostname = "ct-mgmt-pbs-01"
     ip_config {
@@ -65,6 +70,11 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
   started               = true
   unprivileged          = true
   environment_variables = {}
+
+  startup {
+    order    = 5
+    up_delay = 10
+  }
 
   initialization {
     hostname = "ct-srv-docker-01"
@@ -121,6 +131,11 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   started               = true
   unprivileged          = true
   environment_variables = {}
+
+  startup {
+    order    = 5
+    up_delay = 10
+  }
 
   initialization {
     hostname = "ct-srv-ai-01"
@@ -183,6 +198,11 @@ resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
   started               = true
   unprivileged          = true
   environment_variables = {}
+
+  startup {
+    order    = 6
+    up_delay = 10
+  }
 
   initialization {
     hostname = "ct-dmz-proxy-01"
@@ -248,6 +268,13 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
   started      = true
   unprivileged = false
 
+  # Boots first (2026-06-20 boot-storm fix) — k3s nodes mount NFS-backed PVCs,
+  # so storage must be up before the cluster starts. See docs/OPERATIONS.md.
+  startup {
+    order    = 1
+    up_delay = 15
+  }
+
   initialization {
     hostname = "ct-srv-nfs-01"
     ip_config {
@@ -305,6 +332,11 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   started               = true
   unprivileged          = true
   environment_variables = {}
+
+  startup {
+    order    = 6
+    up_delay = 10
+  }
 
   initialization {
     hostname = "ct-dmz-games-01"

@@ -7,6 +7,15 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   tags      = ["k3s", "master", "kubernetes"]
   started   = true
 
+  # Staggered boot (2026-06-20): all 3 k3s VMs starting simultaneously caused a
+  # resource storm (load avg 147 within 4 min of boot) that made the Proxmox host
+  # unresponsive for several minutes. NFS server boots first (order 1), then
+  # k3s nodes 30s apart. See docs/OPERATIONS.md.
+  startup {
+    order    = 2
+    up_delay = 30
+  }
+
   # disk and clone/initialization are creation-time only; ignore prevents Atlantis
   # from stopping the VM (and killing itself) on subsequent plans.
   lifecycle {
@@ -71,6 +80,11 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   tags      = ["k3s", "worker", "kubernetes"]
   started   = true
 
+  startup {
+    order    = 3
+    up_delay = 30
+  }
+
   lifecycle {
     ignore_changes = [clone, initialization, disk]
   }
@@ -132,6 +146,11 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   node_name = local.target_node
   tags      = ["k3s", "worker", "kubernetes"]
   started   = true
+
+  startup {
+    order    = 4
+    up_delay = 30
+  }
 
   lifecycle {
     ignore_changes = [clone, initialization, disk]
