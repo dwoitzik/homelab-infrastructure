@@ -22,7 +22,11 @@ repos:
       - id: ansible-lint
         name: Ansible Lint
         description: Enforces Ansible best practices and fully qualified collection names.
-        entry: bash -c 'cd ansible && ansible-lint'
+        # Absolute path: git hooks run without sourcing .bashrc, so PATH
+        # additions (e.g. pipx's ~/.local/bin) aren't picked up otherwise -
+        # this caused a stale apt-installed ansible-lint (6.17.2) to win
+        # over the pinned 26.4.0 and silently pass things CI then failed on.
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH"; cd ansible && ansible-lint'
         language: system
         always_run: true
         pass_filenames: false
@@ -31,7 +35,7 @@ repos:
       - id: tflint
         name: TFLint
         description: Check for Terraform errors and best practices.
-        entry: tflint
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH"; tflint "$@"' --
         language: system
         files: \.tf$
         pass_filenames: false
@@ -41,7 +45,7 @@ repos:
       - id: tflint-full-repo
         name: TFLint (all stacks, pre-push only)
         description: Re-checks every Terraform stack before push, not just changed files.
-        entry: bash -c 'for d in terraform/stacks/network terraform/stacks/proxmox; do (cd "$d" && tflint --recursive); done'
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH"; for d in terraform/stacks/network terraform/stacks/proxmox; do (cd "$d" && tflint --recursive); done'
         language: system
         always_run: true
         pass_filenames: false
