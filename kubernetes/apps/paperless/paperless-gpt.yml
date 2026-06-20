@@ -47,3 +47,11 @@ spec:
           value: deu
         - name: LOG_LEVEL
           value: info
+        volumeMounts:
+        - name: prompts
+          mountPath: /app/prompts/title_prompt.tmpl
+          subPath: title_prompt.tmpl
+      volumes:
+      - name: prompts
+        configMap:
+          name: paperless-gpt-prompts
