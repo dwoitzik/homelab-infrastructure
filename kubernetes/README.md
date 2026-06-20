@@ -20,7 +20,7 @@ This directory manages the **Cloud-Native layer** of the homelab. By moving from
 graph LR
     User([User]) -->|HTTPS| MLB[MetalLB VIP: .200]
     MLB --> TRF[Traefik Ingress]
-    
+
     subgraph auth ["🔒 Identity Layer"]
         TRF <-->|ForwardAuth| ATH[Authelia]
         ATH <--> PG[(Postgres)]
@@ -46,7 +46,7 @@ Unlike the manual setup in Nginx Proxy Manager, this cluster uses **Cert-Manager
 By using **Longhorn**, every database (Postgres, Redis) and stateful app has its data replicated across multiple nodes. This eliminates the "single point of failure" of local Docker mounts and allows pods to migrate between nodes without data loss.
 
 ### 3. The "NPM Killer": Middleware-based Auth
-The most significant improvement over the legacy NPM setup is the **Authelia ForwardAuth Middleware**. 
+The most significant improvement over the legacy NPM setup is the **Authelia ForwardAuth Middleware**.
 - **Legacy:** Manual `auth_forward` snippets in NPM for every proxy host.
 - **GitOps:** Simply add an annotation to any Ingress to protect it with Authelia:
   ```yaml

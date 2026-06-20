@@ -26,6 +26,7 @@ repos:
         language: system
         always_run: true
         pass_filenames: false
+        stages: [pre-commit, pre-push]
 
       - id: tflint
         name: TFLint
@@ -35,6 +36,25 @@ repos:
         files: \.tf$
         pass_filenames: false
         args: ["--recursive"]
+        stages: [pre-commit, pre-push]
+
+      - id: tflint-full-repo
+        name: TFLint (all stacks, pre-push only)
+        description: Re-checks every Terraform stack before push, not just changed files.
+        entry: bash -c 'for d in terraform/stacks/network terraform/stacks/proxmox; do (cd "$d" && tflint --recursive); done'
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: terraform-fmt-check-full-repo
+        name: Terraform fmt -check (all stacks, pre-push only)
+        description: Re-checks formatting for every Terraform stack before push.
+        entry: bash -c 'for d in terraform/stacks/network terraform/stacks/proxmox; do (cd "$d" && terraform fmt -check); done'
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]
 
       - id: yamllint
         name: YAML Lint
