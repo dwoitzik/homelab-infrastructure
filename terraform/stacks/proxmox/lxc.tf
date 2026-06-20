@@ -356,8 +356,8 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   }
 
   memory {
-    dedicated = 4096
-    swap      = 512
+    dedicated = 12288
+    swap      = 1024
   }
 
   features {
@@ -366,7 +366,7 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
 
   disk {
     datastore_id = local.storage
-    size         = 30
+    size         = 50
   }
 
   network_interface {
