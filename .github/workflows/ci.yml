@@ -36,6 +36,8 @@ jobs:
 
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.63.1
 
       - name: TFLint
         run: tflint
@@ -66,6 +68,8 @@ jobs:
 
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.63.1
 
       - name: TFLint
         run: tflint
@@ -82,7 +86,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install ansible-lint
-        run: pip install ansible-lint ansible-core
+        run: pip install "ansible-lint==26.4.0" "ansible-core>=2.16,<2.19"
 
       - name: Install collections
         run: ansible-galaxy collection install -r ansible/requirements.yml
