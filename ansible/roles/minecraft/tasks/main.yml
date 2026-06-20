@@ -7,6 +7,7 @@
   loop:
     - /opt/minecraft
     - /opt/minecraft/data
+    - /opt/minecraft/data-cobblemon
 
 - name: Deploy Minecraft docker-compose.yml
   ansible.builtin.copy:
@@ -27,9 +28,25 @@
           volumes:
             - ./data-2:/data
           restart: unless-stopped
+
+        cobblemon:
+          image: itzg/minecraft-server
+          container_name: mc-server-cobblemon
+          environment:
+            EULA: "TRUE"
+            TYPE: "FABRIC"
+            VERSION: "1.21.1"
+            MODRINTH_PROJECTS: "cobblemon,fabric-api"
+            MEMORY: "6G"
+            TZ: "Europe/Berlin"
+          ports:
+            - "25566:25565"
+          volumes:
+            - ./data-cobblemon:/data
+          restart: unless-stopped
     mode: '0644'
 
-- name: Start Minecraft server container
+- name: Start Minecraft server containers
   community.docker.docker_compose_v2:
     project_src: /opt/minecraft
     state: present
