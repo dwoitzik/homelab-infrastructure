@@ -41,7 +41,7 @@ spec:
             memory: 256Mi
         ingressRoute:
           dashboard:
-            enabled: true
+            enabled: false
         tlsStore:
           default:
             defaultCertificate:
