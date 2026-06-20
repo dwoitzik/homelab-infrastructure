@@ -44,7 +44,7 @@ spec:
         - name: AUTO_TAG
           value: paperless-gpt-to-process
         - name: LANGUAGE
-          value: deu
+          value: German
         - name: LOG_LEVEL
           value: info
         volumeMounts:
