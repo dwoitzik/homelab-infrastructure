@@ -4,9 +4,9 @@
 
 # Homelab Infrastructure as Code
 
-Full-stack homelab managed entirely through Infrastructure as Code — from MikroTik firewall rules to Kubernetes application deployments. All changes flow through pull requests; nothing is applied manually.
+My homelab, fully managed as code: MikroTik firewall rules, Proxmox VMs/LXCs, and everything running on top in Kubernetes. Everything goes through a pull request — I don't apply changes by hand.
 
-**→ [docs/OPERATIONS.md](docs/OPERATIONS.md)** — start here for "where do I look first," secrets locations, and known failure modes.
+Start with [docs/OPERATIONS.md](docs/OPERATIONS.md) if you want to know where things live, where secrets are kept, or how I've debugged this stuff before.
 
 ## Stack Overview
 
@@ -170,7 +170,7 @@ git push && gh pr create
 # merge after apply succeeds
 ```
 
-Never run `terraform apply` locally — all applies go through Atlantis.
+I never run `terraform apply` locally. Everything goes through Atlantis.
 
 ## Ansible Workflow
 
