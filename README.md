@@ -77,52 +77,61 @@ graph TB
 
 ```
 ├── kubernetes/
-│   ├── apps/                # ArgoCD-managed workloads (ApplicationSet)
-│   │   ├── atlantis/        # Terraform GitOps runner
-│   │   ├── authelia/        # SSO / OIDC identity provider
-│   │   ├── cloudflared/     # Cloudflare Tunnel
-│   │   ├── garage/          # S3-compatible object storage
-│   │   ├── gitea/           # Private git instance
-│   │   ├── headscale/       # Tailscale control plane
-│   │   ├── home-assistant/  # Smart home hub
-│   │   ├── homepage/        # Dashboard
-│   │   ├── mealie/          # Recipe manager
-│   │   ├── nextcloud/       # Files · CalDAV · CardDAV
-│   │   ├── open-webui/      # Local LLM interface (Ollama)
-│   │   ├── paperless/       # Document management
-│   │   ├── renovate/        # Dependency update bot
-│   │   ├── uptime-kuma/     # Uptime monitoring
-│   │   └── vaultwarden/     # Password manager
-│   └── system/              # Manually-applied system components
-│       ├── argocd/          # ArgoCD config (RBAC, OIDC)
-│       ├── cert-manager/    # TLS certificate automation
-│       ├── metallb/         # LoadBalancer IPs
-│       ├── monitoring/      # kube-prometheus-stack + Loki + PVE exporter
-│       ├── postgres/        # Authelia PostgreSQL
-│       ├── redis/           # Authelia Redis
-│       ├── traefik/         # Traefik ingress
-│       ├── velero/          # Cluster backup to Garage S3
+│   ├── apps/                  # ArgoCD-managed workloads (ApplicationSet picks up any new folder)
+│   │   ├── atlantis/          # Terraform GitOps runner
+│   │   ├── authelia/          # SSO / OIDC identity provider
+│   │   ├── cloudflared/       # Cloudflare Tunnel
+│   │   ├── garage/            # S3-compatible object storage
+│   │   ├── gitea/             # Private git instance
+│   │   ├── headscale/         # Tailscale control plane
+│   │   ├── home-assistant/    # Smart home hub
+│   │   ├── homepage/          # Dashboard
+│   │   ├── jellyfin/          # Media server
+│   │   ├── keel/              # Image auto-update
+│   │   ├── mealie/            # Recipe manager
+│   │   ├── nextcloud/         # Files · CalDAV · CardDAV
+│   │   ├── open-webui/        # Local LLM interface (Ollama)
+│   │   ├── paperless/         # Document management + paperless-gpt
+│   │   ├── renovate/          # Dependency update bot
+│   │   ├── uptime-kuma/       # Uptime monitoring
+│   │   └── vaultwarden/       # Password manager
+│   └── system/                # Manually-applied system components
+│       ├── argocd/            # ArgoCD config (RBAC, OIDC)
+│       ├── cert-manager/      # TLS certificate automation
+│       ├── chaos-mesh/        # Scheduled pod-kill / latency-injection experiments
+│       ├── cloudnative-pg/    # CNPG operator (Authelia Postgres)
+│       ├── external-secrets/  # External Secrets Operator
+│       ├── infrastructure/    # sysctl-fix DaemonSet, Cloudflare DDNS, misc cluster glue
+│       ├── kyverno/           # Policy engine (resource limits, no-latest-tag, no-privileged)
+│       ├── metallb/           # LoadBalancer IPs
+│       ├── monitoring/        # kube-prometheus-stack + Loki + Tempo + PVE exporter
+│       ├── nfs-provisioner/   # nfs-client StorageClass
+│       ├── postgres/          # Authelia PostgreSQL
+│       ├── redis/             # Authelia Redis
+│       ├── traefik/           # Traefik ingress
+│       ├── vault/             # HashiCorp Vault + auto-unseal sidecar
+│       ├── velero/            # Cluster backup to Garage S3 (+ Cloudflare R2 offsite)
 │       ├── apps-ingressroute.yml   # All app IngressRoutes
 │       └── other-ingressroute.yml  # System IngressRoutes (ArgoCD, Grafana)
 ├── terraform/
 │   └── stacks/
-│       ├── network/         # MikroTik — VLANs, firewall, DHCP, NAT
-│       └── proxmox/         # VMs and LXC containers
+│       ├── network/          # MikroTik — VLANs, firewall, DHCP, NAT
+│       └── proxmox/          # VMs and LXC containers
 ├── ansible/
-│   ├── roles/               # One role per service (14 roles)
-│   ├── group_vars/          # Variables + Ansible Vault secrets
-│   ├── k3s-cluster/         # k3s provisioning (install, upgrade, reset)
+│   ├── roles/                # One role per service (19 roles)
+│   ├── group_vars/           # Variables + Ansible Vault secrets
+│   ├── k3s-cluster/          # k3s provisioning (install, upgrade, reset)
 │   └── inventory.ini
-├── docker/                  # Docker Compose for DMZ services
-│   ├── crafty/              # Minecraft server manager (dmz_games LXC)
-│   └── npmplus/             # Nginx Proxy Manager Plus (dmz_proxies LXC)
+├── docker/                   # Docker Compose for DMZ services
+│   ├── crafty/                # Minecraft server manager (dmz_games LXC)
+│   └── npmplus/                # Nginx Proxy Manager Plus (dmz_proxies LXC)
 ├── docs/
-│   ├── decisions/           # ADR-001 through ADR-004
-│   └── *.md                 # Architecture, naming, topology, VLAN docs
+│   ├── decisions/             # ADRs
+│   └── *.md                   # Architecture, naming, topology, VLAN docs
 ├── network/
 │   └── scripts/bootstrap.rsc  # MikroTik initial bootstrap (RouterOS script)
-├── atlantis.yaml            # Atlantis — stack definitions
-└── .github/workflows/ci.yml # Terraform lint + Ansible lint
+├── atlantis.yaml              # Atlantis — stack definitions
+└── .github/workflows/ci.yml   # Terraform lint + Ansible lint
 ```
 
 ## Kubernetes Services
