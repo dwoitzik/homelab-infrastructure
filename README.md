@@ -96,7 +96,6 @@ graph TB
 │   └── system/              # Manually-applied system components
 │       ├── argocd/          # ArgoCD config (RBAC, OIDC)
 │       ├── cert-manager/    # TLS certificate automation
-│       ├── longhorn/        # Distributed storage
 │       ├── metallb/         # LoadBalancer IPs
 │       ├── monitoring/      # kube-prometheus-stack + Loki + PVE exporter
 │       ├── postgres/        # Authelia PostgreSQL
@@ -104,7 +103,7 @@ graph TB
 │       ├── traefik/         # Traefik ingress
 │       ├── velero/          # Cluster backup to Garage S3
 │       ├── apps-ingressroute.yml   # All app IngressRoutes
-│       └── other-ingressroute.yml  # System IngressRoutes (ArgoCD, Grafana, Longhorn)
+│       └── other-ingressroute.yml  # System IngressRoutes (ArgoCD, Grafana)
 ├── terraform/
 │   └── stacks/
 │       ├── network/         # MikroTik — VLANs, firewall, DHCP, NAT
@@ -133,7 +132,6 @@ graph TB
 | Homepage | home.woitzik.dev | Authelia |
 | ArgoCD | argo.woitzik.dev | Authelia OIDC |
 | Grafana | monitoring.woitzik.dev | Authelia OIDC |
-| Longhorn | longhorn.woitzik.dev | Authelia |
 | Traefik | traefik.woitzik.dev | Authelia |
 | Uptime Kuma | status.woitzik.dev | Authelia |
 | Paperless-ngx | docs.woitzik.dev | Authelia |
