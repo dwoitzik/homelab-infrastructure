@@ -6,25 +6,27 @@
 # only sees the Fritzbox's LAN, not the real internet-facing public IP.
 ###############################################################################
 
-# Cobblemon Minecraft server (Fabric) — ct-dmz-games-01, second instance on 25566
+# Cobblemon Minecraft server (Fabric) — routed through ct-dmz-proxy-01 (NPM
+# stream + CrowdSec), same pattern as the existing Minecraft server on 25565.
+# NPM then forwards 25566 -> ct-dmz-games-01:25566 internally.
 resource "routeros_ip_firewall_nat" "dstnat_cobblemon" {
   chain        = "dstnat"
   action       = "dst-nat"
   protocol     = "tcp"
   dst_port     = "25566"
   in_interface = "ether1"
-  to_addresses = "10.0.30.3"
+  to_addresses = "10.0.30.2"
   to_ports     = "25566"
-  comment      = "DNAT: Cobblemon Minecraft -> ct-dmz-games-01"
+  comment      = "DNAT: Cobblemon Minecraft -> ct-dmz-proxy-01 (NPM stream)"
 }
 
 resource "routeros_ip_firewall_filter" "fwd_12_wan_to_cobblemon" {
   action       = "accept"
   chain        = "forward"
   protocol     = "tcp"
-  dst_address  = "10.0.30.3"
+  dst_address  = "10.0.30.2"
   dst_port     = "25566"
   in_interface = "ether1"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "12: WAN -> Cobblemon Minecraft (ct-dmz-games-01:25566)"
+  comment      = "12: WAN -> Cobblemon Minecraft (ct-dmz-proxy-01:25566)"
 }
