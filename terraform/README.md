@@ -1,70 +1,52 @@
 # Terraform
 
-Infrastructure provisioning managed as code. All changes are applied exclusively through pull requests via **Atlantis** — no direct `terraform apply` from local machines in normal operation.
+Everything here applies through Atlantis. I don't run `terraform apply` from my own machine.
 
 ## Structure
 
 ```
-terraform/
-└── stacks/
-    └── network/              # Active — MikroTik firewall, VLANs, NAT, DNS
-        ├── main.tf           # Provider configuration
-        ├── firewall.tf       # Input/forward chains, NAT rules
-        ├── vpn.tf            # WireGuard configuration
-        ├── variables.tf      # Input variable declarations
-        └── locals.tf         # Local values
+terraform/stacks/
+├── network/      # MikroTik — VLANs, firewall, DHCP, NAT, IPv6
+└── proxmox/      # VMs and LXCs
 ```
-
-## Active Stacks
 
 ### `stacks/network`
-Manages all MikroTik RouterOS configuration via the [terraform-routeros provider](https://github.com/terraform-routeros/terraform-routeros):
 
-- Firewall filter rules (input + forward chains, zero-trust policy)
-- NAT rules (hairpin NAT, port forwarding)
-- VLAN definitions (Mgmt, DMZ, Server, IoT, Admin)
-- WireGuard VPN peers
-- Cloudflare DNS records
+Manages the MikroTik via the [terraform-routeros provider](https://github.com/terraform-routeros/terraform-routeros):
 
-## Making Changes
+- Firewall filter rules, IPv4 and IPv6 (`firewall_deterministic.tf`, `firewall_extra.tf`, `firewall_ipv6.tf`)
+- NAT and port forwards (`nat_portforward.tf`)
+- VLANs, bridge config, DHCP (`main.tf`, `dhcp.tf`)
+- SNMP, WAN/IPv6 setup, scheduled power tasks (`snmp.tf`, `wan.tf`, `ipv6_network.tf`, `power.tf`)
+- `imports.tf` — pre-existing RouterOS objects (services, firewall rules) adopted into Terraform via native `import` blocks rather than recreated
+
+### `stacks/proxmox`
+
+VMs and LXCs via the [bpg/proxmox provider](https://github.com/bpg/terraform-provider-proxmox).
+
+## Making a change
 
 ```bash
-# Never apply directly — open a PR instead
-git checkout -b feature/firewall-rule
-# edit terraform/stacks/network/*.tf
-git push origin feature/firewall-rule
-# open PR → Atlantis posts plan as PR comment
-# review plan → comment "atlantis apply" to apply
+git checkout -b feature/my-change
+# edit terraform/stacks/<stack>/*.tf
+git push && gh pr create
+# Atlantis posts the plan as a PR comment
+# comment "atlantis apply" once it looks right
 ```
 
-For emergency local apply only:
-```bash
-cd terraform/stacks/network
-terraform init
-terraform plan -var-file=terraform.tfvars
-terraform apply -var-file=terraform.tfvars
-```
+## Variables
 
-## Required Variables
-
-Copy and fill in `terraform.tfvars` (never commit this file):
-
-```hcl
-mikrotik_url      = "https://10.0.10.1"
-mikrotik_user     = "terraform"
-mikrotik_password = ""
-mikrotik_insecure = true
-```
+Each stack needs its own `terraform.tfvars` (not committed — copy from `terraform.tfvars.example`).
 
 ## State
 
-Terraform state is managed locally by Atlantis in `/home/atlantis/.atlantis/` on the Docker LXC. State is not stored in this repository.
+Both stacks use a Garage S3 backend (self-hosted, in-cluster — see `docs/decisions/ADR-003-garage-terraform-backend.md`). Not stored in this repo.
 
-## Adding a New Stack
+## Adding a stack
 
 ```bash
 mkdir -p terraform/stacks/my_stack
-# create main.tf, variables.tf
-# add to atlantis.yaml projects list
-# add to .github/workflows/ci.yml terraform job
+# main.tf, variables.tf, providers.tf
+# add to atlantis.yaml
+# add to .github/workflows/ci.yml
 ```
