@@ -1,6 +1,6 @@
 # Naming Convention
 
-To ensure scalability and clarity, a standardized naming convention is applied to all physical hosts, virtual machines, and containers.
+Every physical host, VM, and container follows the same naming pattern, so I can tell what something is and where it lives just from the name.
 
 ## Schema
 `[Type]-[Zone]-[Service]-[Index]`
