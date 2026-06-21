@@ -38,7 +38,7 @@ resource "routeros_ip_firewall_filter" "in_05_k3s_router_api" {
   dst_port     = "8728,8729"
   src_address  = "10.0.20.0/24"
   place_before = routeros_ip_firewall_filter.drop_all_input.id
-  comment      = "IN-05: Allow router API access from K3s Nodes (legacy MikroDash grant, consumer unconfirmed - still active traffic, do not remove blind)"
+  comment      = "IN-05: Allow router API access from K3s Nodes (legacy MikroDash grant, current consumer unconfirmed, active traffic present)"
 }
 
 resource "routeros_ip_firewall_filter" "in_04_atlantis_api" {
