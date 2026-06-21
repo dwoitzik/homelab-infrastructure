@@ -66,7 +66,13 @@ dns:
   ipset_file: ""
   bootstrap_prefer_ipv6: false
   upstream_timeout: 10s
-  private_networks: []
+  # Scoped to exactly the Fritzbox LAN — if left empty, AdGuard treats ALL
+  # RFC1918 ranges as "private" and forwards PTR queries for the k3s pod
+  # network (10.42.0.0/16) to the Fritzbox too, which can't answer them.
+  # Each such query burns a 2s timeout; at cluster scale this becomes a
+  # query flood that looks like a DNS outage (incident: 2026-06-19).
+  private_networks:
+    - 192.168.178.0/24
   use_private_ptr_resolvers: true
   local_ptr_upstreams:
     - 192.168.178.1
