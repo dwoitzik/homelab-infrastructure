@@ -7,92 +7,39 @@ All notable changes to this infrastructure are documented here.
 ## [0.6.0] — 2026-06-21
 
 ### Added
-- k3s HA: all 3 nodes (`vm-srv-k3s-11/12/13`) run as control-plane + embedded etcd,
-  live-migrated from single-node SQLite (`--cluster-init`) — no rebuild required
-- k3s API HA VIP (`10.0.20.10`) via Keepalived, health-checked against `systemctl is-active k3s`
-- Vault auto-unseal sidecar (`vault-unseal` Deployment) — no more manual unseal after every Vault restart
-- Independent DNS health alerting on both RPis — Discord webhook, zero dependency on the
-  k3s/Prometheus stack, so it still works on days the cluster itself is down
-- Hardware watchdog (BCM overlay + systemd `RuntimeWatchdogSec`) on both RPis — self-heals
-  from a total system freeze, not just a crashed container
-- Host firewall (`nftables`, additive `inet hostfw` table) on both RPis for natively-bound
-  services; deliberately does not touch Docker's own iptables-nft managed tables
-- fail2ban (sshd jail) on both RPis
-- Per-container `mem_limit` on every RPi Docker workload
-- Local rotating config backup (systemd timer, 14-snapshot retention) for RPi DNS configs —
-  these are physical hosts, not LXCs/VMs, so PBS/Velero never covered them
-- Docker daemon-wide log size cap (`max-size: 10m`, `max-file: 3`) — unbounded json-file
-  logs were a real long-term disk-fill risk on SD-card-backed hosts
-- Gitleaks secret scanning: pre-commit (staged), pre-push (full history), and CI — three
-  independent layers against committing new secrets
-- MikroTik service hardening: telnet/ftp disabled, api/api-ssl scoped to `10.0.0.0/8`
-  (`terraform/stacks/network/imports.tf`, adopted via native `import` blocks)
-- Cloudflare R2 offsite Velero backup location (configured, pending API credentials)
-- Cobblemon Minecraft server (Fabric, `mc-server-cobblemon`) on `ct-dmz-games-01`, routed
-  through `ct-dmz-proxy-01` (NPM stream + CrowdSec), same pattern as the existing server
-- `cloudflare-ddns` CronJob — keeps `cobblemon.woitzik.dev` in sync with the actual WAN IP
-- `docs/secrets-inventory.md`, `docs/OPERATIONS.md` — central "where is X / why does Y
-  happen" reference docs
+- k3s HA: all 3 nodes run control-plane + embedded etcd (migrated from single-node SQLite, no rebuild)
+- k3s API VIP (`10.0.20.10`) via Keepalived
+- Vault auto-unseal sidecar — no more manual unseal after a restart
+- Independent DNS health check on both RPis (Discord alert, no dependency on k3s/Prometheus)
+- Hardware watchdog on both RPis (BCM overlay + systemd)
+- Host firewall (nftables) on both RPis for natively-bound services
+- fail2ban on both RPis
+- Per-container memory limits on RPi Docker workloads
+- Local rotating config backup for RPi DNS configs (PBS/Velero don't cover physical hosts)
+- Docker log size cap, daemon-wide
+- Gitleaks scanning: pre-commit, pre-push, CI
+- MikroTik service hardening (telnet/ftp disabled, api/api-ssl scoped to internal networks)
+- Cloudflare R2 offsite Velero backup location (pending credentials)
+- Cobblemon Minecraft server, routed through the existing DMZ proxy/CrowdSec setup
+- Cloudflare DDNS CronJob for `cobblemon.woitzik.dev`
+- `docs/secrets-inventory.md`, `docs/OPERATIONS.md`
 
 ### Fixed
-- **Critical**: `daily-backup` Velero schedule was missing `defaultVolumesToFsBackup` —
-  backups completed "successfully" while only capturing k8s manifests, not actual PVC data
-  (Postgres, Vaultwarden, Paperless, Nextcloud). Found and fixed 2026-06-19, verified with
-  a Kopia pod-volume-backup test restore.
-- NetworkPolicy default-deny rollout (2026-06-19) had silently broken two cross-namespace
-  paths (Velero→Garage, Homepage→Uptime Kuma) for days before being noticed
-- AdGuard PTR query flood: `private_networks` was unscoped, forwarding reverse-DNS lookups
-  for the k3s pod network (`10.42.0.0/16`) to the Fritzbox, which can't answer them — each
-  query burned a 2s timeout, looking like a DNS outage at cluster scale
-- AdGuard's Ansible template had drifted badly from the live config (schema_version 28 vs
-  live 34) — rebuilt from the running config, recovering 3 DNS rewrites that only ever
-  existed via the web UI and would have been lost on a from-scratch RPi rebuild
-- Traefik ArgoCD sync had been silently broken for over a day (`tlsStore` Helm schema
-  mismatch) — every manual fix attempt during that window never actually reached the cluster
-- ArgoCD repo-server Helm/manifest cache staleness caused `kubectl apply` changes to
-  silently revert within seconds, hit on tempo, traefik, and paperless-gpt the same day
-- paperless-gpt title generation defaulted to English regardless of document language —
-  `LANGUAGE=deu` (ISO code) was injected verbatim into the LLM prompt; switched to the
-  plain word "German" and added an explicit strict-language instruction
-- Proxmox host repeated hard freezes: boot-time resource storm (all VMs/LXCs starting
-  simultaneously, load avg 147 within 4 min) fixed via staggered `startup` order; a second,
-  load-independent freeze traced to depleted/dried-out thermal paste (not a software issue)
-- CI was silently unreliable: local `ansible-lint` (6.17.2, apt-installed) was 20 major
-  versions behind what CI installed unpinned (26.4.0) — pinned both to match, plus a
-  pre-push hook that runs the exact same checks before any push leaves the machine
+- Velero daily backup was missing `defaultVolumesToFsBackup` — backups looked fine but never captured actual PVC data
+- NetworkPolicy default-deny rollout had broken Velero→Garage and Homepage→Uptime Kuma without anyone noticing
+- AdGuard was flooding PTR queries to the Fritzbox for the k3s pod network, which can't answer them
+- AdGuard's Ansible template had drifted from the live config — rebuilt it, recovered 3 DNS rewrites that only existed in the web UI
+- Traefik's ArgoCD sync was broken for over a day (Helm schema mismatch)
+- ArgoCD repo-server cache staleness was reverting kubectl changes within seconds
+- paperless-gpt defaulted to English regardless of document language
+- Proxmox host kept freezing on boot — staggered VM/LXC startup order fixed the resource storm; a second freeze turned out to be dried-out thermal paste, not software
+- ansible-lint locally was 20 versions behind CI, which is why lint passed locally and failed in CI
 
 ### Removed
-- `processor.max_cstate=1 idle=nomwait` kernel parameter (briefly applied as a suspected
-  fix for the Proxmox freezes, reverted after it pushed idle CPU temps to 96°C — the actual
-  cause was thermal paste, not C-states)
-- **36 orphaned MikroTik firewall rules** (live router had 77, only 22 matched
-  `firewall_deterministic.tf`). Several rounds of past "reconstruct deterministic firewall"
-  work had each added a fresh copy of the ruleset without removing the previous one —
-  3-4 full generations were stacked in the live `forward` chain. Since RouterOS evaluates
-  rules in order and stops at the first match, the *oldest* (broadest) generation was
-  actually winning over the newest, narrowest one: e.g. an unscoped `"04a: SRV - Allow
-  monitoring to all internal VLANs"` fired before the intended `"port 9100 only"` version
-  ever got evaluated — silently undoing that tightening. Removed via direct REST API calls
-  (read-only diff against the 22 current `.tf` resources first, full per-rule restore
-  script staged as a one-shot RouterOS scheduler "dead man's switch" before any delete,
-  cancelled only after DNS/SSH/WAN were verified still working). 41 rules remain: the 22
-  Terraform-managed ones plus 19 distinct rules with real, non-duplicate functions (VPN,
-  Atlantis/MikroDash API access, WireGuard, Cobblemon, monitoring scrape, OIDC) that were
-  never added to Terraform in the first place — those are tracked as a follow-up to bring
-  under IaC.
-- **MikroTik HTTPS certificate chain renewed before expiry**: the router's self-signed
-  root CA (`local-root-cert`) was 5 weeks from expiring (2026-07-27), which would have
-  broken the certificate chain for `www-ssl`/`api-ssl` even though the leaf cert it had
-  issued was valid until 2035 — an expired CA invalidates the whole chain regardless of
-  the leaf's own dates. Generated a new 10-year root CA + leaf cert, rebound both services
-  to it, verified the live TLS handshake before deleting the old pair.
-- **rpi-srv-02 hostname fix**: the device at `10.0.20.3` was reporting OS hostname
-  `rpi-srv-01` (identical to the actual rpi-srv-01) — found via a DHCP lease audit showing
-  a mismatch between the lease comment and the live `host-name` field. Both Pis were
-  indistinguishable in logs/metrics/alerts by hostname alone. Fixed by re-running the
-  existing `common` role (`ansible.builtin.hostname`) against rpi-srv-02 — the automation
-  was already correct, it just hadn't been re-applied since whatever event reset it (likely
-  an SD card re-image that skipped the playbook).
+- `processor.max_cstate=1 idle=nomwait` kernel param — was a guess at fixing the Proxmox freezes, made idle temps worse, reverted
+- 36 duplicate/orphaned MikroTik firewall rules left behind by past firewall rewrites — some of the old broad rules were still winning over newer, tighter ones
+- Renewed the MikroTik's self-signed CA, which was 5 weeks from expiry (would have broken HTTPS to the router regardless of the leaf cert's own 2035 expiry)
+- Fixed rpi-srv-02 reporting its hostname as rpi-srv-01 — both Pis were indistinguishable in logs by hostname alone
 
 ## [0.5.0] — 2026-06
 
