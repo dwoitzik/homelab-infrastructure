@@ -74,57 +74,53 @@ attention. These are the ones worth knowing about:
 | `cloudflare-api-token-secret` | `cert-manager` | DNS-01 challenge token for the wildcard cert |
 | `wildcard-woitzik-dev-tls` | replicated to every namespace with an IngressRoute | Single source: cert-manager Certificate in `kube-system`, copied via `cert-manager` namespace-sync or manual `kubectl get/apply` if a new namespace needs it |
 
-## ⚠️ Known plaintext leaks — remediation status
+## Plaintext leak remediation status
 
-**This repo is PUBLIC.** Lesson learned 2026-06-21: don't blanket-label leaks as "blocked
-on the cluster" without checking each one individually — anything rotatable via an
-*external* provider's own dashboard (Cloudflare, etc.) is exploitable by anyone right now
-and should be rotated immediately regardless of cluster state. Only secrets whose
-*consumer* is itself unreachable while the cluster is down (Garage, Postgres, internal
-OIDC) are actually low-urgency until the cluster's back — and even then, only the
-*exploitability* is low, not the leak itself.
+Tracking table for credentials that were committed in plaintext outside the Vault/
+ExternalSecrets pattern described above. Severity classification distinguishes secrets
+exploitable via an external provider (rotate immediately, independent of cluster state)
+from secrets whose consuming service is itself unreachable while the cluster is down
+(lower immediate exploitability, but still requiring rotation).
 
-### Done
+### Remediated
 
-| Secret | What happened |
+| Secret | Resolution |
 |---|---|
-| Cloudflare Tunnel token (`kubernetes/apps/cloudflared/`) | Rotated in Cloudflare Zero Trust dashboard 2026-06-21 (external, didn't need the cluster). New token in Ansible Vault; live file converted to ExternalSecret (`secret/cloudflared`), no plaintext in the repo anymore going forward. |
-| Garage S3 key for Velero (`kubernetes/system/velero/secrets.yml`) | **Found 2026-06-21** — wasn't in the original 12, missed because Garage's key format doesn't match generic AWS-key detectors. Converted to ExternalSecret (`secret/garage`), old plaintext file deleted. Actual key rotation still needs the Garage admin CLI (cluster). |
-| Authelia OIDC client secret shared across **proxmox, pbs, argocd, grafana** (`kubernetes/apps/authelia/configmap.yml` hash + live plaintext in `kubernetes/system/argocd/argocd-cm.yml` and `kubernetes/system/monitoring/application.yml`) | **Most severe finding, found 2026-06-21, also not in the original 12.** Same secret reused across four SSO clients including hypervisor (Proxmox) and backup server (PBS) access — compromising one client's secret compromises all four. Two of the four had the plaintext value committed live in the public repo. Converted both live files to ExternalSecret-sourced refs (`secret/argocd`, `secret/grafana`); old value preserved in Ansible Vault (`authelia_oidc_shared_client_secret_OLD`) so nothing breaks once the cluster's back, pending an actual rotation to four *distinct* secrets — see below. |
-| Grafana admin password (`kubernetes/system/monitoring/application.yml`) | **Found 2026-06-21**, not in the original 12. Converted to `admin.existingSecret` + ExternalSecret (`secret/grafana`). Old value preserved in Ansible Vault pending rotation. |
+| Cloudflare Tunnel token (`kubernetes/apps/cloudflared/`) | Rotated via the Cloudflare Zero Trust dashboard on 2026-06-21. New token stored in Ansible Vault; manifest converted to an ExternalSecret (`secret/cloudflared`). |
+| Garage S3 access key for Velero (`kubernetes/system/velero/secrets.yml`) | Identified 2026-06-21 during a follow-up scan of the working tree (not covered by the original history-based audit). Converted to an ExternalSecret (`secret/garage`); plaintext file removed. Key rotation itself requires the Garage admin CLI (cluster). |
+| Authelia OIDC client secret shared across **proxmox, pbs, argocd, grafana** (`kubernetes/apps/authelia/configmap.yml` hash; plaintext also present in `kubernetes/system/argocd/argocd-cm.yml` and `kubernetes/system/monitoring/application.yml`) | Identified 2026-06-21. Highest-impact finding: a single secret authenticates four SSO clients, including hypervisor (Proxmox) and backup server (PBS) access. Both live manifests converted to ExternalSecret-sourced references (`secret/argocd`, `secret/grafana`); current value retained in Ansible Vault (`authelia_oidc_shared_client_secret_OLD`) pending rotation to four distinct per-client secrets (see below). |
+| Grafana admin password (`kubernetes/system/monitoring/application.yml`) | Identified 2026-06-21. Converted to `admin.existingSecret` + ExternalSecret (`secret/grafana`); current value retained in Ansible Vault pending rotation. |
 
-### Still pending (needs live cluster + service access)
+### Pending (requires cluster and/or live service access)
 
-| File | Secret | Plan |
+| File | Secret | Remediation plan |
 |---|---|---|
-| `kubernetes/apps/authelia/configmap.yml` | OIDC issuer private key (signs SSO tokens for ArgoCD/Vault/Grafana/etc.) | **Highest priority.** Generate a new keypair, store in Vault `secret/authelia` as `oidc-issuer-private-key`, reference via ExternalSecret + volume mount instead of inline in the ConfigMap. Old key must be considered compromised — every service trusting it should be checked for unexpected sessions after rotation. |
-| Authelia OIDC client secret (the shared one above) | Currently one secret, four clients | Generate **four distinct** secrets (proxmox, pbs, argocd, grafana), update Authelia's per-client hash for each, update ArgoCD/Grafana's Vault-sourced value, and re-enter the new secret manually in Proxmox's and PBS's own OIDC realm config (their web UI, not a repo file — see `SSO_SETUP.md`). Proxmox/PBS specifically need the Proxmox host back up too, not just k3s. |
-| `kubernetes/apps/garage/config.yml` | RPC secret + admin token | Move both to Vault `secret/garage`, regenerate via Garage admin CLI (`garage node-id` / re-init layout uses a fresh RPC secret — requires careful cluster handling since this is the storage backend for Velero/Loki/CNPG backups). This also invalidates the Velero access key above — rotate together. |
-| `kubernetes/apps/garage/secrets.yml` | Admin token (duplicate of the one above) | Same secret, two places — fix both in the same pass. |
-| `kubernetes/system/postgres/cnpg-backup-secret.yml` | Garage S3 secret key (used by CNPG WAL archiving) | Move to Vault, regenerate Garage access key pair after the RPC/admin rotation above. |
-| `terraform/stacks/network/local_backend.hcl` | Garage S3 access key (Terraform state backend!) | Same access key as above — also embedded in the Terraform backend config. Regenerating the Garage key invalidates this too; update in lockstep or Terraform loses access to its own state. |
-| `kubernetes/apps/paperless/secrets.yml` | Postgres password + AI API token | Move to Vault `secret/paperless`. Postgres password rotation needs an `ALTER USER` on the actual Postgres instance, not just the Secret. |
-| `kubernetes/apps/headscale/config.yml` | OIDC client secret (Authelia↔Headscale) | Rotate in Authelia's OIDC client config AND Headscale's `oidc.client_secret` together — they must match. Move to Vault. |
-| `kubernetes/system/monitoring/loki.yml` | Minio/S3 password (Loki's object storage backend) | Already uses `secretKeyRef` in the live file (verified 2026-06-21) — the leak is historical (git log) only, not live. Still needs an actual credential rotation + Vault migration to fully close out. |
-| `kubernetes/apps/mikrodash/secrets.yml` | Mikrodash password | Lowest priority (internal dashboard, not a credential chain, MikroDash itself decommissioned per CHANGELOG 0.5.0). Move to Vault `secret/mikrodash` when convenient, or just delete the file if nothing reads it anymore. |
-| `kubernetes/apps/authelia/users_database_secret.yml` | David's argon2id password hash | Hashed, not plaintext — lower severity, but still shouldn't be hand-committed. Move the whole `users_database.yml` generation into the existing ExternalSecret pattern already used for `authelia-secrets`. |
-| `ROADMAP.md` | — | False positive (doc text), allowlisted in `.gitleaks.toml`, no action needed. |
+| `kubernetes/apps/authelia/configmap.yml` | OIDC issuer private key (signs SSO tokens for ArgoCD/Vault/Grafana, etc.) | Highest priority. Generate a new keypair, store in Vault `secret/authelia` as `oidc-issuer-private-key`, reference via ExternalSecret + volume mount instead of inline in the ConfigMap. Treat the old key as compromised; audit dependent services for unexpected sessions after rotation. |
+| Authelia OIDC client secret (shared, see above) | One secret currently serves four clients | Generate four distinct secrets (proxmox, pbs, argocd, grafana); update Authelia's per-client hash for each; update the ArgoCD/Grafana Vault-sourced values; re-enter the new secret in Proxmox's and PBS's own OIDC realm configuration (web UI, not a repo file — see `SSO_SETUP.md`). The Proxmox/PBS steps additionally require the Proxmox host itself to be back up. |
+| `kubernetes/apps/garage/config.yml` | RPC secret + admin token | Move to Vault `secret/garage`; regenerate via the Garage admin CLI. Requires careful handling since Garage is the storage backend for Velero/Loki/CNPG backups. Invalidates the Velero access key above — rotate together. |
+| `kubernetes/apps/garage/secrets.yml` | Admin token (duplicate of the above) | Same secret in two locations; address both in the same pass. |
+| `kubernetes/system/postgres/cnpg-backup-secret.yml` | Garage S3 secret key (CNPG WAL archiving) | Move to Vault; regenerate after the Garage RPC/admin rotation above. |
+| `terraform/stacks/network/local_backend.hcl` | Garage S3 access key (Terraform state backend) | Same access key as above, also embedded in the Terraform backend config. Update in lockstep with the Garage key rotation or Terraform loses access to its own state. |
+| `kubernetes/apps/paperless/secrets.yml` | Postgres password + AI API token | Move to Vault `secret/paperless`. Postgres password rotation requires an `ALTER USER` on the database instance, not just the Secret update. |
+| `kubernetes/apps/headscale/config.yml` | OIDC client secret (Authelia ↔ Headscale) | Rotate in both Authelia's client config and Headscale's `oidc.client_secret` together — values must match. Move to Vault. |
+| `kubernetes/system/monitoring/loki.yml` | Minio/S3 password (Loki object storage backend) | Live manifest already uses `secretKeyRef` (verified 2026-06-21) — exposure is limited to git history. Still requires credential rotation and Vault migration to close out. |
+| `kubernetes/apps/mikrodash/secrets.yml` | MikroDash password | Low priority — MikroDash is decommissioned (CHANGELOG 0.5.0). Move to Vault `secret/mikrodash`, or remove the file if nothing references it. |
+| `kubernetes/apps/authelia/users_database_secret.yml` | Argon2id password hash | Hashed rather than plaintext, lower severity, but should not be hand-committed. Migrate `users_database.yml` generation into the existing ExternalSecret pattern used for `authelia-secrets`. |
+| `ROADMAP.md` | — | False positive (documentation text), allowlisted in `.gitleaks.toml`. No action required. |
 
-**A full re-scan of the live tree (not just git history) on 2026-06-21 found the three "Done"
-items above that the original history-based audit missed.** Recommend repeating
-`gitleaks detect --no-git --source=. --baseline-path .gitleaks-baseline.json` periodically
-against the current working tree specifically, not just relying on the pre-commit/pre-push
-hooks catching things going forward — those only catch *new* commits, not gaps in what
-already got merged before the hooks existed.
+A re-scan of the working tree (rather than git history alone) on 2026-06-21 surfaced the
+three items listed under "Remediated" above. The pre-commit/pre-push hooks only catch new
+commits, so periodically running
+`gitleaks detect --no-git --source=. --baseline-path .gitleaks-baseline.json` against the
+current tree is recommended to catch anything merged before the hooks were in place.
 
-**Suggested order once the cluster is back:** Garage credentials first (everything else's
+**Recommended rotation order once the cluster is back:** Garage credentials first (other
 backups depend on it being consistent), then the four-way Authelia OIDC client secret
-(highest blast radius — hypervisor + backup server access), then the Authelia OIDC issuer
-key, then the rest in any order. After each rotation, re-run
-`gitleaks detect --baseline-path .gitleaks-baseline.json` — once a secret is removed from
-the *live* files, it'll still show in the baseline (history) until the baseline is
-regenerated, which is expected; the baseline only needs regenerating once all of these are
-actually addressed, to confirm nothing was missed.
+(highest impact — hypervisor and backup server access), then the Authelia OIDC issuer key,
+then the remainder in any order. Re-run `gitleaks detect --baseline-path
+.gitleaks-baseline.json` after each rotation; an already-rotated secret will still appear
+in the baseline (which reflects history) until the baseline is regenerated once all items
+are addressed.
 
 ## Rotation notes
 
