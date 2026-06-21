@@ -64,6 +64,21 @@ looks like a DNS outage. If AdGuard query volume spikes again, check
 | `kubectl apply` on a manifest succeeds, but a live resource (Deployment volumeMounts, StatefulSet storageClassName, IngressRoute fields) reverts to old values within seconds | **ArgoCD repo-server Helm/manifest cache staleness** — hit 3x on 2026-06-20 (tempo PVC storageClassName, traefik tlsStore/dashboard, paperless-gpt volumeMounts). `selfHeal: true` re-applies from ArgoCD's cached render of the chart/manifests, which can lag behind a fresh git push or a fresh kubectl apply. Fix: `kubectl patch application <name> -n argocd --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'`, wait ~15s, then re-check. If that alone doesn't work, restart the cache itself: `kubectl rollout restart deployment argocd-repo-server -n argocd`. For StatefulSets specifically, also delete+recreate the StatefulSet (volumeClaimTemplates are immutable — a stale-cached re-apply won't fix the field even after the cache clears, the object itself must be replaced). |
 | Two ArgoCD Applications both create a resource with the same name/namespace (`SharedResourceWarning` in `.status.conditions`, resource flickers between two specs or gets pruned entirely) | Ownership conflict — e.g. a Helm chart's own `ingressRoute.dashboard.enabled` and a manually-defined `IngressRoute` with the same name fighting over the object. Pick one owner, disable/remove the other's claim to that resource name, then recreate. | `kubernetes/system/traefik/application.yml` (`ingressRoute.dashboard.enabled: false` — the manual Authelia-protected route in `other-ingressroute.yml` is the canonical one) |
 
+## Pending — needs the cluster back up to finish
+
+- **Secrets remediation (Phase 2)**: 12 plaintext secrets found in git history by gitleaks
+  on 2026-06-21 — full list and rotation plan in `docs/secrets-inventory.md`. Blocked on
+  live Vault + service access.
+- **MikroTik service hardening apply**: `terraform/stacks/network/imports.tf` (telnet/ftp
+  disabled, api/api-ssl scoped to 10.0.0.0/8) is committed and `terraform validate`-clean,
+  but not yet applied — this stack's backend is Garage S3 (k3s-hosted), and per the
+  network/proxmox-stacks rule, it only ever applies via Atlantis. Needs an `atlantis apply`
+  comment on the next PR/plan once the cluster is back, or a manual one-time apply if
+  Atlantis itself needs the change to even reach the cluster (chicken-and-egg — check
+  Atlantis is actually reachable first).
+- **Velero R2 offsite backup**: configured, waiting on Cloudflare R2 credentials from David
+  (see `project_velero_r2_pending` memory note / `docs/backup-strategy.md` Stage 1b).
+
 ## Last known-good audit
 
 2026-06-19: full pass across AdGuard, Velero, NetworkPolicies, Vault, k3s, CI. Findings
