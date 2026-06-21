@@ -11,3 +11,9 @@ regexes = [
   # not a secret.
   '''Proxmox/PBS/Grafana/Headscale use `client_secret_basic`''',
 ]
+# The baseline file itself contains copies of past findings as JSON strings -
+# without this, regenerating the baseline recursively re-scans its own
+# previous output and the baseline grows forever.
+paths = [
+  '''\.gitleaks-baseline\.json''',
+]
