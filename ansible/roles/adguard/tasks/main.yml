@@ -29,6 +29,7 @@
           container_name: adguardhome
           restart: always
           network_mode: host
+          mem_limit: 512m
           volumes:
             - /opt/adguardhome/work:/opt/adguardhome/work
             - /opt/adguardhome/conf:/opt/adguardhome/conf
@@ -59,6 +60,7 @@
               image: ghcr.io/bakito/adguardhome-sync
               container_name: adguardhome-sync
               restart: unless-stopped
+              mem_limit: 128m
               environment:
                 - ORIGIN_URL=http://10.0.20.2:3001
                 - ORIGIN_USERNAME=dw
