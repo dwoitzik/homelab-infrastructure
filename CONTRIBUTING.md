@@ -43,10 +43,10 @@ git push && gh pr create
 
 ```bash
 # Dry run first
-ansible-playbook ansible/playbooks/site.yml --check
+ansible-playbook ansible/site.yml --check
 
 # Apply to specific host group
-ansible-playbook ansible/playbooks/site.yml --limit rpi_nodes
+ansible-playbook ansible/site.yml --limit rpi_nodes
 ```
 
 Host groups: `rpi_nodes`, `app_nodes`, `mgmt_nodes`, `dmz_proxies`, `dmz_games`, `ai_nodes`.

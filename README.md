@@ -176,10 +176,10 @@ I never run `terraform apply` locally. Everything goes through Atlantis.
 
 ```bash
 # Dry run
-ansible-playbook ansible/playbooks/site.yml --check
+ansible-playbook ansible/site.yml --check
 
 # Apply to specific group
-ansible-playbook ansible/playbooks/site.yml --limit rpi_nodes
+ansible-playbook ansible/site.yml --limit rpi_nodes
 
 # Edit secrets
 ansible-vault edit ansible/group_vars/all/vault.yml
