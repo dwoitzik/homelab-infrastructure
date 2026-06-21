@@ -29,6 +29,7 @@
           image: klutchell/unbound:latest
           container_name: unbound
           restart: unless-stopped
+          mem_limit: 256m
           ports:
             - "5335:53/udp"
             - "5335:53/tcp"
@@ -47,6 +48,7 @@
           image: willfarrell/autoheal:latest
           container_name: autoheal
           restart: always
+          mem_limit: 64m
           environment:
             - AUTOHEAL_CONTAINER_LABEL=autoheal
           volumes:

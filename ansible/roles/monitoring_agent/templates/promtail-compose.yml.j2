@@ -3,6 +3,7 @@ services:
     image: grafana/promtail:latest
     container_name: promtail
     restart: unless-stopped
+    mem_limit: 256m
     volumes:
       - ./promtail.yml:/etc/promtail/promtail.yml:ro
       - /var/log:/var/log:ro

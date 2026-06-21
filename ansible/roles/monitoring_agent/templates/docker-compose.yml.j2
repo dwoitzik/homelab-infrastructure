@@ -3,6 +3,7 @@ services:
     image: prom/node-exporter:latest
     container_name: node_exporter
     restart: unless-stopped
+    mem_limit: 128m
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
