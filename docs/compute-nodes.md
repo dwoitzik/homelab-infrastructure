@@ -26,18 +26,17 @@
 | `ct-dmz-proxy-01` | LXC | 2 | 1 GB | DMZ reverse proxy (Public Facing) |
 | `ct-dmz-games-01` | LXC | 4 | 12 GB | Game servers (bumped from 4 GB after Cobblemon lag investigation, 2026-06) |
 
-All three k3s nodes run as control-plane with embedded etcd (migrated from single-node
-SQLite, 2026-06) — there is no single "primary" node anymore. API access is via a
-Keepalived VIP (`10.0.20.10`), health-checked against `systemctl is-active k3s`.
-Longhorn was removed in the same migration; all PVCs now use the `nfs-client`
-StorageClass backed by `ct-srv-nfs-01`.
+All three k3s nodes are control-plane with embedded etcd now (migrated from single-node
+SQLite in 2026-06), so there's no "primary" node anymore. API access goes through the
+Keepalived VIP (`10.0.20.10`). Longhorn got removed in the same migration; PVCs use the
+`nfs-client` StorageClass backed by `ct-srv-nfs-01` instead.
 
 ### Performance Tweaks
 
 | Setting | Value | Note |
 | :--- | :--- | :--- |
 | CPU Governor | `powersave` | Reduces idle consumption |
-| CPU C-States | Hardware default | Tried `max_cstate=1 idle=nomwait` as a suspected fix for repeated host freezes (2026-06-20), reverted — pushed idle temps to 96°C. Real cause was depleted thermal paste, fixed by repaste. |
+| CPU C-States | Hardware default | Tried `max_cstate=1 idle=nomwait` as a guess at fixing repeated host freezes, made idle temps worse (96°C), reverted. Real cause was the thermal paste. |
 | IOMMU | Active (`amd_iommu=on`, `iommu=pt`) | GPU passthrough to LXC |
 | Swap | 8 GB ZFS zvol (`rpool/swap`) | Safety net for LLM inference |
 | ZFS ARC | Capped at 8 GB (`zfs_arc_max`) | Was unbounded (up to ~50% RAM); capped after it competed with VM memory during boot |
@@ -76,15 +75,15 @@ StorageClass backed by `ct-srv-nfs-01`.
 
 ### Resilience & Security (2026-06-21 hardening pass)
 
-These RPis are physical hardware running DNS for the whole house — no PBS/Velero coverage
-(those only reach VMs/LXCs), so every protection here is self-contained on the device.
+These run DNS for the whole house and PBS/Velero only cover VMs/LXCs, not physical
+hardware. So everything here is self-contained on the device itself.
 
 | Component | Detail |
 | :--- | :--- |
-| Hardware watchdog | BCM overlay + systemd `RuntimeWatchdogSec=15s` — self-heals from a total kernel freeze, not just a crashed container |
-| Host firewall | `nftables`, additive `inet hostfw` table — default-drop INPUT, only covers natively-bound services (SSH, AdGuard via `network_mode: host`, VRRP); deliberately does not touch Docker's own iptables-nft tables |
+| Hardware watchdog | BCM overlay + systemd `RuntimeWatchdogSec=15s`. Recovers from a total kernel freeze, not just a crashed container. |
+| Host firewall | `nftables`, additive `inet hostfw` table, default-drop INPUT. Only covers natively-bound services (SSH, AdGuard since it's `network_mode: host`, VRRP) — doesn't touch Docker's own iptables-nft tables on purpose. |
 | fail2ban | sshd jail, 5 attempts / 10 min → 1h ban |
-| Independent DNS healthcheck | systemd timer, every 2 min, posts to Discord only on state change — zero dependency on the k3s/Prometheus stack |
-| Local config backup | systemd timer, daily 02:30, 14-snapshot retention of AdGuard/Unbound config |
-| Docker log limits | `max-size: 10m, max-file: 3` daemon-wide — unbounded json-file logs were a real disk-fill risk on SD storage |
+| Independent DNS healthcheck | systemd timer every 2 min, posts to Discord only on state change. No dependency on k3s/Prometheus. |
+| Local config backup | systemd timer, daily 02:30, keeps 14 snapshots of AdGuard/Unbound config |
+| Docker log limits | `max-size: 10m, max-file: 3` daemon-wide — unbounded logs were eating disk on SD storage |
 | Per-container memory limits | Set on every RPi Docker workload |
