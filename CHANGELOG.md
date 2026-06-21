@@ -65,6 +65,21 @@ All notable changes to this infrastructure are documented here.
 - `processor.max_cstate=1 idle=nomwait` kernel parameter (briefly applied as a suspected
   fix for the Proxmox freezes, reverted after it pushed idle CPU temps to 96°C — the actual
   cause was thermal paste, not C-states)
+- **36 orphaned MikroTik firewall rules** (live router had 77, only 22 matched
+  `firewall_deterministic.tf`). Several rounds of past "reconstruct deterministic firewall"
+  work had each added a fresh copy of the ruleset without removing the previous one —
+  3-4 full generations were stacked in the live `forward` chain. Since RouterOS evaluates
+  rules in order and stops at the first match, the *oldest* (broadest) generation was
+  actually winning over the newest, narrowest one: e.g. an unscoped `"04a: SRV - Allow
+  monitoring to all internal VLANs"` fired before the intended `"port 9100 only"` version
+  ever got evaluated — silently undoing that tightening. Removed via direct REST API calls
+  (read-only diff against the 22 current `.tf` resources first, full per-rule restore
+  script staged as a one-shot RouterOS scheduler "dead man's switch" before any delete,
+  cancelled only after DNS/SSH/WAN were verified still working). 41 rules remain: the 22
+  Terraform-managed ones plus 19 distinct rules with real, non-duplicate functions (VPN,
+  Atlantis/MikroDash API access, WireGuard, Cobblemon, monitoring scrape, OIDC) that were
+  never added to Terraform in the first place — those are tracked as a follow-up to bring
+  under IaC.
 
 ## [0.5.0] — 2026-06
 
