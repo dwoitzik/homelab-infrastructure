@@ -13,5 +13,5 @@ data:
     name: Authelia
     issuer: https://auth.woitzik.dev
     clientID: argocd
-    clientSecret: ***REMOVED-SHARED-OIDC-CLIENT-SECRET***
+    clientSecret: $argocd-secret:oidc.clientSecret
     requestedScopes: ["openid", "profile", "email", "groups"]
