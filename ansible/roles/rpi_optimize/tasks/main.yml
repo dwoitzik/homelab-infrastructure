@@ -164,3 +164,70 @@
     name: fail2ban
     state: started
     enabled: true
+
+# ─── Local config backup ───────────────────────────────────────────────────
+# There is currently no backup mechanism at all for these RPis — they're
+# physical hardware, not LXCs/VMs, so PBS/Velero don't cover them. AdGuard's
+# config has drifted from its Ansible template multiple times via web-UI
+# changes (see 2026-06-21 fix); a local rotating snapshot is a cheap safety
+# net against accidental deletion/corruption while NFS-based backup (which
+# depends on the Proxmox host) is unavailable.
+
+- name: Create local backup directory
+  ansible.builtin.file:
+    path: /opt/backups
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: Deploy config backup script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/backup-rpi-configs.sh
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      DEST=/opt/backups
+      STAMP=$(date +%Y%m%d-%H%M%S)
+      tar czf "${DEST}/configs-${STAMP}.tar.gz" \
+        -C / opt/adguardhome/conf opt/unbound 2>/dev/null || true
+      # Keep the 14 most recent snapshots, drop the rest
+      ls -t "${DEST}"/configs-*.tar.gz 2>/dev/null | tail -n +15 | xargs -r rm --
+    mode: '0755'
+
+- name: Deploy backup systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/backup-rpi-configs.service
+    content: |
+      [Unit]
+      Description=Backup RPi DNS/network configs locally
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/backup-rpi-configs.sh
+    mode: '0644'
+  notify: Reload systemd daemon
+
+- name: Deploy backup systemd timer (daily, staggered to avoid sync collision)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/backup-rpi-configs.timer
+    content: |
+      [Unit]
+      Description=Daily local backup of RPi DNS/network configs
+
+      [Timer]
+      OnCalendar=*-*-* 02:30:00
+      RandomizedDelaySec=300
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+    mode: '0644'
+  notify: Reload systemd daemon
+
+- name: Enable and start the backup timer
+  ansible.builtin.systemd:
+    name: backup-rpi-configs.timer
+    state: started
+    enabled: true
+    daemon_reload: true
