@@ -4,6 +4,68 @@ All notable changes to this infrastructure are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-21
+
+### Added
+- k3s HA: all 3 nodes (`vm-srv-k3s-11/12/13`) run as control-plane + embedded etcd,
+  live-migrated from single-node SQLite (`--cluster-init`) — no rebuild required
+- k3s API HA VIP (`10.0.20.10`) via Keepalived, health-checked against `systemctl is-active k3s`
+- Vault auto-unseal sidecar (`vault-unseal` Deployment) — no more manual unseal after every Vault restart
+- Independent DNS health alerting on both RPis — Discord webhook, zero dependency on the
+  k3s/Prometheus stack, so it still works on days the cluster itself is down
+- Hardware watchdog (BCM overlay + systemd `RuntimeWatchdogSec`) on both RPis — self-heals
+  from a total system freeze, not just a crashed container
+- Host firewall (`nftables`, additive `inet hostfw` table) on both RPis for natively-bound
+  services; deliberately does not touch Docker's own iptables-nft managed tables
+- fail2ban (sshd jail) on both RPis
+- Per-container `mem_limit` on every RPi Docker workload
+- Local rotating config backup (systemd timer, 14-snapshot retention) for RPi DNS configs —
+  these are physical hosts, not LXCs/VMs, so PBS/Velero never covered them
+- Docker daemon-wide log size cap (`max-size: 10m`, `max-file: 3`) — unbounded json-file
+  logs were a real long-term disk-fill risk on SD-card-backed hosts
+- Gitleaks secret scanning: pre-commit (staged), pre-push (full history), and CI — three
+  independent layers against committing new secrets
+- MikroTik service hardening: telnet/ftp disabled, api/api-ssl scoped to `10.0.0.0/8`
+  (`terraform/stacks/network/imports.tf`, adopted via native `import` blocks)
+- Cloudflare R2 offsite Velero backup location (configured, pending API credentials)
+- Cobblemon Minecraft server (Fabric, `mc-server-cobblemon`) on `ct-dmz-games-01`, routed
+  through `ct-dmz-proxy-01` (NPM stream + CrowdSec), same pattern as the existing server
+- `cloudflare-ddns` CronJob — keeps `cobblemon.woitzik.dev` in sync with the actual WAN IP
+- `docs/secrets-inventory.md`, `docs/OPERATIONS.md` — central "where is X / why does Y
+  happen" reference docs
+
+### Fixed
+- **Critical**: `daily-backup` Velero schedule was missing `defaultVolumesToFsBackup` —
+  backups completed "successfully" while only capturing k8s manifests, not actual PVC data
+  (Postgres, Vaultwarden, Paperless, Nextcloud). Found and fixed 2026-06-19, verified with
+  a Kopia pod-volume-backup test restore.
+- NetworkPolicy default-deny rollout (2026-06-19) had silently broken two cross-namespace
+  paths (Velero→Garage, Homepage→Uptime Kuma) for days before being noticed
+- AdGuard PTR query flood: `private_networks` was unscoped, forwarding reverse-DNS lookups
+  for the k3s pod network (`10.42.0.0/16`) to the Fritzbox, which can't answer them — each
+  query burned a 2s timeout, looking like a DNS outage at cluster scale
+- AdGuard's Ansible template had drifted badly from the live config (schema_version 28 vs
+  live 34) — rebuilt from the running config, recovering 3 DNS rewrites that only ever
+  existed via the web UI and would have been lost on a from-scratch RPi rebuild
+- Traefik ArgoCD sync had been silently broken for over a day (`tlsStore` Helm schema
+  mismatch) — every manual fix attempt during that window never actually reached the cluster
+- ArgoCD repo-server Helm/manifest cache staleness caused `kubectl apply` changes to
+  silently revert within seconds, hit on tempo, traefik, and paperless-gpt the same day
+- paperless-gpt title generation defaulted to English regardless of document language —
+  `LANGUAGE=deu` (ISO code) was injected verbatim into the LLM prompt; switched to the
+  plain word "German" and added an explicit strict-language instruction
+- Proxmox host repeated hard freezes: boot-time resource storm (all VMs/LXCs starting
+  simultaneously, load avg 147 within 4 min) fixed via staggered `startup` order; a second,
+  load-independent freeze traced to depleted/dried-out thermal paste (not a software issue)
+- CI was silently unreliable: local `ansible-lint` (6.17.2, apt-installed) was 20 major
+  versions behind what CI installed unpinned (26.4.0) — pinned both to match, plus a
+  pre-push hook that runs the exact same checks before any push leaves the machine
+
+### Removed
+- `processor.max_cstate=1 idle=nomwait` kernel parameter (briefly applied as a suspected
+  fix for the Proxmox freezes, reverted after it pushed idle CPU temps to 96°C — the actual
+  cause was thermal paste, not C-states)
+
 ## [0.5.0] — 2026-06
 
 ### Added
