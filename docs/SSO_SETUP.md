@@ -32,10 +32,6 @@ To enable SSO for Proxmox VE and Proxmox Backup Server, you need to configure th
    - **Scopes**: `openid profile email groups`
 5. Click **Add**.
 
-## 3. Minio SSO
-- When you open [minio.woitzik.dev](https://minio.woitzik.dev), you should see a button **"Login with OpenID"**.
-- Click that button to be redirected to Authelia.
-
-## 4. Argo CD SSO
+## 3. Argo CD SSO
 - On the Argo CD login page ([argo.woitzik.dev](https://argo.woitzik.dev)), there should be a button **"LOG IN VIA AUTHELIA"**.
 - Click it to sign in with your lab credentials.
