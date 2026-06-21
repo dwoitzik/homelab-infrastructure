@@ -187,5 +187,3 @@ resource "routeros_system_scheduler" "day_mode" {
   interval   = "1d"
   on_event   = "leds_on"
 }
-# Recovery PR
-# Recovery 3
