@@ -78,16 +78,12 @@ looks like a DNS outage. If AdGuard query volume spikes again, check
   Atlantis is actually reachable first).
 - **Velero R2 offsite backup**: configured, waiting on Cloudflare R2 credentials from David
   (see `project_velero_r2_pending` memory note / `docs/backup-strategy.md` Stage 1b).
-- **19 MikroTik firewall rules not yet in Terraform**: after the 2026-06-21 cleanup of 36
-  orphaned/duplicate rules, 19 *legitimate, distinct* rules remain that were created
-  manually at some point (VPN access tiers, Atlantis/MikroDash API access, WireGuard,
-  Cobblemon port-forward, monitoring scrape, OIDC routes) and were never added to
-  `firewall_deterministic.tf`. Not a security issue — they're intentional and working —
-  but they're invisible to `terraform plan`, so a future cleanup pass could recreate the
-  same drift. Worth importing into Terraform properly once there's time. (Checked
-  `firewall_ipv6.tf` too on 2026-06-21: no duplication drift there, just one extra
-  legitimate rule in the same boat — `output` chain, blocks rogue IPv6 router
-  advertisements from reaching WAN clients via the FritzBox.)
+- ~~**19 MikroTik firewall rules not yet in Terraform**~~ — done 2026-06-21: 16 IPv4 + 1
+  IPv6 legitimate rule imported into `firewall_extra.tf`/`imports.tf`. 3 more rules from
+  the same investigation turned out to be genuinely dead (WireGuard — zero interfaces,
+  zero peers, zero traffic, decommissioned in favor of Headscale/Tailscale) and were
+  deleted instead of imported. Not yet *applied* though — same Atlantis-only constraint as
+  the service-hardening change above.
 - **No remote syslog from MikroTik**: security events (failed logins, firewall drops) only
   go to a 1000-line in-memory ring buffer — nothing centralized. Wiring this to Loki needs
   a syslog receiver on the cluster side (Promtail syslog stage or similar), so it's blocked
