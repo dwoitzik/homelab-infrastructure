@@ -1,23 +1,36 @@
-# 📦 Kubernetes Applications
+# Kubernetes Applications
 
-This directory houses the manifests for applications deployed on the K3s cluster. The deployment follows a GitOps pattern, ensuring all application states are declaratively defined and automatically synchronized.
+Manifests for everything ArgoCD deploys via the ApplicationSet — it watches this directory
+and picks up any new subfolder automatically.
 
-## 🔑 Shared Security Patterns
+## Shared patterns
 
-### 1. Identity & SSO
-Applications are integrated into a centralized identity layer using **Authelia**. Where supported, OIDC is used for full SSO. For legacy apps, Traefik's `ForwardAuth` middleware ensures that only authenticated users can reach the service.
+**Identity:** Authelia handles SSO. Apps with OIDC support use it directly; older apps go
+through Traefik's `ForwardAuth` middleware instead.
 
-### 2. Secret Management
-Passwords and sensitive API tokens are abstracted into Kubernetes `Secrets`. This ensures that deployment manifests can be safely shared while keeping actual credentials controlled.
+**Secrets:** Real values never get committed — manifests carry `REPLACE_WITH_*`
+placeholders, and the actual Secret gets applied straight to the cluster (or sourced from
+Vault via ExternalSecrets where that's set up). See `docs/secrets-inventory.md`.
 
-### 3. Persistent Storage
-Persistence is provided by **Longhorn**, allowing for distributed, replicated block storage. This enables high availability for stateful applications across the cluster nodes.
+**Storage:** PVCs use the `nfs-client` StorageClass, backed by `ct-srv-nfs-01`. Used to be
+Longhorn — migrated off it, see ROADMAP.md for why.
 
-## 🚀 Deployed Services
+## What's here
 
-- **Authelia**: Central Identity & OIDC Provider.
-- **Paperless-ngx**: Document management system with Postgres/Redis backend.
-- **Minio**: S3-compatible object storage with OIDC integration.
-- **Vaultwarden**: Bitwarden-compatible password manager.
-- **Open-WebUI**: Local LLM interface.
-- **Mikrodash**: Monitoring dashboard for MikroTik routers.
+- `authelia` — SSO/OIDC identity provider
+- `atlantis` — Terraform GitOps runner
+- `cloudflared` — Cloudflare Tunnel
+- `garage` — S3-compatible object storage (Velero backend, Terraform state)
+- `gitea` — private git
+- `headscale` — self-hosted Tailscale control plane
+- `home-assistant` — smart home hub
+- `homepage` — dashboard
+- `jellyfin` — media server
+- `keel` — image auto-update
+- `mealie` — recipe manager
+- `nextcloud` — files, CalDAV, CardDAV
+- `open-webui` — local LLM frontend for Ollama
+- `paperless` — document management (with paperless-gpt for AI titling)
+- `renovate` — dependency update bot
+- `uptime-kuma` — uptime monitoring
+- `vaultwarden` — password manager
