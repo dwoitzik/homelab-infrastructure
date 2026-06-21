@@ -3,3 +3,14 @@ extends: default
 rules:
   line-length:
     max: 200
+  # ansible-lint requires these exact values to consider this config
+  # "compatible" - without them it silently falls back to its own
+  # built-in yamllint rules and warns on every single run.
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: false
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
