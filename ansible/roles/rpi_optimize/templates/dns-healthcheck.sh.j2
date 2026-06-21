@@ -1,0 +1,38 @@
+#!/bin/bash
+# Independent DNS health check — deliberately has ZERO dependency on the
+# k3s/Prometheus/Alertmanager stack, so it still works if the Proxmox host
+# (and everything on it) is down. Only alerts on a state CHANGE, not on
+# every run, to avoid spamming Discord.
+set -uo pipefail
+
+WEBHOOK_URL="{{ rpi_optimize_discord_webhook_url }}"
+STATE_FILE="/var/lib/dns-healthcheck.state"
+HOSTNAME=$(hostname)
+
+check_dns() {
+  # AdGuard on 53, Unbound directly on 5335 - test both independently
+  dig +short +timeout=3 google.com @127.0.0.1 -p 53 > /dev/null 2>&1 && \
+  dig +short +timeout=3 google.com @127.0.0.1 -p 5335 > /dev/null 2>&1
+}
+
+PREV_STATE="unknown"
+[ -f "$STATE_FILE" ] && PREV_STATE=$(cat "$STATE_FILE")
+
+if check_dns; then
+  CURRENT_STATE="healthy"
+else
+  CURRENT_STATE="unhealthy"
+fi
+
+if [ "$CURRENT_STATE" != "$PREV_STATE" ]; then
+  if [ "$CURRENT_STATE" = "unhealthy" ]; then
+    MESSAGE="🔴 **${HOSTNAME}**: DNS resolution failing (AdGuard port 53 and/or Unbound port 5335 not answering). This alert is independent of the main monitoring stack."
+  else
+    MESSAGE="🟢 **${HOSTNAME}**: DNS resolution recovered."
+  fi
+  curl -s -X POST -H "Content-Type: application/json" \
+    -d "{\"content\": \"${MESSAGE}\"}" \
+    "${WEBHOOK_URL}" > /dev/null 2>&1 || true
+fi
+
+echo "$CURRENT_STATE" > "$STATE_FILE"
