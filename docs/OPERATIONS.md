@@ -84,7 +84,10 @@ looks like a DNS outage. If AdGuard query volume spikes again, check
   Cobblemon port-forward, monitoring scrape, OIDC routes) and were never added to
   `firewall_deterministic.tf`. Not a security issue — they're intentional and working —
   but they're invisible to `terraform plan`, so a future cleanup pass could recreate the
-  same drift. Worth importing into Terraform properly once there's time.
+  same drift. Worth importing into Terraform properly once there's time. (Checked
+  `firewall_ipv6.tf` too on 2026-06-21: no duplication drift there, just one extra
+  legitimate rule in the same boat — `output` chain, blocks rogue IPv6 router
+  advertisements from reaching WAN clients via the FritzBox.)
 - **No remote syslog from MikroTik**: security events (failed logins, firewall drops) only
   go to a 1000-line in-memory ring buffer — nothing centralized. Wiring this to Loki needs
   a syslog receiver on the cluster side (Promtail syslog stage or similar), so it's blocked
