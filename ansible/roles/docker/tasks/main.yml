@@ -42,3 +42,21 @@
     name: "{{ ansible_user }}"
     groups: docker
     append: true
+
+# Without this, the default json-file log driver grows unbounded — on
+# SD-card-backed hosts (RPis) this is a real long-term disk-fill risk that
+# would otherwise only surface as an unexplained "disk full" incident months
+# from now.
+- name: Cap Docker container log size (daemon-wide default)
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    mode: '0644'
+  notify: Restart Docker daemon
