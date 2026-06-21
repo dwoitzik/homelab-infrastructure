@@ -279,3 +279,76 @@
     state: started
     enabled: true
     daemon_reload: true
+
+# ─── Host firewall (native services only) ──────────────────────────────────
+# Deliberately its OWN ruleset file + systemd service, NOT /etc/nftables.conf
+# (that file starts with "flush ruleset" - enabling the stock nftables.service
+# would wipe Docker's own iptables-nft managed NAT/FORWARD tables on every
+# boot and break every published container port). This only adds an
+# *additive* `inet hostfw` table; it never touches Docker's tables.
+#
+# Only covers natively-bound services (ssh, haproxy VIP, tailscale, VRRP) and
+# AdGuard (network_mode: host, so it's host-stack traffic, not docker-NAT'd).
+# Bridge-mode containers (unbound:5335, node_exporter:9100) are DNAT'd by
+# Docker before host INPUT ever sees them, so this does NOT restrict those -
+# confirmed by testing live on rpi-srv-02 on 2026-06-21. Tightening that would
+# require rules in Docker's DOCKER-USER chain and careful IPv4/IPv6 handling;
+# deferred as low value (MikroTik already segments these RPis from the
+# internet) versus the real risk of a subtle rule-ordering mistake taking
+# down DNS for the house.
+
+- name: Install nftables
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+
+- name: Deploy host firewall ruleset (native services only)
+  ansible.builtin.copy:
+    dest: /etc/nftables-hostfw.conf
+    content: |
+      #!/usr/sbin/nft -f
+      table inet hostfw {
+        chain input {
+          type filter hook input priority filter; policy drop;
+          iif "lo" accept
+          ct state established,related accept
+          ip protocol icmp accept
+          meta l4proto ipv6-icmp accept
+          tcp dport 22 accept
+          tcp dport 53 accept
+          udp dport 53 accept
+          tcp dport 3001 accept
+          tcp dport { 80, 443 } accept
+          udp dport 41641 accept
+          ip protocol vrrp accept
+        }
+      }
+    mode: '0644'
+  notify: Apply host firewall ruleset
+
+- name: Deploy host firewall systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/hostfw.service
+    content: |
+      [Unit]
+      Description=Host firewall (inet hostfw table, additive - does not touch Docker's tables)
+      After=network.target docker.service
+      Wants=docker.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=true
+      ExecStart=/usr/sbin/nft -f /etc/nftables-hostfw.conf
+      ExecStop=/usr/sbin/nft delete table inet hostfw
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: '0644'
+  notify: Reload systemd daemon
+
+- name: Enable and start the host firewall service
+  ansible.builtin.systemd:
+    name: hostfw.service
+    state: started
+    enabled: true
+    daemon_reload: true
