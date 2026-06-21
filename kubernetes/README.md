@@ -1,77 +1,39 @@
-# ☸️ K3s GitOps Cluster
+# K3s GitOps Cluster
 
-This directory manages the **Cloud-Native layer** of the homelab. By moving from standalone Docker containers to a coordinated K3s cluster, we achieve automated SSL management, resilient distributed storage, and centralized identity-aware routing.
+This is the Kubernetes layer of the homelab — 3-node k3s, all control-plane with embedded
+etcd, fronted by Traefik and managed by ArgoCD.
 
-## 🛠️ Infrastructure Stack
+## Stack
 
-| Component | Technology | Role |
+| Component | What | Notes |
 |---|---|---|
-| **Distribution** | K3s (Lightweight Kubernetes) | Orchestration & Lifecycle |
-| **GitOps** | ArgoCD | Declarative Deployment & Self-healing |
-| **Ingress Controller** | Traefik | Layer 7 Routing & Middleware |
-| **Storage** | Longhorn | Distributed Block Storage (Replicated) |
-| **Certificates** | Cert-Manager + Cloudflare | Automated Wildcard SSL (DNS-01) |
-| **Load Balancer** | MetalLB | Layer 2 VIP Management (10.0.20.200+) |
-| **Security** | Authelia | SSO & Portal-based MFA |
+| Distribution | k3s | All 3 nodes run control-plane + etcd, no single primary |
+| GitOps | ArgoCD | ApplicationSet auto-deploys everything under `apps/` |
+| Ingress | Traefik | TLS termination, OIDC via Authelia ForwardAuth |
+| Storage | NFS (`nfs-client` StorageClass) | Backed by `ct-srv-nfs-01`. Used to be Longhorn — migrated off it, see ROADMAP.md |
+| Certificates | cert-manager + Cloudflare DNS-01 | One wildcard cert (`*.woitzik.dev`), bound to Traefik's `TLSStore` |
+| Load balancer | MetalLB | VIP `10.0.20.200` |
+| Identity | Authelia | SSO + OIDC for everything that supports it |
+| Secrets | HashiCorp Vault + External Secrets Operator | See `docs/secrets-inventory.md` |
 
-## 🗺️ Traffic Architecture
+## Layout
 
-```mermaid
-graph LR
-    User([User]) -->|HTTPS| MLB[MetalLB VIP: .200]
-    MLB --> TRF[Traefik Ingress]
-
-    subgraph auth ["🔒 Identity Layer"]
-        TRF <-->|ForwardAuth| ATH[Authelia]
-        ATH <--> PG[(Postgres)]
-        ATH <--> RD[(Redis)]
-    end
-
-    subgraph apps ["📦 Applications"]
-        TRF --> ARGO[ArgoCD]
-        TRF --> LH[Longhorn]
-        TRF --> APP[Future Apps]
-    end
-
-    classDef secure fill:#f9f,stroke:#333,stroke-width:2px;
-    class auth secure;
+```
+├── system/      # Manually-applied infra (Traefik, ArgoCD itself, monitoring, Vault, etc.)
+└── apps/        # ArgoCD-managed workloads — drop a folder in here, it deploys itself
 ```
 
-## 🚀 Core Concepts
+`system/` isn't watched by the ApplicationSet, so anything there needs a manual
+`kubectl apply` the first time. `apps/` is fully GitOps — push and ArgoCD picks it up.
 
-### 1. Automatic Wildcard SSL
-Unlike the manual setup in Nginx Proxy Manager, this cluster uses **Cert-Manager** with the **Cloudflare DNS-01 challenge**. It maintains a single `*.woitzik.dev` certificate globally. Traefik is configured via a `TLSStore` to automatically serve this certificate to any Ingress without requiring individual secret definitions.
+## Adding a new app
 
-### 2. Distributed Persistence
-By using **Longhorn**, every database (Postgres, Redis) and stateful app has its data replicated across multiple nodes. This eliminates the "single point of failure" of local Docker mounts and allows pods to migrate between nodes without data loss.
+1. New directory under `apps/`, with a Deployment + Service (+ PVC if it needs one).
+2. Add an IngressRoute to `kubernetes/system/apps-ingressroute.yml` and apply it manually — that file isn't ArgoCD-managed.
+3. Push to `main`. ArgoCD detects the new directory and deploys it.
 
-### 3. The "NPM Killer": Middleware-based Auth
-The most significant improvement over the legacy NPM setup is the **Authelia ForwardAuth Middleware**.
-- **Legacy:** Manual `auth_forward` snippets in NPM for every proxy host.
-- **GitOps:** Simply add an annotation to any Ingress to protect it with Authelia:
-  ```yaml
-  traefik.ingress.kubernetes.io/router.middlewares: kube-system-authelia@kubernetescrd
-  ```
+Protecting a route with Authelia is just an annotation:
 
-## 📁 Repository Layout
-
-```text
-├── system/                   # Core infrastructure (System-level)
-│   ├── argocd-config/        # Ingress & self-management
-│   ├── certificates/         # Wildcard cert & ClusterIssuer
-│   ├── longhorn/             # Storage management
-│   ├── traefik/              # Ingress controller & Middlewares
-│   └── postgres/             # Shared DBs for system tools
-└── apps/                     # User-facing applications
-    └── authelia/             # SSO & Identity provider
+```yaml
+traefik.ingress.kubernetes.io/router.middlewares: kube-system-authelia@kubernetescrd
 ```
-
-## 🔄 Operations
-
-### Adding a New App
-1. Create a new directory in `apps/`.
-2. Define an ArgoCD `Application` in `system/`.
-3. Push to `main`. ArgoCD will detect the change and provision the resources.
-
-### Secrets Management
-*Currently: Managed via manual Kubernetes Secrets (Migration to SealedSecrets or External Secrets Operator planned).*
