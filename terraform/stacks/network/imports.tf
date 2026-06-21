@@ -55,3 +55,86 @@ resource "routeros_ip_service" "api_ssl" {
   port    = 8729
   address = "10.0.0.0/8"
 }
+
+# --- Firewall rules that existed live but were never in Terraform (2026-06-21 audit) ---
+# See firewall_extra.tf for the resource definitions and full context.
+
+import {
+  to = routeros_ip_firewall_filter.in_03_admin_router_api
+  id = "*50"
+}
+
+import {
+  to = routeros_ip_firewall_filter.in_06_snmp
+  id = "*51"
+}
+
+import {
+  to = routeros_ip_firewall_filter.in_05_k3s_router_api
+  id = "*56"
+}
+
+import {
+  to = routeros_ip_firewall_filter.in_04_atlantis_api
+  id = "*58"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_vpn_mobile_dmz
+  id = "*4F"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_vpn_mobile_internal
+  id = "*53"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_vpn_laptop_full
+  id = "*54"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_monitoring_dmz_scrape
+  id = "*55"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_wan_minecraft
+  id = "*59"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_mgmt_internet
+  id = "*5E"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_wan_cobblemon
+  id = "*B5"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_vpn_full_tunnel
+  id = "*63"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_proxmox_oidc
+  id = "*64"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_heimnetz_k3s_ingress
+  id = "*69"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_mgmt_oidc_traefik
+  id = "*6A"
+}
+
+import {
+  to = routeros_ipv6_firewall_filter.v6_block_rogue_ra
+  id = "*A"
+}
