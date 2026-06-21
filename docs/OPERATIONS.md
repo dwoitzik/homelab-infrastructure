@@ -76,6 +76,12 @@ again: `docker logs adguardhome | grep "i/o timeout"`, then check `private_netwo
 - **No native MikroTik config backup**: the Terraform API user doesn't have permission to
   run `/system backup`/`/export`. Recoverability depends entirely on Terraform state right
   now. Needs either a higher-privilege API user or an admin credential in Vault.
+- **Check for a leftover Longhorn ArgoCD Application in-cluster**: `kubernetes/system/longhorn/`
+  (an Application manifest with `selfHeal: true`/`prune: true`, plus an IngressRoute) was
+  still in the repo despite Longhorn being fully migrated to NFS — removed from git
+  2026-06-21, but if it was ever applied to the cluster, the Application object itself
+  might still exist and keep reconciling Longhorn back in. Check with
+  `kubectl get application longhorn -n argocd` once the cluster's up, delete it if present.
 
 ## Last known-good audit
 
