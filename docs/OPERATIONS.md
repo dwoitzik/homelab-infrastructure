@@ -78,6 +78,22 @@ looks like a DNS outage. If AdGuard query volume spikes again, check
   Atlantis is actually reachable first).
 - **Velero R2 offsite backup**: configured, waiting on Cloudflare R2 credentials from David
   (see `project_velero_r2_pending` memory note / `docs/backup-strategy.md` Stage 1b).
+- **19 MikroTik firewall rules not yet in Terraform**: after the 2026-06-21 cleanup of 36
+  orphaned/duplicate rules, 19 *legitimate, distinct* rules remain that were created
+  manually at some point (VPN access tiers, Atlantis/MikroDash API access, WireGuard,
+  Cobblemon port-forward, monitoring scrape, OIDC routes) and were never added to
+  `firewall_deterministic.tf`. Not a security issue — they're intentional and working —
+  but they're invisible to `terraform plan`, so a future cleanup pass could recreate the
+  same drift. Worth importing into Terraform properly once there's time.
+- **No remote syslog from MikroTik**: security events (failed logins, firewall drops) only
+  go to a 1000-line in-memory ring buffer — nothing centralized. Wiring this to Loki needs
+  a syslog receiver on the cluster side (Promtail syslog stage or similar), so it's blocked
+  on the cluster being up — revisit once it's back.
+- **No native MikroTik config backup job**: the `terraform` API user lacks permission to
+  run `/system backup`/`/export` (tested 2026-06-21, got "not enough permissions"). Full
+  recoverability currently depends entirely on Terraform state (which itself lives in
+  Garage S3 — i.e. on the cluster). Would need either elevated API-user permissions or an
+  admin-level credential added to Vault to fix properly.
 
 ## Last known-good audit
 
