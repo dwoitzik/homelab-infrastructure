@@ -12,8 +12,17 @@
 
 - name: Reboot RPi (config.txt changed)
   ansible.builtin.reboot:
-    msg: "Rebooting for headless power optimizations (WiFi/BT/GPU/HDMI config.txt changes)"
+    msg: "Rebooting for headless power optimizations (WiFi/BT/GPU/HDMI/watchdog config.txt changes)"
     connect_timeout: 5
     reboot_timeout: 120
     post_reboot_delay: 15
   when: rpi_optimize_reboot | bool
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reexec: true
+
+- name: Restart fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    state: restarted
