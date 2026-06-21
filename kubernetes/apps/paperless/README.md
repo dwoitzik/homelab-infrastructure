@@ -1,22 +1,20 @@
-# 📄 Paperless-ngx Deployment
+# Paperless-ngx
 
-Document management system deployed as a multi-container stack on Kubernetes.
+Document management, deployed as a few separate pieces rather than one big container.
 
-## 🏗️ Architecture
+## What's running
 
-The stack consists of:
-- **Paperless-ngx**: The main application webserver.
-- **PostgreSQL 16**: Primary data store for document metadata.
-- **Redis 7**: Message broker for asynchronous task processing.
-- **Tika & Gotenberg**: Add-on services for OCR and document conversion.
+- **Paperless-ngx** — the main webserver
+- **paperless-gpt** — AI-generated titles/tags via Ollama (model: `qwen2.5:7b`)
+- **PostgreSQL 16** — document metadata
+- **Redis 7** — task queue
+- **Tika + Gotenberg** — OCR and document conversion
 
-## 🔒 Security
+## Auth
 
-- **Authentication**: Integration with Authelia via `Remote-User` header.
-- **Secrets**: Database credentials managed via Kubernetes Opaque Secrets.
+Goes through Authelia via the `Remote-User` header, not its own login.
 
-## 💾 Storage
+## Storage
 
-Uses Longhorn storage class for high availability:
-- Data and Media volumes are replicated across cluster nodes.
-- DB data is persisted separately to ensure atomic updates.
+PVCs use the `nfs-client` StorageClass (`ct-srv-nfs-01`). Data, media, and the database
+each get their own volume so a DB write doesn't get blocked behind a large media write.
