@@ -26,3 +26,9 @@
   ansible.builtin.systemd:
     name: fail2ban
     state: restarted
+
+- name: Apply host firewall ruleset
+  ansible.builtin.shell: |
+    /usr/sbin/nft delete table inet hostfw 2>/dev/null
+    /usr/sbin/nft -f /etc/nftables-hostfw.conf
+  changed_when: true
