@@ -74,6 +74,38 @@ attention. These are the ones worth knowing about:
 | `cloudflare-api-token-secret` | `cert-manager` | DNS-01 challenge token for the wildcard cert |
 | `wildcard-woitzik-dev-tls` | replicated to every namespace with an IngressRoute | Single source: cert-manager Certificate in `kube-system`, copied via `cert-manager` namespace-sync or manual `kubectl get/apply` if a new namespace needs it |
 
+## ⚠️ Known plaintext leaks (2026-06-21 audit) — remediation pending
+
+A full `gitleaks detect` scan against the complete git history (see `.gitleaks.toml`,
+`.gitleaks-baseline.json`) found **12 distinct secrets committed in plaintext** outside the
+Vault/ExternalSecrets pattern described above. Gitleaks now blocks any *new* leak via
+pre-commit/pre-push/CI hooks, but these specific ones are pre-existing and need manual
+remediation. **Blocked on the Proxmox host being back up** (needs live Vault + cluster
+access to move things and live service access to rotate credentials safely).
+
+| File | Secret | Plan |
+|---|---|---|
+| `kubernetes/apps/authelia/configmap.yml` | OIDC issuer private key (signs SSO tokens for ArgoCD/Vault/Grafana/etc.) | **Highest priority.** Generate a new keypair, store in Vault `secret/authelia` as `oidc-issuer-private-key`, reference via ExternalSecret + volume mount instead of inline in the ConfigMap. Old key must be considered compromised — every service trusting it should be checked for unexpected sessions after rotation. |
+| `kubernetes/apps/garage/config.yml` | RPC secret + admin token | Move both to Vault `secret/garage`, regenerate via Garage admin CLI (`garage node-id` / re-init layout uses a fresh RPC secret — requires careful cluster handling since this is the storage backend for Velero/Loki/CNPG backups). |
+| `kubernetes/apps/garage/secrets.yml` | Admin token (duplicate of the one above) | Same secret, two places — fix both in the same pass. |
+| `kubernetes/system/postgres/cnpg-backup-secret.yml` | Garage S3 secret key (used by CNPG WAL archiving) | Move to Vault, regenerate Garage access key pair after the RPC/admin rotation above. |
+| `terraform/stacks/network/local_backend.hcl` | Garage S3 access key (Terraform state backend!) | Same access key as above — also embedded in the Terraform backend config. Regenerating the Garage key invalidates this too; update in lockstep or Terraform loses access to its own state. |
+| `kubernetes/apps/paperless/secrets.yml` | Postgres password + AI API token | Move to Vault `secret/paperless`. Postgres password rotation needs an `ALTER USER` on the actual Postgres instance, not just the Secret. |
+| `kubernetes/apps/cloudflared/secrets.yml` | Cloudflare Tunnel token | Rotate in Cloudflare Zero Trust dashboard (invalidates the old token immediately), move new one to Vault `secret/cloudflared`. |
+| `kubernetes/apps/headscale/config.yml` | OIDC client secret (Authelia↔Headscale) | Rotate in Authelia's OIDC client config AND Headscale's `oidc.client_secret` together — they must match. Move to Vault. |
+| `kubernetes/system/monitoring/loki.yml` | Minio/S3 password (Loki's object storage backend) | Move to Vault `secret/loki`. Check if this is actually still Minio or already migrated to Garage — config drift risk here too, verify before rotating. |
+| `kubernetes/apps/mikrodash/secrets.yml` | Mikrodash password | Lowest priority (internal dashboard, not a credential chain). Move to Vault `secret/mikrodash` when convenient. |
+| `kubernetes/apps/authelia/users_database_secret.yml` | David's argon2id password hash | Hashed, not plaintext — lower severity, but still shouldn't be hand-committed. Move the whole `users_database.yml` generation into the existing ExternalSecret pattern already used for `authelia-secrets`. |
+| `ROADMAP.md` | — | False positive (doc text), allowlisted in `.gitleaks.toml`, no action needed. |
+
+**Suggested order once the cluster is back:** Garage credentials first (everything else's
+backups depend on it being consistent), then Authelia OIDC key (highest blast radius if
+left exposed), then the rest in any order. After each rotation, re-run
+`gitleaks detect --baseline-path .gitleaks-baseline.json` — once a secret is removed from
+the *live* files, it'll still show in the baseline (history) until the baseline is
+regenerated, which is expected; the baseline only needs regenerating once all of these are
+actually addressed, to confirm nothing was missed.
+
 ## Rotation notes
 
 - **Vault unseal keys**: rotating requires `vault operator rekey` — update both the Ansible
