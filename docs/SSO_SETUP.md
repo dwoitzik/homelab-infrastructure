@@ -1,4 +1,4 @@
-# 🔐 Proxmox SSO Setup (Authelia OIDC)
+# Proxmox SSO Setup (Authelia OIDC)
 
 To enable SSO for Proxmox VE and Proxmox Backup Server, you need to configure the OIDC Realm in their respective web interfaces.
 
