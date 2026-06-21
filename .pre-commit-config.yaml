@@ -67,3 +67,25 @@ repos:
         language: system
         types: [yaml]
         args: [-d, "{extends: relaxed, rules: {line-length: disable}}"]
+
+      - id: gitleaks-staged
+        name: Gitleaks (staged changes)
+        description: >-
+          Blocks committing NEW secrets. Uses .gitleaks-baseline.json so the
+          12 pre-existing leaks found on 2026-06-21 (tracked for cleanup in
+          docs/secrets-inventory.md) don't block every commit until they're
+          fully remediated - only genuinely new secrets fail this.
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH"; gitleaks protect --staged --baseline-path .gitleaks-baseline.json --no-banner -v'
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: gitleaks-full-repo
+        name: Gitleaks (full history, pre-push only)
+        description: Re-scans the entire repo and history before any push, against the same baseline.
+        entry: bash -c 'export PATH="$HOME/.local/bin:$PATH"; gitleaks detect --baseline-path .gitleaks-baseline.json --no-banner -v'
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]

@@ -1,0 +1,13 @@
+title = "homelab-infrastructure gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives"
+regexes = [
+  # ROADMAP.md doc text listing which services use which OIDC client auth
+  # method — matches the generic-api-key pattern but is plain documentation,
+  # not a secret.
+  '''Proxmox/PBS/Grafana/Headscale use `client_secret_basic`''',
+]
