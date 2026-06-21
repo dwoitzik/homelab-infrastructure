@@ -80,6 +80,19 @@ All notable changes to this infrastructure are documented here.
   Atlantis/MikroDash API access, WireGuard, Cobblemon, monitoring scrape, OIDC) that were
   never added to Terraform in the first place — those are tracked as a follow-up to bring
   under IaC.
+- **MikroTik HTTPS certificate chain renewed before expiry**: the router's self-signed
+  root CA (`local-root-cert`) was 5 weeks from expiring (2026-07-27), which would have
+  broken the certificate chain for `www-ssl`/`api-ssl` even though the leaf cert it had
+  issued was valid until 2035 — an expired CA invalidates the whole chain regardless of
+  the leaf's own dates. Generated a new 10-year root CA + leaf cert, rebound both services
+  to it, verified the live TLS handshake before deleting the old pair.
+- **rpi-srv-02 hostname fix**: the device at `10.0.20.3` was reporting OS hostname
+  `rpi-srv-01` (identical to the actual rpi-srv-01) — found via a DHCP lease audit showing
+  a mismatch between the lease comment and the live `host-name` field. Both Pis were
+  indistinguishable in logs/metrics/alerts by hostname alone. Fixed by re-running the
+  existing `common` role (`ansible.builtin.hostname`) against rpi-srv-02 — the automation
+  was already correct, it just hadn't been re-applied since whatever event reset it (likely
+  an SD card re-image that skipped the playbook).
 
 ## [0.5.0] — 2026-06
 
