@@ -191,7 +191,7 @@ spec:
               - name: "null"
               - name: discord
                 discord_configs:
-                  - webhook_url: ***REMOVED-DISCORD-WEBHOOK***
+                  - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord-webhook/url
                     title: |-
                       [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
                     message: |-
@@ -247,6 +247,15 @@ spec:
                       - '10.0.20.251:9100'
                     labels:
                       group: 'ai_nodes'
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: instance
+              - job_name: 'node-exporter-pve'
+                static_configs:
+                  - targets:
+                      - '10.0.10.10:9100'
+                    labels:
+                      group: 'pve_hosts'
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: instance
