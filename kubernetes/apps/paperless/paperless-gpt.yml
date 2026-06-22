@@ -36,11 +36,11 @@ spec:
         - name: OLLAMA_HOST
           value: http://10.0.20.251:11434
         - name: LLM_MODEL
-          value: gemma2:27b
+          value: qwen2.5-coder:7b
         - name: VISION_LLM_PROVIDER
           value: ollama
         - name: VISION_LLM_MODEL
-          value: gemma2:27b
+          value: qwen2.5-coder:7b
         - name: AUTO_TAG
           value: paperless-gpt-to-process
         - name: LANGUAGE
