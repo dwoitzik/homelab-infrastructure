@@ -1,0 +1,10 @@
+config:
+  MD013: false   # line-length — tables and code blocks legitimately exceed 80 chars
+  MD024: false   # no-duplicate-heading — CHANGELOG uses repeated section names (Added/Changed) by design
+  MD041: false   # first-line-heading — README.md legitimately starts with a badge image
+  MD060: false   # table-column-style — whitespace style preference, no readability impact
+
+ignores:
+  - "terraform/**"
+  - "ansible/k3s-cluster/**"
+  - "CLAUDE.local.md"

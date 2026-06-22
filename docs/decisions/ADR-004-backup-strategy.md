@@ -16,6 +16,7 @@ A homelab running production-grade services (Vaultwarden, monitoring, DNS) requi
 ## Decision
 
 Implement the industry-standard **3-2-1 rule**:
+
 - **3** copies of data
 - **2** different storage media
 - **1** offsite copy
@@ -33,6 +34,7 @@ A Healthchecks.io ping confirms successful completion — if the sync fails or d
 ### Stage 3 — Disaster recovery
 
 In the event of total local hardware failure:
+
 1. Reinstall Proxmox VE on new hardware
 2. Deploy a fresh PBS LXC via Ansible
 3. Link Google Drive via rclone (`rclone config`)

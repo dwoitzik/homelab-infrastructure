@@ -62,7 +62,7 @@ mkdir kubernetes/apps/my-service
 # Create kubernetes/apps/my-service/my-service.yml with Deployment + Service [+ PVC]
 ```
 
-2. Add an IngressRoute to `kubernetes/system/apps-ingressroute.yml`:
+1. Add an IngressRoute to `kubernetes/system/apps-ingressroute.yml`:
 
 ```yaml
 ---
@@ -82,13 +82,13 @@ spec:
   tls: {secretName: wildcard-woitzik-dev-tls}
 ```
 
-3. Apply the IngressRoute manually (it's not ArgoCD-managed):
+1. Apply the IngressRoute manually (it's not ArgoCD-managed):
 
 ```bash
 kubectl apply -f kubernetes/system/apps-ingressroute.yml
 ```
 
-4. Commit and push — ArgoCD detects the new directory and deploys automatically.
+1. Commit and push — ArgoCD detects the new directory and deploys automatically.
 
 If the service needs a Secret (passwords, tokens), keep a placeholder in git and apply the real value manually:
 
@@ -111,6 +111,7 @@ The following hooks run on every commit:
 | `yamllint` | YAML style |
 
 Run manually:
+
 ```bash
 pre-commit run --all-files
 ```
@@ -128,6 +129,7 @@ ansible-vault edit ansible/group_vars/all/vault.yml
 ## CI
 
 GitHub Actions runs on every push and PR to `main`:
+
 - **Terraform**: `fmt -check`, `init -backend=false`, `validate`, `tflint` per stack
 - **Ansible**: `ansible-lint` with full collection resolution
 

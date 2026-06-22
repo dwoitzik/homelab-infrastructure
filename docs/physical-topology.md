@@ -3,6 +3,7 @@
 This document describes the hardware interconnects and physical layer configuration.
 
 ## 1. Connectivity Map
+
 | Source Device | Source Port | Target Device | Target Port | Cable Type | Speed |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | Fritzbox 6591 | LAN 1 | MikroTik RB5009 | ether1 | Cat.6a | 1 Gbps |
