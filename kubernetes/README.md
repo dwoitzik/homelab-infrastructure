@@ -18,7 +18,7 @@ etcd, fronted by Traefik and managed by ArgoCD.
 
 ## Layout
 
-```
+```text
 ├── system/      # Manually-applied infra (Traefik, ArgoCD itself, monitoring, Vault, etc.)
 └── apps/        # ArgoCD-managed workloads — drop a folder in here, it deploys itself
 ```

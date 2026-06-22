@@ -8,6 +8,7 @@
 Terraform requires a state backend to store the current state of managed infrastructure. We migrated from Minio to Garage for better integration with the K3s cluster.
 
 The primary requirements remain:
+
 - State must be accessible from Atlantis running in Kubernetes
 - State must be accessible from developer machines for emergency local runs
 - No external SaaS dependency

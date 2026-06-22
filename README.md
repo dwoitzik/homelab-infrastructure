@@ -75,7 +75,7 @@ graph TB
 
 ## Repository Layout
 
-```
+```text
 ├── kubernetes/
 │   ├── apps/                  # ArgoCD-managed workloads (ApplicationSet picks up any new folder)
 │   │   ├── atlantis/          # Terraform GitOps runner
@@ -204,6 +204,7 @@ ansible-vault edit ansible/group_vars/all/vault.yml
 ## Monitoring
 
 Prometheus scrapes metrics from all hosts:
+
 - k3s nodes: DaemonSet node_exporter (10.0.20.11-13)
 - Raspberry Pis: node_exporter Docker container (10.0.20.2-3)
 - Docker LXC: node_exporter Docker container (10.0.20.252)
