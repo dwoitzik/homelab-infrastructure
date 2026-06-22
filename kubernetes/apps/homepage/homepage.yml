@@ -325,7 +325,7 @@ spec:
             value: "1"
       containers:
       - name: homepage
-        image: ghcr.io/gethomepage/homepage:latest
+        image: ghcr.io/gethomepage/homepage:v1.13.2
         ports:
         - containerPort: 3000
         envFrom:
