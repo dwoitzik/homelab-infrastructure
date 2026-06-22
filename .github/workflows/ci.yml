@@ -148,7 +148,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Scan k8s manifests for misconfigurations
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: kubernetes/
@@ -157,7 +157,7 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Scan Terraform for misconfigurations
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: terraform/
@@ -166,7 +166,7 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Scan k8s manifests (SARIF for GitHub Security tab)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: kubernetes/
