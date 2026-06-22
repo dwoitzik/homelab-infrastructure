@@ -68,6 +68,40 @@ repos:
         types: [yaml]
         args: [-d, "{extends: relaxed, rules: {line-length: disable}}"]
 
+      - id: markdownlint
+        name: Markdown Lint
+        description: >-
+          Lint Markdown files for style and structure. Config in
+          .markdownlint-cli2.yaml (MD013/line-length, MD024/duplicate-heading,
+          MD041/first-line-heading, MD060/table-column-style disabled as
+          style choices; vendor dirs excluded).
+        # Use the nvm-managed binary directly — PATH isn't sourced in hooks.
+        entry: bash -c 'export PATH="$HOME/.nvm/versions/node/$(node --version 2>/dev/null | tr -d v)/bin:$HOME/.nvm/versions/node/v22.22.1/bin:$PATH"; markdownlint-cli2 "$@"' --
+        language: system
+        types: [markdown]
+        pass_filenames: true
+        stages: [pre-commit, pre-push]
+
+      - id: kubeconform
+        name: Kubeconform
+        description: >-
+          Validate Kubernetes manifests against the 1.31 API schema.
+          CRD types (unknown schema) are skipped with -ignore-missing-schemas.
+          Non-manifest YAML files (e.g. Authelia user DB) are excluded.
+        entry: bash -c '
+          export PATH="$HOME/.local/bin:$PATH";
+          find kubernetes/ -name "*.yaml" -o -name "*.yml" |
+            grep -v users_database |
+            xargs kubeconform
+              -kubernetes-version 1.31.0
+              -ignore-missing-schemas
+              -summary
+              -exit-on-error'
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+
       - id: gitleaks-staged
         name: Gitleaks (staged changes)
         description: >-

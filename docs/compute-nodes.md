@@ -1,6 +1,7 @@
 # Compute Nodes & Architecture Strategy
 
 ## 1. Proxmox Host (`pve-mgmt-01`)
+
 **Role:** Main Hypervisor & Heavy Workload Compute
 
 | Component | Specification |
@@ -51,6 +52,7 @@ Keepalived VIP (`10.0.20.10`). Longhorn got removed in the same migration; PVCs 
 ---
 
 ## 2. Raspberry Pi Cluster (High Availability & Gateway)
+
 **Role:** Out-of-Band Network Services & HA Ingress Layer
 
 | Component | Specification |

@@ -7,6 +7,7 @@ All notable changes to this infrastructure are documented here.
 ## [0.6.0] — 2026-06-21
 
 ### Added
+
 - k3s HA: all 3 nodes run control-plane + embedded etcd (migrated from single-node SQLite, no rebuild)
 - k3s API VIP (`10.0.20.10`) via Keepalived
 - Vault auto-unseal sidecar — no more manual unseal after a restart
@@ -25,6 +26,7 @@ All notable changes to this infrastructure are documented here.
 - `docs/secrets-inventory.md`, `docs/OPERATIONS.md`
 
 ### Fixed
+
 - Velero daily backup was missing `defaultVolumesToFsBackup` — backups looked fine but never captured actual PVC data
 - NetworkPolicy default-deny rollout had broken Velero→Garage and Homepage→Uptime Kuma without anyone noticing
 - AdGuard was flooding PTR queries to the Fritzbox for the k3s pod network, which can't answer them
@@ -36,6 +38,7 @@ All notable changes to this infrastructure are documented here.
 - ansible-lint locally was 20 versions behind CI, which is why lint passed locally and failed in CI
 
 ### Removed
+
 - `processor.max_cstate=1 idle=nomwait` kernel param — was a guess at fixing the Proxmox freezes, made idle temps worse, reverted
 - 36 duplicate/orphaned MikroTik firewall rules left behind by past firewall rewrites — some of the old broad rules were still winning over newer, tighter ones
 - Renewed the MikroTik's self-signed CA, which was 5 weeks from expiry (would have broken HTTPS to the router regardless of the leaf cert's own 2035 expiry)
@@ -44,6 +47,7 @@ All notable changes to this infrastructure are documented here.
 ## [0.5.0] — 2026-06
 
 ### Added
+
 - k3s cluster (3 nodes on Proxmox VMs) — control-plane + 2 workers
 - ArgoCD GitOps — ApplicationSet auto-deploys `kubernetes/apps/*`
 - Traefik ingress with wildcard TLS (`*.woitzik.dev` via cert-manager DNS-01)
@@ -77,6 +81,7 @@ All notable changes to this infrastructure are documented here.
 - Wildcard certificate (`wildcard-woitzik-dev-tls`) in `kube-system`
 
 ### Changed
+
 - DNS/edge layer simplified: RPis now handle only AdGuard + Unbound + Keepalived
 - Reverse proxy migrated from Nginx Proxy Manager to Traefik in k3s
 - Monitoring migrated from standalone Prometheus/Grafana to kube-prometheus-stack
@@ -84,6 +89,7 @@ All notable changes to this infrastructure are documented here.
 - k3s VM RAM increased: k3s-11 8→12 GB (balloon), k3s-12/13 8→16 GB (balloon)
 
 ### Removed
+
 - Minio (replaced by Garage S3)
 - NPM as primary reverse proxy (replaced by Traefik in k3s)
 - Standalone Prometheus/Grafana Docker deployment (replaced by kube-prometheus-stack)
@@ -93,6 +99,7 @@ All notable changes to this infrastructure are documented here.
 ## [0.4.0] — 2026-04
 
 ### Added
+
 - Atlantis self-hosted GitOps runner deployed via Ansible on Docker LXC
 - Cloudflare Tunnel for zero-inbound-port exposure of Atlantis webhook
 - All Terraform changes now flow exclusively through pull requests
@@ -100,6 +107,7 @@ All notable changes to this infrastructure are documented here.
 - `ansible/requirements.yml` for declarative collection dependencies
 
 ### Changed
+
 - All Ansible roles updated to use FQCN module names (`ansible.builtin.*`)
 - All `yes`/`no` truthy values replaced with `true`/`false`
 - `nginx-proxy-manager` role renamed to `nginx_proxy_manager` (lint compliance)
@@ -108,6 +116,7 @@ All notable changes to this infrastructure are documented here.
 ## [0.3.0] — 2026-03
 
 ### Added
+
 - GitHub Actions CI pipeline (Terraform lint + validate, Ansible lint)
 - Pre-commit hooks (`tflint`, `yamllint`, trailing whitespace, end-of-file)
 - Architecture Decision Records: ADR-001 (Unbound), ADR-002 (Keepalived)
@@ -115,11 +124,13 @@ All notable changes to this infrastructure are documented here.
 - GitHub repo topics for discoverability
 
 ### Changed
+
 - Repo structure standardised: `ansible/`, `terraform/stacks/`, `docker/`, `docs/`, `network/`
 
 ## [0.2.0] — 2025
 
 ### Added
+
 - Monitoring stack: Prometheus + Grafana + node exporter + SNMP exporter for MikroTik
 - Vaultwarden self-hosted password manager
 - CrowdSec firewall bouncer on DMZ nodes
@@ -128,12 +139,14 @@ All notable changes to this infrastructure are documented here.
 - AdGuardHome-sync for replica state replication
 
 ### Changed
+
 - Keepalived VIP configuration templated via Ansible
 - Unbound recursive DNS tuned with kernel buffer optimisation
 
 ## [0.1.0] — 2025
 
 ### Added
+
 - Initial repository structure
 - MikroTik firewall rules managed via Terraform (routeros provider)
 - Ansible roles: common, docker, watchtower, keepalived, adguard, unbound, nginx_proxy_manager
