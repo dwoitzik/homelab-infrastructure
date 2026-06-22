@@ -181,6 +181,12 @@ spec:
                 - receiver: "null"
                   matchers:
                     - alertname =~ "KubeProxyDown|KubeSchedulerDown|KubeControllerManagerDown"
+                # Hardware temperature alerts go to Discord regardless of severity
+                - receiver: discord
+                  matchers:
+                    - alertname =~ "ProxmoxHostHighTemp|RpiHighTemp"
+                  group_wait: 30s
+                  repeat_interval: 2h
                 # Only critical alerts go to Discord, with 2h repeat to avoid spam
                 - receiver: discord
                   matchers:
