@@ -68,9 +68,8 @@ Keepalived VIP (`10.0.20.10`). Longhorn got removed in the same migration; PVCs 
 | Service | Details |
 | :--- | :--- |
 | **Keepalived (VRRP)** | VIP `10.0.20.5` — Fails over from `rpi-srv-01` to `rpi-srv-02` |
-| **HAProxy / Traefik** | Ingress gateway routing TCP traffic to K3s backend |
-| **AdGuard Home** | Primary DNS sinkhole |
-| **Unbound** | Recursive DNS resolver |
+| **AdGuard Home** | Primary DNS sinkhole (blocks ads/trackers, PTR forwarding for `192.168.178.0/24` only) |
+| **Unbound** | Recursive DNS resolver (root-hints, prefetch, DNSSEC) |
 
 ### Performance Tweaks
 
