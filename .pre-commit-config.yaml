@@ -71,10 +71,13 @@ repos:
       - id: gitleaks-staged
         name: Gitleaks (staged changes)
         description: >-
-          Blocks committing NEW secrets. Uses .gitleaks-baseline.json so the
-          12 pre-existing leaks found on 2026-06-21 (tracked for cleanup in
-          docs/secrets-inventory.md) don't block every commit until they're
-          fully remediated - only genuinely new secrets fail this.
+          Blocks committing NEW secrets. Git history was fully purged of known
+          leaks on 2026-06-22 (git-filter-repo); .gitleaks-baseline.json now
+          only allowlists the ROADMAP.md documentation false positive. Run
+          `gitleaks detect --no-git --source=. --baseline-path
+          .gitleaks-baseline.json` periodically against the live tree too -
+          this hook only catches what gets committed going forward, not gaps
+          in what's already merged.
         entry: bash -c 'export PATH="$HOME/.local/bin:$PATH"; gitleaks protect --staged --baseline-path .gitleaks-baseline.json --no-banner -v'
         language: system
         always_run: true
