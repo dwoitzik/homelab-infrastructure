@@ -103,7 +103,7 @@ spec:
         ports:
         - containerPort: 3000
       - name: tika
-        image: apache/tika:latest
+        image: apache/tika:3.3.1.0
         ports:
         - containerPort: 9998
 ---
