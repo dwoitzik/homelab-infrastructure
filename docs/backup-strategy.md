@@ -54,10 +54,12 @@ The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with
 ## Disaster Recovery
 
 **Full cluster loss (VMs gone):**
+
 1. Reinstall Proxmox VE
 2. Restore VMs/LXCs from PBS (local) or via rclone from Google Drive
 3. k3s will self-restore once VMs are up
 4. Restore Velero backups: `velero restore create --from-backup <name>`
 
 **Kubernetes data loss only (cluster intact):**
+
 1. `velero restore create --from-backup <name> --include-namespaces apps`
