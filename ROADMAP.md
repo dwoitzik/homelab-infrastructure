@@ -35,8 +35,13 @@
 
 | Service | Namespace | Description |
 |---|---|---|
-| **Immich** | `apps` | Self-hosted Google Photos — ML face recognition, mobile backup |
 | **Navidrome** | `apps` | Music streaming (Subsonic-compatible) |
+
+### Pending (storage planned)
+
+| Service | Namespace | Description |
+|---|---|---|
+| **Immich** | `apps` | Self-hosted Google Photos — ML face recognition, mobile backup. Storage split: original/thumbnail files on a 512GB USB stick (`usb-immich-photos`, ext4, `noatime`) — read-mostly workload, fine for flash endurance. Postgres DB (metadata, face-recognition vectors) stays on the existing NFS/SSD storage, not the stick. No SMART monitoring on the stick expected; treat as a higher-risk volume, same caveat as the existing unbacked `media` PVC. |
 
 ### In Progress
 
@@ -55,6 +60,7 @@
 | **Paperless → Nextcloud consume** | Mount Nextcloud shared folder als Paperless consume PVC: Nextcloud External Storage App → lokales Filesystem, dann NFS-PV in k3s für Paperless `consume` mounten. Alternativ: Paperless WebDAV-Consume direkt auf Nextcloud-WebDAV. |
 | **Claude Code Web Terminal** | Claude Code CLI + `ttyd` als Web-Terminal im Homelab — sodass du ohne lokalen PC weiterarbeiten kannst. Deployment: neuer CT `ct-srv-claude-01` (VMID 222) oder k3s Deployment mit `ttyd` + Claude Code CLI. Zugriff über `claude.woitzik.dev` (Authelia-geschützt). Benötigt Anthropic API-Key in Vault. ttyd: `ttyd --port 7681 --credential user:pass claude` oder direkt als k8s Deployment mit NFS PVC für Workspace-Persistenz. |
 | **Remote Dev Environment (code-server)** | VS Code Server auf k3s — `coder/code-server:latest` als k8s Deployment, 2Gi PVC für Workspace, Authelia-geschütztes IngressRoute. Benötigt: gepinntes Image, ResourceLimits (Kyverno), PVC mit ReadWriteOnce. |
+| **MySpeed** | Self-hosted Internet-Speedtest-Historie (`ghcr.io/germannewsmaker/myspeed`), als neue App unter `kubernetes/apps/myspeed/` nach dem etablierten Muster (Deployment + Service + PVC + IngressRoute, Authelia-geschützt). |
 
 ---
 
@@ -103,8 +109,9 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 
 ### Short-term
 
+- **512GB USB stick** (`usb-immich-photos`) — Immich original/thumbnail storage, see "Pending (storage planned)" above. Already available, not a future purchase.
 - **4TB SSD** (M.2 NVMe or SATA) for Proxmox host
-  - Enables: Immich photo library, Jellyfin media migration, Garage S3 expansion
+  - Enables: Jellyfin media migration, Garage S3 expansion, Navidrome
   - Installation: straightforward, Proxmox auto-detects as new datastore
 
 ### Long-term
