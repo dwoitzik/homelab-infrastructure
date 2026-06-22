@@ -3,6 +3,7 @@
 This document defines the logical network structure and security zones. The MikroTik RB5009 acts as the core router and stateful firewall, enforcing strict isolation.
 
 ## 1. VLAN Inventory
+
 | VLAN ID | Name  | Subnet         | Gateway    | Primary Function |
 | :--- | :--- | :--- | :--- | :--- |
 | 10 | MGMT | 10.0.10.0/24 | 10.0.10.1 | Infrastructure Management (Proxmox host, PBS, Router API). |
@@ -12,12 +13,14 @@ This document defines the logical network structure and security zones. The Mikr
 | 100 | ADMIN | 10.0.100.0/24 | 10.0.100.1 | Trusted Administrative Workstations. |
 
 ## 2. Firewall Policies (Zero Trust)
+
 * **Default Drop:** All inter-VLAN traffic is blocked at the end of the FORWARD chain.
 * **Management Access:** Only the **ADMIN** zone is authorized to access the **MGMT** interfaces.
 * **DMZ Isolation:** The **DMZ** can only respond to established traffic and reach the WAN. Lateral movement to internal segments is hard-dropped.
 * **Proxy Pinholing:** Specific pinholes exist for the External Proxy (DMZ) to reach designated internal backends on defined ports (80/443).
 
 ## 3. Physical Port Configuration (MikroTik RB5009)
+
 | Interface | Device / Link | Mode | Tagged/PVID |
 | :--- | :--- | :--- | :--- |
 | ether1 | WAN (Fritzbox 6591) | DHCP-Client | - |
