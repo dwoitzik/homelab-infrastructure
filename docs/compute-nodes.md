@@ -35,13 +35,18 @@ Keepalived VIP (`10.0.20.10`). Longhorn got removed in the same migration; PVCs 
 
 | Setting | Value | Note |
 | :--- | :--- | :--- |
+| CPU TDP | 25W (BIOS, down from 54W default) | BMAX ships an undersized PSU for this chip's rated TDP — repeated freezes traced to power delivery, not the CPU die itself |
 | CPU Governor | `powersave` | Reduces idle consumption |
-| CPU C-States | Hardware default | Tried `max_cstate=1 idle=nomwait` as a guess at fixing repeated host freezes, made idle temps worse (96°C), reverted. Real cause was the thermal paste. |
+| CPU C-States | Hardware default | Tried `max_cstate=1 idle=nomwait` as a guess at fixing repeated host freezes, made idle temps worse (96°C), reverted. Not the cause. |
+| PCIe ASPM | `performance` (forced via `pcie_aspm=off` + live policy switch) | Power-saving PCIe link states were a candidate cause of NVMe stalls under load, given the marginal PSU |
 | IOMMU | Active (`amd_iommu=on`, `iommu=pt`) | GPU passthrough to LXC |
 | Swap | 8 GB ZFS zvol (`rpool/swap`) | Safety net for LLM inference |
-| ZFS ARC | Capped at 8 GB (`zfs_arc_max`) | Was unbounded (up to ~50% RAM); capped after it competed with VM memory during boot |
+| ZFS version | 2.4.2-pve1 (upgraded from 2.4.1-pve1, 2026-06-22) | 2.4.1 has a known unfixed deadlock under ARC memory pressure + concurrent I/O (`openzfs/zfs#18426`) matching every freeze symptom seen here exactly: ARC pinned at max, I/O worker threads idle-waiting, no kernel panic trace |
+| ZFS ARC | Capped at 4 GB (`zfs_arc_max`, down from 8 GB) | Tightened further after the freezes continued even at 8 GB |
+| ZFS dirty data | Capped at 1 GB (`zfs_dirty_data_max`, down from the 4 GB default) | Forces smaller, more frequent flushes instead of large write-behind batches |
+| ZFS txg timeout | 5s (`zfs_txg_timeout`, down from 15s default) | Same goal — shorter sync intervals, smaller worst-case throttle stalls under write pressure |
 | USB Storage | `nofail, device-timeout=5s` | USB dropout must not block boot/crash host |
-| VM/LXC `onboot` startup order | Staggered (NFS first, then k3s nodes 30s apart, then the rest) | Fixes a boot-time resource storm that hit load average 147 within 4 min (2026-06-20) |
+| VM/LXC `onboot` | Disabled (`onboot=0`) for all VMs/LXCs | Was staggered auto-start; switched to fully manual start after a host reboot kept auto-restarting everything regardless of intentionally-stopped state, defeating isolated debugging (2026-06-22) |
 
 ---
 
