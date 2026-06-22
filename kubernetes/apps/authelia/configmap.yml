@@ -59,8 +59,7 @@ data:
     identity_providers:
       oidc:
         hmac_secret: '/config/secrets/hmac-secret'
-        issuer_private_key: |
-          ***REMOVED-AUTHELIA-OIDC-PRIVATE-KEY***
+        issuer_private_key: '/config/secrets/oidc-issuer-private-key'
         clients:
           - client_id: 'proxmox'
             client_name: 'Proxmox VE'
