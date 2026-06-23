@@ -41,7 +41,7 @@ data:
               type: traefik
               url: http://traefik-api.kube-system.svc.cluster.local:9000
         - Atlantis:
-            icon: https://avatars.githubusercontent.com/u/18697940?s=200
+            icon: https://avatars.githubusercontent.com/u/32311288?s=200
             href: https://atlantis.woitzik.dev
             description: Terraform GitOps · Proxmox & Network
     - Security:
