@@ -14,6 +14,10 @@ resource "routeros_ip_firewall_filter" "in_03_admin_router_api" {
   src_address_list = "Mgmt_Devices"
   place_before     = routeros_ip_firewall_filter.drop_all_input.id
   comment          = "IN-03: Allow Admin-VLAN access to Router-API"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "in_06_snmp" {
@@ -24,6 +28,10 @@ resource "routeros_ip_firewall_filter" "in_06_snmp" {
   src_address  = "10.0.20.0/24"
   place_before = routeros_ip_firewall_filter.drop_all_input.id
   comment      = "IN-06: Allow SNMP from SRV-Net (Monitoring)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 # Comment kept close to the original on purpose - the rule still carries real
@@ -39,6 +47,10 @@ resource "routeros_ip_firewall_filter" "in_05_k3s_router_api" {
   src_address  = "10.0.20.0/24"
   place_before = routeros_ip_firewall_filter.drop_all_input.id
   comment      = "IN-05: Allow router API access from K3s Nodes (legacy MikroDash grant, current consumer unconfirmed, active traffic present)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "in_04_atlantis_api" {
@@ -49,6 +61,10 @@ resource "routeros_ip_firewall_filter" "in_04_atlantis_api" {
   src_address  = "10.0.20.0/24"
   place_before = routeros_ip_firewall_filter.drop_all_input.id
   comment      = "IN-04: Allow Atlantis REST API access from K3s Nodes"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_vpn_mobile_dmz" {
@@ -58,6 +74,10 @@ resource "routeros_ip_firewall_filter" "fwd_vpn_mobile_dmz" {
   dst_address  = "10.0.30.0/24"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment      = "08: VPN - Mobile access to DMZ (External Proxy)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_vpn_mobile_internal" {
@@ -67,6 +87,10 @@ resource "routeros_ip_firewall_filter" "fwd_vpn_mobile_internal" {
   dst_address  = "10.0.20.0/24"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment      = "07: VPN - Mobile limited to internal services"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_vpn_laptop_full" {
@@ -76,6 +100,10 @@ resource "routeros_ip_firewall_filter" "fwd_vpn_laptop_full" {
   dst_address  = "10.0.0.0/16"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment      = "06: VPN - Laptop Full Access"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_monitoring_dmz_scrape" {
@@ -87,6 +115,10 @@ resource "routeros_ip_firewall_filter" "fwd_monitoring_dmz_scrape" {
   dst_port     = "9100,9080"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment      = "05: Monitoring - Prometheus scrape DMZ node exporters"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_wan_minecraft" {
@@ -98,6 +130,10 @@ resource "routeros_ip_firewall_filter" "fwd_wan_minecraft" {
   dst_port     = "25565"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment      = "13: WAN - Allow Internet traffic to DMZ Minecraft Server"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_mgmt_internet" {
@@ -107,6 +143,10 @@ resource "routeros_ip_firewall_filter" "fwd_mgmt_internet" {
   out_interface = "ether1"
   place_before  = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment       = "11: MGMT - Internet access (Critical for PBS rclone & Updates)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_wan_cobblemon" {
@@ -118,6 +158,10 @@ resource "routeros_ip_firewall_filter" "fwd_wan_cobblemon" {
   dst_port     = "25566"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment      = "12: WAN -> Cobblemon Minecraft (ct-dmz-proxy-01:25566)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_vpn_full_tunnel" {
@@ -127,6 +171,10 @@ resource "routeros_ip_firewall_filter" "fwd_vpn_full_tunnel" {
   out_interface = "ether1"
   place_before  = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment       = "14: VPN - Allow Internet Access for Full Tunnel"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_proxmox_oidc" {
@@ -138,6 +186,10 @@ resource "routeros_ip_firewall_filter" "fwd_proxmox_oidc" {
   dst_port     = "443"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment      = "15: MGMT - Allow Proxmox to reach internal Proxy for OIDC"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_heimnetz_k3s_ingress" {
@@ -149,6 +201,10 @@ resource "routeros_ip_firewall_filter" "fwd_heimnetz_k3s_ingress" {
   dst_port     = "80,443"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment      = "18: Heimnetz - Allow access to K3s Ingress (Core Services)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ip_firewall_filter" "fwd_mgmt_oidc_traefik" {
@@ -160,6 +216,10 @@ resource "routeros_ip_firewall_filter" "fwd_mgmt_oidc_traefik" {
   dst_port     = "443"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment      = "17: MGMT - Allow OIDC traffic to K3s Traefik VIP"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ipv6_firewall_filter" "v6_block_rogue_ra" {
