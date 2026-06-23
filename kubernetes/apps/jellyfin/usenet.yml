@@ -147,6 +147,13 @@ spec:
           securityContext:
             capabilities:
               add: [NET_ADMIN, SYS_MODULE]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
           volumeMounts:
             - name: mullvad-config
               mountPath: /etc/wireguard/wg0.conf

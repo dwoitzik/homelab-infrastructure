@@ -34,46 +34,61 @@ ExternalSecret. Headscale is the only exception.
 
 ---
 
-### SEC-002 — Authelia shared OIDC client secret across 4 services · **HIGH**
+### SEC-002 — Authelia shared OIDC client secret across 4 services · **RESOLVED**
 
-Per `docs/secrets-inventory.md`: Proxmox, PBS, ArgoCD, and Grafana share one OIDC client
-secret. Additionally, `hmac_secret` in Vault was found to be the same value as this shared
-secret (`dubist1plebyakalb`) — a third instance of the same value.
+Generated 4 distinct client secrets (proxmox, pbs, argocd, grafana) 2026-06-23, each
+hashed independently via `authelia crypto hash generate argon2` run inside the live
+Authelia pod. Updated: Authelia's per-client `client_secret` hash in `configmap.yml`;
+Vault `secret/argocd#oidc-client-secret` and `secret/grafana#oidc-client-secret` (both
+already flow through ExternalSecret -> k8s Secret -> the consuming pod, no plumbing
+changes needed); Proxmox's OIDC realm via `pvesh set /access/domains/authelia --client-key
+...` and PBS's via `proxmox-backup-manager openid update authelia --client-key ...` (both
+fully API/CLI-automatable, no manual UI step needed). `hmac_secret` (the third instance of
+the same shared value) rotated independently as part of SEC-003/004.
 
-- **Impact:** Compromise of any one client's side (e.g., a Proxmox config export) exposes
-  credentials for all four, including the hypervisor.
-- **Fix:** Generate four distinct client secrets; update Authelia's per-client hash
-  (`argon2id` via `authelia crypto hash generate argon2`); update Vault `secret/argocd`,
-  `secret/grafana`; re-enter in Proxmox/PBS OIDC realm UI. Rotate `hmac_secret`
-  independently.
-- **Effort:** Medium (3–4h for all four clients + hmac_secret).
+Verified live: all four services' pods restarted cleanly post-rotation; Proxmox/PBS retain
+their `pam`/local-root fallback login and ArgoCD/Grafana retain their local admin account,
+so none of this carried real lockout risk.
 
 ---
 
-### SEC-003 — Authelia session-secret and storage-key are placeholder values · **HIGH**
+### SEC-003 — Authelia session-secret and storage-key are placeholder values · **PARTIALLY RESOLVED**
 
 `secret/authelia` `session-secret` = `thisisaverysecretsessionsecret`;
-`storage-key` = `thisisaverysecretstoragekey`. Both are low-entropy strings that appear
-to be copy-pasted from example configs.
+`storage-key` = `thisisaverysecretstoragekey`. Both low-entropy, copy-pasted-looking
+values. `jwt-secret` (`thisisaverysecretjwtsecret`) turned out to be the same pattern,
+not originally called out, but fixed alongside it.
 
-- **Impact:** Session tokens and the storage encryption layer are weaker than intended.
-  An attacker who obtains a session cookie has an easier brute-force path.
-- **Fix:** Regenerate both with `openssl rand -hex 64`; update Vault; restart Authelia.
-  Note: changing `storage-key` requires re-encrypting the storage database — follow
-  Authelia's `authelia storage encryption change-key` procedure first.
-- **Effort:** Small but careful (1–2h; must not skip the re-encryption step).
+- **Fixed 2026-06-23:** `session-secret` and `jwt-secret` regenerated with `openssl rand
+  -hex 32`, written to Vault, restarted Authelia clean.
+- **Still open:** `storage-key` was deliberately left untouched. It encrypts Authelia's
+  storage backend at rest, so rotating it requires running Authelia's `storage encryption
+  change-key` procedure *first* (re-encrypting existing data with the new key) — doing it
+  out of order would make Authelia unable to decrypt its own database. That's a separate,
+  more careful piece of work, not bundled into this pass.
 
 ---
 
-### SEC-004 — Cross-service secret reuse: redis-password and storage-password · **MEDIUM**
+### SEC-004 — Cross-service secret reuse: redis-password and storage-password · **RESOLVED**
 
-Both share the same value as the Paperless Postgres password (`TD3fAJ2s1cxJ`). Three
-unrelated services accept the same credential.
+Both `redis-password` and `storage-password` shared the same value as the Paperless
+Postgres password (`TD3fAJ2s1cxJ`). Generated two new, independent random values
+2026-06-23:
 
-- **Impact:** A credential leak in any one service (Paperless DB, Authelia Redis,
-  Authelia storage) gives access to all three.
-- **Fix:** Generate unique values; update Vault; restart affected pods.
-- **Effort:** Small (1h each, do together with SEC-002/003).
+- `redis-password`: updated the `redis-secret` k8s Secret (manually managed, not
+  ExternalSecret-sourced) and restarted `redis-authelia` so its `--requirepass` picks up
+  the new value, then updated Vault `secret/authelia#redis-password` to match and
+  restarted Authelia.
+- `storage-password`: ran `ALTER USER authelia WITH PASSWORD ...` directly against the
+  live `postgres-authelia` (CNPG) instance, then updated Vault to match. Deliberately
+  **not** added to Authelia's ExternalSecret (see comment in `external-secret.yml`) — if
+  it synced automatically from a future Vault-only edit, Authelia's DB connection would
+  break until someone remembered the matching `ALTER USER` step. Both sides must be
+  rotated together, manually, going forward.
+
+Found but not fixed: `postgres-authelia` (CNPG cluster) is itself on the `nfs-client`
+StorageClass — flagged as REL-010, a lower-urgency cousin of GIT-006 (Postgres has its
+own robust locking, unlike SQLite/BoltDB, but NFS is still not its recommended storage).
 
 ---
 
@@ -526,9 +541,10 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 | ID | Category | Severity | Title |
 |---|---|---|---|
 | SEC-001 | Security | **RESOLVED** | Hardcoded OIDC secret in Headscale ConfigMap — moved to Vault via ExternalSecret (2026-06-23) |
-| SEC-002 | Security | **HIGH** | Shared OIDC client secret across 4 services |
-| SEC-003 | Security | **HIGH** | Placeholder session-secret and storage-key in Vault |
-| SEC-004 | Security | **MEDIUM** | Cross-service secret reuse (redis/storage/paperless) |
+| SEC-002 | Security | **RESOLVED** | Shared OIDC client secret across 4 services |
+| SEC-003 | Security | **PARTIAL** | Placeholder session-secret and storage-key in Vault (storage-key still pending, needs re-encryption procedure) |
+| SEC-004 | Security | **RESOLVED** | Cross-service secret reuse (redis/storage/paperless) |
+| REL-010 | Reliability | **LOW** | `postgres-authelia` (CNPG) is on `nfs-client` -- same storage-class concern as GIT-006, lower severity (Postgres has real locking, unlike SQLite/BoltDB) |
 | SEC-005 | Security | **MEDIUM** | 14 images on `:latest` / floating tags |
 | SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
