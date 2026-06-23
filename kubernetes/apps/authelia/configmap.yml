@@ -59,7 +59,10 @@ data:
     identity_providers:
       oidc:
         hmac_secret: '/config/secrets/hmac-secret'
-        issuer_private_key: '/config/secrets/oidc-issuer-private-key'
+        jwks:
+          - key_id: 'authelia-main'
+            algorithm: 'RS256'
+            key: {{ secret "/config/secrets/oidc-issuer-private-key" | mindent 14 "|" | msquote }}
         clients:
           - client_id: 'proxmox'
             client_name: 'Proxmox VE'
