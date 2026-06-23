@@ -48,6 +48,8 @@ spec:
           value: /config/secrets/storage-password
         - name: AUTHELIA_SESSION_REDIS_PASSWORD_FILE
           value: /config/secrets/redis-password
+        - name: X_AUTHELIA_CONFIG_FILTERS
+          value: template
       volumes:
       - name: config
         configMap:
