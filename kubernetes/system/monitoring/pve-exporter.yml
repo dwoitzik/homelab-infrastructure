@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
       - name: pve-exporter
-        image: prompve/prometheus-pve-exporter:v3.9.0
+        image: prompve/prometheus-pve-exporter:3.9.0
         ports:
         - containerPort: 9221
         args:
@@ -43,6 +43,13 @@ spec:
         env:
         - name: PVE_URL
           value: "https://10.0.10.10:8006"
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
       volumes:
       - name: config
         secret:

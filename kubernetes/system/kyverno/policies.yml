@@ -1,10 +1,10 @@
-# Kyverno cluster policies — all in audit mode initially.
-# To move a policy to enforce: change validationFailureAction to Enforce.
-# Use PolicyReport (kubectl get policyreport -A) to view current violations before enforcing.
+# Kyverno cluster policies.
+# require-resource-limits and disallow-latest-tag were Audit-only until the
+# underlying gaps (IAC-001, SEC-005) were fixed; flipped to Enforce 2026-06-23
+# once a PolicyReport sweep confirmed zero violations cluster-wide.
 
 ---
-# Warn when pods are missing resource limits.
-# Fix violations first, then switch to Enforce.
+# Block pods missing resource limits.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -15,7 +15,7 @@ metadata:
       Pods without resource limits can starve other workloads on the same node.
       Run `kubectl get policyreport -A` to see violations before enforcing.
 spec:
-  validationFailureAction: Audit
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: check-container-limits
@@ -31,9 +31,12 @@ spec:
             deny:
               conditions:
                 any:
-                  - key: "{{ element.resources.limits | length(@) }}"
+                  - key: "{{ element.resources.limits.cpu || '' }}"
                     operator: Equals
-                    value: 0
+                    value: ""
+                  - key: "{{ element.resources.limits.memory || '' }}"
+                    operator: Equals
+                    value: ""
 ---
 # Block privileged containers outright.
 # This is safe to enforce immediately — no homelab service needs privileged mode.
@@ -66,7 +69,8 @@ spec:
                     operator: Equals
                     value: true
 ---
-# Audit use of :latest or untagged images — do not enforce until all manifests are pinned.
+# Block use of :latest or untagged images. All manifests pinned to semver tags
+# as of SEC-005 (2026-06-23) -- see docs/AUDIT.md.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -75,10 +79,8 @@ metadata:
     policies.kyverno.io/title: Disallow :latest Image Tag
     policies.kyverno.io/description: >
       Images pinned to :latest are non-deterministic and make rollbacks impossible.
-      Currently in Audit mode. Check PolicyReports, pin all images to semver tags,
-      then switch to Enforce.
 spec:
-  validationFailureAction: Audit
+  validationFailureAction: Enforce
   background: true
   rules:
     - name: check-image-tag
@@ -88,7 +90,7 @@ spec:
               kinds: [Pod]
               namespaces: [apps, monitoring, database]
       validate:
-        message: "Image '{{ element.image }}' must use a specific tag, not :latest or untagged."
+        message: "Container '{{ request.object.spec.containers[0].name }}' must use a specific image tag, not :latest or untagged."
         foreach:
           - list: "request.object.spec.containers"
             deny:
