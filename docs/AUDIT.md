@@ -510,7 +510,7 @@ inaccessible after every restart).
 
 | ID | Category | Severity | Title |
 |---|---|---|---|
-| SEC-001 | Security | **HIGH** | Hardcoded OIDC secret in Headscale ConfigMap |
+| SEC-001 | Security | **RESOLVED** | Hardcoded OIDC secret in Headscale ConfigMap — moved to Vault via ExternalSecret (2026-06-23) |
 | SEC-002 | Security | **HIGH** | Shared OIDC client secret across 4 services |
 | SEC-003 | Security | **HIGH** | Placeholder session-secret and storage-key in Vault |
 | SEC-004 | Security | **MEDIUM** | Cross-service secret reuse (redis/storage/paperless) |
@@ -526,7 +526,8 @@ inaccessible after every restart).
 | REL-007 | Reliability | **MEDIUM** | Vault seal gap causes cascading ExternalSecret failures on restart |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
-| GIT-002 | GitOps | **LOW** | k3s-12/13 tagged "worker" in Terraform; now control-plane |
+| GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
+| GIT-006 | GitOps | **HIGH** | Garage `garage-meta` (sqlite) was on NFS (`nfs-client`); SQLite's locking/WAL model is incompatible with NFS and the metadata DB became corrupted ("database disk image is malformed" / "locking protocol" errors), breaking Velero, Loki, and TF-state writes. Recovered via `sqlite3 .recover` + cleared derived merkle/GC tables; **fixed** by migrating `garage-meta` to `local-path` (2026-06-23). `garage-data` (blob storage, no locking needs) remains on NFS, which is fine. |
 | GIT-003 | GitOps | **MEDIUM** | System components are manual-apply; no drift detection |
 | GIT-004 | GitOps | **LOW** | Proxmox provider version constraint far behind latest |
 | GIT-005 | GitOps | **LOW** | R2 BackupStorageLocation has placeholder URL committed |
