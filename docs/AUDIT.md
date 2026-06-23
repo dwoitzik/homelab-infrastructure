@@ -161,41 +161,42 @@ verification when talking to the Proxmox API.
 
 ## 2. Reliability / Recoverability
 
-### REL-001 — 2 of 3 k3s nodes stopped; cluster running single-node · **CRITICAL**
+### REL-001 — 2 of 3 k3s nodes stopped; cluster running single-node · **RESOLVED** (2026-06-23)
 
-Proxmox live state: `vm-srv-k3s-12` and `vm-srv-k3s-13` are `stopped`. Only `vm-srv-k3s-11`
-is running. The etcd quorum requires 2 of 3 nodes — with only one running, the cluster has
-no fault tolerance. If `vm-srv-k3s-11` goes down, the entire cluster is unavailable and
-etcd must be recovered from backup.
+Originally: Proxmox live state had `vm-srv-k3s-12` and `vm-srv-k3s-13` stopped, with
+`vm-srv-k3s-11` carrying the whole cluster alone. The original fix proposal (start all
+three as embedded-etcd members for HA) was attempted and **reverted** — running 3
+concurrent etcd writers on VMs that all share one physical host and one ZFS pool produced
+enough I/O contention to freeze the host repeatedly (see `docs/compute-nodes.md`).
 
-- **Impact:** Total cluster outage on single node failure. All GitOps-managed workloads
-  (Vaultwarden, Nextcloud, Paperless, etc.) go down simultaneously.
-- **Fix:** Start k3s-12 and k3s-13 (manually, given `onboot=0`). Verify all three appear
-  as `Ready` nodes and etcd shows 3 members.
-- **Blast radius:** None — starting stopped VMs only adds nodes to the cluster.
-- **Effort:** Minutes.
+- **Current state:** All three nodes run continuously with `on_boot = true`.
+  `vm-srv-k3s-11` is the sole control-plane + etcd server; `-12`/`-13` are agent-only
+  workers, adding compute capacity without adding etcd writers. This is a deliberate
+  single-server design, not an oversight — see `docs/k3s-architecture.md` §1.
+- **Residual risk (accepted, not a bug):** `mini` (the physical host) remains a single
+  point of failure either way — 3-way HA on one host/one disk was never actually safe.
+  Target is fast *recovery* via `DISASTER-RECOVERY.md`, not zero-downtime HA.
+- **Known follow-up, not yet done:** the Keepalived VIP (`10.0.20.10`) still lists
+  k3s-12/13 in its failover priority from the old 3-master design even though they no
+  longer run the API server — see `docs/k3s-architecture.md` §1 caveat.
 
 ---
 
-### REL-002 — PBS backup server stopped; last VM backup was April 30, 2026 · **CRITICAL**
+### REL-002 — PBS backup server stopped; last VM backup was April 30, 2026 · **RESOLVED** (2026-06-23)
 
-`ct-mgmt-pbs-01` is `stopped`. The PBS datastore (`/mnt/pbs-storage`) shows the last
-backup was 2026-04-30 — over 7 weeks ago. PBS is the only VM-level backup mechanism.
-Velero covers k8s workloads but not the VM disks themselves.
+Originally: `ct-mgmt-pbs-01` was stopped, last successful VM backup was 7+ weeks stale,
+and the k3s VMs (211/212/213) plus the NFS LXC (220) were not even in the PBS backup job's
+scope.
 
-Additionally: PBS datastore backups covered only LXC 110, 200, 301, 302. The k3s VMs
-(211, 212, 213) and NFS LXC (220) are **not** in PBS backup jobs.
-
-- **Impact:** VM-level recovery path is unavailable. If k3s-11's disk fails, recovery
-  requires rebuilding k3s from scratch (k3s install → ArgoCD bootstrap → Vault inject →
-  Velero restore). No PBS snapshot for the NFS server means NFS data (130 GB used) has
-  no VM-level backup — only Velero, which backs up PVC contents, not the NFS server config.
-- **Fix:**
-  1. Start `ct-mgmt-pbs-01`.
-  2. Add k3s VMs (211, 212, 213) and NFS LXC (220) to PBS backup jobs.
-  3. Set `onboot=1` for PBS so it starts automatically after a host reboot.
-  4. Verify backup runs successfully and alert on failure (healthchecks.io).
-- **Effort:** Medium (2–3h including Proxmox backup job config).
+- **Current state (verified live 2026-06-23):** `ct-mgmt-pbs-01` is running with
+  `onboot=1`. The backup job (`backup-8b6a6f73-c4ce`, schedule `0 3 * * *`) uses `all: 1`,
+  covering every VM/CT on the host including all three k3s VMs and the NFS LXC. The
+  03:00 run completed successfully this morning (2026-06-23, 03:00–03:41) with retention
+  keep-daily=7/keep-last=3/keep-weekly=4.
+- **Residual gap:** PBS datastore is local to `mini` (2TB USB HDD) with rclone→Google
+  Drive offsite — see `docs/backup-strategy.md`. No independent verification/alerting
+  (e.g. healthchecks.io) on backup job success is wired up yet; failures would currently
+  only be noticed by manually checking PBS.
 
 ---
 
@@ -439,22 +440,27 @@ but is not fully automated.
 
 ## 5. Documentation
 
-### DOC-001 — No DISASTER-RECOVERY.md · **HIGH**
+### DOC-001 — No DISASTER-RECOVERY.md · **RESOLVED** (2026-06-23)
 
 `CLAUDE.local.md` requires "A top-level DISASTER-RECOVERY.md describes full-rebuild +
-per-service restore, kept current." The ROADMAP also lists this as a pending item.
+per-service restore, kept current."
 
-This document does not exist. `docs/backup-strategy.md` covers the backup mechanics but
-not the step-by-step rebuild procedure.
+Added `/DISASTER-RECOVERY.md` at repo root covering all 6 required tiers (network,
+Proxmox, k3s bootstrap, ArgoCD bootstrap, Vault init/unseal/ESO, Velero restore) as
+runnable command sequences, plus a per-service restore table covering every node-pinned
+`local-path` app, CNPG/Authelia's bootstrap-secret gotcha, Nextcloud's non-CNPG Postgres,
+Jellyfin's unbacked `media` PVC, the NFS LXC's concurrency constraint, and the Cobblemon
+LXC (outside k8s/ArgoCD/Velero's scope entirely). Also corrected two prerequisite stale
+docs this depended on: `docs/k3s-architecture.md` (still described the reverted 3-way
+HA topology) and `README.md`'s stack table (same stale claim).
 
-- **Impact:** In an actual disaster, the operator must reconstruct the recovery steps
-  from multiple fragmented docs (k3s-architecture.md, backup-strategy.md, secrets-inventory.md,
-  ROADMAP.md). Under stress, this increases MTTR significantly.
-- **Fix:** Write `DISASTER-RECOVERY.md` covering: (1) Proxmox rebuild from PBS, (2) k3s
-  cluster bootstrap from bare VMs, (3) ArgoCD bootstrap, (4) Vault init + unseal,
-  (5) ExternalSecrets sync, (6) Velero restore. Each step should be a runnable command
-  sequence.
-- **Effort:** Medium (3–4h to write; requires testing to verify).
+- **Not yet tested end-to-end** — this is a written, reasoned-through procedure, not a
+  drilled one. Treat as best-effort until an actual (or staged) recovery exercises it;
+  update it with whatever doesn't match reality when that happens.
+- **New gap surfaced while writing this:** CNPG's `postgres-authelia` cluster has
+  continuous WAL archiving configured (barman → Garage S3) but no `ScheduledBackup`
+  resource — so there's no base backup to restore from via barman alone. Logged as a new
+  finding, not yet fixed — see `REL-011` below.
 
 ---
 
@@ -548,14 +554,15 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 | SEC-005 | Security | **MEDIUM** | 14 images on `:latest` / floating tags |
 | SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
-| REL-001 | Reliability | **CRITICAL** | 2 of 3 k3s nodes stopped; no etcd quorum |
-| REL-002 | Reliability | **CRITICAL** | PBS stopped; last VM backup 7+ weeks ago; k3s VMs not in backup scope |
+| REL-001 | Reliability | **RESOLVED** | All 3 k3s nodes run continuously (`on_boot=true`); single-server topology by deliberate design, not an HA gap -- see `docs/k3s-architecture.md` |
+| REL-002 | Reliability | **RESOLVED** | PBS running with `onboot=1`; `all: 1` backup job covers every VM/CT incl. k3s nodes + NFS LXC; verified successful 2026-06-23 03:00 run |
 | REL-003 | Reliability | **HIGH** | Velero backend (Garage) is in-cluster; circular recovery dependency |
 | REL-004 | Reliability | **HIGH** | NFS single point of failure for all PVCs |
 | REL-005 | Reliability | **HIGH** | rpool at 70% utilization with no alert |
 | REL-006 | Reliability | **HIGH** | No Proxmox VM snapshots for k3s nodes |
 | REL-007 | Reliability | **RESOLVED** | Vault seal gap causes cascading ExternalSecret failures on restart — mitigated via faster unseal polling + wait-for-secret initContainers |
 | REL-009 | Reliability | **LOW** | Vault's raft storage (`data-vault-0`) is on `nfs-client`; BoltDB has similar locking needs to the SQLite issue in GIT-006, no corruption seen yet — deserves a dedicated migration pass given Vault's blast radius |
+| REL-011 | Reliability | **MEDIUM** | `postgres-authelia` (CNPG) has barman WAL archiving configured but no `ScheduledBackup` resource — no base backup exists to restore from via barman alone, only the PVC itself (Velero/PBS) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
