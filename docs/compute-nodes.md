@@ -21,16 +21,22 @@
 | `ct-srv-docker-01` | LXC | 4 | 4 GB | Legacy Docker workloads |
 | `ct-srv-ai-01` | LXC | 8 | 32 GB | Ollama / LLM inference (GPU Passthrough) |
 | `ct-srv-nfs-01` | LXC | 2 | 1 GB | NFS storage server (ZFS-backed, `nfs-client` StorageClass for all k3s PVCs) |
-| `vm-srv-k3s-11` | VM | 4 | 12 GB | k3s control-plane + embedded etcd (1 of 3, HA) |
-| `vm-srv-k3s-12` | VM | 4 | 16 GB | k3s control-plane + embedded etcd (1 of 3, HA) |
-| `vm-srv-k3s-13` | VM | 4 | 16 GB | k3s control-plane + embedded etcd (1 of 3, HA) |
+| `vm-srv-k3s-11` | VM | 4 | 12 GB | k3s control-plane + embedded etcd (sole server) |
+| `vm-srv-k3s-12` | VM | 4 | 16 GB | k3s agent (worker only, no etcd) |
+| `vm-srv-k3s-13` | VM | 4 | 16 GB | k3s agent (worker only, no etcd) |
 | `ct-dmz-proxy-01` | LXC | 2 | 1 GB | DMZ reverse proxy (Public Facing) |
 | `ct-dmz-games-01` | LXC | 4 | 12 GB | Game servers (bumped from 4 GB after Cobblemon lag investigation, 2026-06) |
 
-All three k3s nodes are control-plane with embedded etcd now (migrated from single-node
-SQLite in 2026-06), so there's no "primary" node anymore. API access goes through the
-Keepalived VIP (`10.0.20.10`). Longhorn got removed in the same migration; PVCs use the
-`nfs-client` StorageClass backed by `ct-srv-nfs-01` instead.
+`vm-srv-k3s-11` is the sole control-plane + etcd server; `vm-srv-k3s-12` and `-13` are
+agent (worker) nodes only. A 3-node embedded-etcd HA setup was tried and reverted — all
+three VMs share the same physical host and ZFS pool, so a 3-writer etcd quorum produced
+enough concurrent I/O to freeze the host (the same failure mode as the ZFS tuning above,
+just from a different source). Single-etcd plus agent workers gives the compute capacity
+of 3 VMs without the multi-writer etcd I/O storm. This is not HA for the control plane —
+`mini` remains a single point of failure either way — so the only real mitigation is fast
+recovery from Git + backups, not uptime. RPis are intentionally excluded from k3s entirely
+(SD cards can't take etcd/database write load). PVCs use the `nfs-client` StorageClass
+backed by `ct-srv-nfs-01`.
 
 ### Performance Tweaks
 
