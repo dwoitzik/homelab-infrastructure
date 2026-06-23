@@ -38,6 +38,9 @@ spec:
               containerPort: 8080
             - name: metrics
               containerPort: 9090
+          envFrom:
+            - secretRef:
+                name: headscale-oidc
           volumeMounts:
             - name: config
               mountPath: /etc/headscale/config.yaml

@@ -51,7 +51,8 @@ data:
     oidc:
       issuer: "https://auth.woitzik.dev"
       client_id: "headscale"
-      client_secret: "headscale-pass-2026"
+      # client_secret injected via HEADSCALE_OIDC_CLIENT_SECRET env var from
+      # headscale-oidc Secret (ExternalSecret → Vault secret/headscale)
       scope: ["openid", "profile", "email"]
 
     log:
