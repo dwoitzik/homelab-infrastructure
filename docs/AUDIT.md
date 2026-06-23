@@ -239,24 +239,35 @@ change affecting running state.
 
 ---
 
-### REL-007 — Vault sealed on startup; auto-unseal works but ExternalSecrets fail during the gap · **MEDIUM**
+### REL-007 — Vault sealed on startup; auto-unseal works but ExternalSecrets fail during the gap · **RESOLVED (mitigated)**
 
-`vault-0` StatefulSet shows 0/1 ready in recent observations (sealed on restart). The
-`vault-unseal` Deployment polls every 30 seconds and unseals automatically — so this
-resolves itself. However, during the seal window, ExternalSecrets fail to sync, and any
-pod that tries to start during that gap (e.g., Authelia on cluster restart) will fail to
-read its secrets.
+`vault-0` seals on restart; `vault-unseal` polls and auto-unseals, so this self-resolves,
+but during the seal window ExternalSecrets can't sync and any pod whose Secret doesn't
+exist yet (cold start / disaster-recovery rebuild, not a routine pod restart — an existing
+Secret object is untouched by Vault sealing) would otherwise crash-loop on a missing
+`secretKeyRef`.
 
-The current restart ordering (cluster → all pods start simultaneously → Vault starts late →
-ExternalSecrets fail) causes cascading failures visible as Authelia crashlooping on cluster
-restarts.
+ArgoCD sync waves (the originally proposed fix) turned out not to actually address this:
+waves only order resources within an ArgoCD-initiated *sync*, not the pod restart order
+after a node/cluster reboot, which is what kubelet drives independently of ArgoCD.
 
-- **Impact:** Every cluster restart causes a temporary (minutes) secret-sync failure across
-  all apps using ExternalSecrets. Authelia takes 3–5 crashloop iterations before recovering.
-- **Fix:** Add ArgoCD sync waves to ensure Vault (wave 0) + ExternalSecrets (wave 1) sync
-  and are healthy before app deployments (wave 2+). Or add an init container to Authelia
-  that waits for Vault readiness.
-- **Effort:** Medium (ArgoCD sync waves across multiple Applications).
+Fixed 2026-06-23 with the two changes that actually help regardless of how the restart
+happens:
+
+1. `vault-unseal` poll interval: 30s → 5s — shrinks the seal window 6x.
+2. Added a `wait-for-vault-secret` initContainer to Authelia and `postgres-paperless`
+   (the two apps explicitly observed crash-looping) that blocks on the expected secret
+   files existing, with the secret volume marked `optional: true` so the pod can actually
+   be scheduled and run the wait loop even if the Secret doesn't exist at all yet — instead
+   of CrashLoopBackoff's exponential backoff, it just polls every 2s and starts the instant
+   the secret appears.
+
+**Not fixed, flagged as a new finding:** Vault's own raft storage (`data-vault-0` PVC) is
+*also* on `nfs-client`. Raft uses BoltDB underneath, which has similar (though less
+severe — single-writer, not WAL/shared-mmap) file-locking requirements to the SQLite
+issue in GIT-006. No corruption observed so far, but given Vault is the secrets root for
+half the cluster, migrating it deserves its own careful, dedicated pass (like the GIT-007
+state rebuild) rather than being rushed alongside this fix.
 
 ---
 
@@ -490,19 +501,11 @@ Velero, and has no runbook.
 
 ---
 
-### WRK-003 — Paperless requires Vault to be unsealed; fails on cluster restart · **MEDIUM**
+### WRK-003 — Paperless requires Vault to be unsealed; fails on cluster restart · **RESOLVED**
 
-Paperless reads its database password via ExternalSecret from Vault. On cluster restart,
-Vault is sealed for ~30–60 seconds. Paperless starts before Vault is unsealed, cannot
-read its secrets, and fails. Once Vault is unsealed, the ExternalSecret syncs and Paperless
-recovers — but this adds significant startup delay and noisy error logs.
-
-This is a specific case of REL-007 (Vault seal gap) with high user visibility (documents
-inaccessible after every restart).
-
-- **Fix:** ArgoCD sync waves (see REL-007 fix). Alternatively, add an `initContainer`
-  to Paperless that polls the ExternalSecret for a `Ready` condition before starting.
-- **Effort:** Medium.
+Specific case of REL-007 — fixed the same way (2026-06-23): `postgres-paperless` now has
+a `wait-for-vault-secret` initContainer that blocks until `paperless-secrets` actually
+contains `postgres-password`, instead of crash-looping. See REL-007 for the full fix.
 
 ---
 
@@ -523,7 +526,8 @@ inaccessible after every restart).
 | REL-004 | Reliability | **HIGH** | NFS single point of failure for all PVCs |
 | REL-005 | Reliability | **HIGH** | rpool at 70% utilization with no alert |
 | REL-006 | Reliability | **HIGH** | No Proxmox VM snapshots for k3s nodes |
-| REL-007 | Reliability | **MEDIUM** | Vault seal gap causes cascading ExternalSecret failures on restart |
+| REL-007 | Reliability | **RESOLVED** | Vault seal gap causes cascading ExternalSecret failures on restart — mitigated via faster unseal polling + wait-for-secret initContainers |
+| REL-009 | Reliability | **LOW** | Vault's raft storage (`data-vault-0`) is on `nfs-client`; BoltDB has similar locking needs to the SQLite issue in GIT-006, no corruption seen yet — deserves a dedicated migration pass given Vault's blast radius |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
@@ -543,7 +547,7 @@ inaccessible after every restart).
 | DOC-004 | Docs | **LOW** | 4 architectural decisions without ADRs |
 | WRK-001 | Workloads | **MEDIUM** | Jellyfin/media stack stuck in ContainerCreating |
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed or backed up |
-| WRK-003 | Workloads | **MEDIUM** | Paperless fails on cluster restart due to Vault seal gap |
+| WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
 
 ---
 
