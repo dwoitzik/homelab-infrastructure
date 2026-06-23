@@ -26,3 +26,10 @@ spec:
             secretKeyRef:
               name: cloudflared-secrets
               key: tunnel-token
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
