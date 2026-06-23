@@ -178,6 +178,23 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
     type             = "debian"
   }
 
+  # AMD Vega iGPU passthrough for Ollama (ROCm) — render node + compute device.
+  device_passthrough {
+    path       = "/dev/dri/renderD128"
+    uid        = 0
+    gid        = 992
+    mode       = "0660"
+    deny_write = false
+  }
+
+  device_passthrough {
+    path       = "/dev/kfd"
+    uid        = 0
+    gid        = 992
+    mode       = "0660"
+    deny_write = false
+  }
+
   lifecycle {
     ignore_changes = [
       description,
