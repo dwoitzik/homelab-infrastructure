@@ -77,7 +77,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   vm_id     = 212
   name      = "vm-srv-k3s-12"
   node_name = local.target_node
-  tags      = ["k3s", "master", "kubernetes"]
+  tags      = ["k3s", "worker", "kubernetes"]
   started   = true
 
   startup {
@@ -144,7 +144,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   vm_id     = 213
   name      = "vm-srv-k3s-13"
   node_name = local.target_node
-  tags      = ["k3s", "master", "kubernetes"]
+  tags      = ["k3s", "worker", "kubernetes"]
   started   = true
 
   startup {
