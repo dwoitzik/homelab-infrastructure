@@ -53,13 +53,16 @@ The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with
 
 ## Disaster Recovery
 
-**Full cluster loss (VMs gone):**
+Full rebuild and per-service restore procedures live in
+[`DISASTER-RECOVERY.md`](../DISASTER-RECOVERY.md) at the repo root — covering Proxmox
+rebuild, k3s bootstrap, ArgoCD bootstrap, Vault init/unseal, ExternalSecrets sync, and
+Velero restore in detail. This page only covers backup *mechanics* (what's backed up,
+where, how often); the other doc covers *recovery* (what to run, in what order).
 
-1. Reinstall Proxmox VE
-2. Restore VMs/LXCs from PBS (local) or via rclone from Google Drive
-3. k3s will self-restore once VMs are up
-4. Restore Velero backups: `velero restore create --from-backup <name>`
+Quick reference for the two most common cases:
 
-**Kubernetes data loss only (cluster intact):**
-
-1. `velero restore create --from-backup <name> --include-namespaces apps`
+- **Full cluster loss (VMs gone):** Proxmox rebuild → restore VMs/LXCs from PBS → k3s
+  bootstrap (not automatic — see `DISASTER-RECOVERY.md` Tier 2) → ArgoCD bootstrap → Vault
+  init/unseal → Velero restore.
+- **Kubernetes data loss only (cluster intact):**
+  `velero restore create --from-backup <name> --include-namespaces apps`
