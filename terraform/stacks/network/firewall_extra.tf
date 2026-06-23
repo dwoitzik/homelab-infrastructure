@@ -222,6 +222,17 @@ resource "routeros_ip_firewall_filter" "fwd_mgmt_oidc_traefik" {
   }
 }
 
+resource "routeros_ip_firewall_filter" "fwd_k3s_nfs_media" {
+  action       = "accept"
+  chain        = "forward"
+  protocol     = "tcp"
+  src_address  = "10.0.20.0/24"
+  dst_address  = "10.0.10.10"
+  dst_port     = "2049"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "19: Server VLAN -> MGMT NFSv4 export for Jellyfin/usenet media PVC (mnt/media)"
+}
+
 resource "routeros_ipv6_firewall_filter" "v6_block_rogue_ra" {
   action        = "drop"
   chain         = "output"
