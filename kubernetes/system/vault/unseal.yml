@@ -30,7 +30,7 @@ spec:
                   vault operator unseal "$UNSEAL_KEY_2" 2>&1 || true
                   echo "$(date): Unseal attempt done"
                 fi
-                sleep 30
+                sleep 5
               done
           env:
             - name: VAULT_ADDR
