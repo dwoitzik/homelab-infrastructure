@@ -17,6 +17,10 @@ resource "routeros_ipv6_firewall_filter" "v6_in_00_established" {
   connection_state = "established,related,untracked"
   place_before     = routeros_ipv6_firewall_filter.v6_in_01_icmpv6.id
   comment          = "V6-IN-00: Allow established/related"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ipv6_firewall_filter" "v6_in_01_icmpv6" {
@@ -25,6 +29,10 @@ resource "routeros_ipv6_firewall_filter" "v6_in_01_icmpv6" {
   protocol     = "icmpv6"
   place_before = routeros_ipv6_firewall_filter.v6_input_drop_all.id
   comment      = "V6-IN-01: Allow ICMPv6 (NDP, RA, ping6)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ipv6_firewall_filter" "v6_input_drop_all" {
@@ -43,6 +51,10 @@ resource "routeros_ipv6_firewall_filter" "v6_fwd_00_established" {
   connection_state = "established,related,untracked"
   place_before     = routeros_ipv6_firewall_filter.v6_fwd_01_icmpv6.id
   comment          = "V6-FWD-00: Allow established/related"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ipv6_firewall_filter" "v6_fwd_01_icmpv6" {
@@ -51,6 +63,10 @@ resource "routeros_ipv6_firewall_filter" "v6_fwd_01_icmpv6" {
   protocol     = "icmpv6"
   place_before = routeros_ipv6_firewall_filter.v6_fwd_02_internal_out.id
   comment      = "V6-FWD-01: Allow ICMPv6"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ipv6_firewall_filter" "v6_fwd_02_internal_out" {
@@ -60,6 +76,10 @@ resource "routeros_ipv6_firewall_filter" "v6_fwd_02_internal_out" {
   out_interface = "ether1"
   place_before  = routeros_ipv6_firewall_filter.v6_forward_drop_all.id
   comment       = "V6-FWD-02: Allow internal ULA to WAN"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
 }
 
 resource "routeros_ipv6_firewall_filter" "v6_forward_drop_all" {
