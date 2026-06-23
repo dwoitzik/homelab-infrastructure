@@ -542,6 +542,38 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 
 ---
 
+### WRK-004 — paperless-gpt failing on every document; Ollama iGPU crashing constantly · **RESOLVED** (2026-06-23)
+
+`paperless-gpt` was failing 100% of auto-tagging/OCR jobs with "unexpected EOF" from the
+LLM. Root cause: Ollama's AMD iGPU backend (`ct-srv-ai-01`, Ryzen 5825U/Barcelo, gfx90c)
+was crashing with `vk::DeviceLostError` ("context is lost") roughly once per inference
+call under any concurrent load — 451 crashes logged in a single day. This chip has no
+official ROCm support; the live config had drifted to `OLLAMA_IGPU_ENABLE=1` (a Vulkan/
+radv fallback path), which is what was actually crashing — not the `HSA_OVERRIDE_GFX_VERSION=9.0.0`
+ROCm spoof originally declared in `ansible/roles/ollama/tasks/main.yml` (also never stable
+on this chip, abandoned at some earlier point without anyone reverting the Ansible role).
+
+- **Fix:** Switched Ollama to CPU-only (removed both GPU env vars from the systemd
+  override). Verified stable under a 6-request concurrent stress test (0 crashes, all
+  succeeded) before rolling out via Ansible. Restarted `paperless-gpt`; confirmed a real
+  document processed end-to-end (title/tags/correspondent/date all correctly extracted,
+  ~5.5 min on CPU vs. near-instant on a working GPU — slower but actually completes).
+- **Separately verified, not broken:** Jellyfin's transcoding path uses a different GPU
+  block entirely (VAAPI video encode/decode, not Vulkan compute) — confirmed healthy via
+  `vainfo` and a real `ffmpeg` hardware encode test on the same chip. The Ollama crash says
+  nothing about VAAPI's stability. However, Jellyfin currently has **no GPU passthrough
+  configured at all** (separate, pre-existing gap, not something this incident caused) —
+  tracked as a follow-up to move Jellyfin to its own GPU-passthrough LXC, same pattern as
+  `ct_srv_ai_01`, since Proxmox iGPU passthrough is exclusive and can't be shared between
+  the AI LXC and a k3s VM simultaneously.
+- **Known fallout:** the document backlog that failed during the crash period was
+  retried automatically by paperless-gpt's own retry logic once Ollama stabilized — but
+  several documents in Paperless show garbled/hallucinated titles and content from
+  earlier broken AI runs (unrelated model, predates this fix). Needs a manual data-quality
+  pass, tracked separately.
+
+---
+
 ## Summary Table
 
 | ID | Category | Severity | Title |
@@ -583,6 +615,7 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 | WRK-001 | Workloads | **MEDIUM** | Jellyfin/media stack stuck in ContainerCreating |
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed or backed up |
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
+| WRK-004 | Workloads | **RESOLVED** | paperless-gpt failing on every document; Ollama iGPU (Vulkan) crashing constantly under load -- switched to CPU-only |
 
 ---
 
