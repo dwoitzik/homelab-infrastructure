@@ -318,6 +318,16 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
     swap      = 1024
   }
 
+  # Host bind mount holding every NFS-exported PVC. Never declared in
+  # Terraform before (masked by the old ignore_changes = all) -- omitting it
+  # would have meant destroy-and-recreate of this entire LXC on next apply.
+  mount_point {
+    volume    = "/nfs-data"
+    path      = "/nfs-data"
+    backup    = false
+    replicate = true
+  }
+
   features {
     nesting = true
   }
