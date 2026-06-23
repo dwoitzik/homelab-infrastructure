@@ -29,6 +29,21 @@ spec:
                 operator: In
                 values:
                 - rpi
+      initContainers:
+      - name: wait-for-vault-secret
+        image: busybox:1.36
+        # REL-007: on a cold cluster restart Vault starts sealed; ExternalSecrets
+        # can't sync until vault-unseal (polls every 5s) unseals it, so the
+        # authelia-secrets Secret may not exist yet. Block here instead of
+        # crash-looping the main container on missing secret files.
+        command:
+        - sh
+        - -c
+        - until [ -f /secrets/hmac-secret ] && [ -f /secrets/oidc-issuer-private-key ]; do echo waiting for authelia-secrets; sleep 2; done
+        volumeMounts:
+        - name: secrets
+          mountPath: /secrets
+          readOnly: true
       containers:
       - name: authelia
         image: ghcr.io/authelia/authelia:4.39.20
@@ -57,6 +72,7 @@ spec:
       - name: secrets
         secret:
           secretName: authelia-secrets
+          optional: true
       - name: users-db
         secret:
           secretName: authelia-users-db
