@@ -34,46 +34,61 @@ ExternalSecret. Headscale is the only exception.
 
 ---
 
-### SEC-002 — Authelia shared OIDC client secret across 4 services · **HIGH**
+### SEC-002 — Authelia shared OIDC client secret across 4 services · **RESOLVED**
 
-Per `docs/secrets-inventory.md`: Proxmox, PBS, ArgoCD, and Grafana share one OIDC client
-secret. Additionally, `hmac_secret` in Vault was found to be the same value as this shared
-secret (`dubist1plebyakalb`) — a third instance of the same value.
+Generated 4 distinct client secrets (proxmox, pbs, argocd, grafana) 2026-06-23, each
+hashed independently via `authelia crypto hash generate argon2` run inside the live
+Authelia pod. Updated: Authelia's per-client `client_secret` hash in `configmap.yml`;
+Vault `secret/argocd#oidc-client-secret` and `secret/grafana#oidc-client-secret` (both
+already flow through ExternalSecret -> k8s Secret -> the consuming pod, no plumbing
+changes needed); Proxmox's OIDC realm via `pvesh set /access/domains/authelia --client-key
+...` and PBS's via `proxmox-backup-manager openid update authelia --client-key ...` (both
+fully API/CLI-automatable, no manual UI step needed). `hmac_secret` (the third instance of
+the same shared value) rotated independently as part of SEC-003/004.
 
-- **Impact:** Compromise of any one client's side (e.g., a Proxmox config export) exposes
-  credentials for all four, including the hypervisor.
-- **Fix:** Generate four distinct client secrets; update Authelia's per-client hash
-  (`argon2id` via `authelia crypto hash generate argon2`); update Vault `secret/argocd`,
-  `secret/grafana`; re-enter in Proxmox/PBS OIDC realm UI. Rotate `hmac_secret`
-  independently.
-- **Effort:** Medium (3–4h for all four clients + hmac_secret).
+Verified live: all four services' pods restarted cleanly post-rotation; Proxmox/PBS retain
+their `pam`/local-root fallback login and ArgoCD/Grafana retain their local admin account,
+so none of this carried real lockout risk.
 
 ---
 
-### SEC-003 — Authelia session-secret and storage-key are placeholder values · **HIGH**
+### SEC-003 — Authelia session-secret and storage-key are placeholder values · **PARTIALLY RESOLVED**
 
 `secret/authelia` `session-secret` = `thisisaverysecretsessionsecret`;
-`storage-key` = `thisisaverysecretstoragekey`. Both are low-entropy strings that appear
-to be copy-pasted from example configs.
+`storage-key` = `thisisaverysecretstoragekey`. Both low-entropy, copy-pasted-looking
+values. `jwt-secret` (`thisisaverysecretjwtsecret`) turned out to be the same pattern,
+not originally called out, but fixed alongside it.
 
-- **Impact:** Session tokens and the storage encryption layer are weaker than intended.
-  An attacker who obtains a session cookie has an easier brute-force path.
-- **Fix:** Regenerate both with `openssl rand -hex 64`; update Vault; restart Authelia.
-  Note: changing `storage-key` requires re-encrypting the storage database — follow
-  Authelia's `authelia storage encryption change-key` procedure first.
-- **Effort:** Small but careful (1–2h; must not skip the re-encryption step).
+- **Fixed 2026-06-23:** `session-secret` and `jwt-secret` regenerated with `openssl rand
+  -hex 32`, written to Vault, restarted Authelia clean.
+- **Still open:** `storage-key` was deliberately left untouched. It encrypts Authelia's
+  storage backend at rest, so rotating it requires running Authelia's `storage encryption
+  change-key` procedure *first* (re-encrypting existing data with the new key) — doing it
+  out of order would make Authelia unable to decrypt its own database. That's a separate,
+  more careful piece of work, not bundled into this pass.
 
 ---
 
-### SEC-004 — Cross-service secret reuse: redis-password and storage-password · **MEDIUM**
+### SEC-004 — Cross-service secret reuse: redis-password and storage-password · **RESOLVED**
 
-Both share the same value as the Paperless Postgres password (`TD3fAJ2s1cxJ`). Three
-unrelated services accept the same credential.
+Both `redis-password` and `storage-password` shared the same value as the Paperless
+Postgres password (`TD3fAJ2s1cxJ`). Generated two new, independent random values
+2026-06-23:
 
-- **Impact:** A credential leak in any one service (Paperless DB, Authelia Redis,
-  Authelia storage) gives access to all three.
-- **Fix:** Generate unique values; update Vault; restart affected pods.
-- **Effort:** Small (1h each, do together with SEC-002/003).
+- `redis-password`: updated the `redis-secret` k8s Secret (manually managed, not
+  ExternalSecret-sourced) and restarted `redis-authelia` so its `--requirepass` picks up
+  the new value, then updated Vault `secret/authelia#redis-password` to match and
+  restarted Authelia.
+- `storage-password`: ran `ALTER USER authelia WITH PASSWORD ...` directly against the
+  live `postgres-authelia` (CNPG) instance, then updated Vault to match. Deliberately
+  **not** added to Authelia's ExternalSecret (see comment in `external-secret.yml`) — if
+  it synced automatically from a future Vault-only edit, Authelia's DB connection would
+  break until someone remembered the matching `ALTER USER` step. Both sides must be
+  rotated together, manually, going forward.
+
+Found but not fixed: `postgres-authelia` (CNPG cluster) is itself on the `nfs-client`
+StorageClass — flagged as REL-010, a lower-urgency cousin of GIT-006 (Postgres has its
+own robust locking, unlike SQLite/BoltDB, but NFS is still not its recommended storage).
 
 ---
 
@@ -109,14 +124,25 @@ Also: `open-webui:main`, `gitea:1.22` (major-only), `uptime-kuma:1` (major-only)
 
 ---
 
-### SEC-006 — Kyverno resource-limits and no-latest-tag policies in Audit mode · **MEDIUM**
+### SEC-006 — Kyverno resource-limits and no-latest-tag policies in Audit mode · **RESOLVED**
 
-Both `require-resource-limits` and `disallow-latest-tag` are `validationFailureAction: Audit`.
-This means violations are logged to PolicyReport but not blocked.
+Flipped both to `Enforce` 2026-06-23 after confirming zero PolicyReport violations
+cluster-wide. Found and fixed two real bugs in the policies along the way:
 
-- **Impact:** New deployments without limits or with `:latest` tags slip through undetected.
-- **Fix:** After SEC-005 is remediated (images pinned), flip both to `Enforce`.
-- **Effort:** Trivial once SEC-005 is done.
+- `disallow-latest-tag`'s `message` field referenced `{{ element.image }}` outside the
+  `foreach` it was defined in — Kyverno's policy admission webhook itself now rejects
+  that (newer Kyverno validates this at policy-creation time); moved the message to a
+  non-element-specific form at the rule level instead.
+- `require-resource-limits`'s deny condition (`element.resources.limits | length(@)`)
+  crashed with a JMESPath type error under Kyverno's `autogen` controller (which
+  auto-generates an equivalent Deployment/StatefulSet-level rule from the Pod-level one) —
+  unlike `disallow-privileged-containers`' condition, it had no `|| <default>` fallback
+  for a field that's legitimately absent in the autogenerated evaluation context.
+  Rewrote as two explicit `element.resources.limits.cpu || ''` / `.memory || ''` checks,
+  matching the safe pattern the privileged-containers policy already used.
+
+Verified with a deliberate negative test (a bare Pod with no `resources:`) — correctly
+rejected by the admission webhook.
 
 ---
 
@@ -364,22 +390,23 @@ not yet exist in the cluster.
 
 ## 4. IaC Quality
 
-### IAC-001 — No resource limits on most Kubernetes workloads · **MEDIUM**
+### IAC-001 — No resource limits on most Kubernetes workloads · **RESOLVED**
 
-Of 40 manifest files in `kubernetes/apps/`, 19 define `resources:`. The remaining 21 have
-no `limits` or `requests`. This means Kyverno's `require-resource-limits` policy fires on
-every pod creation in `apps`, `monitoring`, and `database` namespaces — all in Audit mode,
-so it's logged but not enforced.
+Most of the originally-flagged apps (bazarr, gitea, home-assistant, jellyseerr, mealie,
+nzbhydra2, open-webui, radarr, sabnzbd, sonarr) picked up limits incidentally during other
+work this session (image pinning, NFS migrations). Swept the remaining 16 containers
+across 13 manifests on 2026-06-23 and added `resources.requests`/`limits` to all of them:
+atlantis, authelia, cloudflared, garage, headscale, homepage, keel, postgres-paperless,
+redis-paperless, paperless-addons (gotenberg + tika), uptime-kuma, vaultwarden, the
+cloudflare-ddns CronJob, pve-exporter, and redis-authelia. Verified zero remaining gaps
+via a script over every Deployment/StatefulSet/DaemonSet/CronJob in `kubernetes/`.
 
-Specific services missing limits: bazarr, cloudflared, gitea, headscale, home-assistant,
-jellyseerr, keel, mealie, nzbhydra2, open-webui, radarr, sabnzbd, sonarr, vaultwarden.
+Also found and removed `kubernetes/system/redis/application.yml` — a stale duplicate of
+`redis.yml` still referencing the long-removed Longhorn StorageClass; harmless (the live
+StatefulSet already matched the current file) but dead, confusing code.
 
-- **Impact:** A runaway pod can starve other workloads on the single-node cluster.
-  This is particularly risky given the marginal host memory budget (AI LXC uses 32 GB,
-  leaving ~30 GB for 3 k3s VMs + host).
-- **Fix:** Add `resources.requests` and `resources.limits` to all Deployments; then flip
-  Kyverno policy to `Enforce`.
-- **Effort:** Medium (bulk change across 20+ manifests).
+- **Fix still pending:** flip Kyverno's `require-resource-limits` policy from `Audit` to
+  `Enforce` now that the gap is closed (see SEC-006).
 
 ---
 
@@ -514,11 +541,12 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 | ID | Category | Severity | Title |
 |---|---|---|---|
 | SEC-001 | Security | **RESOLVED** | Hardcoded OIDC secret in Headscale ConfigMap — moved to Vault via ExternalSecret (2026-06-23) |
-| SEC-002 | Security | **HIGH** | Shared OIDC client secret across 4 services |
-| SEC-003 | Security | **HIGH** | Placeholder session-secret and storage-key in Vault |
-| SEC-004 | Security | **MEDIUM** | Cross-service secret reuse (redis/storage/paperless) |
+| SEC-002 | Security | **RESOLVED** | Shared OIDC client secret across 4 services |
+| SEC-003 | Security | **PARTIAL** | Placeholder session-secret and storage-key in Vault (storage-key still pending, needs re-encryption procedure) |
+| SEC-004 | Security | **RESOLVED** | Cross-service secret reuse (redis/storage/paperless) |
+| REL-010 | Reliability | **LOW** | `postgres-authelia` (CNPG) is on `nfs-client` -- same storage-class concern as GIT-006, lower severity (Postgres has real locking, unlike SQLite/BoltDB) |
 | SEC-005 | Security | **MEDIUM** | 14 images on `:latest` / floating tags |
-| SEC-006 | Security | **MEDIUM** | Kyverno enforcement policies in Audit mode |
+| SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
 | REL-001 | Reliability | **CRITICAL** | 2 of 3 k3s nodes stopped; no etcd quorum |
 | REL-002 | Reliability | **CRITICAL** | PBS stopped; last VM backup 7+ weeks ago; k3s VMs not in backup scope |
@@ -538,7 +566,7 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 | GIT-003 | GitOps | **MEDIUM** | System components are manual-apply; no drift detection |
 | GIT-004 | GitOps | **LOW** | Proxmox provider version constraint far behind latest |
 | GIT-005 | GitOps | **LOW** | R2 BackupStorageLocation has placeholder URL committed |
-| IAC-001 | IaC | **MEDIUM** | ~50% of app Deployments lack resource limits |
+| IAC-001 | IaC | **RESOLVED** | ~50% of app Deployments lack resource limits |
 | IAC-002 | IaC | **MEDIUM** | MikroTik firewall hardening apply still pending Atlantis |
 | IAC-003 | IaC | **LOW** | No automated k3s VM rebuild procedure |
 | DOC-001 | Docs | **HIGH** | DISASTER-RECOVERY.md does not exist |
