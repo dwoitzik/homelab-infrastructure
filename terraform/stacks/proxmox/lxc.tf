@@ -309,9 +309,23 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
     cores = 2
   }
 
+  # 512MB was a near-miss: this LXC OOM-killed during a routine multi-directory
+  # backup read across the SQLite apps it serves over NFS (2026-06-23), taking
+  # down NFS for the whole cluster. Bumped with headroom — this is the storage
+  # backend for nearly every nfs-client PVC in the cluster, not just its own data.
   memory {
-    dedicated = 1024
-    swap      = 512
+    dedicated = 2048
+    swap      = 1024
+  }
+
+  # Host bind mount holding every NFS-exported PVC. Never declared in
+  # Terraform before (masked by the old ignore_changes = all) -- omitting it
+  # would have meant destroy-and-recreate of this entire LXC on next apply.
+  mount_point {
+    volume    = "/nfs-data"
+    path      = "/nfs-data"
+    backup    = false
+    replicate = true
   }
 
   features {
@@ -336,9 +350,18 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
     type             = "debian"
   }
 
-  # NFS CT holds live PVC data — ignore all drift to prevent accidental destroy
+  # NFS CT holds live PVC data — ignore drift on fields that risk a destructive
+  # recreate. memory is intentionally NOT ignored: it's safe to resize live and
+  # needs to stay Terraform-managed after the 512MB incident above.
   lifecycle {
-    ignore_changes = all
+    ignore_changes = [
+      description,
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+      network_interface[0].mac_address,
+      disk,
+      features,
+    ]
   }
 }
 
