@@ -25,6 +25,13 @@ spec:
         - sh
         - -c
         - until [ -f /secrets/postgres-password ]; do echo waiting for paperless-secrets; sleep 2; done
+        resources:
+          requests:
+            cpu: 5m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 32Mi
         volumeMounts:
         - name: paperless-secrets
           mountPath: /secrets

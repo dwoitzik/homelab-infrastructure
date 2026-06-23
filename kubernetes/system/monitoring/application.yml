@@ -48,6 +48,13 @@ spec:
             userKey: admin-user
             passwordKey: admin-password
           sidecar:
+            resources:
+              requests:
+                cpu: 25m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
             datasources:
               enabled: true
               searchNamespace: ALL
@@ -108,12 +115,11 @@ spec:
                   hide: false
                 lokiSearch:
                   datasourceUid: loki
-          env:
-            - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: grafana-oidc-secret
-                  key: client-secret
+          envValueFrom:
+            GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+              secretKeyRef:
+                name: grafana-oidc-secret
+                key: client-secret
           grafana.ini:
             analytics:
               check_for_updates: false
