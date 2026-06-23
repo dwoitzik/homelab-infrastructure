@@ -2,36 +2,59 @@
 
 ## 1. Cluster Topology
 
-3-node k3s v1.31 cluster on Proxmox VMs (Debian 13 trixie). **HA since 2026-06-19**: all
-three nodes run as servers with embedded etcd (migrated live from single-node SQLite via
-`--cluster-init`, no downtime beyond a ~60s API restart).
+3-node k3s v1.31 cluster on Proxmox VMs (Debian 13 trixie). **Single-server, not HA, by
+deliberate design (corrected 2026-06-23):** a prior attempt at 3-way embedded-etcd HA
+caused repeated host freezes — all three VMs share one physical host (`mini`) and one ZFS
+pool, so 3 concurrent etcd writers produced enough I/O contention to lock up the host.
+`vm-srv-k3s-11` is the sole control-plane + etcd server; `-12`/`-13` are agent (worker)
+nodes only, providing compute capacity without adding etcd writers. **Do not re-introduce
+multi-server etcd on this hardware** — see `docs/compute-nodes.md` for the full incident
+writeup. Target is fast *recovery*, not zero-downtime HA: `mini` is a single point of
+failure either way.
 
-| Node | IP | Role | vCPU | RAM (dedicated/balloon) |
+| Node | IP | Role | vCPU | RAM |
 |---|---|---|---|---|
-| `vm-srv-k3s-11` | 10.0.20.11 | Control Plane + etcd + Worker | 4 | 12 GB (balloon 4–12) |
-| `vm-srv-k3s-12` | 10.0.20.12 | Control Plane + etcd + Worker | 4 | 16 GB (balloon 4–16) |
-| `vm-srv-k3s-13` | 10.0.20.13 | Control Plane + etcd + Worker | 4 | 16 GB (balloon 4–16) |
+| `vm-srv-k3s-11` | 10.0.20.11 | Control Plane + etcd + Worker (sole server) | 4 | 12 GB |
+| `vm-srv-k3s-12` | 10.0.20.12 | Worker (agent only, no etcd) | 4 | 16 GB |
+| `vm-srv-k3s-13` | 10.0.20.13 | Worker (agent only, no etcd) | 4 | 16 GB |
 
-Balloon memory enables overcommit — nodes start at 4 GB and scale up to their max as workloads demand.
+All three have `on_boot = true` in Terraform — they auto-start on host reboot.
 
-**API HA endpoint**: `10.0.20.10` — Keepalived VIP (VRRP, router-id 52) across all three
-nodes. MASTER priority: k3s-11 (150) > k3s-12 (120) > k3s-13 (100), tracked via a
-`chk_k3s` vrrp_script that checks `systemctl is-active k3s`. kubeconfig and all
-Ansible/CI access should target the VIP, not a specific node IP.
+**API endpoint**: `10.0.20.10` — a Keepalived VIP (VRRP, router-id 52) sits in front of
+the API server, currently always resolving to k3s-11 since it's the only node actually
+running `kube-apiserver`. **Known caveat:** Keepalived's failover priority list still
+includes k3s-12/13 from the old 3-master design — if k3s-11 goes down, the VIP could float
+to a node with no API server at all, making it *more* broken than just using k3s-11's IP
+directly. If k3s-11 is down, go straight to `10.0.20.11` (or rebuild it — see
+`DISASTER-RECOVERY.md`) rather than trusting the VIP to land somewhere useful.
 
-- Ansible: `ansible/k3s-vip.yml` (Keepalived setup), `ansible/k3s-cluster/inventory-ha.yml` (target inventory for the etcd migration, kept for reference/rebuilds)
-- If the VIP itself is ever unreachable: any single node IP (`.11`/`.12`/`.13`) still serves the API directly.
+- Ansible: `ansible/k3s-vip.yml` (Keepalived setup) — priorities need revisiting given the
+  topology correction above; not yet done as of 2026-06-23.
 
-## 2. Storage (NFS)
+## 2. Storage (NFS + local-path)
 
-Longhorn was removed (2026-06 migration, see ROADMAP.md). All PVCs use the `nfs-client`
+Longhorn was removed (2026-06 migration, see ROADMAP.md). Most PVCs use the `nfs-client`
 storage class, backed by `ct-srv-nfs-01` (10.0.20.100, ZFS-backed export). There is no
 in-cluster replication for PV data — durability relies entirely on the NFS server's ZFS
 redundancy plus Velero backups (see `docs/backup-strategy.md`).
 
-- Storage class: `nfs-client` (default for all PVCs)
-- NFS server: `ct-srv-nfs-01` (10.0.20.100)
-- Exception: `media` PVC (Jellyfin) is a direct NFS mount, not provisioned via the nfs-client provisioner
+**`nfs-client` is NOT safe for embedded databases** (SQLite, BoltDB, etc.) — NFS's
+locking/WAL model is incompatible with how these engines manage concurrent access.
+Garage's metadata store corrupted this way on 2026-06-23 (see GIT-006 in `docs/AUDIT.md`).
+Every app found to be SQLite-backed was migrated to `local-path` instead: Garage
+(`garage-meta`), Headscale, Vaultwarden, Gitea, Mealie, Open WebUI, paperless-ai, Home
+Assistant. **`local-path` PVs are node-pinned** — a pod using one can only ever schedule
+back onto the node it first bound to; if that node is lost, the data is gone unless
+restored from a Velero backup. New apps with an embedded DB should default to
+`local-path`, not `nfs-client`.
+
+- Default storage class: `nfs-client` (bulk/shared data, blob storage, anything without
+  its own locking-sensitive embedded DB)
+- `local-path` (k3s built-in, node-local): embedded-DB apps listed above, plus uptime-kuma
+- NFS server: `ct-srv-nfs-01` (10.0.20.100) — only 2GB RAM as of 2026-06-23 (was 512MB,
+  OOM-killed once already); see `docs/compute-nodes.md`
+- Exception: `media` PVC (Jellyfin) is a direct NFS mount to the Proxmox host, not
+  provisioned via the nfs-client provisioner
 
 ## 3. Ingress & Traffic Flow
 

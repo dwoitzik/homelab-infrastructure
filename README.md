@@ -15,7 +15,7 @@ Start with [docs/OPERATIONS.md](docs/OPERATIONS.md) if you want to know where th
 | Hypervisor | Proxmox VE (Ryzen 7 5825U, 64 GB RAM) |
 | Networking | MikroTik RB5009 (Terraform-managed firewall) |
 | Edge DNS | 2× Raspberry Pi 4B — AdGuard Home + Unbound |
-| Kubernetes | k3s v1.31 — 3-node HA cluster, embedded etcd, all nodes control-plane (VIP `10.0.20.10`) |
+| Kubernetes | k3s v1.31 — 3-node cluster, single control-plane + etcd, 2 agent-only workers — see `docs/k3s-architecture.md` |
 | Ingress + TLS | Traefik + cert-manager (wildcard `*.woitzik.dev` via DNS-01) |
 | Storage | NFS (`ct-srv-nfs-01`, ZFS-backed) — Longhorn fully removed |
 | GitOps (k8s) | ArgoCD — ApplicationSet watching `kubernetes/apps/*` |
