@@ -20,13 +20,10 @@ resource "routeros_ip_firewall_nat" "dstnat_cobblemon" {
   comment      = "DNAT: Cobblemon Minecraft -> ct-dmz-proxy-01 (NPM stream)"
 }
 
-resource "routeros_ip_firewall_filter" "fwd_12_wan_to_cobblemon" {
-  action       = "accept"
-  chain        = "forward"
-  protocol     = "tcp"
-  dst_address  = "10.0.30.2"
-  dst_port     = "25566"
-  in_interface = "ether1"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "12: WAN -> Cobblemon Minecraft (ct-dmz-proxy-01:25566)"
-}
+# NOTE: the matching forward-chain accept rule for this port already exists
+# as routeros_ip_firewall_filter.fwd_wan_cobblemon in firewall_extra.tf
+# (imported from the live router, id *B5). A duplicate "fwd_12_wan_to_cobblemon"
+# resource with identical attributes used to live here too — same comment,
+# same match criteria — which would have claimed the same live object under a
+# second Terraform address. Removed 2026-06-23 while rebuilding network state
+# (GIT-007); only the NAT rule belongs in this file.
