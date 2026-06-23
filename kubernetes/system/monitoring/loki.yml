@@ -17,6 +17,10 @@ spec:
           auth_enabled: false
           commonConfig:
             replication_factor: 1
+          ingester:
+            chunk_idle_period: 5m
+            max_chunk_age: 30m
+            chunk_target_size: 1572864
           compactor:
             working_directory: /var/loki/compactor
             compaction_interval: 10m
@@ -73,6 +77,13 @@ spec:
           replicas: 1
           persistence:
             storageClass: nfs-client
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 3Gi
           extraEnv:
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
@@ -93,8 +104,22 @@ spec:
         chunksCache:
           allocatedMemory: 512
           maxItemSize: 5m
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
         resultsCache:
           allocatedMemory: 512
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
         lokiCanary:
           enabled: false
         test:
