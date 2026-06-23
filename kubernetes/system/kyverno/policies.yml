@@ -2,6 +2,17 @@
 # require-resource-limits and disallow-latest-tag were Audit-only until the
 # underlying gaps (IAC-001, SEC-005) were fixed; flipped to Enforce 2026-06-23
 # once a PolicyReport sweep confirmed zero violations cluster-wide.
+#
+# Both are scoped to [apps, database] only, not monitoring. The PolicyReport
+# sweep only reflected pods that existed *at that moment*; restarting Grafana
+# (kube-prometheus-stack chart) immediately after enforcing got blocked --
+# grafana-sc-dashboard, grafana-sc-datasources, and other chart-templated
+# sidecars across kube-prometheus-stack/loki/promtail in `monitoring` lack
+# resources by upstream chart default. Chasing every third-party sidecar's
+# resource values (and keeping them patched as charts get upgraded) is a
+# separate, larger effort than this pass's scope: the manifests this repo
+# directly authors. `apps` and `database` are 100% hand-written manifests in
+# this repo, so enforcement there doesn't have this problem.
 
 ---
 # Block pods missing resource limits.
@@ -23,7 +34,7 @@ spec:
         any:
           - resources:
               kinds: [Pod]
-              namespaces: [apps, monitoring, database]
+              namespaces: [apps, database]
       validate:
         message: "Container '{{ request.object.spec.containers[0].name }}' must define resources.limits (cpu and memory)."
         foreach:
@@ -88,7 +99,7 @@ spec:
         any:
           - resources:
               kinds: [Pod]
-              namespaces: [apps, monitoring, database]
+              namespaces: [apps, database]
       validate:
         message: "Container '{{ request.object.spec.containers[0].name }}' must use a specific image tag, not :latest or untagged."
         foreach:
