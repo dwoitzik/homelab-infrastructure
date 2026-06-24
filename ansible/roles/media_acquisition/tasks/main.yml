@@ -1,9 +1,26 @@
 ---
-- name: Ensure NFS client packages are installed
-  ansible.builtin.apt:
-    name: nfs-common
-    state: present
-    update_cache: true
+# NOTE on architecture, found live (2026-06-24): NFS client mounts from inside
+# this unprivileged LXC fail with EPERM regardless of the `mount=nfs` Proxmox
+# feature flag (a deeper unprivileged-userns kernel restriction, not just an
+# AppArmor/seccomp config gap) -- confirmed both NFSv3 and NFSv4 fail the same
+# way, while `showmount` (a plain RPC query, not an actual mount) succeeds
+# fine, ruling out a network/export-ACL problem. Two different fixes for the
+# two different data sources, neither of which needs an NFS client mount
+# inside this container at all:
+#   - Media library (/mnt/media): this lives on a LOCAL ZFS dataset on the
+#     SAME Proxmox host this LXC runs on (the NFS export to k8s pods is
+#     incidental -- the host doesn't need NFS to reach its own disk). Bound
+#     in directly via a native Proxmox LXC mount point (`mp0` in
+#     terraform/stacks/proxmox/lxc.tf), no NFS involved.
+#   - Per-app configs (sonarr/radarr/bazarr/sabnzbd/nzbhydra2/jellyseerr):
+#     these live on a *different* host (the NFS LXC, ct-srv-nfs-01) so a
+#     bind-mount isn't available the same way. One-time data copy via
+#     `tar | ssh | tar` directly between the two hosts (see WRK-006 in
+#     docs/AUDIT.md) instead of an ongoing NFS mount -- matches this repo's
+#     established pattern of keeping SQLite-backed app state off NFS
+#     entirely (GIT-006) rather than fighting NFS locking/mount issues.
+#     The real, final sync (with the source apps stopped, for consistency)
+#     happens at actual cutover time, not here.
 
 - name: Ensure base directories exist
   ansible.builtin.file:
@@ -12,40 +29,12 @@
     mode: '0755'
   loop:
     - "{{ media_acquisition_base_dir }}"
-    - "{{ media_acquisition_base_dir }}/sonarr"
-    - "{{ media_acquisition_base_dir }}/radarr"
-    - "{{ media_acquisition_base_dir }}/bazarr"
-    - "{{ media_acquisition_base_dir }}/sabnzbd"
-    - "{{ media_acquisition_base_dir }}/nzbhydra2"
-    - "{{ media_acquisition_base_dir }}/jellyseerr"
-    - "{{ media_acquisition_base_dir }}/media"
-
-# Reuses the exact same NFS exports these apps' Kubernetes PVCs were bound
-# to (kubectl get pv ... -o jsonpath='{.spec.nfs}') -- same config data,
-# just mounted directly by this LXC instead of via k8s's nfs-client
-# provisioner. No data migration needed.
-- name: Mount NFS-backed config directories
-  ansible.posix.mount:
-    src: "{{ item.src }}"
-    path: "{{ item.path }}"
-    fstype: nfs
-    opts: rw,sync,hard,intr
-    state: mounted
-  loop:
-    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/sonarr", path: "{{ media_acquisition_base_dir }}/sonarr/config" }
-    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/radarr", path: "{{ media_acquisition_base_dir }}/radarr/config" }
-    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/bazarr", path: "{{ media_acquisition_base_dir }}/bazarr/config" }
-    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/sabnzbd", path: "{{ media_acquisition_base_dir }}/sabnzbd/config" }
-    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/k8s-general/apps/nzbhydra2-config", path: "{{ media_acquisition_base_dir }}/nzbhydra2/config" }
-    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/k8s-general/apps/jellyseerr-config", path: "{{ media_acquisition_base_dir }}/jellyseerr/config" }
-
-- name: Mount media library share
-  ansible.posix.mount:
-    src: "{{ media_acquisition_media_nfs_server }}:{{ media_acquisition_media_nfs_path }}"
-    path: "{{ media_acquisition_base_dir }}/media"
-    fstype: nfs
-    opts: rw,sync,hard,intr
-    state: mounted
+    - "{{ media_acquisition_base_dir }}/sonarr/config"
+    - "{{ media_acquisition_base_dir }}/radarr/config"
+    - "{{ media_acquisition_base_dir }}/bazarr/config"
+    - "{{ media_acquisition_base_dir }}/sabnzbd/config"
+    - "{{ media_acquisition_base_dir }}/nzbhydra2/config"
+    - "{{ media_acquisition_base_dir }}/jellyseerr/config"
 
 - name: Deploy media acquisition docker-compose configuration
   ansible.builtin.template:
