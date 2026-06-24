@@ -288,6 +288,7 @@ spec:
                   - source_labels: [__param_target]
                     target_label: instance
               - job_name: 'blackbox-http'
+                scrape_interval: 60s
                 metrics_path: /probe
                 params:
                   module: [http_2xx]
@@ -309,6 +310,7 @@ spec:
                   - target_label: __address__
                     replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
               - job_name: 'blackbox-authelia-health'
+                scrape_interval: 60s
                 metrics_path: /probe
                 params:
                   module: [http_2xx]
