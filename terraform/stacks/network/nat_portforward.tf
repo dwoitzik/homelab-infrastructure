@@ -6,8 +6,30 @@
 # only sees the Fritzbox's LAN, not the real internet-facing public IP.
 ###############################################################################
 
+# REL-017: this rule never existed -- found while investigating why
+# mc-server-2 (the original Minecraft server, port 25565) had been
+# unreachable from the internet all night, confirmed via the live router's
+# REST API (GET /rest/ip/firewall/nat) only ever showing the Cobblemon rule
+# below, nothing for 25565. The matching forward-chain ALLOW rule
+# (fwd_wan_minecraft in firewall_extra.tf) exists and always has, but an
+# ALLOW rule is useless without a NAT rule to actually rewrite the
+# destination from the public IP to the internal proxy in the first place --
+# confirmed live: NPM and the backend (ct-dmz-games-01) were both already
+# listening and reachable internally the entire time, only the public path
+# was ever broken.
+resource "routeros_ip_firewall_nat" "dstnat_minecraft" {
+  chain        = "dstnat"
+  action       = "dst-nat"
+  protocol     = "tcp"
+  dst_port     = "25565"
+  in_interface = "ether1"
+  to_addresses = "10.0.30.2"
+  to_ports     = "25565"
+  comment      = "DNAT: Minecraft -> ct-dmz-proxy-01 (NPM stream)"
+}
+
 # Cobblemon Minecraft server (Fabric) — routed through ct-dmz-proxy-01 (NPM
-# stream + CrowdSec), same pattern as the existing Minecraft server on 25565.
+# stream + CrowdSec), same pattern as the Minecraft server above on 25565.
 # NPM then forwards 25566 -> ct-dmz-games-01:25566 internally.
 resource "routeros_ip_firewall_nat" "dstnat_cobblemon" {
   chain        = "dstnat"
