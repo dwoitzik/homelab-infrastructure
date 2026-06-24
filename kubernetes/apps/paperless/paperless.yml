@@ -16,10 +16,12 @@ spec:
       containers:
       - name: paperless
         image: paperlessngx/paperless-ngx:2.20.15
+        # SEC-012: image entrypoint runs init-folders as root to chown
+        # /tmp/paperless and /usr/src/paperless/export -- confirmed live,
+        # dropping all capabilities crash-loops it (same failure class as
+        # gitea/authelia/mealie/headscale/postgres/redis in this pass).
         securityContext:
           allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
         resources:
           requests:
             cpu: 200m
