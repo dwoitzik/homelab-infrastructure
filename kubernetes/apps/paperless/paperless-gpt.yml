@@ -41,8 +41,18 @@ spec:
           value: ollama
         - name: OLLAMA_HOST
           value: http://10.0.20.251:11434
+        # WRK-005: qwen2.5-coder:7b (a code-specialized model) was generating
+        # multi-paragraph English essay summaries instead of short titles --
+        # ignoring the prompt's explicit "title only" and "respond in German"
+        # instructions outright, and in one case hallucinated a completely
+        # unrelated personal-advice response. Confirmed live via paperless-gpt's
+        # own logs (repeated "error creating correspondent: ... no more than 128
+        # characters" failures, since it tried reusing the same broken text as a
+        # correspondent name too). minicpm-v (already loaded, same size class,
+        # already used as VISION_LLM_MODEL) tested clean and short in German on
+        # the same prompts via a direct Ollama API call before deploying this.
         - name: LLM_MODEL
-          value: qwen2.5-coder:7b
+          value: minicpm-v
         - name: VISION_LLM_PROVIDER
           value: ollama
         - name: VISION_LLM_MODEL
