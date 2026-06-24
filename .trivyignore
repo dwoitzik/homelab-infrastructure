@@ -21,3 +21,26 @@ KSV-0118 path:kubernetes/system/infrastructure/sysctl-fix.yml
 # the manifest here stays live until that cutover completes.
 KSV-0022 path:kubernetes/apps/jellyfin/usenet.yml
 KSV-0120 path:kubernetes/apps/jellyfin/usenet.yml
+
+# sysctl-fix DaemonSet's container is privileged: true -- allowPrivilegeEscalation
+# is moot there (privileged mode already implies it), and the blast radius of
+# testing a contradictory combination on a DaemonSet running on every node wasn't
+# worth it for a no-op setting.
+KSV-0001 path:kubernetes/system/infrastructure/sysctl-fix.yml
+
+# False positives: Trivy pattern-matches ConfigMap key/value names like "key" or
+# "client_secret" without understanding what they actually contain. Verified each
+# one directly:
+#   - authelia-config: client_secret values are argon2id *hashes* (the actual
+#     plaintext secret lives with each OIDC client, e.g. Grafana -- Authelia only
+#     stores the hash to verify it); jwt_secret/session secret/encryption_key/
+#     hmac_secret/oidc-issuer-private-key are all Vault Agent template refs
+#     ({{ secret "/config/secrets/X" }}), resolved at runtime, not literal values.
+#   - headscale-config: only contains file *paths* to private keys, not the keys
+#     themselves; client_secret is injected via env var from a real Secret object,
+#     never stored in this ConfigMap at all.
+#   - homepage-config: all {{HOMEPAGE_VAR_*}} placeholders, resolved via
+#     envFrom: secretRef: homepage-secrets at runtime.
+KSV-01010 path:kubernetes/apps/authelia/configmap.yml
+KSV-01010 path:kubernetes/apps/headscale/config.yml
+KSV-01010 path:kubernetes/apps/homepage/homepage.yml
