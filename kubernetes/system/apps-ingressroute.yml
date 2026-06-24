@@ -274,7 +274,8 @@ spec:
     services: [{name: gitea, port: 3000}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# Home Assistant
+# Home Assistant (Authelia guards web UI; Companion app should use Headscale VPN
+# for direct local access, same pattern as Jellyfin below)
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -285,6 +286,7 @@ spec:
   routes:
   - match: Host(`ha.woitzik.dev`)
     kind: Rule
+    middlewares: [{name: authelia}]
     services: [{name: home-assistant, port: 8123}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
