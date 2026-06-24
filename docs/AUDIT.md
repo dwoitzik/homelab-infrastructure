@@ -466,6 +466,48 @@ secret in the cluster — worth fixing proactively rather than waiting for an in
 
 ---
 
+### REL-010 — `postgres-authelia` (CNPG) was on `nfs-client` · **RESOLVED** (2026-06-24)
+
+Lower-urgency cousin of GIT-006/REL-009 (Postgres has real locking, unlike SQLite/BoltDB,
+so this was flagged as LOW rather than HIGH) — migrated anyway while the pattern was
+fresh from REL-009, since Authelia's auth database is still high-blast-radius if anything
+ever did go wrong.
+
+- **Fix:** Took a `pg_dump` logical backup first (in addition to the Proxmox snapshot
+  already taken for REL-009 on the same node). Used CNPG's **declarative hibernation**
+  feature (`cnpg.io/hibernation=on` annotation) instead of manually deleting the
+  StatefulSet — this is CNPG's own documented mechanism for exactly this scenario:
+  cleanly stops the instance while leaving the PVC intact. Same two-hop PVC copy as
+  REL-009 (old name -> temp local-path PVC -> delete old -> final PVC named
+  `postgres-authelia-1` on local-path -> copy from temp -> delete temp), verified by
+  comparing total logical byte counts (`stat -c '%s'` summed across all files, not
+  `du -sh` — NFS under-reports real usage via `du`, a red herring that cost some time
+  mid-migration) plus `md5sum` on `PG_VERSION` and `global/pg_control`.
+  - **The real complication:** a manually-created PVC isn't enough for CNPG to recognize
+    it as belonging to the cluster on resume — it needs the `cnpg.io/cluster`,
+    `cnpg.io/instanceName`, `cnpg.io/pvcRole=PG_DATA` labels, the `cnpg.io/nodeSerial`
+    and `cnpg.io/pvcStatus=ready` annotations, **and an `ownerReference` to the Cluster**.
+    Missing the ownerReference specifically caused the cluster to declare itself
+    `Cluster is unrecoverable and needs manual intervention` / "restore from a recent
+    backup" — a scary-sounding terminal state that was actually just one missing field,
+    not real data loss (confirmed the PVC's data was always intact throughout; adding
+    the ownerReference and re-cycling hibernation resolved it immediately).
+  - Real data on disk (~10.4GB logical) was already larger than the declared `8Gi`
+    request (NFS doesn't enforce capacity the way local-path/block storage might) —
+    bumped the declared size to `12Gi` for headroom and accuracy.
+- **Verified:** `totp_configurations`/`encryption` row counts unchanged post-migration,
+  Authelia reconnected and served traffic normally (confirmed via a live
+  `https://auth.woitzik.dev/api/health` 200 and real OIDC consent-flow traffic in logs).
+- **Note:** the live `Cluster` spec briefly drifted back to `nfs-client` via ArgoCD
+  self-heal before this fix was committed — cosmetic only (CNPG doesn't recreate an
+  already-bound PVC just because the declared storageClass changed), but a reminder that
+  GIT-003's manual-apply gap applies to *any* live edit of an ArgoCD-tracked resource,
+  not just the Application objects themselves.
+- **Effort:** Small in mechanics, but the CNPG label/ownerReference requirements were
+  undocumented and took real investigation to find.
+
+---
+
 ## 3. GitOps Quality
 
 ### GIT-001 — Terraform state backend requires live Garage (in-cluster) · **HIGH**
@@ -857,7 +899,7 @@ not because either model is fundamentally broken.
 | SEC-002 | Security | **RESOLVED** | Shared OIDC client secret across 4 services |
 | SEC-003 | Security | **RESOLVED** | Placeholder secrets rotated; found and fixed a much bigger bug along the way -- `configmap.yml` set 4 secret fields (jwt/session/storage-key/hmac) as bare literal strings instead of Authelia's file-templating syntax, so the *actual* functional secrets were public path strings, not the random Vault values (2026-06-24) |
 | SEC-004 | Security | **RESOLVED** | Cross-service secret reuse (redis/storage/paperless) |
-| REL-010 | Reliability | **LOW** | `postgres-authelia` (CNPG) is on `nfs-client` -- same storage-class concern as GIT-006, lower severity (Postgres has real locking, unlike SQLite/BoltDB) |
+| REL-010 | Reliability | **RESOLVED** | `postgres-authelia` (CNPG) migrated from `nfs-client` to `local-path` via CNPG's declarative hibernation feature; required adding an ownerReference CNPG doesn't document needing (2026-06-24) |
 | SEC-005 | Security | **MEDIUM** | 14 images on `:latest` / floating tags |
 | SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
