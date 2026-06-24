@@ -63,6 +63,8 @@ spec:
         image: ghcr.io/runatlantis/atlantis:v0.33.0
         securityContext:
           allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
         ports:

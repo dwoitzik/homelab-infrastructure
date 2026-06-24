@@ -47,6 +47,8 @@ spec:
           args: ["/garage", "server"]
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
             capabilities:
               drop: ["ALL"]
           env:
