@@ -466,12 +466,16 @@ migrated to control-plane + etcd nodes in June 2026. The Terraform tags are stal
 
 ---
 
-### GIT-003 — ArgoCD ApplicationSet covers only `kubernetes/apps/*`; system components are manual · **MEDIUM**
+### GIT-003 — ArgoCD ApplicationSet covers only `kubernetes/apps/*`; system components are manual · **HIGH** (severity raised 2026-06-24)
 
 The `homelab-apps` ApplicationSet auto-deploys everything under `kubernetes/apps/*` but
 `kubernetes/system/*` requires manual `kubectl apply`. A merge to main of a system
 component does not deploy it — it must be applied manually or via a separate ArgoCD
-Application per component.
+Application per component. Critically, this applies to the *Application objects
+themselves*, not just the resources they manage: editing an existing
+`kubernetes/system/<name>/application.yml` (e.g. fixing a `directory.include` glob) has
+**zero effect** until someone manually re-applies that exact file — the Application's own
+`spec` is not watched for drift from git at all.
 
 Some system components (cert-manager, metallb, traefik, etc.) have their own ArgoCD
 `Application` manifests inside `kubernetes/system/<name>/application.yml`, but others
@@ -479,10 +483,18 @@ do not (postgres cluster, redis, argocd itself, infrastructure resources).
 
 - **Impact:** Drift risk for system components. A change pushed to git may not deploy
   automatically, and there is no alert when the live state diverges.
+- **Confirmed real impact, not just theoretical (2026-06-24):** GIT-010's fix (correcting
+  `postgres-cluster-application.yml`'s glob) merged cleanly via PR but never took live
+  effect — and neither had REL-011's `ScheduledBackup` fix from earlier the same day,
+  for the exact same reason. Both required a manual `kubectl apply` discovered only by
+  noticing `status.history` hadn't recorded a sync since 2026-06-18.
 - **Fix:** Document explicitly which system components are ArgoCD-managed vs. manual-apply.
   Add a runbook step to check `kubectl get applications -n argocd` against the list after
-  every system PR merge.
-- **Effort:** Documentation only (small).
+  every system PR merge. Longer-term: bring `kubernetes/system/*` Application objects
+  themselves under a parent "app of apps" Application so edits to *them* also auto-sync —
+  this is the actual fix, not just a checklist step.
+- **Effort:** Small for the documentation/runbook step (done implicitly via this entry);
+  larger for the real app-of-apps fix (not done).
 
 ---
 
@@ -531,7 +543,20 @@ silent, permanent drift risk (anyone editing it in Git would see no effect at al
 - **Fix:** Corrected the glob to `'{cluster,external-secret,scheduled-backup}.yml'`.
   Verified the live `cnpg-garage-backup` ExternalSecret's spec already matches the
   repo's `external-secret.yml` exactly, so adopting it into GitOps is a clean no-op.
-- **Effort:** Trivial — done.
+- **Bigger problem found applying the fix:** merging the PR alone did nothing — this
+  `Application` object lives under `kubernetes/system/*`, which (per GIT-003) isn't
+  covered by any ApplicationSet or parent Application. Its own spec only ever gets
+  updated by a manual `kubectl apply` of `postgres-cluster-application.yml` itself;
+  nothing watches it for drift from git. `kubectl get application postgres-cluster -o
+  jsonpath='{.spec.source.directory.include}'` still showed the broken glob *after*
+  merge, confirmed via `status.history` that the Application hadn't actually
+  re-synced since 2026-06-18. This means **REL-011's `ScheduledBackup` never actually
+  deployed either**, despite that PR merging cleanly — same root cause, just not
+  caught until now. Ran the manual `kubectl apply` to push the corrected spec live;
+  all three resources (`Cluster`, `ExternalSecret`, `ScheduledBackup`) now show
+  `Synced` under `status.resources`.
+- **Effort:** Trivial — done, but flags GIT-003 as more urgent than "documentation
+  only": at least one real fix (REL-011) silently failed to deploy because of it.
 
 ---
 
@@ -793,7 +818,7 @@ on this chip, abandoned at some earlier point without anyone reverting the Ansib
 | GIT-008 | GitOps | **LOW** | Live duplicate: `routeros_ip_firewall_mangle.mss_clamp` exists twice on the router (ids `*1` and `*5`), byte-identical config, both carrying real traffic — almost certainly created by a prior `apply` retried against the same missing state (GIT-007). Imported the lower id into Terraform; the duplicate (`*5`) still exists live and should be deleted manually via Atlantis/router once confirmed safe — not done as part of the GIT-007 state rebuild to avoid mixing state-recovery with a live destructive change. |
 | GIT-009 | GitOps | **RESOLVED** | Two NAT masquerade rules (outbound WAN `*5`, MGMT->SRV `*8`) brought under Terraform via import; also found and fixed a dangling interface-list reference on `*5` (2026-06-24, needs `atlantis apply` to land) |
 | GIT-010 | GitOps | **RESOLVED** | `postgres-cluster` Application's directory glob never matched its ExternalSecret filename -- silently unmanaged by GitOps since creation, fixed (2026-06-24) |
-| GIT-003 | GitOps | **MEDIUM** | System components are manual-apply; no drift detection |
+| GIT-003 | GitOps | **HIGH** | System components are manual-apply; no drift detection -- confirmed this silently broke both GIT-010 and REL-011's fixes until caught manually (2026-06-24) |
 | GIT-004 | GitOps | **LOW** | Proxmox provider version constraint far behind latest |
 | GIT-005 | GitOps | **LOW** | R2 BackupStorageLocation has placeholder URL committed |
 | IAC-001 | IaC | **RESOLVED** | ~50% of app Deployments lack resource limits |
