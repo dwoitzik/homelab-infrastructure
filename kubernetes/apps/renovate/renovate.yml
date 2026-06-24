@@ -35,6 +35,11 @@ spec:
           containers:
             - name: renovate
               image: ghcr.io/renovatebot/renovate:39
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop: ["ALL"]
               env:
                 - name: RENOVATE_TOKEN
                   valueFrom:

@@ -32,6 +32,10 @@ spec:
       initContainers:
       - name: wait-for-vault-secret
         image: busybox:1.36
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         # REL-007: on a cold cluster restart Vault starts sealed; ExternalSecrets
         # can't sync until vault-unseal (polls every 5s) unseals it, so the
         # authelia-secrets Secret may not exist yet. Block here instead of
@@ -54,6 +58,10 @@ spec:
       containers:
       - name: authelia
         image: ghcr.io/authelia/authelia:4.39.20
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         ports:
         - containerPort: 9091
         volumeMounts:
