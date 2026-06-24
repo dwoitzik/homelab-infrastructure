@@ -637,7 +637,7 @@ reduces readability.
 
 ---
 
-### DOC-003 — compute-nodes.md says RPi runs HAProxy/Traefik as ingress gateway — this is stale · **LOW**
+### DOC-003 — compute-nodes.md says RPi runs HAProxy/Traefik as ingress gateway — this is stale · **RESOLVED**
 
 `docs/compute-nodes.md` lists "HAProxy / Traefik — Ingress gateway routing TCP traffic to
 K3s backend" as an RPi service. The actual ingress path is MetalLB → Traefik running
@@ -647,6 +647,9 @@ ingress migration.
 - **Fix:** Remove the HAProxy/Traefik line from the RPi services table; update to reflect
   AdGuard + Unbound + Keepalived only.
 - **Effort:** Trivial.
+- **Resolution:** Reworded the RPi section ("HA Ingress Layer" / "Gateway Strategy") to
+  drop the ingress claim and added a note that MetalLB + in-cluster Traefik own k3s
+  ingress; RPis only run AdGuard + Unbound + Keepalived.
 
 ---
 
@@ -775,7 +778,7 @@ on this chip, abandoned at some earlier point without anyone reverting the Ansib
 | IAC-003 | IaC | **LOW** | No automated k3s VM rebuild procedure |
 | DOC-001 | Docs | **HIGH** | DISASTER-RECOVERY.md does not exist |
 | DOC-002 | Docs | **LOW** | ROADMAP.md is partially in German |
-| DOC-003 | Docs | **LOW** | compute-nodes.md has stale ingress description |
+| DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |
 | DOC-004 | Docs | **LOW** | 4 architectural decisions without ADRs |
 | WRK-001 | Workloads | **MEDIUM** | Jellyfin/media stack stuck in ContainerCreating |
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed or backed up |
