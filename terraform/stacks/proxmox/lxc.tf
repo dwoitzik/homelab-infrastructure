@@ -512,3 +512,4 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
     ]
   }
 }
+# Trigger fresh atlantis plan (media-acq LXC apply pending)
