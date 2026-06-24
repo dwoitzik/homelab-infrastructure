@@ -30,10 +30,12 @@ spec:
       containers:
         - name: mealie
           image: ghcr.io/mealie-recipes/mealie:v2.8.0
+          # SEC-012: image entrypoint runs as root and needs CAP_CHOWN to
+          # chown /app/data and su-exec into uid 911 -- confirmed live,
+          # dropping all capabilities crash-loops it ("operation not
+          # permitted" on chown and the user switch).
           securityContext:
             allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
           ports:
             - containerPort: 9000
           env:
