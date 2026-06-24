@@ -43,10 +43,13 @@ spec:
       containers:
       - name: postgres
         image: postgres:16
+        # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
+        # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
+        # the postgres user -- confirmed live, dropping all capabilities
+        # crash-loops it ("error: failed switching to 'postgres': operation
+        # not permitted").
         securityContext:
           allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
         env:
         - name: POSTGRES_DB
           value: paperless
@@ -108,9 +111,11 @@ spec:
       containers:
       - name: redis
         image: redis:7
+        # SEC-012: redis:7 has no non-root default user despite running fine
+        # under capability drop -- confirmed live, runAsNonRoot alone fails
+        # admission ("container has runAsNonRoot and image will run as root").
         securityContext:
           allowPrivilegeEscalation: false
-          runAsNonRoot: true
           capabilities:
             drop: ["ALL"]
         ports:
