@@ -16,6 +16,10 @@ spec:
       containers:
       - name: paperless-gpt
         image: icereed/paperless-gpt:v0.25.1
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         resources:
           requests:
             cpu: 50m

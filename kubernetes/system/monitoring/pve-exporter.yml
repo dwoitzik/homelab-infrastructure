@@ -32,6 +32,10 @@ spec:
       containers:
       - name: pve-exporter
         image: prompve/prometheus-pve-exporter:3.9.0
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         ports:
         - containerPort: 9221
         args:

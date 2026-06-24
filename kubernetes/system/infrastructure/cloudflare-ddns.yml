@@ -17,6 +17,11 @@ spec:
           containers:
             - name: ddns
               image: curlimages/curl:8.10.1
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop: ["ALL"]
               env:
                 - name: CF_API_TOKEN
                   valueFrom:
