@@ -1,0 +1,6 @@
+---
+jellyfin_base_dir: /opt/jellyfin
+jellyfin_puid: "1000"
+jellyfin_pgid: "1000"
+jellyfin_tz: "Europe/Berlin"
+jellyfin_published_url: "https://media.woitzik.dev"
