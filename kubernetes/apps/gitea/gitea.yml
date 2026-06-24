@@ -30,6 +30,10 @@ spec:
       containers:
         - name: gitea
           image: gitea/gitea:1.22
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: web
               containerPort: 3000

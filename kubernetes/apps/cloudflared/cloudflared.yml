@@ -16,6 +16,11 @@ spec:
       containers:
       - name: cloudflared
         image: cloudflare/cloudflared:2026.6.1
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop: ["ALL"]
         args:
         - tunnel
         - "--no-autoupdate"

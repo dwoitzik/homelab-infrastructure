@@ -32,6 +32,10 @@ spec:
       containers:
         - name: uptime-kuma
           image: louislam/uptime-kuma:1
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: UPTIME_KUMA_DISABLE_AUTH
               value: "1"

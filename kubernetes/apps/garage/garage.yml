@@ -45,6 +45,10 @@ spec:
         - name: garage
           image: dxflrs/garage:v2.3.0
           args: ["/garage", "server"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: GARAGE_CONFIG
               value: /etc/garage.toml

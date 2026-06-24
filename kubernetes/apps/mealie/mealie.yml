@@ -30,6 +30,10 @@ spec:
       containers:
         - name: mealie
           image: ghcr.io/mealie-recipes/mealie:v2.8.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 9000
           env:

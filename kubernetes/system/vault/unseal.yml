@@ -18,6 +18,11 @@ spec:
       containers:
         - name: unseal
           image: hashicorp/vault:1.17
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
           command:
             - sh
             - -c
