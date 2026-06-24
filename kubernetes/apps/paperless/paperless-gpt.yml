@@ -41,6 +41,12 @@ spec:
           value: ollama
         - name: VISION_LLM_MODEL
           value: minicpm-v
+        - name: IMAGE_MAX_RENDER_DPI
+          value: "300"
+        - name: IMAGE_MAX_PIXEL_DIMENSION
+          value: "4000"
+        - name: IMAGE_MAX_TOTAL_PIXELS
+          value: "16000000"
         - name: AUTO_TAG
           value: paperless-gpt-to-process
         - name: LANGUAGE
