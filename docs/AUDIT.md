@@ -1144,10 +1144,33 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
   schema was already current, not silently reset), and `/media` library paths matching
   the old k3s mount 1:1 (same `/media` path inside the container either way).
 - **Cutover:** kept the existing Traefik IngressRoute and Authelia middleware
-  untouched — only swapped the `jellyfin` Service from a pod selector to a manual
-  EndpointSlice pointing at the LXC's IP, so nothing downstream needed to change. Old
-  k8s Deployment/PVCs/PV removed (all `Retain` reclaim policy, so the underlying NFS
-  data wasn't touched, just the k8s objects pruned).
+  untouched — only swapped the `jellyfin` Service's backend from a pod selector to a
+  manually-pointed external IP, so nothing downstream needed to change.
+- **Two more issues found live during cutover, both fixed same-day:**
+  - **Shared-PVC blast radius:** the `media` PVC/PV removed from `jellyfin.yml` turned
+    out to *also* be referenced by name from `usenet.yml`'s Sonarr/Radarr/Bazarr/SABnzbd
+    Deployments (`claimName: media`) — a coupling invisible from jellyfin.yml alone.
+    Caught before any actual disruption: the PVC went into `Terminating` but stayed
+    `Bound` and those 4 pods stayed `Running` (blocked by `kubernetes.io/pvc-protection`
+    until the pods that reference it go away) — a safe-but-temporary window, not a free
+    pass. Fixed by recreating the same NFS volume under new names in `usenet.yml` (its
+    actual remaining owner) and repointing those 4 Deployments to it; the old PVC/PV
+    finished terminating cleanly once nothing referenced them anymore. **Lesson:** before
+    deleting any PV/PVC, grep the whole `kubernetes/` tree for its name, not just the
+    file that appears to define it — cross-file `claimName` references are easy to miss.
+  - **EndpointSlice doesn't work for this use case:** routing the `jellyfin` Service to
+    an external IP via a bare `EndpointSlice` looked completely correct via `kubectl`
+    (Service + EndpointSlice both existed, endpoint listed right) but Traefik 404'd
+    `media.woitzik.dev` regardless. Its own logs gave the real reason directly:
+    `subset not found for apps/jellyfin` — Traefik's Kubernetes CRD provider resolves
+    Service backends through the legacy `v1/Endpoints` API ("subsets"), not
+    `EndpointSlice`, regardless of which one Kubernetes itself prefers. Switched to a
+    plain `Endpoints` object; confirmed fixed via both `curl` and Traefik's logs going
+    quiet for that ingress.
+- Old k8s Deployment/PVCs/PV removed (all `Retain` reclaim policy, so the underlying
+  NFS data wasn't touched, just the k8s objects pruned). Final state confirmed end to
+  end: `media.woitzik.dev` reachable through Traefik, the 4 still-running k8s media-
+  acquisition pods unaffected, Jellyfin container healthy on the LXC.
 
 ---
 
