@@ -889,6 +889,19 @@ not because either model is fundamentally broken.
   different (rotate the page vs. swap the model).
 - **Effort:** Small once root-caused; the root-causing itself was the real work.
 
+**3. Separate, not-yet-fixed issue found while watching the queue process: `LLM_MODEL`
+(`qwen2.5-coder:7b`, used for title/correspondent/tag/document-type generation, distinct
+from `VISION_LLM_MODEL`) occasionally responds in chatty-assistant style instead of
+returning the requested short value** — e.g. for document 36, it returned a multi-
+paragraph "I apologize, but I'm not able to fully understand..." explanation as the
+*correspondent name*, which Paperless then rejected (`Ensure this field has no more
+than 128 characters`), and a similarly long paragraph as the suggested document type
+(silently ignored since it didn't match any configured type). Confirmed low-frequency
+(1 failed correspondent creation, 2 chatty-refusal responses in the prior 24h of logs)
+rather than systemic, but real — worth a prompt-engineering pass (more directive
+system prompt, and/or truncate-and-validate suggested values before using them as
+field input) if it recurs. Not fixed in this pass.
+
 ---
 
 ## Summary Table
@@ -937,7 +950,7 @@ not because either model is fundamentally broken.
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed or backed up |
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
 | WRK-004 | Workloads | **RESOLVED** | paperless-gpt failing on every document; Ollama iGPU (Vulkan) crashing constantly under load -- switched to CPU-only |
-| WRK-005 | Workloads | **RESOLVED** | Paperless data-quality pass: 41 documents missing their archived PDF (nfs-client related, originals intact, regenerated via document_archiver) + the 5 "hallucinated" docs from WRK-004 were actually just scanned upside-down, not a model problem (2026-06-24) |
+| WRK-005 | Workloads | **PARTIAL** | Paperless data-quality pass: missing archives (nfs-client related, fixed) + 5 "hallucinated" docs were actually scanned upside-down (fixed) + LLM_MODEL occasionally returns chatty-assistant text instead of short field values (low-frequency, not fixed) (2026-06-24) |
 
 ---
 
