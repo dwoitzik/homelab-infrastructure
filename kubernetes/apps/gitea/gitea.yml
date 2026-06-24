@@ -30,10 +30,14 @@ spec:
       containers:
         - name: gitea
           image: gitea/gitea:1.22
+          # SEC-012: the official image's entrypoint runs as root and needs
+          # CAP_CHOWN/CAP_SETGID/CAP_SETUID etc. to chown/chmod its data dirs
+          # and su-exec into the git user -- confirmed live, dropping all
+          # capabilities crash-loops it ("chown: Operation not permitted",
+          # "su-exec: setgroups: Operation not permitted"). Only the
+          # privilege-escalation flag is safe to set here.
           securityContext:
             allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
           ports:
             - name: web
               containerPort: 3000
