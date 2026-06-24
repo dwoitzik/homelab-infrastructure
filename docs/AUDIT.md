@@ -649,13 +649,14 @@ WRK-006's `ct_srv_media_acq_01`:
    never actually exercised the CREATE path via this token. Removed the block from the
    new LXC's create path; will add it back manually via root SSH once the bare container
    exists, then reconcile state the same way.
-2. **`usb-templates` (the flaky USB scratch stick, per `CLAUDE.local.md`) is currently
-   unplugged/unavailable** — confirmed via `pvesm status` on the live host, it doesn't
-   even show up as a storage backend. Every existing container's
-   `operating_system.template_file_id` references it, but all of them `ignore_changes`
-   on that field, so it never mattered until creating a *new* container needed to
-   actually fetch the template. The identical template file already exists on `local`
-   (reliable disk) — switched to that.
+2. **`usb-templates`' Proxmox storage *definition* was missing from
+   `/etc/pve/storage.cfg`**, so `pvesm status` and the API didn't know it existed —
+   initially misdiagnosed this as the physical USB disk being unplugged, which was
+   wrong; the disk (`sdb`, 460GB) was physically connected and already mounted at
+   `/mnt/pve/usb-templates` the whole time, template file intact. Just the storage
+   *registration* was gone. Re-registered with `pvesm add dir usb-templates --path
+   /mnt/pve/usb-templates --content vztmpl,iso,backup` — no data lost, no workaround
+   needed once correctly diagnosed.
 
 - **Effort:** Small, but both would have silently blocked any future LXC creation
   (including the still-planned Jellyfin GPU-passthrough LXC) until hit by trial and
@@ -998,7 +999,7 @@ download traffic itself.
 | GIT-008 | GitOps | **LOW** | Live duplicate: `routeros_ip_firewall_mangle.mss_clamp` exists twice on the router (ids `*1` and `*5`), byte-identical config, both carrying real traffic — almost certainly created by a prior `apply` retried against the same missing state (GIT-007). Imported the lower id into Terraform; the duplicate (`*5`) still exists live and should be deleted manually via Atlantis/router once confirmed safe — not done as part of the GIT-007 state rebuild to avoid mixing state-recovery with a live destructive change. |
 | GIT-009 | GitOps | **RESOLVED** | Two NAT masquerade rules (outbound WAN `*5`, MGMT->SRV `*8`) brought under Terraform via import; also found and fixed a dangling interface-list reference on `*5` (2026-06-24, needs `atlantis apply` to land) |
 | GIT-010 | GitOps | **RESOLVED** | `postgres-cluster` Application's directory glob never matched its ExternalSecret filename -- silently unmanaged by GitOps since creation, fixed (2026-06-24) |
-| GIT-011 | GitOps | **RESOLVED** | Two silent LXC-creation blockers found provisioning WRK-006: Atlantis's TF token isn't root@pam (blocks device_passthrough on create), and `usb-templates` storage is currently unplugged (2026-06-24) |
+| GIT-011 | GitOps | **RESOLVED** | Two LXC-creation blockers found provisioning WRK-006: Atlantis's TF token isn't root@pam (blocks device_passthrough on create), and `usb-templates`' Proxmox storage registration was missing (disk was fine, re-registered) (2026-06-24) |
 | GIT-003 | GitOps | **HIGH** | System components are manual-apply; no drift detection -- confirmed this silently broke both GIT-010 and REL-011's fixes until caught manually (2026-06-24) |
 | GIT-004 | GitOps | **LOW** | Proxmox provider version constraint far behind latest |
 | GIT-005 | GitOps | **DEFERRED** | Offsite backup (R2/B2) deliberately skipped -- neither provider offers a true no-cost guarantee that fits the "never pay" requirement without tradeoffs (2026-06-24) |

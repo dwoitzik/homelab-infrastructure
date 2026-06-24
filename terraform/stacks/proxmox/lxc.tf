@@ -1,12 +1,7 @@
 locals {
   target_node = "pve-mgmt-01"
   storage     = "local-zfs"
-  # "usb-templates" (the flaky USB scratch stick, per CLAUDE.local.md) is
-  # currently unplugged/unavailable -- confirmed live via `pvesm status`, it
-  # doesn't even show up. Existing containers don't care (they ignore_changes
-  # on this field), but it breaks creating any *new* one. The same template
-  # file already exists on `local` (reliable disk) too -- use that instead.
-  template = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+  template    = "usb-templates:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
 }
 
 # --- Management Stack ---
