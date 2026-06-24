@@ -653,9 +653,9 @@ ingress migration.
 
 ---
 
-### DOC-004 — Missing ADRs for several architectural decisions · **LOW**
+### DOC-004 — Missing ADRs for several architectural decisions · **RESOLVED**
 
-Decisions not recorded as ADRs:
+Decisions that were not recorded as ADRs:
 
 - Velero + Kopia for PVC backup (the `defaultVolumesToFsBackup` fix is a significant decision)
 - CloudNativePG for Authelia Postgres (migration from bare StatefulSet)
@@ -665,8 +665,12 @@ Decisions not recorded as ADRs:
 Existing ADRs: Unbound (ADR-001), Cloudflare Tunnel (ADR-002), Garage as TF backend
 (ADR-003), 3-2-1 backup (ADR-004), NFS over Longhorn (ADR-005).
 
-- **Fix:** Write ADR-006 through ADR-009 for the above decisions.
-- **Effort:** Small (1h each).
+Added `docs/decisions/ADR-006-cloudnativepg-authelia.md`,
+`ADR-007-velero-kopia-pvc-backup.md`, `ADR-008-networkpolicy-default-deny.md`, and
+`ADR-009-vault-auto-unseal.md`, each grounded in the actual git history and commit
+messages behind the decision (CNPG migration commits, the 2026-06-19 Velero
+`defaultVolumesToFsBackup` incident, the NetworkPolicy rollout breaking Velero→Garage and
+Homepage→Uptime Kuma, and the `vault-unseal` polling-sidecar design from REL-007).
 
 ---
 
@@ -779,7 +783,7 @@ on this chip, abandoned at some earlier point without anyone reverting the Ansib
 | DOC-001 | Docs | **HIGH** | DISASTER-RECOVERY.md does not exist |
 | DOC-002 | Docs | **LOW** | ROADMAP.md is partially in German |
 | DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |
-| DOC-004 | Docs | **LOW** | 4 architectural decisions without ADRs |
+| DOC-004 | Docs | **RESOLVED** | 4 architectural decisions without ADRs — added ADR-006..009 |
 | WRK-001 | Workloads | **MEDIUM** | Jellyfin/media stack stuck in ContainerCreating |
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed or backed up |
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
