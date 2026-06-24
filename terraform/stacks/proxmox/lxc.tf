@@ -265,16 +265,18 @@ resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
     type             = "debian"
   }
 
-  # /dev/net/tun passthrough -- required for WireGuard (Mullvad) inside this
-  # unprivileged container. Device is world-rw on the host (crw-rw-rw-, 10:200).
-  device_passthrough {
-    path       = "/dev/net/tun"
-    uid        = 0
-    gid        = 0
-    mode       = "0666"
-    deny_write = false
-  }
-
+  # /dev/net/tun passthrough (needed for WireGuard/Mullvad inside this
+  # unprivileged container) is NOT declared here on purpose: the Atlantis
+  # Terraform API token isn't root@pam, and Proxmox only allows configuring
+  # device_passthrough on container *creation* for root@pam (confirmed via a
+  # live apply failure: "Permission check failed (configuring device
+  # passthrough is only allowed for root@pam)"). Same constraint the AI LXC
+  # below hit -- that one's device_passthrough blocks only work because the
+  # container was created manually as root and imported into state
+  # afterward (see imports.tf), never actually exercising the CREATE path
+  # via this token. Once this container exists, add the device passthrough
+  # manually via root SSH, then add a matching block here + reconcile state
+  # the same way.
   lifecycle {
     ignore_changes = [
       description,
