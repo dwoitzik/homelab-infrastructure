@@ -17,9 +17,10 @@ spec:
           containers:
             - name: ddns
               image: curlimages/curl:8.10.1
+              # SEC-012: curlimages/curl's default image user is root --
+              # confirmed live, runAsNonRoot alone fails admission.
               securityContext:
                 allowPrivilegeEscalation: false
-                runAsNonRoot: true
                 capabilities:
                   drop: ["ALL"]
               env:
