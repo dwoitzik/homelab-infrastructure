@@ -30,9 +30,12 @@ spec:
       - name: redis
         image: redis:7-alpine
         command: ["redis-server", "--requirepass", "$(REDIS_PASSWORD)", "--appendonly", "yes"]
+        # SEC-012: redis:7-alpine has no non-root default user -- confirmed
+        # live elsewhere (redis-paperless/redis-nextcloud), runAsNonRoot
+        # alone fails admission. Not yet rolled out to this StatefulSet's
+        # live pod when caught, fixed here before it could.
         securityContext:
           allowPrivilegeEscalation: false
-          runAsNonRoot: true
           capabilities:
             drop: ["ALL"]
         env:

@@ -58,10 +58,12 @@ spec:
       containers:
       - name: authelia
         image: ghcr.io/authelia/authelia:4.39.20
+        # SEC-012: image entrypoint runs as root and needs CAP_CHOWN/
+        # CAP_SETGID/CAP_SETUID to chown /config and su-exec into its
+        # runtime user -- confirmed live, dropping all capabilities
+        # crash-loops it ("su-exec: setgroups(0): Operation not permitted").
         securityContext:
           allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
         ports:
         - containerPort: 9091
         volumeMounts:

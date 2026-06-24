@@ -41,10 +41,13 @@ spec:
       containers:
         - name: postgres
           image: postgres:16-alpine
+          # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
+          # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
+          # the postgres user -- confirmed live (same failure as
+          # paperless/stack.yml's postgres), dropping all capabilities
+          # crash-loops it.
           securityContext:
             allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
           env:
             - name: POSTGRES_DB
               value: nextcloud
@@ -102,9 +105,10 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
+          # SEC-012: redis:7-alpine has no non-root default user -- confirmed
+          # live, runAsNonRoot alone fails admission.
           securityContext:
             allowPrivilegeEscalation: false
-            runAsNonRoot: true
             capabilities:
               drop: ["ALL"]
           ports:

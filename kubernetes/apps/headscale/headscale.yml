@@ -31,10 +31,11 @@ spec:
       containers:
         - name: headscale
           image: ghcr.io/juanfont/headscale:0.29.1
+          # SEC-012: needs to create /var/run/headscale (its unix socket dir)
+          # at startup -- confirmed live, dropping all capabilities fails
+          # with "creating directory failed with permission error".
           securityContext:
             allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
           args:
             - serve
           ports:

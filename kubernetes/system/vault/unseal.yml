@@ -18,9 +18,11 @@ spec:
       containers:
         - name: unseal
           image: hashicorp/vault:1.17
+          # SEC-012: hashicorp/vault's default image user is root -- confirmed
+          # live, runAsNonRoot alone fails admission ("container has
+          # runAsNonRoot and image will run as root").
           securityContext:
             allowPrivilegeEscalation: false
-            runAsNonRoot: true
             capabilities:
               drop: ["ALL"]
           command:
