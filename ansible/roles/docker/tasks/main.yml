@@ -1,4 +1,10 @@
 ---
+- name: Ensure gnupg is installed (required by apt_repository's signed-by handling)
+  ansible.builtin.apt:
+    name: gnupg
+    state: present
+    update_cache: true
+
 - name: Ensure /etc/apt/keyrings directory exists
   ansible.builtin.file:
     path: /etc/apt/keyrings
