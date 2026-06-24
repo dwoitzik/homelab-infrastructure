@@ -245,6 +245,48 @@ just relying on Home Assistant's own login.
 
 ---
 
+### SEC-010 — GitHub "Security and quality" tab: 545 open Code Scanning alerts · **PARTIAL** (2026-06-24)
+
+User-reported, not self-discovered: GitHub's Security tab showed 545 open Trivy
+findings against `kubernetes/`. My API token lacks the `security_events` scope needed
+to read code-scanning/secret-scanning alerts directly (confirmed via a live 403 on
+both endpoints) — worked from a screenshot instead.
+
+- **Root cause of the volume:** ~20 Deployment/StatefulSet/DaemonSet manifests across
+  this repo have **no `securityContext` at all**. Each container missing one trips
+  roughly a dozen separate Trivy rules (KSV-0001, 0003, 0004, 0012, 0014, 0020, 0021,
+  0030, 0104, 0118, etc. — confirmed by running `trivy config` locally against
+  individual files), which accounts for the bulk of the count.
+- **Two findings were genuinely justified, not oversights** — confirmed by running
+  `trivy config` locally to get exact rule IDs, then suppressing precisely those
+  IDs+paths via a new `.trivyignore` (flat format with `path:` scoping — note: a
+  `.trivyignore.yaml` structured-format attempt first did NOT work for misconfigurations,
+  only the plain `.trivyignore` does):
+  - `sysctl-fix` DaemonSet (`KSV-0009/0010/0017/0118`): genuinely needs hostNetwork,
+    hostPID, and privileged to reach the host's sysctl namespace — there's no less-
+    privileged way to do this from inside a container.
+  - SABnzbd's Mullvad kill-switch init container (`KSV-0022/0120`): genuinely needs
+    NET_ADMIN (create the wg0 interface) and SYS_MODULE (load the wireguard kernel
+    module) for a WireGuard tunnel to come up at all.
+- **Not yet done:** adding proper `securityContext` (drop all capabilities,
+  `allowPrivilegeEscalation: false`, `runAsNonRoot` where the image supports it,
+  `readOnlyRootFilesystem` where feasible) to the ~20 affected manifests is the real
+  fix for the bulk of the 545 — this is the larger remaining piece, not done in this
+  pass given the number of distinct apps with different runtime requirements (PUID/PGID
+  patterns, root-requiring init scripts, etc.) that each need individual verification
+  rather than one blanket template.
+- **Also separately noted:** the GitHub repo sidebar's "Contributors" widget was still
+  showing a stale "claude" entry from before this session's git-filter-repo history
+  rewrite — verified clean across every branch/ref via `git log --all -p | grep -i
+  co-authored-by` (zero hits) and the `/contributors` API (only `dwoitzik`). This is
+  GitHub's own cached contributor-graph computation, which is documented to lag behind
+  actual repository state after a force-push rewrite — no user-facing way to force a
+  refresh.
+- **Effort:** Small for the two justified suppressions (done); medium-large for the
+  real `securityContext` hardening pass across ~20 files (not done).
+
+---
+
 ## 2. Reliability / Recoverability
 
 ### REL-001 — 2 of 3 k3s nodes stopped; cluster running single-node · **RESOLVED** (2026-06-23)
@@ -377,6 +419,41 @@ notes) being starved of disk I/O badly enough to blow through raft's read-index 
 - **Effort:** Alerting is small (1-2h); root-causing the I/O contention properly is
   larger and probably needs to wait for calmer conditions to test against (it's hard to
   diagnose disk contention while intentionally generating disk contention).
+
+---
+
+### REL-013 — Redundant monitoring: two systems probing the same ~20 endpoints, too aggressively · **RESOLVED** (2026-06-24)
+
+Found while investigating unusually high DNS query volume reported live (AdGuard:
+1.86M queries/week, `vm-srv-k3s-11` alone responsible for 69% of all queries network-
+wide). Two independent monitoring systems were both doing HTTP(S) uptime checks against
+nearly the same set of `*.woitzik.dev` hostnames:
+
+- **Uptime Kuma**: 23 active monitors, every one checking every **60 seconds** (some
+  matching the exact same targets Prometheus's blackbox-exporter also checks: Authelia,
+  Vaultwarden, Home Assistant, Nextcloud, ArgoCD, etc).
+- **Prometheus blackbox-exporter**: 9 HTTP targets, scraped at Prometheus's global
+  default interval (confirmed live: `30s`), no per-job override.
+
+Each check does its own DNS resolution; with `search home.lan` configured on the k3s
+nodes' resolv.conf (confirmed via `resolvectl status` on `vm-srv-k3s-11`), most lookups
+get queried twice (once plain, once with `.home.lan` appended) — visible directly in
+AdGuard's top-domains list, where `auth.woitzik.dev` and `auth.woitzik.dev.home.lan`
+both show near-identical counts. Possibly a contributing factor to REL-012's etcd disk-
+I/O starvation, given this all runs on the same contended node.
+
+- **Fix:** Bumped Uptime Kuma's 23 monitors from 60s to 300s interval (direct SQLite
+  update — Kuma has no bulk-edit UI for this — backed up `kuma.db` first, restarted the
+  pod since the scheduler caches intervals in memory). Added explicit
+  `scrape_interval: 60s` to both blackbox-exporter Prometheus jobs (doubling their
+  interval from the 30s global default).
+- **Not fixed / out of scope for this pass:** the underlying `search home.lan` doubling
+  itself, and the deeper redundancy of running two separate uptime-checking systems
+  against overlapping targets at all — consolidating onto one would be a bigger,
+  separate decision (Uptime Kuma's simple status page vs. Prometheus/Alertmanager's
+  richer alerting are both genuinely useful, not obviously redundant to remove either).
+- **Effort:** Small for what was done; the `search home.lan` / dual-system question is
+  a separate, larger decision.
 
 ---
 
@@ -981,6 +1058,7 @@ download traffic itself.
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
 | SEC-008 | Security | **RESOLVED** | Atlantis had zero auth + plain-HTTP entrypoint -- added Authelia (webhook path excluded), HTTPS-only (2026-06-23) |
 | SEC-009 | Security | **RESOLVED** | Home Assistant had no auth layer beyond its own login -- added Authelia, same pattern as Jellyfin (2026-06-23) |
+| SEC-010 | Security | **PARTIAL** | 545 open Trivy code-scanning alerts, mostly ~20 manifests missing securityContext; suppressed 2 genuinely-justified findings via .trivyignore, real hardening pass not yet done (2026-06-24) |
 | REL-001 | Reliability | **RESOLVED** | All 3 k3s nodes run continuously (`on_boot=true`); single-server topology by deliberate design, not an HA gap -- see `docs/k3s-architecture.md` |
 | REL-002 | Reliability | **RESOLVED** | PBS running with `onboot=1`; `all: 1` backup job covers every VM/CT incl. k3s nodes + NFS LXC; verified successful 2026-06-23 03:00 run |
 | REL-003 | Reliability | **HIGH** | Velero backend (Garage) is in-cluster; circular recovery dependency |
@@ -991,6 +1069,7 @@ download traffic itself.
 | REL-009 | Reliability | **RESOLVED** | Vault's raft storage migrated from `nfs-client` to `local-path` (same BoltDB-on-NFS risk as GIT-006), zero downtime to ExternalSecrets cluster-wide, verified byte-identical data at every copy step (2026-06-24) |
 | REL-011 | Reliability | **RESOLVED** | `postgres-authelia` (CNPG) had barman WAL archiving configured but no `ScheduledBackup` resource — no base backup existed to restore from via barman alone, only the PVC itself (Velero/PBS). Added `ScheduledBackup` (`kubernetes/system/postgres/scheduled-backup.yml`), daily `0 2 * * *`, targeting the existing `barmanObjectStore` already on the Cluster; also fixed the `postgres-cluster` Application's `directory.include` glob so the new file is picked up by ArgoCD |
 | REL-012 | Reliability | **CRITICAL** | k3s control plane (etcd) crash-looping all day, 39 restarts -- etcd apply latency up to 14.3s under disk I/O contention, no alerting fired |
+| REL-013 | Reliability | **RESOLVED** | Uptime Kuma (23 monitors @ 60s) and Prometheus blackbox-exporter (9 targets @ 30s) both probing largely the same domains, doubled again by a `search home.lan` DNS suffix -- bumped both intervals (2026-06-24) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
