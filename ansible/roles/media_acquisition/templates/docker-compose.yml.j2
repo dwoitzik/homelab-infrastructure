@@ -1,0 +1,144 @@
+---
+# Media acquisition stack -- Sonarr/Radarr/Bazarr/SABnzbd/NZBHydra2 all share
+# gluetun's network namespace, so ALL their traffic (downloads, indexer
+# queries, metadata lookups) is forced through Mullvad with gluetun's
+# built-in kill switch: if the VPN drops, these containers lose network
+# entirely rather than falling back to the LXC's normal connection.
+#
+# jellyseerr and tor sit on a separate bridge network (media-acq-net) --
+# jellyseerr is just a request-management UI reachable via Traefik, it
+# doesn't make acquisition queries itself, so it doesn't need the VPN.
+# tor is intentionally NOT inside gluetun's namespace: Tor's own traffic
+# should reach the Tor network directly, not double-tunneled through
+# Mullvad first. NZBHydra2 (inside gluetun's namespace) reaches Tor's SOCKS
+# proxy via the media-acq-net subnet, which is explicitly allowed through
+# gluetun's kill switch (FIREWALL_OUTBOUND_SUBNETS below).
+networks:
+  media-acq-net:
+    ipam:
+      config:
+        - subnet: 172.28.1.0/24
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=mullvad
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY={{ media_acquisition_mullvad_private_key }}
+      - WIREGUARD_ADDRESSES={{ media_acquisition_mullvad_addresses }}
+      - SERVER_COUNTRIES={{ media_acquisition_mullvad_country }}
+      - FIREWALL_OUTBOUND_SUBNETS={{ (media_acquisition_firewall_outbound_subnets + ['172.28.1.0/24']) | join(',') }}
+      - HEALTH_VPN_DURATION_INITIAL=30s
+    ports:
+      - "8989:8989"   # sonarr
+      - "7878:7878"   # radarr
+      - "6767:6767"   # bazarr
+      - "8080:8080"   # sabnzbd
+      - "5076:5076"   # nzbhydra2
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:4.0.17.2952-ls314
+    container_name: sonarr
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    environment:
+      - PUID={{ media_acquisition_puid }}
+      - PGID={{ media_acquisition_pgid }}
+      - TZ={{ media_acquisition_tz }}
+    volumes:
+      - {{ media_acquisition_base_dir }}/sonarr/config:/config
+      - {{ media_acquisition_base_dir }}/media:/media
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:6.2.1.10461-ls307
+    container_name: radarr
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    environment:
+      - PUID={{ media_acquisition_puid }}
+      - PGID={{ media_acquisition_pgid }}
+      - TZ={{ media_acquisition_tz }}
+    volumes:
+      - {{ media_acquisition_base_dir }}/radarr/config:/config
+      - {{ media_acquisition_base_dir }}/media:/media
+    restart: unless-stopped
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:v1.5.6-ls351
+    container_name: bazarr
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    environment:
+      - PUID={{ media_acquisition_puid }}
+      - PGID={{ media_acquisition_pgid }}
+      - TZ={{ media_acquisition_tz }}
+    volumes:
+      - {{ media_acquisition_base_dir }}/bazarr/config:/config
+      - {{ media_acquisition_base_dir }}/media:/media
+    restart: unless-stopped
+
+  sabnzbd:
+    image: lscr.io/linuxserver/sabnzbd:5.0.4-ls259
+    container_name: sabnzbd
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    environment:
+      - PUID={{ media_acquisition_puid }}
+      - PGID={{ media_acquisition_pgid }}
+      - TZ={{ media_acquisition_tz }}
+    volumes:
+      - {{ media_acquisition_base_dir }}/sabnzbd/config:/config
+      - {{ media_acquisition_base_dir }}/media:/media
+    restart: unless-stopped
+
+  nzbhydra2:
+    image: lscr.io/linuxserver/nzbhydra2:v8.8.4-ls93
+    container_name: nzbhydra2
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    environment:
+      - PUID={{ media_acquisition_puid }}
+      - PGID={{ media_acquisition_pgid }}
+      - TZ={{ media_acquisition_tz }}
+    volumes:
+      - {{ media_acquisition_base_dir }}/nzbhydra2/config:/config
+    restart: unless-stopped
+
+  tor:
+    image: dperson/torproxy:latest
+    container_name: tor
+    networks:
+      media-acq-net:
+        ipv4_address: 172.28.1.10
+    restart: unless-stopped
+    # SOCKS5 proxy on 172.28.1.10:9050 -- configure NZBHydra2's indexer
+    # proxy settings to use this for search queries specifically. Standalone
+    # on purpose: Tor's own traffic reaches the Tor network directly, not
+    # double-tunneled through Mullvad.
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:2.7.3
+    container_name: jellyseerr
+    networks:
+      - media-acq-net
+    environment:
+      - TZ={{ media_acquisition_tz }}
+      - LOG_LEVEL=info
+    volumes:
+      - {{ media_acquisition_base_dir }}/jellyseerr/config:/app/config
+    ports:
+      - "5055:5055"
+    restart: unless-stopped
