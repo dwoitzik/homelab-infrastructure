@@ -614,6 +614,69 @@ Alertmanager entirely: `204` success).
 
 ---
 
+### REL-016 — `mini` froze solid during an Ollama test, needed a manual power-cycle · **PARTIAL** (2026-06-24)
+
+Self-inflicted, while investigating a `paperless-gpt` quality problem (see WRK-005 follow-
+up below). Ran a single test inference against `gemma2:27b` (~18GB, CPU-only since
+WRK-004 moved Ollama off the iGPU) to evaluate it as a replacement model. The request
+took **17+ minutes** before failing with no output, and within that window the entire
+physical host (`mini`) became unreachable: SSH timed out at the banner-exchange stage
+(not just slow — the TCP handshake completed but `sshd` never got far enough to respond)
+across *every* LXC tried, not just the one running Ollama, and `kubectl` failed with
+`no route to host` against the k3s control plane (also virtualized on the same physical
+box). Matches the host-freeze failure mode already documented from a prior USB I/O
+contention incident (see `docs/OPERATIONS.md`) — confirmed by the user, who'd seen this
+exact pattern before tied to disk load. Required a manual power-cycle; no remote
+recovery path existed.
+
+- **Root cause, best assessment:** `ct-srv-ai-01` had `cores = 8` (of the host's 16
+  logical threads) with **no `cpulimit`** — Proxmox does not isolate CPU between LXCs
+  by default, so a CPU-bound inference job could legitimately claim 100% of all 8
+  assigned cores indefinitely. The 17-minute runtime for what should be a short
+  generation task (a few dozen tokens) points at the *disk* side specifically, though:
+  loading an 18GB model file from `rpool`, which REL-005/REL-012 already established is
+  under sustained contention at 82%+ utilization, is consistent with the same disk-
+  latency cascade already implicated in etcd's crash-looping. CPU and disk contention on
+  this single shared host are most likely the same underlying problem wearing two
+  different hats, not two separate bugs.
+- **Recovery, after the power-cycle:** found that most LXCs (`ct-mgmt-pbs-01`,
+  `ct-srv-docker-01`, `ct-srv-ai-01`, `ct-dmz-proxy-01` — which fronts *all* external
+  traffic including both Minecraft servers — and `ct-dmz-games-01` itself) had
+  `onboot: 0` and did not restart automatically; only `ct-srv-nfs-01`,
+  `ct-srv-media-acq-01`, and `ct-srv-jellyfin-01` came back on their own. Every one of
+  these had to be found and started manually (`pct start`) one at a time, including
+  diagnosing that Cobblemon's *game* port was reachable while its *reverse proxy* LXC
+  was still down — two different LXCs, two different fixes, found by testing each port
+  independently rather than assuming "the game server" is a single thing to check.
+- **Fixed:**
+  - `ct-srv-ai-01` reduced from `cores = 8` to `cores = 6`, plus `pct set 201 -cpulimit
+    6` applied manually — confirmed via the provider's own schema
+    (`terraform providers schema -json`) that bpg/proxmox 0.100.0's container `cpu{}`
+    block has **no `limit` attribute at all** (only `architecture`/`cores`/`units`),
+    so the cores reduction is the only half of this expressible in Terraform.
+  - `onboot=1` set manually on all five LXCs that lacked it. **Also a provider gap, not
+    just an oversight on my part**: added `start_on_boot = true` to the Terraform
+    resources first, and confirmed live, twice, that `atlantis plan` reports
+    "No changes" even though the real `onboot` value was still `0` on the host —
+    bpg/proxmox 0.100.0 doesn't read this attribute back from the API into Terraform
+    state, so anything declared here silently never takes effect. Reverted that
+    Terraform change rather than leave a fix in git that looks real but does nothing;
+    documented the gap inline instead (`lxc.tf`, next to each affected resource).
+- **Not fixed:** the underlying disk contention (REL-005/REL-012) that's the most
+  likely actual trigger. The CPU cap and onboot fixes reduce blast radius and
+  recovery time for a recurrence; they don't prevent one. Also not fixed: no
+  alerting exists for "host is about to freeze" — REL-012's new `KubeAPIServerDown`
+  alert would have caught this episode's *symptom* (the control plane being
+  unreachable) if Alertmanager itself weren't on the same affected host and
+  potentially unable to deliver during the exact window it would matter most.
+- **Lesson:** before running any CPU- or disk-heavy one-off command (loading a new,
+  large model; a bulk reindex; anything reading double-digit GB from disk) against
+  shared homelab hardware with no resource isolation, check size/impact first — "let's
+  just test this" is not a small action on a single-host setup where everything shares
+  the same CPU and the same already-contended disk.
+
+---
+
 ### REL-013 — Redundant monitoring: two systems probing the same ~20 endpoints, too aggressively · **RESOLVED** (2026-06-24)
 
 Found while investigating unusually high DNS query volume reported live (AdGuard:
@@ -1340,6 +1403,7 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | REL-013 | Reliability | **RESOLVED** | Uptime Kuma (23 monitors @ 60s) and Prometheus blackbox-exporter (9 targets @ 30s) both probing largely the same domains, doubled again by a `search home.lan` DNS suffix -- bumped both intervals (2026-06-24) |
 | REL-014 | Reliability | **RESOLVED** | Every custom PrometheusRule (SLO alerts, hardware-temp alerts) was silently never evaluated -- missing `release: kube-prometheus-stack` label never matched Prometheus's ruleSelector. Fixed, verified live via /api/v1/rules (2026-06-24) |
 | REL-015 | Reliability | **PARTIAL** | Discord alerting silently broken -- Prometheus Operator can't validate `webhook_url_file` in raw Helm config (tries reading the file from its own pod, which never has it mounted), generated secret was 24 days stale. Manual stopgap restores delivery; durable fix (AlertmanagerConfig CRD) not attempted live (2026-06-24) |
+| REL-016 | Reliability | **PARTIAL** | `mini` froze solid during an Ollama CPU inference test (18GB model, likely disk-contention cascade per REL-005/REL-012), needed a manual power-cycle; 5 LXCs had `onboot=0` and didn't auto-recover. Capped AI LXC CPU (6 cores + manual cpulimit, bpg/proxmox has no `limit` attribute), set onboot=1 manually (provider doesn't read this attribute back either). Root disk contention still unresolved (2026-06-24) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
