@@ -35,18 +35,13 @@ spec:
       scheme: https
       serversTransport: insecure-transport
   tls: {secretName: wildcard-woitzik-dev-tls}
----
-# Traefik Dash
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: traefik-dashboard
-  namespace: kube-system
-spec:
-  entryPoints: [websecure]
-  routes:
-  - match: Host(`traefik.woitzik.dev`)
-    kind: Rule
-    middlewares: [{name: authelia, namespace: apps}]
-    services: [{name: api@internal, kind: TraefikService}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
+# REL-018: the "Traefik Dash" IngressRoute (name: traefik-dashboard) that used to be
+# here was a duplicate of the one in kubernetes/system/other-ingressroute.yml -- same
+# name, same namespace, but THIS one had no path restriction
+# (Host(`traefik.woitzik.dev`) alone, vs. the other's
+# `&& (PathPrefix(`/api`) || PathPrefix(`/dashboard`))`). Found live: this file's
+# Application (kubernetes/system/infrastructure, selfHeal: true) was periodically
+# overwriting the more restrictive version with this less restrictive one, widening
+# exposure of the Traefik admin API/dashboard. Removed here -- the correct, path-
+# restricted definition in other-ingressroute.yml is now the only one, tracked by its
+# own Application (system-manifests) so it can't drift again.
