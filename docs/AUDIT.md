@@ -1114,6 +1114,41 @@ download traffic itself.
 - **Still blocked on:** a real Mullvad WireGuard config (account + generated config
   from the user — can't be created on their behalf).
 
+### WRK-007 — Jellyfin moved to a dedicated GPU-passthrough LXC · **RESOLVED** (2026-06-24)
+
+The k3s Deployment had no GPU passthrough at all — pure software transcode, despite
+CLAUDE.local.md already stating hardware transcode should run on mini's APU.
+
+- **Provisioned** `ct_srv_jellyfin_01` (10.0.20.254) reusing mini's AMD Vega iGPU render
+  node (`/dev/dri/renderD128`) already passed through to `ct-srv-ai-01` for ROCm —
+  confirmed concurrent access from both LXCs is fine, it's a DRM render node, not an
+  exclusive lock. Hit the same `root@pam`-only restriction on container creation as
+  WRK-006, this time for **both** `device_passthrough` and `mount_point type bind`
+  (the latter hadn't shown up on WRK-006 because that block was added *after* the
+  container already existed, never exercising the create path) — same fix: create bare,
+  configure manually via root SSH, declare in Terraform afterward to avoid drift.
+- **Config migration hit a subtler problem:** `tar | ssh | tar` between the NFS host
+  and the new LXC intermittently corrupted mid-stream (`tar: Skipping to next header`)
+  even with the source pod fully stopped — not the file-lock issue from WRK-006's NFS
+  copy, since stopping the writer didn't fix it reliably. Saving the tar to a local file
+  first and checking its byte count against the source (`wc -c` on both ends) before
+  extracting caught it immediately when corrupt and confirmed success when clean;
+  retrying the same command got a good copy. Root cause not fully pinned down (likely
+  an NFS server-side artifact, not file locking) — worth remembering as a verify-before-
+  trusting step for any future host-to-host copy in this repo, not just diagnosing after
+  the fact.
+- **Verified before cutover:** `ffmpeg` reports `h264_vaapi`/`hevc_vaapi`/etc. as
+  available, `/dev/dri/renderD128` visible inside the container with the right group,
+  migrated config preserved exactly (`jellyfin.db` byte-identical, `StartupWizardCompleted:
+  true`, real server name, 0 pending migrations against the restored DB — confirms the
+  schema was already current, not silently reset), and `/media` library paths matching
+  the old k3s mount 1:1 (same `/media` path inside the container either way).
+- **Cutover:** kept the existing Traefik IngressRoute and Authelia middleware
+  untouched — only swapped the `jellyfin` Service from a pod selector to a manual
+  EndpointSlice pointing at the LXC's IP, so nothing downstream needed to change. Old
+  k8s Deployment/PVCs/PV removed (all `Retain` reclaim policy, so the underlying NFS
+  data wasn't touched, just the k8s objects pruned).
+
 ---
 
 ## Summary Table
@@ -1168,6 +1203,7 @@ download traffic itself.
 | WRK-004 | Workloads | **RESOLVED** | paperless-gpt failing on every document; Ollama iGPU (Vulkan) crashing constantly under load -- switched to CPU-only |
 | WRK-005 | Workloads | **PARTIAL** | Paperless data-quality pass: missing archives (nfs-client related, fixed) + 5 "hallucinated" docs were actually scanned upside-down (fixed) + LLM_MODEL occasionally returns chatty-assistant text instead of short field values (low-frequency, not fixed) (2026-06-24) |
 | WRK-006 | Workloads | **IN PROGRESS** | Media acquisition stack moved to a dedicated gluetun/Mullvad-isolated LXC -- provisioned, deployed, kill-switch verified failing closed; blocked on a real Mullvad config + final cutover (2026-06-24, ADR-010) |
+| WRK-007 | Workloads | **RESOLVED** | Jellyfin moved to a dedicated GPU-passthrough LXC for VAAPI hardware transcode (shares mini's APU render node with ct-srv-ai-01's ROCm passthrough); config migrated and verified, old k8s resources removed (2026-06-24) |
 
 ---
 

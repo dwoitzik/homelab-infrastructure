@@ -1,109 +1,30 @@
----
-# Media storage PersistentVolume backed by NFS share on Proxmox host.
-# Before enabling: set up NFS on Proxmox and update server/path below.
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: media-nfs
-spec:
-  capacity:
-    storage: 1Ti
-  accessModes:
-    - ReadWriteMany
-  nfs:
-    server: 10.0.10.10
-    path: /mnt/media
-  mountOptions:
-    - nfsvers=4.2
-    - noatime
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: media
-  namespace: apps
-spec:
-  accessModes:
-    - ReadWriteMany
-  storageClassName: ""
-  resources:
-    requests:
-      storage: 1Ti
-  volumeName: media-nfs
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: jellyfin-config
-  namespace: apps
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: nfs-client
-  resources:
-    requests:
-      storage: 5Gi
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: jellyfin
-  namespace: apps
-  annotations:
-    keel.sh/policy: force
-    keel.sh/trigger: poll
-spec:
-  # WRK-007: scaled to 0 temporarily for the GPU-passthrough LXC migration --
-  # need this pod stopped to get a clean, non-corrupted final copy of
-  # /config (NFS file locks were corrupting the tar stream while this was
-  # still writing to it). Will be removed entirely once the LXC version is
-  # verified and traffic is repointed.
-  replicas: 0
-  selector:
-    matchLabels:
-      app: jellyfin
-  template:
-    metadata:
-      labels:
-        app: jellyfin
-    spec:
-      containers:
-        - name: jellyfin
-          image: jellyfin/jellyfin:10.11.11
-          env:
-            - name: JELLYFIN_PublishedServerUrl
-              value: "https://media.woitzik.dev"
-          ports:
-            - containerPort: 8096
-          volumeMounts:
-            - name: config
-              mountPath: /config
-            - name: media
-              mountPath: /media
-              readOnly: true
-          resources:
-            requests:
-              cpu: 200m
-              memory: 512Mi
-            limits:
-              cpu: 2000m
-              memory: 2Gi
-      volumes:
-        - name: config
-          persistentVolumeClaim:
-            claimName: jellyfin-config
-        - name: media
-          persistentVolumeClaim:
-            claimName: media
----
+# WRK-007: Jellyfin moved to a dedicated GPU-passthrough LXC (ct-srv-jellyfin-01,
+# 10.0.20.254) for VAAPI hardware transcode access to mini's APU -- the k3s
+# Deployment had no GPU passthrough at all (pure software transcode). Provisioning
+# is Ansible (ansible/roles/jellyfin), not k8s; this Service+EndpointSlice exists
+# purely so Traefik's existing IngressRoute (services: [{name: jellyfin, port: 8096}])
+# keeps working unchanged, routing to the external LXC instead of a cluster pod.
 apiVersion: v1
 kind: Service
 metadata:
   name: jellyfin
   namespace: apps
 spec:
-  selector:
-    app: jellyfin
   ports:
     - port: 8096
       targetPort: 8096
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: jellyfin
+  namespace: apps
+  labels:
+    kubernetes.io/service-name: jellyfin
+addressType: IPv4
+ports:
+  - name: ""
+    port: 8096
+endpoints:
+  - addresses:
+      - 10.0.20.254
