@@ -53,7 +53,12 @@ metadata:
     keel.sh/policy: force
     keel.sh/trigger: poll
 spec:
-  replicas: 1
+  # WRK-007: scaled to 0 temporarily for the GPU-passthrough LXC migration --
+  # need this pod stopped to get a clean, non-corrupted final copy of
+  # /config (NFS file locks were corrupting the tar stream while this was
+  # still writing to it). Will be removed entirely once the LXC version is
+  # verified and traffic is repointed.
+  replicas: 0
   selector:
     matchLabels:
       app: jellyfin
