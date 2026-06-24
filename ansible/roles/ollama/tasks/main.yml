@@ -36,6 +36,18 @@
     mode: '0755'
 
 - name: Configure Ollama environment variables
+  # CPU-only by deliberate choice (2026-06-23 incident): this AMD Barcelo iGPU
+  # (gfx90c) has no official ROCm support. Both GPU paths tried so far crashed
+  # Ollama's inference backend constantly under real load:
+  #   - HSA_OVERRIDE_GFX_VERSION=9.0.0 (ROCm, spoofing gfx900) - never actually
+  #     stable on this chip, abandoned before this comment was written.
+  #   - OLLAMA_IGPU_ENABLE=1 (Vulkan/radv path) - 451 "vk::DeviceLostError" /
+  #     "context is lost" crashes in a single day under paperless-gpt's
+  #     auto-tagging backlog, ~1 crash per request under concurrent load.
+  # Do not re-enable GPU acceleration here without first confirming a fix
+  # actually holds up under several minutes of concurrent generate calls
+  # (the failure only shows up under sustained/parallel load, not single
+  # isolated requests, which is why both regressions went unnoticed at first).
   ansible.builtin.copy:
     dest: /etc/systemd/system/ollama.service.d/override.conf
     owner: root
@@ -44,7 +56,6 @@
     content: |
       [Service]
       Environment="OLLAMA_HOST=0.0.0.0"
-      Environment="HSA_OVERRIDE_GFX_VERSION=9.0.0"
   notify: Restart Ollama
 
 - name: Flush handlers

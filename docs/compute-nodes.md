@@ -57,9 +57,9 @@ backed by `ct-srv-nfs-01`.
 
 ---
 
-## 2. Raspberry Pi Cluster (High Availability & Gateway)
+## 2. Raspberry Pi Cluster (High Availability DNS)
 
-**Role:** Out-of-Band Network Services & HA Ingress Layer
+**Role:** Out-of-Band Network Services — Highly-Available DNS
 
 | Component | Specification |
 | :--- | :--- |
@@ -69,13 +69,17 @@ backed by `ct-srv-nfs-01`.
 | **Network** | 1 GbE — MikroTik `ether6`/`ether7` (VLAN 20) |
 | **OS** | Raspberry Pi OS Lite 64-bit (Debian Bookworm) |
 
-### Services (Gateway Strategy)
+### Services (DNS Strategy)
 
 | Service | Details |
 | :--- | :--- |
 | **Keepalived (VRRP)** | VIP `10.0.20.5` — Fails over from `rpi-srv-01` to `rpi-srv-02` |
 | **AdGuard Home** | Primary DNS sinkhole (blocks ads/trackers, PTR forwarding for `192.168.178.0/24` only) |
 | **Unbound** | Recursive DNS resolver (root-hints, prefetch, DNSSEC) |
+
+Ingress for k3s-hosted services is unrelated to this layer: MetalLB assigns LoadBalancer
+IPs and Traefik (running inside k3s) terminates and routes that traffic. The RPis are not
+on the ingress path — they exist solely to serve DNS for the network.
 
 ### Performance Tweaks
 

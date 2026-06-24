@@ -52,20 +52,55 @@ so none of this carried real lockout risk.
 
 ---
 
-### SEC-003 — Authelia session-secret and storage-key are placeholder values · **PARTIALLY RESOLVED**
+### SEC-003 — Authelia session-secret and storage-key are placeholder values · **RESOLVED** (2026-06-24)
 
 `secret/authelia` `session-secret` = `thisisaverysecretsessionsecret`;
 `storage-key` = `thisisaverysecretstoragekey`. Both low-entropy, copy-pasted-looking
 values. `jwt-secret` (`thisisaverysecretjwtsecret`) turned out to be the same pattern,
 not originally called out, but fixed alongside it.
 
-- **Fixed 2026-06-23:** `session-secret` and `jwt-secret` regenerated with `openssl rand
-  -hex 32`, written to Vault, restarted Authelia clean.
-- **Still open:** `storage-key` was deliberately left untouched. It encrypts Authelia's
-  storage backend at rest, so rotating it requires running Authelia's `storage encryption
-  change-key` procedure *first* (re-encrypting existing data with the new key) — doing it
-  out of order would make Authelia unable to decrypt its own database. That's a separate,
-  more careful piece of work, not bundled into this pass.
+- **2026-06-23:** `session-secret` and `jwt-secret` regenerated with `openssl rand -hex
+  32`, written to Vault, restarted Authelia clean. `storage-key` was deliberately left
+  untouched at the time, believed to need extra care via `storage encryption change-key`.
+
+- **2026-06-24, much bigger problem found while finishing this:** rotating `storage-key`
+  properly requires Authelia to successfully decrypt existing data with the *old* key
+  first. It couldn't — `authelia storage encryption check` reported the configured key
+  invalid against the live schema. Root cause: `kubernetes/apps/authelia/configmap.yml`
+  set `encryption_key: '/config/secrets/storage-key'` as a bare quoted YAML string. That
+  is not a file-path reference Authelia auto-resolves — it's the literal config value.
+  **The functional encryption key, this entire deployment's lifetime, has been the literal
+  string `/config/secrets/storage-key`** — and the same bug affected `jwt_secret`,
+  `session.secret`, and `identity_providers.oidc.hmac_secret`, all written with the same
+  bare-path-string pattern (only `oidc-issuer-private-key` used Authelia's actual
+  `{{ secret "..." | mindent ... }}` templating function correctly). Since this repo is a
+  public portfolio artifact, that means the real JWT/session/OIDC HMAC signing secrets
+  have been a publicly-visible string the entire time, not the random values Vault
+  appeared to hold.
+  - **Investigation mistake, corrected before any real damage:** before finding the root
+    cause, the live `encryption`/`totp_configurations` rows were deleted on the (wrong)
+    assumption the original key was unrecoverably lost — this would have invalidated the
+    one real TOTP enrollment in the database. A `pg_dump` backup had been taken first;
+    confirmed the literal-string theory by restoring the backup into an isolated temporary
+    database (`authelia_verify_temp`, same Postgres instance, dropped after) and validating
+    `authelia storage encryption check` against it with `--encryption-key=/config/secrets/storage-key`
+    — succeeded, including the TOTP row. Restored the original rows into production from
+    the same backup before making any further changes, then re-verified clean.
+  - **Fix:** Changed all four fields in `configmap.yml` to
+    `{{ secret "/config/secrets/X" | msquote }}`, Authelia's actual file-templating
+    syntax (`X_AUTHELIA_CONFIG_FILTERS=template` was already set on the Deployment).
+    Verified correct *before* committing, via an isolated test ConfigMap unmanaged by
+    ArgoCD (a live `kubectl apply` of the real fix kept getting silently reverted by
+    ArgoCD's `selfHeal: true` until the Git source was actually updated and merged).
+  - Ran the real `authelia storage encryption change-key` (now that the true old key —
+    the literal path string — was correctly identified) to re-encrypt with a fresh
+    `openssl rand -hex 32` value, then updated Vault + the live Secret to match.
+    `jwt-secret`/`session-secret`/`hmac-secret` already held real random values from the
+    2026-06-23 pass (that rotation just hadn't taken effect yet) — no re-rotation needed,
+    just the templating fix so the files actually get read now.
+  - Verified live: both Authelia replicas started clean post-merge, `Storage schema is
+    already up to date`, serving auth traffic normally, TOTP enrollment intact.
+- **Effort:** Was small; became large once the templating bug surfaced. Done.
 
 ---
 
@@ -159,6 +194,57 @@ verification when talking to the Proxmox API.
 
 ---
 
+### SEC-008 — Atlantis had zero authentication and was reachable over plain HTTP · **CRITICAL** (fixed 2026-06-23)
+
+Found while auditing Authelia coverage across all `IngressRoute`s (prompted by a request to
+harden privacy/security across the board, not Atlantis-specific). Of 28 `IngressRoute`s,
+`atlantis-final` was the only one with `entryPoints: [web, websecure]` — reachable over
+unencrypted HTTP, not just HTTPS — and the only one with **no auth layer of any kind**: no
+Authelia middleware, no `ATLANTIS_WEB_BASIC_AUTH`/username/password env vars on the
+Deployment. Confirmed live: `curl -sk https://atlantis.woitzik.dev/` returned the full
+Atlantis UI (PR list, plan history, repo config) with a plain `200`, no redirect to Authelia,
+no password prompt.
+
+- **Impact:** Atlantis holds the credentials and drives `terraform apply` for the entire
+  homelab (Proxmox root-capable API token, MikroTik router credentials, AWS/Garage S3 keys —
+  all visible to it as env vars, and plan output can echo non-`sensitive`-marked values).
+  Anyone who could reach `atlantis.woitzik.dev` — any device on the LAN, or the internet if
+  the domain resolves publicly — could view full Terraform plan/apply history and repo
+  config with zero credentials required.
+- **Why it wasn't just "add Authelia and move on":** Atlantis's GitHub webhook (`POST
+  /events`, used to trigger plan/apply from PR comments) is itself authenticated via
+  `ATLANTIS_GH_WEBHOOK_SECRET` (HMAC signature) — gating the whole host behind Authelia's
+  forward-auth would have broken GitHub's webhook delivery, silently killing the entire
+  GitOps Terraform workflow.
+- **Fix (2026-06-23):** Split `atlantis-final` into two routes in
+  `kubernetes/system/apps-ingressroute.yml`: `Host(...) && PathPrefix(/events)` (priority
+  10, no middleware — webhook keeps its own HMAC auth) and the catch-all `Host(...)`
+  (priority 1, `authelia` middleware — same pattern as every other internal tool). Also
+  dropped the `web` entrypoint so it's `websecure`-only like every other service.
+- **Blast radius:** UI access now requires an Authelia session; GitHub webhook delivery
+  unaffected (still hits `/events` directly, still HMAC-verified).
+- **Effort:** Small (1h) — done.
+
+---
+
+### SEC-009 — Home Assistant had no auth layer beyond its own login · **MEDIUM** (fixed 2026-06-23)
+
+Same Authelia-coverage audit as SEC-008. Of the apps with no Authelia middleware,
+`nextcloud-final` and `gitea-final` are deliberate (CalDAV/CardDAV and git protocol clients
+need direct unauthenticated-at-the-edge access, both already commented in
+`apps-ingressroute.yml`); `ha-final` had no such comment and no documented reason — it was
+just relying on Home Assistant's own login.
+
+- **Fix:** Added the `authelia` middleware to `ha-final`, same pattern already used for
+  Jellyfin (`media-final`): Authelia gates the web UI, Companion app users should connect
+  via the Headscale VPN for direct local access instead of the public hostname.
+- **Blast radius:** Browser access to `ha.woitzik.dev` now requires an Authelia session
+  first. If the HA Companion app was configured against the public URL directly (not
+  via Headscale), it will need reconfiguring.
+- **Effort:** Small — done.
+
+---
+
 ## 2. Reliability / Recoverability
 
 ### REL-001 — 2 of 3 k3s nodes stopped; cluster running single-node · **RESOLVED** (2026-06-23)
@@ -249,6 +335,48 @@ the 120 GB allocated, available space will tighten as workloads grow.
   allocation (42.9 GB used of allocated), consider compressing large volumes with
   `zfs set compression=zstd`. Alert when rpool exceeds 80% (`zpool list` Prometheus metric).
 - **Effort:** Medium.
+
+---
+
+### REL-012 — k3s control plane (etcd) crash-looping all day, 39 restarts · **CRITICAL** (discovered live 2026-06-23, not yet fixed)
+
+Caught live while checking the homepage dashboard: `kubectl` against the API VIP and
+against `vm-srv-k3s-11` directly both got connection-refused. SSH'd in and found
+`k3s.service`'s systemd restart counter at 39 for the day, restart timestamps spread from
+13:52 through 20:54 (roughly every 1-2h). The cluster recovered on its own within ~2
+minutes each time — by the time this was investigated, nodes were `Ready` again — but it
+has been silently flapping all day with nothing alerting on it.
+
+Root cause (from `journalctl -u k3s` right before each failure): etcd `apply request took
+too long` warnings up to **14.3 seconds** (expected: 100ms) on simple read-only range
+requests, causing the controller-manager's leader-election lease renewal to time out
+(`context deadline exceeded`), which is fatal to the k3s process (`exit code 1`) and
+triggers a systemd restart. This is single-node etcd (deliberately, see GIT topology
+notes) being starved of disk I/O badly enough to blow through raft's read-index timeout.
+
+- **Likely contributing factor:** `rpool` is at 70%+ utilization (REL-005, already flagged
+  but not fixed) on the single shared NVMe behind every VM/LXC on `mini`. High utilization
+  degrades NVMe write latency, and this is the same physical disk class previously
+  implicated in the documented ZFS/host-freeze investigation (`docs/OPERATIONS.md`).
+  Today also had unusually heavy concurrent activity across LXCs (Ollama CPU inference
+  stress-testing, paperless-gpt batch processing, NFS LXC near-OOM earlier) which may have
+  compounded disk/CPU contention on the shared host at the same time.
+- **Impact:** Every one of these episodes is a full control-plane outage (API server
+  unreachable, no scheduling, no kubectl) lasting roughly 1-2 minutes, recurring multiple
+  times per day, completely silently — no alert fired despite Blackbox/Prometheus already
+  monitoring most services. The 39-restart count alone makes this more severe than several
+  other CRITICAL-tier findings in this doc.
+- **Fix (not yet done):** (1) Add alerting on `kube_node_status_condition` / API server
+  reachability and on `k3s.service` restart count — this should have paged immediately.
+  (2) Resolve REL-005 (free up rpool headroom) as a likely contributing factor.
+  (3) Consider `etcdctl defrag` (etcd hasn't been compacted in the 24 days since the node
+  last restarted cleanly) and/or moving etcd's WAL to a less-contended disk if one becomes
+  available. (4) Re-evaluate whether single-node etcd on this hardware needs a lower
+  `--etcd-arg` heartbeat/election-timeout tolerance, or whether the real fix is just less
+  disk pressure.
+- **Effort:** Alerting is small (1-2h); root-causing the I/O contention properly is
+  larger and probably needs to wait for calmer conditions to test against (it's hard to
+  diagnose disk contention while intentionally generating disk contention).
 
 ---
 
@@ -389,6 +517,40 @@ not yet exist in the cluster.
 
 ---
 
+### GIT-009 — Two live NAT masquerade rules were never declared in Terraform · **RESOLVED** (2026-06-24)
+
+Confirmed live via the RouterOS REST API (`GET /rest/ip/firewall/nat`) that both rules
+exist and carry real traffic, but neither had a Terraform resource:
+
+- `*5` — outbound internet masquerade ("NAT: Outbound Internet Access"). Also turned up a
+  second, unrelated problem while investigating: this rule's `out-interface-list` field
+  points at interface-list id `*2000010`, which no longer exists (`GET
+  /rest/interface/list` only returns the 4 RouterOS builtin lists). The rule still
+  masquerades correctly because RouterOS keeps matching on the cached internal reference,
+  but the management API can no longer resolve or display it by name — a dangling
+  reference from some earlier, undocumented change.
+- `*8` — masquerade for MGMT (VLAN 10) → SRV (VLAN 20) return traffic.
+
+- **Fix:** Added `routeros_ip_firewall_nat.srcnat_masquerade_wan` and
+  `.srcnat_masquerade_mgmt_to_srv` in `terraform/stacks/network/nat_portforward.tf`, with
+  `import` blocks in `imports.tf` targeting live ids `*5`/`*8`. For `*5`, declared
+  `out_interface = "ether1"` (the WAN interface used everywhere else in this codebase)
+  instead of trying to recreate the dangling interface-list — verified via `terraform
+  plan` (run locally, read-only, against the real backend/router) that this produces a
+  clean in-place update on `*5` (swap `out_interface_list = "*2000010"` for
+  `out_interface = "ether1"`) and a zero-diff import on `*8`.
+- **Note:** `terraform plan` also surfaced an unrelated, pre-existing drift on
+  `routeros_snmp_community.monitoring` (write-only password fields always show as a diff
+  since RouterOS can't return them for comparison) — not caused by this change, left alone.
+- **Blast radius:** Requires an `atlantis apply` to take effect. `*8` is a no-op apply. `*5`
+  briefly recreates the WAN masquerade match criteria in place (RouterOS updates the rule's
+  fields, not a delete+recreate) — should not cause a connectivity gap, but is the one part
+  of this PR actually touching live, traffic-carrying WAN NAT, so apply it during a low-risk
+  window.
+- **Effort:** Small — code written and validated; needs `atlantis apply` to land.
+
+---
+
 ## 4. IaC Quality
 
 ### IAC-001 — No resource limits on most Kubernetes workloads · **RESOLVED**
@@ -475,7 +637,7 @@ reduces readability.
 
 ---
 
-### DOC-003 — compute-nodes.md says RPi runs HAProxy/Traefik as ingress gateway — this is stale · **LOW**
+### DOC-003 — compute-nodes.md says RPi runs HAProxy/Traefik as ingress gateway — this is stale · **RESOLVED**
 
 `docs/compute-nodes.md` lists "HAProxy / Traefik — Ingress gateway routing TCP traffic to
 K3s backend" as an RPi service. The actual ingress path is MetalLB → Traefik running
@@ -485,6 +647,9 @@ ingress migration.
 - **Fix:** Remove the HAProxy/Traefik line from the RPi services table; update to reflect
   AdGuard + Unbound + Keepalived only.
 - **Effort:** Trivial.
+- **Resolution:** Reworded the RPi section ("HA Ingress Layer" / "Gateway Strategy") to
+  drop the ingress claim and added a note that MetalLB + in-cluster Traefik own k3s
+  ingress; RPis only run AdGuard + Unbound + Keepalived.
 
 ---
 
@@ -546,18 +711,52 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 
 ---
 
+### WRK-004 — paperless-gpt failing on every document; Ollama iGPU crashing constantly · **RESOLVED** (2026-06-23)
+
+`paperless-gpt` was failing 100% of auto-tagging/OCR jobs with "unexpected EOF" from the
+LLM. Root cause: Ollama's AMD iGPU backend (`ct-srv-ai-01`, Ryzen 5825U/Barcelo, gfx90c)
+was crashing with `vk::DeviceLostError` ("context is lost") roughly once per inference
+call under any concurrent load — 451 crashes logged in a single day. This chip has no
+official ROCm support; the live config had drifted to `OLLAMA_IGPU_ENABLE=1` (a Vulkan/
+radv fallback path), which is what was actually crashing — not the `HSA_OVERRIDE_GFX_VERSION=9.0.0`
+ROCm spoof originally declared in `ansible/roles/ollama/tasks/main.yml` (also never stable
+on this chip, abandoned at some earlier point without anyone reverting the Ansible role).
+
+- **Fix:** Switched Ollama to CPU-only (removed both GPU env vars from the systemd
+  override). Verified stable under a 6-request concurrent stress test (0 crashes, all
+  succeeded) before rolling out via Ansible. Restarted `paperless-gpt`; confirmed a real
+  document processed end-to-end (title/tags/correspondent/date all correctly extracted,
+  ~5.5 min on CPU vs. near-instant on a working GPU — slower but actually completes).
+- **Separately verified, not broken:** Jellyfin's transcoding path uses a different GPU
+  block entirely (VAAPI video encode/decode, not Vulkan compute) — confirmed healthy via
+  `vainfo` and a real `ffmpeg` hardware encode test on the same chip. The Ollama crash says
+  nothing about VAAPI's stability. However, Jellyfin currently has **no GPU passthrough
+  configured at all** (separate, pre-existing gap, not something this incident caused) —
+  tracked as a follow-up to move Jellyfin to its own GPU-passthrough LXC, same pattern as
+  `ct_srv_ai_01`, since Proxmox iGPU passthrough is exclusive and can't be shared between
+  the AI LXC and a k3s VM simultaneously.
+- **Known fallout:** the document backlog that failed during the crash period was
+  retried automatically by paperless-gpt's own retry logic once Ollama stabilized — but
+  several documents in Paperless show garbled/hallucinated titles and content from
+  earlier broken AI runs (unrelated model, predates this fix). Needs a manual data-quality
+  pass, tracked separately.
+
+---
+
 ## Summary Table
 
 | ID | Category | Severity | Title |
 |---|---|---|---|
 | SEC-001 | Security | **RESOLVED** | Hardcoded OIDC secret in Headscale ConfigMap — moved to Vault via ExternalSecret (2026-06-23) |
 | SEC-002 | Security | **RESOLVED** | Shared OIDC client secret across 4 services |
-| SEC-003 | Security | **PARTIAL** | Placeholder session-secret and storage-key in Vault (storage-key still pending, needs re-encryption procedure) |
+| SEC-003 | Security | **RESOLVED** | Placeholder secrets rotated; found and fixed a much bigger bug along the way -- `configmap.yml` set 4 secret fields (jwt/session/storage-key/hmac) as bare literal strings instead of Authelia's file-templating syntax, so the *actual* functional secrets were public path strings, not the random Vault values (2026-06-24) |
 | SEC-004 | Security | **RESOLVED** | Cross-service secret reuse (redis/storage/paperless) |
 | REL-010 | Reliability | **LOW** | `postgres-authelia` (CNPG) is on `nfs-client` -- same storage-class concern as GIT-006, lower severity (Postgres has real locking, unlike SQLite/BoltDB) |
 | SEC-005 | Security | **MEDIUM** | 14 images on `:latest` / floating tags |
 | SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
+| SEC-008 | Security | **RESOLVED** | Atlantis had zero auth + plain-HTTP entrypoint -- added Authelia (webhook path excluded), HTTPS-only (2026-06-23) |
+| SEC-009 | Security | **RESOLVED** | Home Assistant had no auth layer beyond its own login -- added Authelia, same pattern as Jellyfin (2026-06-23) |
 | REL-001 | Reliability | **RESOLVED** | All 3 k3s nodes run continuously (`on_boot=true`); single-server topology by deliberate design, not an HA gap -- see `docs/k3s-architecture.md` |
 | REL-002 | Reliability | **RESOLVED** | PBS running with `onboot=1`; `all: 1` backup job covers every VM/CT incl. k3s nodes + NFS LXC; verified successful 2026-06-23 03:00 run |
 | REL-003 | Reliability | **HIGH** | Velero backend (Garage) is in-cluster; circular recovery dependency |
@@ -566,6 +765,7 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 | REL-006 | Reliability | **HIGH** | No Proxmox VM snapshots for k3s nodes |
 | REL-007 | Reliability | **RESOLVED** | Vault seal gap causes cascading ExternalSecret failures on restart — mitigated via faster unseal polling + wait-for-secret initContainers |
 | REL-009 | Reliability | **LOW** | Vault's raft storage (`data-vault-0`) is on `nfs-client`; BoltDB has similar locking needs to the SQLite issue in GIT-006, no corruption seen yet — deserves a dedicated migration pass given Vault's blast radius |
+| REL-012 | Reliability | **CRITICAL** | k3s control plane (etcd) crash-looping all day, 39 restarts -- etcd apply latency up to 14.3s under disk I/O contention, no alerting fired |
 | REL-011 | Reliability | **MEDIUM** | `postgres-authelia` (CNPG) has barman WAL archiving configured but no `ScheduledBackup` resource — no base backup exists to restore from via barman alone, only the PVC itself (Velero/PBS) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
@@ -573,7 +773,7 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 | GIT-006 | GitOps | **RESOLVED** | Garage `garage-meta` (sqlite) was on NFS (`nfs-client`); SQLite's locking/WAL model is incompatible with NFS and the metadata DB became corrupted ("database disk image is malformed" / "locking protocol" errors), breaking Velero, Loki, and TF-state writes. Recovered via `sqlite3 .recover` + cleared derived merkle/GC tables; fixed by migrating `garage-meta` to `local-path` (2026-06-23). `garage-data` (blob storage, no locking needs) remains on NFS, which is fine. Audited every other app on `nfs-client` for the same risk and found 6 more SQLite-backed apps exposed: Headscale (migrated same day, PR #50), Vaultwarden, Gitea, Mealie, Open WebUI, paperless-ai, and Home Assistant — all migrated to `local-path` 2026-06-23, each backed up and `PRAGMA integrity_check`-verified before and after. None had corrupted yet, but Vaultwarden/Open WebUI/Home Assistant were confirmed in WAL mode (the highest-risk configuration, same as Garage). |
 | GIT-007 | GitOps | **RESOLVED** | `network/terraform.tfstate` did not exist in Garage at all (only `proxmox/terraform.tfstate` was present) — likely lost during the 2026-06-14 Garage/Longhorn-OOM corruption and never reconciled. Rebuilt 2026-06-23 via a full resource-by-resource `terraform import` against the live router (matched ~110 resources via REST API dumps), validated against a local scratch state with zero `terraform plan` diff before ever touching the real backend. Found and fixed along the way: (1) 15 firewall-filter resources already under `import {}` would have been destroy+recreated on apply — `place_before` has no live-readable value and was being treated as a replace-triggering field on resources that already exist correctly positioned; added `lifecycle { ignore_changes = [place_before] }` to all of them. (2) The 4 `routeros_ip_service` resources (telnet/ftp/api/api-ssl) can't use `import {}` blocks at all — a provider bug (terraform-routeros 1.99.1, latest) makes the post-import Read always fail for name-keyed resources; left them as plain resources instead, since their create function safely PATCHes the existing built-in service by name rather than creating a duplicate. (3) `fwd_12_wan_to_cobblemon` (`nat_portforward.tf`) was a byte-identical duplicate of the already-imported `fwd_wan_cobblemon` (`firewall_extra.tf`) — same live rule claimed under two Terraform addresses; removed the duplicate. |
 | GIT-008 | GitOps | **LOW** | Live duplicate: `routeros_ip_firewall_mangle.mss_clamp` exists twice on the router (ids `*1` and `*5`), byte-identical config, both carrying real traffic — almost certainly created by a prior `apply` retried against the same missing state (GIT-007). Imported the lower id into Terraform; the duplicate (`*5`) still exists live and should be deleted manually via Atlantis/router once confirmed safe — not done as part of the GIT-007 state rebuild to avoid mixing state-recovery with a live destructive change. |
-| GIT-009 | GitOps | **LOW** | Two core NAT rules — outbound internet masquerade (`*5`, "NAT: Outbound Internet Access") and MGMT→SRV return-traffic masquerade (`*8`) — exist live but have never been defined in Terraform at all (not a state-loss issue, just missing coverage). Basic internet access for the whole homelab depends on undocumented, unmanaged router config. Should get proper `routeros_ip_firewall_nat` resources in a follow-up PR. |
+| GIT-009 | GitOps | **RESOLVED** | Two NAT masquerade rules (outbound WAN `*5`, MGMT->SRV `*8`) brought under Terraform via import; also found and fixed a dangling interface-list reference on `*5` (2026-06-24, needs `atlantis apply` to land) |
 | GIT-003 | GitOps | **MEDIUM** | System components are manual-apply; no drift detection |
 | GIT-004 | GitOps | **LOW** | Proxmox provider version constraint far behind latest |
 | GIT-005 | GitOps | **LOW** | R2 BackupStorageLocation has placeholder URL committed |
@@ -582,11 +782,12 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 | IAC-003 | IaC | **LOW** | No automated k3s VM rebuild procedure |
 | DOC-001 | Docs | **HIGH** | DISASTER-RECOVERY.md does not exist |
 | DOC-002 | Docs | **LOW** | ROADMAP.md is partially in German |
-| DOC-003 | Docs | **LOW** | compute-nodes.md has stale ingress description |
+| DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |
 | DOC-004 | Docs | **RESOLVED** | 4 architectural decisions without ADRs — added ADR-006..009 |
 | WRK-001 | Workloads | **MEDIUM** | Jellyfin/media stack stuck in ContainerCreating |
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed or backed up |
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
+| WRK-004 | Workloads | **RESOLVED** | paperless-gpt failing on every document; Ollama iGPU (Vulkan) crashing constantly under load -- switched to CPU-only |
 
 ---
 
