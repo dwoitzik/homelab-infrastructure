@@ -52,6 +52,14 @@
     - node_exporter_native
     - ollama
 
+- name: Provision Media Acquisition Stack (Mullvad-wrapped)
+  hosts: media_acq_nodes
+  become: true
+  roles:
+    - docker
+    - node_exporter_native
+    - media_acquisition
+
 - name: Provision NFS Storage Server
   hosts: nfs_nodes
   become: true

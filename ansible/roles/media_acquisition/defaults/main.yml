@@ -1,0 +1,22 @@
+---
+media_acquisition_base_dir: /opt/media-acq
+media_acquisition_puid: "1000"
+media_acquisition_pgid: "1000"
+media_acquisition_tz: "Europe/Berlin"
+
+media_acquisition_nfs_server: "10.0.20.100"
+media_acquisition_media_nfs_server: "10.0.10.10"
+media_acquisition_media_nfs_path: "/mnt/media"
+
+# Mullvad WireGuard, via gluetun. Real values come from
+# ansible/group_vars/all/vault.yml (vault_mullvad_*) -- placeholders until
+# a real Mullvad config is generated at mullvad.net/account/wireguard-config.
+media_acquisition_mullvad_private_key: "{{ vault_mullvad_private_key | default('PLACEHOLDER') }}"
+media_acquisition_mullvad_addresses: "{{ vault_mullvad_addresses | default('10.x.x.x/32') }}"
+media_acquisition_mullvad_country: "{{ vault_mullvad_country | default('Germany') }}"
+
+# Gluetun's kill switch blocks everything except the VPN tunnel by default --
+# these subnets are explicitly allowed to bypass it for LAN/NFS access.
+media_acquisition_firewall_outbound_subnets:
+  - "10.0.20.0/24"
+  - "10.0.10.0/24"

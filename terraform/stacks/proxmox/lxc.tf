@@ -206,6 +206,86 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   }
 }
 
+# --- Media Acquisition Stack ---
+# Dedicated, isolated LXC for Sonarr/Radarr/Bazarr/SABnzbd/NZBHydra2, replacing the
+# per-pod Mullvad kill-switch sidecar pattern in k3s with LXC-level network isolation.
+# Modest footprint by design: config/app data only (root disk), bulk media remains on
+# the existing NFS mount -- rpool is already at ~80% utilization (REL-005).
+resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
+  vm_id                 = 202
+  node_name             = local.target_node
+  tags                  = ["media", "acquisition", "vpn"]
+  started               = true
+  unprivileged          = true
+  environment_variables = {}
+
+  startup {
+    order    = 5
+    up_delay = 10
+  }
+
+  initialization {
+    hostname = "ct-srv-media-acq-01"
+    ip_config {
+      ipv4 {
+        address = "10.0.20.253/24"
+        gateway = "10.0.20.1"
+      }
+    }
+  }
+
+  cpu {
+    cores = 2
+  }
+
+  memory {
+    dedicated = 4096
+    swap      = 2048
+  }
+
+  features {
+    nesting = true
+  }
+
+  disk {
+    datastore_id = local.storage
+    size         = 25
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr0"
+    mac_address = "bc:24:11:41:9d:e2"
+    vlan_id     = 20
+    firewall    = true
+  }
+
+  operating_system {
+    template_file_id = local.template
+    type             = "debian"
+  }
+
+  # /dev/net/tun passthrough -- required for WireGuard (Mullvad) inside this
+  # unprivileged container. Device is world-rw on the host (crw-rw-rw-, 10:200).
+  device_passthrough {
+    path       = "/dev/net/tun"
+    uid        = 0
+    gid        = 0
+    mode       = "0666"
+    deny_write = false
+  }
+
+  lifecycle {
+    ignore_changes = [
+      description,
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+      network_interface[0].mac_address,
+      features,
+    ]
+  }
+}
+
 # --- DMZ Stack ---
 
 resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {

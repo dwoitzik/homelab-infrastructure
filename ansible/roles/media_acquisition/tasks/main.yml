@@ -1,0 +1,59 @@
+---
+- name: Ensure NFS client packages are installed
+  ansible.builtin.apt:
+    name: nfs-common
+    state: present
+    update_cache: true
+
+- name: Ensure base directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ media_acquisition_base_dir }}"
+    - "{{ media_acquisition_base_dir }}/sonarr"
+    - "{{ media_acquisition_base_dir }}/radarr"
+    - "{{ media_acquisition_base_dir }}/bazarr"
+    - "{{ media_acquisition_base_dir }}/sabnzbd"
+    - "{{ media_acquisition_base_dir }}/nzbhydra2"
+    - "{{ media_acquisition_base_dir }}/jellyseerr"
+    - "{{ media_acquisition_base_dir }}/media"
+
+# Reuses the exact same NFS exports these apps' Kubernetes PVCs were bound
+# to (kubectl get pv ... -o jsonpath='{.spec.nfs}') -- same config data,
+# just mounted directly by this LXC instead of via k8s's nfs-client
+# provisioner. No data migration needed.
+- name: Mount NFS-backed config directories
+  ansible.posix.mount:
+    src: "{{ item.src }}"
+    path: "{{ item.path }}"
+    fstype: nfs
+    opts: rw,sync,hard,intr
+    state: mounted
+  loop:
+    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/sonarr", path: "{{ media_acquisition_base_dir }}/sonarr/config" }
+    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/radarr", path: "{{ media_acquisition_base_dir }}/radarr/config" }
+    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/bazarr", path: "{{ media_acquisition_base_dir }}/bazarr/config" }
+    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/sabnzbd", path: "{{ media_acquisition_base_dir }}/sabnzbd/config" }
+    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/k8s-general/apps/nzbhydra2-config", path: "{{ media_acquisition_base_dir }}/nzbhydra2/config" }
+    - { src: "{{ media_acquisition_nfs_server }}:/nfs-data/k8s-general/apps/jellyseerr-config", path: "{{ media_acquisition_base_dir }}/jellyseerr/config" }
+
+- name: Mount media library share
+  ansible.posix.mount:
+    src: "{{ media_acquisition_media_nfs_server }}:{{ media_acquisition_media_nfs_path }}"
+    path: "{{ media_acquisition_base_dir }}/media"
+    fstype: nfs
+    opts: rw,sync,hard,intr
+    state: mounted
+
+- name: Deploy media acquisition docker-compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ media_acquisition_base_dir }}/docker-compose.yml"
+    mode: '0640'
+
+- name: Ensure media acquisition stack is running
+  community.docker.docker_compose_v2:
+    project_src: "{{ media_acquisition_base_dir }}"
+    state: present
