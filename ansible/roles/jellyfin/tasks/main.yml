@@ -1,0 +1,20 @@
+---
+- name: Ensure base directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ jellyfin_base_dir }}"
+    - "{{ jellyfin_base_dir }}/config"
+
+- name: Deploy jellyfin docker-compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ jellyfin_base_dir }}/docker-compose.yml"
+    mode: '0640'
+
+- name: Ensure jellyfin is running
+  community.docker.docker_compose_v2:
+    project_src: "{{ jellyfin_base_dir }}"
+    state: present

@@ -60,6 +60,14 @@
     - node_exporter_native
     - media_acquisition
 
+- name: Provision Jellyfin (hardware transcode)
+  hosts: jellyfin_nodes
+  become: true
+  roles:
+    - docker
+    - node_exporter_native
+    - jellyfin
+
 - name: Provision NFS Storage Server
   hosts: nfs_nodes
   become: true
