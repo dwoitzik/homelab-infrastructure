@@ -35,9 +35,13 @@ spec:
           containers:
             - name: renovate
               image: ghcr.io/renovatebot/renovate:39
+              # SEC-012: runAsNonRoot reverted after the same admission
+              # failure pattern hit other images in this pass (image's
+              # default user turned out to be root, not assumed non-root) --
+              # not confirmed broken here directly, but not worth the risk
+              # of the next scheduled run failing unattended.
               securityContext:
                 allowPrivilegeEscalation: false
-                runAsNonRoot: true
                 capabilities:
                   drop: ["ALL"]
               env:
