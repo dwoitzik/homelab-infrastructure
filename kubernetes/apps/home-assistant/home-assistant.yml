@@ -32,6 +32,8 @@ spec:
           image: ghcr.io/home-assistant/home-assistant:stable
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
             capabilities:
               drop: ["ALL"]
           ports:

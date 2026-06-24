@@ -38,6 +38,8 @@ spec:
           # permitted"). Same failure class as the other apps in this pass.
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: UPTIME_KUMA_DISABLE_AUTH
               value: "1"

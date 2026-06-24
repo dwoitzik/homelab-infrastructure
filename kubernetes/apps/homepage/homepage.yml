@@ -328,6 +328,8 @@ spec:
         image: ghcr.io/gethomepage/homepage:v1.13.2
         securityContext:
           allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
         ports:

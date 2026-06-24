@@ -38,6 +38,8 @@ spec:
           # privilege-escalation flag is safe to set here.
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - name: web
               containerPort: 3000

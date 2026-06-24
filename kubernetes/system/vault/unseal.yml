@@ -23,6 +23,8 @@ spec:
           # runAsNonRoot and image will run as root").
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
             capabilities:
               drop: ["ALL"]
           command:

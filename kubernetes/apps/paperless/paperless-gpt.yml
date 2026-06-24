@@ -18,6 +18,8 @@ spec:
         image: icereed/paperless-gpt:v0.25.1
         securityContext:
           allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
         resources:

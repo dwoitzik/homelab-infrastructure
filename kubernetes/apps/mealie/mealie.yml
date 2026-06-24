@@ -36,6 +36,8 @@ spec:
           # permitted" on chown and the user switch).
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 9000
           env:

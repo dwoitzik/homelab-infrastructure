@@ -42,6 +42,8 @@ spec:
               # of the next scheduled run failing unattended.
               securityContext:
                 allowPrivilegeEscalation: false
+                seccompProfile:
+                  type: RuntimeDefault
                 capabilities:
                   drop: ["ALL"]
               env:

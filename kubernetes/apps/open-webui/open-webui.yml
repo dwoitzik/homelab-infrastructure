@@ -30,6 +30,8 @@ spec:
         image: ghcr.io/open-webui/open-webui:main
         securityContext:
           allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
         resources:

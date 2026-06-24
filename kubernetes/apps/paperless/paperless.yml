@@ -22,6 +22,8 @@ spec:
         # gitea/authelia/mealie/headscale/postgres/redis in this pass).
         securityContext:
           allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
         resources:
           requests:
             cpu: 200m
