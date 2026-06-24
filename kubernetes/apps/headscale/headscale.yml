@@ -31,6 +31,10 @@ spec:
       containers:
         - name: headscale
           image: ghcr.io/juanfont/headscale:0.29.1
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           args:
             - serve
           ports:
