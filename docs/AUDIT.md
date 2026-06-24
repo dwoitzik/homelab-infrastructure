@@ -621,8 +621,8 @@ HA topology) and `README.md`'s stack table (same stale claim).
   update it with whatever doesn't match reality when that happens.
 - **New gap surfaced while writing this:** CNPG's `postgres-authelia` cluster has
   continuous WAL archiving configured (barman → Garage S3) but no `ScheduledBackup`
-  resource — so there's no base backup to restore from via barman alone. Logged as a new
-  finding, not yet fixed — see `REL-011` below.
+  resource — so there's no base backup to restore from via barman alone. Logged as
+  `REL-011` — **RESOLVED**, see below.
 
 ---
 
@@ -761,8 +761,8 @@ on this chip, abandoned at some earlier point without anyone reverting the Ansib
 | REL-006 | Reliability | **HIGH** | No Proxmox VM snapshots for k3s nodes |
 | REL-007 | Reliability | **RESOLVED** | Vault seal gap causes cascading ExternalSecret failures on restart — mitigated via faster unseal polling + wait-for-secret initContainers |
 | REL-009 | Reliability | **LOW** | Vault's raft storage (`data-vault-0`) is on `nfs-client`; BoltDB has similar locking needs to the SQLite issue in GIT-006, no corruption seen yet — deserves a dedicated migration pass given Vault's blast radius |
+| REL-011 | Reliability | **RESOLVED** | `postgres-authelia` (CNPG) had barman WAL archiving configured but no `ScheduledBackup` resource — no base backup existed to restore from via barman alone, only the PVC itself (Velero/PBS). Added `ScheduledBackup` (`kubernetes/system/postgres/scheduled-backup.yml`), daily `0 2 * * *`, targeting the existing `barmanObjectStore` already on the Cluster; also fixed the `postgres-cluster` Application's `directory.include` glob so the new file is picked up by ArgoCD |
 | REL-012 | Reliability | **CRITICAL** | k3s control plane (etcd) crash-looping all day, 39 restarts -- etcd apply latency up to 14.3s under disk I/O contention, no alerting fired |
-| REL-011 | Reliability | **MEDIUM** | `postgres-authelia` (CNPG) has barman WAL archiving configured but no `ScheduledBackup` resource — no base backup exists to restore from via barman alone, only the PVC itself (Velero/PBS) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
