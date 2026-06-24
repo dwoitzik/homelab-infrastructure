@@ -40,8 +40,8 @@ spec:
         name: postgres-authelia-user
 
   storage:
-    size: 8Gi
-    storageClass: nfs-client
+    size: 12Gi
+    storageClass: local-path
 
   affinity:
     tolerations:
