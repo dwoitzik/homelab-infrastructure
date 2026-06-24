@@ -52,20 +52,55 @@ so none of this carried real lockout risk.
 
 ---
 
-### SEC-003 — Authelia session-secret and storage-key are placeholder values · **PARTIALLY RESOLVED**
+### SEC-003 — Authelia session-secret and storage-key are placeholder values · **RESOLVED** (2026-06-24)
 
 `secret/authelia` `session-secret` = `thisisaverysecretsessionsecret`;
 `storage-key` = `thisisaverysecretstoragekey`. Both low-entropy, copy-pasted-looking
 values. `jwt-secret` (`thisisaverysecretjwtsecret`) turned out to be the same pattern,
 not originally called out, but fixed alongside it.
 
-- **Fixed 2026-06-23:** `session-secret` and `jwt-secret` regenerated with `openssl rand
-  -hex 32`, written to Vault, restarted Authelia clean.
-- **Still open:** `storage-key` was deliberately left untouched. It encrypts Authelia's
-  storage backend at rest, so rotating it requires running Authelia's `storage encryption
-  change-key` procedure *first* (re-encrypting existing data with the new key) — doing it
-  out of order would make Authelia unable to decrypt its own database. That's a separate,
-  more careful piece of work, not bundled into this pass.
+- **2026-06-23:** `session-secret` and `jwt-secret` regenerated with `openssl rand -hex
+  32`, written to Vault, restarted Authelia clean. `storage-key` was deliberately left
+  untouched at the time, believed to need extra care via `storage encryption change-key`.
+
+- **2026-06-24, much bigger problem found while finishing this:** rotating `storage-key`
+  properly requires Authelia to successfully decrypt existing data with the *old* key
+  first. It couldn't — `authelia storage encryption check` reported the configured key
+  invalid against the live schema. Root cause: `kubernetes/apps/authelia/configmap.yml`
+  set `encryption_key: '/config/secrets/storage-key'` as a bare quoted YAML string. That
+  is not a file-path reference Authelia auto-resolves — it's the literal config value.
+  **The functional encryption key, this entire deployment's lifetime, has been the literal
+  string `/config/secrets/storage-key`** — and the same bug affected `jwt_secret`,
+  `session.secret`, and `identity_providers.oidc.hmac_secret`, all written with the same
+  bare-path-string pattern (only `oidc-issuer-private-key` used Authelia's actual
+  `{{ secret "..." | mindent ... }}` templating function correctly). Since this repo is a
+  public portfolio artifact, that means the real JWT/session/OIDC HMAC signing secrets
+  have been a publicly-visible string the entire time, not the random values Vault
+  appeared to hold.
+  - **Investigation mistake, corrected before any real damage:** before finding the root
+    cause, the live `encryption`/`totp_configurations` rows were deleted on the (wrong)
+    assumption the original key was unrecoverably lost — this would have invalidated the
+    one real TOTP enrollment in the database. A `pg_dump` backup had been taken first;
+    confirmed the literal-string theory by restoring the backup into an isolated temporary
+    database (`authelia_verify_temp`, same Postgres instance, dropped after) and validating
+    `authelia storage encryption check` against it with `--encryption-key=/config/secrets/storage-key`
+    — succeeded, including the TOTP row. Restored the original rows into production from
+    the same backup before making any further changes, then re-verified clean.
+  - **Fix:** Changed all four fields in `configmap.yml` to
+    `{{ secret "/config/secrets/X" | msquote }}`, Authelia's actual file-templating
+    syntax (`X_AUTHELIA_CONFIG_FILTERS=template` was already set on the Deployment).
+    Verified correct *before* committing, via an isolated test ConfigMap unmanaged by
+    ArgoCD (a live `kubectl apply` of the real fix kept getting silently reverted by
+    ArgoCD's `selfHeal: true` until the Git source was actually updated and merged).
+  - Ran the real `authelia storage encryption change-key` (now that the true old key —
+    the literal path string — was correctly identified) to re-encrypt with a fresh
+    `openssl rand -hex 32` value, then updated Vault + the live Secret to match.
+    `jwt-secret`/`session-secret`/`hmac-secret` already held real random values from the
+    2026-06-23 pass (that rotation just hadn't taken effect yet) — no re-rotation needed,
+    just the templating fix so the files actually get read now.
+  - Verified live: both Authelia replicas started clean post-merge, `Storage schema is
+    already up to date`, serving auth traffic normally, TOTP enrollment intact.
+- **Effort:** Was small; became large once the templating bug surfaced. Done.
 
 ---
 
@@ -548,7 +583,7 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 |---|---|---|---|
 | SEC-001 | Security | **RESOLVED** | Hardcoded OIDC secret in Headscale ConfigMap — moved to Vault via ExternalSecret (2026-06-23) |
 | SEC-002 | Security | **RESOLVED** | Shared OIDC client secret across 4 services |
-| SEC-003 | Security | **PARTIAL** | Placeholder session-secret and storage-key in Vault (storage-key still pending, needs re-encryption procedure) |
+| SEC-003 | Security | **RESOLVED** | Placeholder secrets rotated; found and fixed a much bigger bug along the way -- `configmap.yml` set 4 secret fields (jwt/session/storage-key/hmac) as bare literal strings instead of Authelia's file-templating syntax, so the *actual* functional secrets were public path strings, not the random Vault values (2026-06-24) |
 | SEC-004 | Security | **RESOLVED** | Cross-service secret reuse (redis/storage/paperless) |
 | REL-010 | Reliability | **LOW** | `postgres-authelia` (CNPG) is on `nfs-client` -- same storage-class concern as GIT-006, lower severity (Postgres has real locking, unlike SQLite/BoltDB) |
 | SEC-005 | Security | **MEDIUM** | 14 images on `:latest` / floating tags |
