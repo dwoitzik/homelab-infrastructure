@@ -517,6 +517,28 @@ ago and `ROADMAP.md` claiming the SLO definitions were done.
   `ruleSelector`/`ruleNamespaceSelector` match is a separate, silent gate. Check
   `/api/v1/rules` (or the Prometheus UI's Status > Rules page) directly to confirm any
   new alerting rule is actually live, every time.
+- **A second, bigger gap found checking how these got deployed at all:** `kubernetes/apps/*`
+  gets auto-discovered by the `homelab-apps` ApplicationSet
+  (`kubernetes/system/argocd/apps-applicationset.yaml`), but `kubernetes/system/*` does
+  **not** — each subdirectory needs its own manually-created Application (the existing,
+  documented pattern for `vault-manifests`/`velero-manifests`). `kubernetes/system/monitoring/`
+  had no such Application at all. Every raw manifest in that directory (the 4
+  PrometheusRules, pve-exporter's Deployment, 3 ExternalSecrets, the Grafana
+  IngressRoute, 5 NetworkPolicies, 2 dashboard ConfigMaps) was live in the cluster only
+  because someone `kubectl apply`'d it manually at some point — git had zero ability to
+  reproduce any of it. Confirmed this wasn't theoretical: `loki-dashboard`
+  (a ConfigMap already committed to git) didn't exist live at all, real drift that had
+  already happened silently. Added `kubernetes/system/monitoring/manifests-application.yml`
+  (same pattern as `vault-manifests`) covering every raw manifest in the directory.
+  Verified safe before enabling `prune`/`selfHeal`: diffed every live resource against
+  its git source first (NetworkPolicies were byte-identical, ExternalSecret diffs were
+  just API-server-defaulted fields, pve-exporter's image matched) — only then applied
+  with automation on, and confirmed `loki-dashboard` got created and the namespace
+  stayed healthy.
+- **This pattern (system/* subdirectories silently missing their own Application) is
+  worth auditing more broadly** — not done here, scope was just monitoring/, but every
+  other `kubernetes/system/*` directory should be checked the same way before assuming
+  "it's in git" means "git can rebuild it."
 
 ---
 
