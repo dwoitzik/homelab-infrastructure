@@ -517,6 +517,24 @@ not yet exist in the cluster.
 
 ---
 
+### GIT-010 — `postgres-cluster` Application's directory glob never matched its ExternalSecret · **RESOLVED** (2026-06-24)
+
+Found while verifying REL-011's `ScheduledBackup` was actually GitOps-tracked.
+`postgres-cluster-application.yml`'s `directory.include` was
+`'{cluster,cnpg-backup-secret,scheduled-backup}.yml'` — but the real file in that
+directory is `external-secret.yml`, not `cnpg-backup-secret.yml`. `kubectl get
+application postgres-cluster -o jsonpath='{.status.resources}'` confirmed only the
+`Cluster` was tracked; the `cnpg-garage-backup` ExternalSecret has been running this
+whole time only because it was applied manually once and never touched since — a
+silent, permanent drift risk (anyone editing it in Git would see no effect at all).
+
+- **Fix:** Corrected the glob to `'{cluster,external-secret,scheduled-backup}.yml'`.
+  Verified the live `cnpg-garage-backup` ExternalSecret's spec already matches the
+  repo's `external-secret.yml` exactly, so adopting it into GitOps is a clean no-op.
+- **Effort:** Trivial — done.
+
+---
+
 ### GIT-009 — Two live NAT masquerade rules were never declared in Terraform · **RESOLVED** (2026-06-24)
 
 Confirmed live via the RouterOS REST API (`GET /rest/ip/firewall/nat`) that both rules
@@ -774,6 +792,7 @@ on this chip, abandoned at some earlier point without anyone reverting the Ansib
 | GIT-007 | GitOps | **RESOLVED** | `network/terraform.tfstate` did not exist in Garage at all (only `proxmox/terraform.tfstate` was present) — likely lost during the 2026-06-14 Garage/Longhorn-OOM corruption and never reconciled. Rebuilt 2026-06-23 via a full resource-by-resource `terraform import` against the live router (matched ~110 resources via REST API dumps), validated against a local scratch state with zero `terraform plan` diff before ever touching the real backend. Found and fixed along the way: (1) 15 firewall-filter resources already under `import {}` would have been destroy+recreated on apply — `place_before` has no live-readable value and was being treated as a replace-triggering field on resources that already exist correctly positioned; added `lifecycle { ignore_changes = [place_before] }` to all of them. (2) The 4 `routeros_ip_service` resources (telnet/ftp/api/api-ssl) can't use `import {}` blocks at all — a provider bug (terraform-routeros 1.99.1, latest) makes the post-import Read always fail for name-keyed resources; left them as plain resources instead, since their create function safely PATCHes the existing built-in service by name rather than creating a duplicate. (3) `fwd_12_wan_to_cobblemon` (`nat_portforward.tf`) was a byte-identical duplicate of the already-imported `fwd_wan_cobblemon` (`firewall_extra.tf`) — same live rule claimed under two Terraform addresses; removed the duplicate. |
 | GIT-008 | GitOps | **LOW** | Live duplicate: `routeros_ip_firewall_mangle.mss_clamp` exists twice on the router (ids `*1` and `*5`), byte-identical config, both carrying real traffic — almost certainly created by a prior `apply` retried against the same missing state (GIT-007). Imported the lower id into Terraform; the duplicate (`*5`) still exists live and should be deleted manually via Atlantis/router once confirmed safe — not done as part of the GIT-007 state rebuild to avoid mixing state-recovery with a live destructive change. |
 | GIT-009 | GitOps | **RESOLVED** | Two NAT masquerade rules (outbound WAN `*5`, MGMT->SRV `*8`) brought under Terraform via import; also found and fixed a dangling interface-list reference on `*5` (2026-06-24, needs `atlantis apply` to land) |
+| GIT-010 | GitOps | **RESOLVED** | `postgres-cluster` Application's directory glob never matched its ExternalSecret filename -- silently unmanaged by GitOps since creation, fixed (2026-06-24) |
 | GIT-003 | GitOps | **MEDIUM** | System components are manual-apply; no drift detection |
 | GIT-004 | GitOps | **LOW** | Proxmox provider version constraint far behind latest |
 | GIT-005 | GitOps | **LOW** | R2 BackupStorageLocation has placeholder URL committed |
