@@ -369,20 +369,15 @@ resource "proxmox_virtual_environment_container" "ct_srv_jellyfin_01" {
     type             = "debian"
   }
 
-  # Media library bind-mount -- same local ZFS dataset ct-srv-media-acq-01 already
-  # mounts this way (the NFS export to k8s pods is incidental, the host doesn't need
-  # NFS to reach its own disk). Mounted read-only at the Docker level since Jellyfin
-  # only needs to read media, never write to it.
-  mount_point {
-    volume = "/mnt/media"
-    path   = "/media"
-  }
-
-  # /dev/dri/renderD128 passthrough (VAAPI hardware transcode) is NOT declared here
-  # on purpose -- same root@pam-only device_passthrough-on-create restriction hit by
-  # ct-srv-media-acq-01's /dev/net/tun (see that resource's history). Once this
-  # container exists, add the device passthrough manually via root SSH, then add a
-  # matching block here + reconcile state the same way.
+  # Media library bind-mount (/mnt/media) and /dev/dri/renderD128 passthrough
+  # (VAAPI hardware transcode) are NOT declared here on purpose: unlike
+  # ct-srv-media-acq-01 (where mount_point worked fine because that container
+  # already existed when the block was added), Proxmox restricts "mount point
+  # type bind" -- like device_passthrough -- to root@pam on container *creation*
+  # (confirmed via a live apply failure: "Permission check failed (mount point
+  # type bind is only allowed for root@pam)"). Once this container exists, add
+  # both manually via root SSH, then add matching blocks here + reconcile state,
+  # same pattern as ct-srv-media-acq-01's tun device.
 
   lifecycle {
     ignore_changes = [
