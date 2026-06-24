@@ -63,8 +63,20 @@ spec:
           value: "4000"
         - name: IMAGE_MAX_TOTAL_PIXELS
           value: "16000000"
+        # WRK-005: auto-tag processing applies suggestions directly with no
+        # human review. Disabled after it silently corrupted a real document
+        # (correspondent "NRW" -> a freshly-created garbage correspondent
+        # literally named "Yes", title -> "The") -- caught and reverted
+        # manually, but this happened with the *replacement* model
+        # (minicpm-v) too, not just qwen2.5-coder. Two different models
+        # producing bad output that gets auto-applied unreviewed means the
+        # auto pipeline itself isn't safe to run unattended, regardless of
+        # which model is behind it. Pointed at a tag name that doesn't exist
+        # so the auto-scan always finds zero matching documents -- the manual
+        # "paperless-gpt" tag (human reviews suggestions before they're
+        # applied) is the only enabled workflow now.
         - name: AUTO_TAG
-          value: paperless-gpt-to-process
+          value: paperless-gpt-auto-disabled
         - name: LANGUAGE
           value: German
         - name: LOG_LEVEL
