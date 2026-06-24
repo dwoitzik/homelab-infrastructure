@@ -306,6 +306,90 @@ resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
   }
 }
 
+# --- Jellyfin Stack ---
+# Dedicated LXC for hardware-transcoded Jellyfin, replacing the software-only k3s
+# Deployment. Needs the same AMD Vega iGPU (VAAPI render node) as ct-srv-ai-01's
+# ROCm passthrough -- both share mini's one APU; /dev/dri/renderD128 supports
+# concurrent access from multiple processes/containers fine (it's just a DRM render
+# node, not an exclusive lock). Modest footprint by design: config/Docker layers
+# only on the root disk, bulk media stays on the existing /mnt/media ZFS dataset via
+# a native bind-mount (same pattern as ct-srv-media-acq-01) -- rpool is already at
+# ~80% utilization (REL-005).
+resource "proxmox_virtual_environment_container" "ct_srv_jellyfin_01" {
+  vm_id                 = 203
+  node_name             = local.target_node
+  tags                  = ["jellyfin", "media", "gpu"]
+  started               = true
+  unprivileged          = true
+  environment_variables = {}
+
+  startup {
+    order    = 5
+    up_delay = 10
+  }
+
+  initialization {
+    hostname = "ct-srv-jellyfin-01"
+    ip_config {
+      ipv4 {
+        address = "10.0.20.254/24"
+        gateway = "10.0.20.1"
+      }
+    }
+  }
+
+  cpu {
+    cores = 2
+  }
+
+  memory {
+    dedicated = 2048
+    swap      = 1024
+  }
+
+  features {
+    nesting = true
+  }
+
+  disk {
+    datastore_id = local.storage
+    size         = 15
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr0"
+    mac_address = "bc:24:11:6f:1a:c9"
+    vlan_id     = 20
+    firewall    = true
+  }
+
+  operating_system {
+    template_file_id = local.template
+    type             = "debian"
+  }
+
+  # Media library bind-mount (/mnt/media) and /dev/dri/renderD128 passthrough
+  # (VAAPI hardware transcode) are NOT declared here on purpose: unlike
+  # ct-srv-media-acq-01 (where mount_point worked fine because that container
+  # already existed when the block was added), Proxmox restricts "mount point
+  # type bind" -- like device_passthrough -- to root@pam on container *creation*
+  # (confirmed via a live apply failure: "Permission check failed (mount point
+  # type bind is only allowed for root@pam)"). Once this container exists, add
+  # both manually via root SSH, then add matching blocks here + reconcile state,
+  # same pattern as ct-srv-media-acq-01's tun device.
+
+  lifecycle {
+    ignore_changes = [
+      description,
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+      network_interface[0].mac_address,
+      features,
+    ]
+  }
+}
+
 # --- DMZ Stack ---
 
 resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
