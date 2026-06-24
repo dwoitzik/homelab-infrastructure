@@ -1,0 +1,20 @@
+# Native CNPG base backup, scheduled. Closes REL-011: the Cluster (cluster.yml) already
+# has continuous WAL archiving to Garage S3 via `.spec.backup.barmanObjectStore`, but
+# without a ScheduledBackup CR there was no base backup to restore from via barman alone
+# (only the underlying PVC, covered separately by Velero/PBS).
+#
+# Timing: runs at 02:00, one hour before Velero's local `daily-backup` Schedule (03:00,
+# kubernetes/system/velero/schedule.yml) and PBS's 03:00 VM/CT job, so the barman base
+# backup completes before other jobs touch the same NFS-backed PVC.
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-authelia-backup
+  namespace: database
+spec:
+  schedule: "0 2 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: postgres-authelia
+  method: barmanObjectStore
