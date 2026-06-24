@@ -581,7 +581,7 @@ The network stack (`routeros`) pins to an exact version (`1.99.1`), which is bet
 
 ---
 
-### GIT-005 — Offsite Velero BackupStorageLocation has placeholder URL · **LOW**
+### GIT-005 — Offsite Velero BackupStorageLocation has placeholder URL · **DEFERRED (deliberate, 2026-06-24)**
 
 `kubernetes/system/velero/r2-backuplocation.yml` contains:
 
@@ -592,9 +592,17 @@ s3Url: https://ACCOUNT_ID.r2.cloudflarestorage.com
 This is a literal placeholder committed to git. The Secret (`velero-r2-credentials`) does
 not yet exist in the cluster.
 
-- **Fix:** Once R2 credentials are available, replace `ACCOUNT_ID` with the real value
-  and create the Secret via ExternalSecret (Vault `secret/cloudflare-r2`).
-- **Effort:** Small once credentials are in hand.
+- **Investigated 2026-06-24:** evaluated Cloudflare R2 (zero egress fees, but no
+  platform-level hard spending cap — only lifecycle rules and usage monitoring as soft
+  safety nets) vs Backblaze B2 (a true hard `$0` cap that refuses writes once the free
+  tier is exceeded, but charges egress on restore). Given the explicit requirement to
+  never incur cost under any circumstance, decided to **skip offsite cloud backup for
+  now** and rely on existing local Proxmox/PBS backups only, rather than accept R2's
+  soft-cap risk or B2's restore-time egress cost.
+- **Fix (if revisited):** Either credential set works once a clear cost tolerance is
+  set; B2 is the safer default if the bar is "must never bill," R2 if occasional
+  restore-testing cost is acceptable in exchange for zero ongoing egress risk.
+- **Effort:** Small once a provider + credentials are decided.
 
 ---
 
@@ -938,7 +946,7 @@ field input) if it recurs. Not fixed in this pass.
 | GIT-010 | GitOps | **RESOLVED** | `postgres-cluster` Application's directory glob never matched its ExternalSecret filename -- silently unmanaged by GitOps since creation, fixed (2026-06-24) |
 | GIT-003 | GitOps | **HIGH** | System components are manual-apply; no drift detection -- confirmed this silently broke both GIT-010 and REL-011's fixes until caught manually (2026-06-24) |
 | GIT-004 | GitOps | **LOW** | Proxmox provider version constraint far behind latest |
-| GIT-005 | GitOps | **LOW** | R2 BackupStorageLocation has placeholder URL committed |
+| GIT-005 | GitOps | **DEFERRED** | Offsite backup (R2/B2) deliberately skipped -- neither provider offers a true no-cost guarantee that fits the "never pay" requirement without tradeoffs (2026-06-24) |
 | IAC-001 | IaC | **RESOLVED** | ~50% of app Deployments lack resource limits |
 | IAC-002 | IaC | **MEDIUM** | MikroTik firewall hardening apply still pending Atlantis |
 | IAC-003 | IaC | **LOW** | No automated k3s VM rebuild procedure |
