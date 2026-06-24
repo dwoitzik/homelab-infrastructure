@@ -268,13 +268,63 @@ both endpoints) — worked from a screenshot instead.
   - SABnzbd's Mullvad kill-switch init container (`KSV-0022/0120`): genuinely needs
     NET_ADMIN (create the wg0 interface) and SYS_MODULE (load the wireguard kernel
     module) for a WireGuard tunnel to come up at all.
-- **Not yet done:** adding proper `securityContext` (drop all capabilities,
-  `allowPrivilegeEscalation: false`, `runAsNonRoot` where the image supports it,
-  `readOnlyRootFilesystem` where feasible) to the ~20 affected manifests is the real
-  fix for the bulk of the 545 — this is the larger remaining piece, not done in this
-  pass given the number of distinct apps with different runtime requirements (PUID/PGID
-  patterns, root-requiring init scripts, etc.) that each need individual verification
-  rather than one blanket template.
+- **Follow-up done in SEC-012** (below): the `securityContext` hardening pass across
+  these ~20+ manifests, including a live incident caused by that pass and its recovery.
+
+### SEC-012 — securityContext hardening pass across ~25 manifests, including a self-inflicted outage and recovery (2026-06-24)
+
+Follow-up to SEC-010. Added `securityContext` to every container in `kubernetes/`
+that was missing one (also deleted `kubernetes/test-app/`, an undeployed leftover
+ArgoCD smoke-test manifest with no remaining purpose). Reduced Trivy config
+misconfiguration findings from 215 to 171.
+
+**What went wrong, and why this is left in instead of cleaned up:** the first pass
+(PR #94) added `capabilities.drop: [ALL]` and, on some containers, `runAsNonRoot: true`
+based on assumptions about each image's default user and entrypoint behavior, verified
+only via `kubeconform` (schema-valid, not behavior-valid) before merging. Within minutes
+of merge, ArgoCD's auto-sync (selfHeal is on — merge is deploy in this repo) rolled out
+the change and **nine containers broke**, including both Postgres instances backing
+Paperless and Nextcloud (real outage, not just a degraded non-critical service):
+
+| Failure mode | Root cause | Affected |
+|---|---|---|
+| Crash-loop on chown/su-exec failure | `capabilities.drop:[ALL]` removed CAP_CHOWN/CAP_SETUID/CAP_SETGID that the image's entrypoint needs to drop from root to its runtime user before exec'ing the real process | gitea, authelia, headscale, mealie, postgres (paperless + nextcloud), redis (paperless + nextcloud — only the instances *without* a `command:` override that bypasses the entrypoint; redis-authelia's explicit `command: redis-server ...` skips that entrypoint entirely and was unaffected) |
+| `CreateContainerConfigError`, container never starts | `runAsNonRoot: true` assumed several images default to a non-root user when they don't | vault-unseal (hashicorp/vault), redis-nextcloud, redis-paperless, cloudflare-ddns (curlimages/curl) |
+
+Caught within ~15 minutes by directly inspecting pod status/logs after forcing an
+ArgoCD hard-refresh (its poll interval otherwise meant `kubectl get application`
+showed stale "Synced/Healthy" against an old revision — checking `Application` sync
+status alone is **not sufficient** to confirm a change is actually live; always check
+the pod's own `creationTimestamp` and the live Deployment/StatefulSet spec). Fixed
+across three follow-up PRs (#95 gitea, #96 the other eight, #97 a second
+redis-specific root cause found while verifying #96's rollout) as the actual failure
+modes were confirmed live, one container at a time — `kubectl logs` on the crashing
+container told the real story every time (`chown: Operation not permitted`,
+`su-exec: setgroups: Operation not permitted`, `setpriv: setresuid failed`).
+
+A second trap during recovery: manually `kubectl apply`-ing the fixed YAML directly
+(to restore service faster than a PR cycle) got **silently reverted by ArgoCD's
+selfHeal**, which kept re-applying the still-broken git state until the actual fix
+landed on `main`. In this repo, with selfHeal on, **git is the only place a fix can
+actually stick** — a manual kubectl fix during an incident buys nothing once selfHeal
+notices the drift.
+
+Final state: `allowPrivilegeEscalation: false` applied everywhere (safe, always-on
+baseline). `capabilities.drop: [ALL]` kept only where verified to not break the
+container's entrypoint. `runAsNonRoot: true` kept only where the image's default user
+is verifiably already non-root (e.g. cloudflared, confirmed live). Each reverted file
+has an inline comment recording the specific verified failure mode, so this isn't
+re-attempted blindly later.
+
+**Lesson for any future blanket securityContext/PodSecurity change in this repo:**
+`kubeconform`/`kubectl --dry-run` only validate schema, not runtime behavior —
+container entrypoints that do their own privilege-dropping (chown + su-exec/setpriv,
+common in postgres, redis without a command override, gitea, authelia, mealie,
+headscale) need `CAP_CHOWN`/`CAP_SETUID`/`CAP_SETGID` and cannot run with all
+capabilities dropped, regardless of what the final running process needs. Verify
+each app's actual startup behavior live before merging, not just that the YAML
+parses.
+
 - **Also separately noted:** the GitHub repo sidebar's "Contributors" widget was still
   showing a stale "claude" entry from before this session's git-filter-repo history
   rewrite — verified clean across every branch/ref via `git log --all -p | grep -i
@@ -1075,7 +1125,8 @@ download traffic itself.
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
 | SEC-008 | Security | **RESOLVED** | Atlantis had zero auth + plain-HTTP entrypoint -- added Authelia (webhook path excluded), HTTPS-only (2026-06-23) |
 | SEC-009 | Security | **RESOLVED** | Home Assistant had no auth layer beyond its own login -- added Authelia, same pattern as Jellyfin (2026-06-23) |
-| SEC-010 | Security | **PARTIAL** | 545 open Trivy code-scanning alerts, mostly ~20 manifests missing securityContext; suppressed 2 genuinely-justified findings via .trivyignore, real hardening pass not yet done (2026-06-24) |
+| SEC-010 | Security | **PARTIAL** | 545 open Trivy code-scanning alerts, mostly ~20 manifests missing securityContext; suppressed 2 genuinely-justified findings via .trivyignore; hardening pass done in SEC-012 (2026-06-24) |
+| SEC-012 | Security | **RESOLVED** | securityContext hardening across ~25 manifests, 215->171 Trivy findings; first attempt broke 9 containers (capabilities.drop/runAsNonRoot assumptions wrong for several images), caught and fixed live within ~15min across 3 follow-up PRs (2026-06-24) |
 | REL-001 | Reliability | **RESOLVED** | All 3 k3s nodes run continuously (`on_boot=true`); single-server topology by deliberate design, not an HA gap -- see `docs/k3s-architecture.md` |
 | REL-002 | Reliability | **RESOLVED** | PBS running with `onboot=1`; `all: 1` backup job covers every VM/CT incl. k3s nodes + NFS LXC; verified successful 2026-06-23 03:00 run |
 | REL-003 | Reliability | **HIGH** | Velero backend (Garage) is in-cluster; circular recovery dependency |
