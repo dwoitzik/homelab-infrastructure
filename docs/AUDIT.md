@@ -287,6 +287,48 @@ the 120 GB allocated, available space will tighten as workloads grow.
 
 ---
 
+### REL-012 — k3s control plane (etcd) crash-looping all day, 39 restarts · **CRITICAL** (discovered live 2026-06-23, not yet fixed)
+
+Caught live while checking the homepage dashboard: `kubectl` against the API VIP and
+against `vm-srv-k3s-11` directly both got connection-refused. SSH'd in and found
+`k3s.service`'s systemd restart counter at 39 for the day, restart timestamps spread from
+13:52 through 20:54 (roughly every 1-2h). The cluster recovered on its own within ~2
+minutes each time — by the time this was investigated, nodes were `Ready` again — but it
+has been silently flapping all day with nothing alerting on it.
+
+Root cause (from `journalctl -u k3s` right before each failure): etcd `apply request took
+too long` warnings up to **14.3 seconds** (expected: 100ms) on simple read-only range
+requests, causing the controller-manager's leader-election lease renewal to time out
+(`context deadline exceeded`), which is fatal to the k3s process (`exit code 1`) and
+triggers a systemd restart. This is single-node etcd (deliberately, see GIT topology
+notes) being starved of disk I/O badly enough to blow through raft's read-index timeout.
+
+- **Likely contributing factor:** `rpool` is at 70%+ utilization (REL-005, already flagged
+  but not fixed) on the single shared NVMe behind every VM/LXC on `mini`. High utilization
+  degrades NVMe write latency, and this is the same physical disk class previously
+  implicated in the documented ZFS/host-freeze investigation (`docs/OPERATIONS.md`).
+  Today also had unusually heavy concurrent activity across LXCs (Ollama CPU inference
+  stress-testing, paperless-gpt batch processing, NFS LXC near-OOM earlier) which may have
+  compounded disk/CPU contention on the shared host at the same time.
+- **Impact:** Every one of these episodes is a full control-plane outage (API server
+  unreachable, no scheduling, no kubectl) lasting roughly 1-2 minutes, recurring multiple
+  times per day, completely silently — no alert fired despite Blackbox/Prometheus already
+  monitoring most services. The 39-restart count alone makes this more severe than several
+  other CRITICAL-tier findings in this doc.
+- **Fix (not yet done):** (1) Add alerting on `kube_node_status_condition` / API server
+  reachability and on `k3s.service` restart count — this should have paged immediately.
+  (2) Resolve REL-005 (free up rpool headroom) as a likely contributing factor.
+  (3) Consider `etcdctl defrag` (etcd hasn't been compacted in the 24 days since the node
+  last restarted cleanly) and/or moving etcd's WAL to a less-contended disk if one becomes
+  available. (4) Re-evaluate whether single-node etcd on this hardware needs a lower
+  `--etcd-arg` heartbeat/election-timeout tolerance, or whether the real fix is just less
+  disk pressure.
+- **Effort:** Alerting is small (1-2h); root-causing the I/O contention properly is
+  larger and probably needs to wait for calmer conditions to test against (it's hard to
+  diagnose disk contention while intentionally generating disk contention).
+
+---
+
 ### REL-006 — No VM-level Proxmox snapshots for k3s nodes · **HIGH**
 
 `pvesh get /nodes/pve-mgmt-01/qemu/211/snapshot` returns only `current` — no named
@@ -629,6 +671,7 @@ on this chip, abandoned at some earlier point without anyone reverting the Ansib
 | REL-006 | Reliability | **HIGH** | No Proxmox VM snapshots for k3s nodes |
 | REL-007 | Reliability | **RESOLVED** | Vault seal gap causes cascading ExternalSecret failures on restart — mitigated via faster unseal polling + wait-for-secret initContainers |
 | REL-009 | Reliability | **LOW** | Vault's raft storage (`data-vault-0`) is on `nfs-client`; BoltDB has similar locking needs to the SQLite issue in GIT-006, no corruption seen yet — deserves a dedicated migration pass given Vault's blast radius |
+| REL-012 | Reliability | **CRITICAL** | k3s control plane (etcd) crash-looping all day, 39 restarts -- etcd apply latency up to 14.3s under disk I/O contention, no alerting fired |
 | REL-011 | Reliability | **MEDIUM** | `postgres-authelia` (CNPG) has barman WAL archiving configured but no `ScheduledBackup` resource — no base backup exists to restore from via barman alone, only the PVC itself (Velero/PBS) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
