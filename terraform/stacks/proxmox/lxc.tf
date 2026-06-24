@@ -278,18 +278,23 @@ resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
     path   = "/media"
   }
 
-  # /dev/net/tun passthrough (needed for WireGuard/Mullvad inside this
-  # unprivileged container) is NOT declared here on purpose: the Atlantis
-  # Terraform API token isn't root@pam, and Proxmox only allows configuring
-  # device_passthrough on container *creation* for root@pam (confirmed via a
-  # live apply failure: "Permission check failed (configuring device
-  # passthrough is only allowed for root@pam)"). Same constraint the AI LXC
-  # below hit -- that one's device_passthrough blocks only work because the
-  # container was created manually as root and imported into state
-  # afterward (see imports.tf), never actually exercising the CREATE path
-  # via this token. Once this container exists, add the device passthrough
-  # manually via root SSH, then add a matching block here + reconcile state
-  # the same way.
+  # /dev/net/tun passthrough -- required for gluetun (Mullvad WireGuard)
+  # inside this unprivileged container; without it Docker can't bind-mount
+  # the device into the gluetun container at all ("error gathering device
+  # information... no such file or directory", confirmed live). Couldn't be
+  # declared at container-creation time (Atlantis's Terraform API token isn't
+  # root@pam, and Proxmox only allows device_passthrough on CREATE for
+  # root@pam) -- added manually via root SSH after the container existed
+  # (`pct set 202 -dev0 ...`), now declared here to match and avoid drift,
+  # same pattern as the AI LXC's GPU passthrough below.
+  device_passthrough {
+    path       = "/dev/net/tun"
+    uid        = 0
+    gid        = 0
+    mode       = "0666"
+    deny_write = false
+  }
+
   lifecycle {
     ignore_changes = [
       description,
