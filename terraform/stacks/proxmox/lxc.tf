@@ -369,15 +369,24 @@ resource "proxmox_virtual_environment_container" "ct_srv_jellyfin_01" {
     type             = "debian"
   }
 
-  # Media library bind-mount (/mnt/media) and /dev/dri/renderD128 passthrough
-  # (VAAPI hardware transcode) are NOT declared here on purpose: unlike
-  # ct-srv-media-acq-01 (where mount_point worked fine because that container
-  # already existed when the block was added), Proxmox restricts "mount point
-  # type bind" -- like device_passthrough -- to root@pam on container *creation*
-  # (confirmed via a live apply failure: "Permission check failed (mount point
-  # type bind is only allowed for root@pam)"). Once this container exists, add
-  # both manually via root SSH, then add matching blocks here + reconcile state,
-  # same pattern as ct-srv-media-acq-01's tun device.
+  # Media library bind-mount -- added manually via root SSH (pct set 203 -mp0
+  # ...) once the container existed, since "mount point type bind" can't be
+  # configured at create time via Atlantis's non-root@pam token. Declared here
+  # to match and avoid drift.
+  mount_point {
+    volume = "/mnt/media"
+    path   = "/media"
+  }
+
+  # /dev/dri/renderD128 passthrough (VAAPI hardware transcode) -- same story,
+  # added manually (pct set 203 -dev0 ...) once the container existed.
+  device_passthrough {
+    path       = "/dev/dri/renderD128"
+    uid        = 0
+    gid        = 992
+    mode       = "0660"
+    deny_write = false
+  }
 
   lifecycle {
     ignore_changes = [
