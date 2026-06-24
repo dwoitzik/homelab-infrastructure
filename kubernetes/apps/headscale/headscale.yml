@@ -36,6 +36,8 @@ spec:
           # with "creating directory failed with permission error".
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
           args:
             - serve
           ports:

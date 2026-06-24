@@ -48,6 +48,8 @@ spec:
           # crash-loops it.
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: POSTGRES_DB
               value: nextcloud
@@ -113,6 +115,8 @@ spec:
           # command: with redis-server directly, skipping that entrypoint.
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 6379
           resources:
@@ -160,6 +164,8 @@ spec:
           image: nextcloud:30-apache
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
             capabilities:
               drop: ["ALL"]
           ports:
@@ -254,6 +260,8 @@ spec:
               command: [php, -f, /var/www/html/cron.php]
               securityContext:
                 allowPrivilegeEscalation: false
+                seccompProfile:
+                  type: RuntimeDefault
                 capabilities:
                   drop: ["ALL"]
               volumeMounts:
