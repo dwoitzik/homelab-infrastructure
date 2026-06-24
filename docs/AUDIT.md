@@ -295,12 +295,17 @@ Caught within ~15 minutes by directly inspecting pod status/logs after forcing a
 ArgoCD hard-refresh (its poll interval otherwise meant `kubectl get application`
 showed stale "Synced/Healthy" against an old revision — checking `Application` sync
 status alone is **not sufficient** to confirm a change is actually live; always check
-the pod's own `creationTimestamp` and the live Deployment/StatefulSet spec). Fixed
-across three follow-up PRs (#95 gitea, #96 the other eight, #97 a second
-redis-specific root cause found while verifying #96's rollout) as the actual failure
-modes were confirmed live, one container at a time — `kubectl logs` on the crashing
-container told the real story every time (`chown: Operation not permitted`,
-`su-exec: setgroups: Operation not permitted`, `setpriv: setresuid failed`).
+the pod's own `creationTimestamp` and the live Deployment/StatefulSet spec). Two more
+of the same failure mode (paperless-ngx's `init-folders` needing CAP_CHOWN, uptime-kuma's
+entrypoint needing CAP_SETGID/CAP_SETUID) surfaced only on a slower ReplicaSet rollout
+and were caught during an extended verification pass ~30 minutes later — a reminder that
+"Running with N restarts looking survivable" isn't proof of health; a clean
+`creationTimestamp` with 0 restarts since is. Fixed across five follow-up PRs (#95
+gitea, #96 the bulk of it, #97 a redis-specific root cause found verifying #96, #99
+paperless-ngx + uptime-kuma found in the extended pass) as the actual failure modes
+were confirmed live, one container at a time — `kubectl logs` on the crashing container
+told the real story every time (`chown: Operation not permitted`, `su-exec: setgroups:
+Operation not permitted`, `setpriv: setresuid failed`/`setgroups failed`).
 
 A second trap during recovery: manually `kubectl apply`-ing the fixed YAML directly
 (to restore service faster than a PR cycle) got **silently reverted by ArgoCD's
