@@ -470,14 +470,23 @@ notes) being starved of disk I/O badly enough to blow through raft's read-index 
   alert rules had never been evaluated either, a separate and arguably worse problem
   than just missing this one alert. (2) Resolve REL-005 (free up rpool headroom) as a
   likely contributing factor — confirmed still at 82.5% as of 2026-06-24, not improved.
-  (3) Consider `etcdctl defrag` (etcd hasn't been compacted in the 24 days since the node
-  last restarted cleanly) and/or moving etcd's WAL to a less-contended disk if one becomes
-  available — not yet done. (4) Re-evaluate whether single-node etcd on this hardware
-  needs a lower `--etcd-arg` heartbeat/election-timeout tolerance, or whether the real fix
-  is just less disk pressure — not yet done. Confirmed live 2026-06-24 this is still
-  actively recurring and getting worse, not better: 87 restarts (up from 39 the prior day),
-  407 "apply request took too long" warnings in just a 6-hour window, with latencies up to
-  10.8s observed directly while investigating this.
+  (3) **Checked, not worth doing** — `etcdctl defrag` was on the original list, but
+  `etcdctl` isn't installed anywhere on `vm-srv-k3s-11` (k3s embeds etcd without
+  shipping the standalone CLI), and the actual DB is only 49MB despite 24 days without
+  compaction — not bloated at all. Defrag's benefit here would be negligible, and it
+  doesn't address the real root cause (shared NVMe I/O contention) anyway, so
+  downloading an unmanaged binary onto the production control-plane node for this
+  wasn't worth the risk. Took an `etcd-snapshot save` first regardless, in case this
+  gets revisited. Moving etcd's WAL to a less-contended disk if one becomes available
+  — still not done, no spare fast disk exists on `mini` right now.
+  (4) Re-evaluate whether single-node etcd on this hardware needs a lower `--etcd-arg`
+  heartbeat/election-timeout tolerance, or whether the real fix is just less disk
+  pressure — not yet done. Confirmed live 2026-06-24 this is still actively recurring
+  and getting worse, not better: 87 restarts (up from 39 the prior day), 407 "apply
+  request took too long" warnings in just a 6-hour window, with latencies up to 10.8s
+  observed directly while investigating this. Checked again later the same day during a
+  calmer window: 0 such warnings in a 30-minute span — confirms this tracks disk
+  contention from concurrent activity elsewhere on `mini`, not a constant condition.
 - **Effort:** Alerting is small (1-2h); root-causing the I/O contention properly is
   larger and probably needs to wait for calmer conditions to test against (it's hard to
   diagnose disk contention while intentionally generating disk contention).
