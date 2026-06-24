@@ -192,6 +192,24 @@ no password prompt.
 
 ---
 
+### SEC-009 — Home Assistant had no auth layer beyond its own login · **MEDIUM** (fixed 2026-06-23)
+
+Same Authelia-coverage audit as SEC-008. Of the apps with no Authelia middleware,
+`nextcloud-final` and `gitea-final` are deliberate (CalDAV/CardDAV and git protocol clients
+need direct unauthenticated-at-the-edge access, both already commented in
+`apps-ingressroute.yml`); `ha-final` had no such comment and no documented reason — it was
+just relying on Home Assistant's own login.
+
+- **Fix:** Added the `authelia` middleware to `ha-final`, same pattern already used for
+  Jellyfin (`media-final`): Authelia gates the web UI, Companion app users should connect
+  via the Headscale VPN for direct local access instead of the public hostname.
+- **Blast radius:** Browser access to `ha.woitzik.dev` now requires an Authelia session
+  first. If the HA Companion app was configured against the public URL directly (not
+  via Headscale), it will need reconfiguring.
+- **Effort:** Small — done.
+
+---
+
 ## 2. Reliability / Recoverability
 
 ### REL-001 — 2 of 3 k3s nodes stopped; cluster running single-node · **RESOLVED** (2026-06-23)
@@ -588,6 +606,7 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 | SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
 | SEC-008 | Security | **RESOLVED** | Atlantis had zero auth + plain-HTTP entrypoint -- added Authelia (webhook path excluded), HTTPS-only (2026-06-23) |
+| SEC-009 | Security | **RESOLVED** | Home Assistant had no auth layer beyond its own login -- added Authelia, same pattern as Jellyfin (2026-06-23) |
 | REL-001 | Reliability | **RESOLVED** | All 3 k3s nodes run continuously (`on_boot=true`); single-server topology by deliberate design, not an HA gap -- see `docs/k3s-architecture.md` |
 | REL-002 | Reliability | **RESOLVED** | PBS running with `onboot=1`; `all: 1` backup job covers every VM/CT incl. k3s nodes + NFS LXC; verified successful 2026-06-23 03:00 run |
 | REL-003 | Reliability | **HIGH** | Velero backend (Garage) is in-cluster; circular recovery dependency |
