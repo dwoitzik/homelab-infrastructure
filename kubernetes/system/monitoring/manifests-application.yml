@@ -1,0 +1,31 @@
+# REL-014: every raw manifest in this directory (PrometheusRules, the pve-exporter
+# Deployment, Discord/Grafana ExternalSecrets, the Grafana IngressRoute, NetworkPolicies,
+# dashboard ConfigMaps) was live in the cluster but tracked by NO ArgoCD Application --
+# deployed once manually at some point, then orphaned from GitOps. A full cluster rebuild
+# from git alone would never have restored any of it (confirmed live: loki-dashboard
+# ConfigMap is in git but doesn't exist in the cluster -- silent drift already happened).
+# kubernetes/apps/* gets this automatically via the homelab-apps ApplicationSet;
+# kubernetes/system/* does not, so each subdirectory needs its own Application, same
+# pattern as vault-manifests/velero-manifests.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-manifests
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dwoitzik/homelab-infrastructure.git
+    targetRevision: main
+    path: kubernetes/system/monitoring
+    directory:
+      include: '{control-plane-alerts,slo-rules,hardware-temp-alerts,pve-exporter,alertmanager-discord,external-secret,ingressroute,network-policies,loki-dashboard,slo-dashboard}.yml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
