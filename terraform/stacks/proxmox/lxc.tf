@@ -147,8 +147,20 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
     }
   }
 
+  # REL-012/REL-016: reduced from 8 to 6 of the host's 16 logical threads -- a
+  # CPU-only Ollama inference run (gemma2:27b, ~18GB) previously had no
+  # ceiling here, took 17+ minutes, and froze the entire host (every other
+  # LXC/VM on mini, confirmed unreachable at the SSH-banner level, needed a
+  # manual power-cycle). Proxmox doesn't isolate CPU between LXCs by default.
+  # This `cores` reduction is the durable, Terraform-tracked half of the fix;
+  # bpg/proxmox 0.100.0's container resource has no `limit` attribute at all
+  # (confirmed via the provider's own schema: cpu{} only exposes
+  # architecture/cores/units) -- Proxmox's actual cpulimit (a fractional
+  # ceiling, not just a core count) is applied manually via
+  # `pct set 201 -cpulimit 6` and is NOT representable here. If this
+  # container is ever recreated, that manual step needs to be redone.
   cpu {
-    cores = 8
+    cores = 6
   }
 
   memory {
