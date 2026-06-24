@@ -105,12 +105,14 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
-          # SEC-012: redis:7-alpine has no non-root default user -- confirmed
-          # live, runAsNonRoot alone fails admission.
+          # SEC-012: this instance has no command override, so it runs the
+          # image's default entrypoint, which needs CAP_SETUID to setpriv-drop
+          # from root to the redis user -- confirmed live ("setpriv: setresuid
+          # failed: Operation not permitted"). redis-authelia (system/redis)
+          # tolerates the same capability drop fine because it overrides
+          # command: with redis-server directly, skipping that entrypoint.
           securityContext:
             allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
           ports:
             - containerPort: 6379
           resources:
