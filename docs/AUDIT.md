@@ -1016,7 +1016,7 @@ field input) if it recurs. Not fixed in this pass.
 
 ---
 
-### WRK-006 — Media acquisition stack: dedicated VPN-isolated LXC (in progress, 2026-06-24)
+### WRK-006 — Media acquisition stack: dedicated VPN-isolated LXC (provisioned & deployed, 2026-06-24)
 
 SABnzbd had a hand-rolled Mullvad WireGuard kill switch (init container + manual
 iptables) but the WireGuard config was a placeholder — fails closed (no leak) but
@@ -1029,16 +1029,33 @@ download traffic itself.
   proxy for NZBHydra2's indexer queries specifically (not bulk downloads — Tor's
   bandwidth can't handle that, and doing so would be abusive to the shared network).
   Full reasoning in `docs/decisions/ADR-010-media-acquisition-lxc.md`.
-- **Done:** Terraform LXC definition (`ct_srv_media_acq_01`, 10.0.20.253, modest 25GB
-  root disk given `rpool` is already at ~80%), Ansible role `media_acquisition`
-  (gluetun + Sonarr/Radarr/Bazarr/SABnzbd/NZBHydra2/Tor/Jellyseerr via Docker Compose,
-  reusing the exact same NFS exports these apps' k8s PVCs were already bound to — no
-  data migration needed), placeholder Mullvad vars in Vault.
-- **Deliberately not done yet:** the LXC needs an `atlantis apply` to actually exist;
-  the Ansible role can't run until it does. The old Kubernetes Deployments/PVCs and
-  Traefik IngressRoutes are left untouched until the new stack is provisioned and
-  verified working — cutting both over in one shot would risk a window with no
-  acquisition stack running at all.
+- **Provisioned:** `ct_srv_media_acq_01` (10.0.20.253) exists and is running. Hit two
+  more `root@pam`-only Proxmox API restrictions doing this (GIT-011): `usb-templates`'
+  storage registration was missing (disk was fine, just unregistered — re-registered),
+  and `device_passthrough` can't be configured on container *creation* via Atlantis's
+  token (worked around by creating the bare container first, adding `/dev/net/tun`
+  passthrough manually via root SSH once it existed, then declaring it in Terraform
+  afterward to avoid drift — confirmed via `atlantis plan` showing zero diff).
+- **NFS turned out to be a dead end inside this unprivileged container** — confirmed
+  live that NFS client mounts fail with EPERM regardless of the `mount=nfs` Proxmox
+  feature flag (both NFSv3 and NFSv4), a deeper unprivileged-userns kernel restriction,
+  not a network/AppArmor problem (`showmount` RPC queries succeed fine). Fixed with two
+  different approaches: the media library is bound in via a native Proxmox LXC mount
+  point (it's a local ZFS dataset on the same host anyway, no NFS needed), and per-app
+  configs were copied once via `tar | ssh | tar` directly between hosts instead of an
+  ongoing NFS mount.
+- **Deployed and validated:** `ansible-playbook site.yml --limit media_acq_nodes` ran
+  clean — Docker installed, all 7 containers (gluetun, Sonarr, Radarr, Bazarr, SABnzbd,
+  NZBHydra2, Tor, Jellyseerr) built and started. Confirmed the kill-switch architecture
+  works exactly as intended: gluetun crash-loops on the still-placeholder Mullvad config
+  rather than passing traffic unprotected — correct, safe failure mode.
+- **Deliberately not done yet:** the old Kubernetes Deployments/PVCs and Traefik
+  IngressRoutes are left untouched until the new stack has a real Mullvad config and is
+  fully verified — cutting over before that would risk a window with no working
+  acquisition stack at all. The config copy done so far is structurally complete but not
+  byte-for-byte final (a few SQLite WAL files were locked by the still-running k8s pods
+  during the copy) — the real, final sync happens at actual cutover time with the
+  source apps stopped.
 - **Still blocked on:** a real Mullvad WireGuard config (account + generated config
   from the user — can't be created on their behalf).
 
@@ -1094,7 +1111,7 @@ download traffic itself.
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
 | WRK-004 | Workloads | **RESOLVED** | paperless-gpt failing on every document; Ollama iGPU (Vulkan) crashing constantly under load -- switched to CPU-only |
 | WRK-005 | Workloads | **PARTIAL** | Paperless data-quality pass: missing archives (nfs-client related, fixed) + 5 "hallucinated" docs were actually scanned upside-down (fixed) + LLM_MODEL occasionally returns chatty-assistant text instead of short field values (low-frequency, not fixed) (2026-06-24) |
-| WRK-006 | Workloads | **IN PROGRESS** | Media acquisition stack moving to a dedicated gluetun/Mullvad-isolated LXC -- code written, blocked on `atlantis apply` + a real Mullvad config from the user (2026-06-24, ADR-010) |
+| WRK-006 | Workloads | **IN PROGRESS** | Media acquisition stack moved to a dedicated gluetun/Mullvad-isolated LXC -- provisioned, deployed, kill-switch verified failing closed; blocked on a real Mullvad config + final cutover (2026-06-24, ADR-010) |
 
 ---
 
