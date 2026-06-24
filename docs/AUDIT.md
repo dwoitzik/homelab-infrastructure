@@ -677,6 +677,44 @@ recovery path existed.
 
 ---
 
+### REL-017 — `mc-server-2` (the original Minecraft server) had no DNAT rule at all · **RESOLVED** (2026-06-24)
+
+Found while recovering from REL-016: the user reported `mc-server-2` (port 25565)
+unreachable, and a direct TCP connect test confirmed it — repeatable, including from
+*before* the host froze, ruling out the freeze as the cause.
+
+- **Root cause:** queried the live MikroTik router's NAT table directly via its own
+  REST API (`GET /rest/ip/firewall/nat`, using the `terraform` user's credentials
+  already in `terraform.tfvars`) rather than guess from Terraform files alone — only
+  Cobblemon's `dst-nat` rule (port 25566) existed. **There was no NAT rule for port
+  25565 at all**, on the live router or in git. The matching forward-chain ALLOW rule
+  (`fwd_wan_minecraft`) existed and always had — but an ALLOW rule only lets traffic
+  *through* the firewall once it's already addressed to the internal proxy; without a
+  `dst-nat` rule to actually rewrite the destination from the public IP in the first
+  place, WAN traffic to port 25565 had nowhere to go. Confirmed both NPM (the reverse
+  proxy) and the backend (`ct-dmz-games-01`) were listening and reachable internally
+  the whole time via `nc -zv` from the proxy itself — the break was purely the missing
+  NAT rule, nothing downstream.
+- **Fix:** added `routeros_ip_firewall_nat.dstnat_minecraft`, mirroring the existing
+  Cobblemon rule exactly. Verified end-to-end after apply, not just "port open": a real
+  Minecraft server-list-ping handshake against the public IP returned the server's
+  actual MOTD and version.
+- **Unrelated drift surfaced in the same plan:** `routeros_snmp_community.monitoring`
+  showed pending changes (clearing `authentication_password`/`encryption_password` to
+  null) that had nothing to do with this fix. Checked before approving: the community
+  is plain SNMPv2c (a community string, `read_access = true`, no version/security-level
+  config), so those fields are vestigial for this resource — safe to let Terraform
+  correct back to the declared, secretless config.
+- **Lesson:** when a forward-chain filter rule for a port already exists, don't assume
+  the matching NAT rule does too — they're independent, and on this router's history
+  (see GIT-007/GIT-009) it's already been established more than once that NAT rules can
+  go undeclared in Terraform, or simply never get created in the first place, while
+  filter rules quietly mask the gap by looking like "the firewall already allows this."
+  Query the live router's NAT table directly rather than inferring connectivity from
+  the filter rules alone.
+
+---
+
 ### REL-013 — Redundant monitoring: two systems probing the same ~20 endpoints, too aggressively · **RESOLVED** (2026-06-24)
 
 Found while investigating unusually high DNS query volume reported live (AdGuard:
@@ -1404,6 +1442,7 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | REL-014 | Reliability | **RESOLVED** | Every custom PrometheusRule (SLO alerts, hardware-temp alerts) was silently never evaluated -- missing `release: kube-prometheus-stack` label never matched Prometheus's ruleSelector. Fixed, verified live via /api/v1/rules (2026-06-24) |
 | REL-015 | Reliability | **PARTIAL** | Discord alerting silently broken -- Prometheus Operator can't validate `webhook_url_file` in raw Helm config (tries reading the file from its own pod, which never has it mounted), generated secret was 24 days stale. Manual stopgap restores delivery; durable fix (AlertmanagerConfig CRD) not attempted live (2026-06-24) |
 | REL-016 | Reliability | **PARTIAL** | `mini` froze solid during an Ollama CPU inference test (18GB model, likely disk-contention cascade per REL-005/REL-012), needed a manual power-cycle; 5 LXCs had `onboot=0` and didn't auto-recover. Capped AI LXC CPU (6 cores + manual cpulimit, bpg/proxmox has no `limit` attribute), set onboot=1 manually (provider doesn't read this attribute back either). Root disk contention still unresolved (2026-06-24) |
+| REL-017 | Reliability | **RESOLVED** | `mc-server-2` (Minecraft, port 25565) had no DNAT rule at all on the live router -- only the forward-filter ALLOW rule existed, never the actual NAT rewrite. Confirmed via the router's own REST API, fixed, verified with a real protocol-level handshake against the public IP (2026-06-24) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
