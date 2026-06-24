@@ -145,6 +145,14 @@ filters:
     id: 3
 
 whitelist_filters: []
+# Tried a $dnsrewrite custom filter rule here to fix SRV lookups for
+# _minecraft._tcp.cobblemon.woitzik.dev (the *.woitzik.dev rewrite above
+# intercepts that name too and returns empty for any type it can't answer,
+# rather than forwarding upstream) -- loaded without error but had no effect
+# on the actual query (confirmed live, dig still got ANSWER: 0). Not chasing
+# this further blindly: the real SRV record at Cloudflare is correct and this
+# only affects testing the no-port hostname from inside the LAN -- external
+# players never hit AdGuard at all. See docs/AUDIT.md if revisited.
 user_rules: []
 
 dhcp:
@@ -191,6 +199,15 @@ filtering:
   rewrites:
     - domain: "*.woitzik.dev"
       answer: "10.0.20.200"
+      enabled: true
+    # cobblemon.woitzik.dev is a raw-TCP Minecraft server, not an HTTP service --
+    # the wildcard above points everything at the Traefik VIP, which has no route
+    # to it (Traefik doesn't proxy this port at all). An explicit, more-specific
+    # rewrite takes precedence over the wildcard and points internal clients at
+    # the same NPM stream proxy (10.0.30.2) external traffic already goes through,
+    # so there's only one path to the backend, not two.
+    - domain: cobblemon.woitzik.dev
+      answer: "10.0.30.2"
       enabled: true
     - domain: www.woitzik.dev
       answer: "64.29.17.65"
