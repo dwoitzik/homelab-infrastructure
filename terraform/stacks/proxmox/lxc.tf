@@ -7,11 +7,12 @@ locals {
 # --- Management Stack ---
 
 resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
-  vm_id        = 110
-  node_name    = local.target_node
-  tags         = ["backup", "management"]
-  started      = true
-  unprivileged = true
+  vm_id         = 110
+  node_name     = local.target_node
+  tags          = ["backup", "management"]
+  started       = true
+  start_on_boot = true
+  unprivileged  = true
 
   startup {
     order    = 5
@@ -68,6 +69,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
   node_name             = local.target_node
   tags                  = ["docker", "server", "services"]
   started               = true
+  start_on_boot         = true
   unprivileged          = true
   environment_variables = {}
 
@@ -129,6 +131,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   node_name             = local.target_node
   tags                  = ["ai", "llm", "server"]
   started               = true
+  start_on_boot         = true
   unprivileged          = true
   environment_variables = {}
 
@@ -418,6 +421,7 @@ resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
   node_name             = local.target_node
   tags                  = ["dmz", "proxy", "network"]
   started               = true
+  start_on_boot         = true
   unprivileged          = true
   environment_variables = {}
 
@@ -575,6 +579,7 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   node_name             = local.target_node
   tags                  = ["dmz", "gaming"]
   started               = true
+  start_on_boot         = true
   unprivileged          = true
   environment_variables = {}
 
