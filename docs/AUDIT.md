@@ -439,6 +439,33 @@ k3s-11 VM disk.
 
 ---
 
+### REL-009 — Vault's raft storage was on `nfs-client` · **RESOLVED** (2026-06-24)
+
+Same risk class as GIT-006: Vault's raft storage uses BoltDB underneath (`raft.db`,
+`vault.db`), which has the same file-locking assumptions that broke Garage's SQLite
+metadata DB on NFS. No corruption had occurred yet, but Vault is the root of every
+secret in the cluster — worth fixing proactively rather than waiting for an incident.
+
+- **Fix:** Took a `vault operator raft snapshot save` backup and a Proxmox VM snapshot
+  of `vm-srv-k3s-11` first. Paused the ArgoCD application-controller (this Application
+  has `selfHeal: true` and would otherwise fight a live StatefulSet/PVC swap).
+  Scaled Vault to 0, deleted the StatefulSet with `--cascade=orphan` (keeps the PVC
+  alive), copied `data-vault-0`'s contents to a new `local-path` PVC via a temporary
+  pod (two hops, since the final PVC needs the exact same name `data-vault-0` for the
+  Helm chart's `volumeClaimTemplate` to bind to it rather than auto-creating a new
+  nfs-client one) — verified byte-identical via `md5sum` on `raft.db`/`vault.db` at
+  every hop before deleting anything. Old PVC's underlying PV has `Retain` reclaim
+  policy, so the original NFS data also survives independently as a second safety net.
+  Updated `kubernetes/system/vault/application.yml`'s Helm value
+  (`server.dataStorage.storageClass: local-path`) and re-applied (per GIT-003, this
+  Application's own spec needs a manual `kubectl apply`, same as GIT-010). Vault came
+  back up, auto-unsealed via the existing sidecar, `HA Mode: active`, all cluster-wide
+  ExternalSecrets stayed healthy throughout.
+- **Effort:** Small once the GIT-009/GIT-010 PVC-swap and Application-apply patterns
+  were already established earlier the same day — done.
+
+---
+
 ## 3. GitOps Quality
 
 ### GIT-001 — Terraform state backend requires live Garage (in-cluster) · **HIGH**
@@ -843,7 +870,7 @@ not because either model is fundamentally broken.
 | REL-005 | Reliability | **HIGH** | rpool at 70% utilization with no alert |
 | REL-006 | Reliability | **HIGH** | No Proxmox VM snapshots for k3s nodes |
 | REL-007 | Reliability | **RESOLVED** | Vault seal gap causes cascading ExternalSecret failures on restart — mitigated via faster unseal polling + wait-for-secret initContainers |
-| REL-009 | Reliability | **LOW** | Vault's raft storage (`data-vault-0`) is on `nfs-client`; BoltDB has similar locking needs to the SQLite issue in GIT-006, no corruption seen yet — deserves a dedicated migration pass given Vault's blast radius |
+| REL-009 | Reliability | **RESOLVED** | Vault's raft storage migrated from `nfs-client` to `local-path` (same BoltDB-on-NFS risk as GIT-006), zero downtime to ExternalSecrets cluster-wide, verified byte-identical data at every copy step (2026-06-24) |
 | REL-011 | Reliability | **RESOLVED** | `postgres-authelia` (CNPG) had barman WAL archiving configured but no `ScheduledBackup` resource — no base backup existed to restore from via barman alone, only the PVC itself (Velero/PBS). Added `ScheduledBackup` (`kubernetes/system/postgres/scheduled-backup.yml`), daily `0 2 * * *`, targeting the existing `barmanObjectStore` already on the Cluster; also fixed the `postgres-cluster` Application's `directory.include` glob so the new file is picked up by ArgoCD |
 | REL-012 | Reliability | **CRITICAL** | k3s control plane (etcd) crash-looping all day, 39 restarts -- etcd apply latency up to 14.3s under disk I/O contention, no alerting fired |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
