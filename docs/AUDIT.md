@@ -551,6 +551,69 @@ ago and `ROADMAP.md` claiming the SLO definitions were done.
 
 ---
 
+### REL-015 — Discord alerting silently broken: Prometheus Operator can't use `webhook_url_file` · **PARTIAL** (2026-06-24, manual stopgap in place, durable fix not done)
+
+Found while rotating a leaked Discord webhook (separate incident, user-initiated).
+Updating the webhook in Vault and forcing an `ExternalSecret`/config-reloader refresh
+had zero effect on actual delivery — every test alert failed with Discord's own
+`404 Unknown Webhook`, even with a brand new, freshly-created, independently-verified-
+working webhook (confirmed via a direct `curl` straight to Discord, bypassing
+Alertmanager entirely: `204` success).
+
+- **Root cause:** the rendered Alertmanager config Alertmanager actually loads
+  (`alertmanager-kube-prometheus-stack-alertmanager-generated`, the secret the
+  Prometheus Operator produces by merging the Helm-rendered base config with any
+  `AlertmanagerConfig` CRDs) had a **literal, hardcoded `webhook_url`** baked in —
+  not the `webhook_url_file` reference that's actually in git and in the Helm-rendered
+  base secret. That generated secret was **24 days old and had never been
+  regenerated**, despite the base config correctly changing to `webhook_url_file` at
+  some point in that window. The Operator's own logs (`kube-prometheus-stack-operator`)
+  showed why, recurring every few minutes since at least 16:46 that day — well before
+  any of today's webhook rotation work: `sync "monitoring/kube-prometheus-stack-
+  alertmanager" failed: provision alertmanager configuration: failed to initialize
+  from secret: no discord webhook URL provided`. The Operator validates
+  `webhook_url_file` references in **raw, Helm-injected** Alertmanager config by trying
+  to read the file from **its own pod**, which never has that secret mounted (only the
+  Alertmanager pod does, via `spec.secrets`) — so this specific pattern can structurally
+  never succeed when used inside a raw `alertmanager.config:` block. It's a known
+  limitation/mismatch between the raw-config passthrough path and the
+  `AlertmanagerConfig` CRD path (which validates secret references via a direct
+  `SecretKeySelector` + Secret API lookup instead, and would actually work) — not
+  something that broke on its own.
+- **Made acutely worse, self-inflicted:** while debugging, deleted the stale
+  `-generated` secret to try to force a clean regeneration. The Operator's sync was
+  *already* permanently failing for the reason above, so it never recreated anything —
+  Alertmanager was left with **no config secret at all** for several minutes (the
+  running pod kept its last-loaded in-memory config, but a restart at that point would
+  have failed to even start). Restored immediately by manually creating the secret with
+  a corrected literal `webhook_url`. Verified via the pod's own logs ("Completed loading
+  of configuration file") and a clean test-alert delivery (zero errors logged, vs. the
+  explicit 404 on every previous attempt).
+- **Current state:** Discord delivery confirmed working again via the manual literal-
+  value secret. This is **not durable** — it lives only in the live cluster, not git,
+  and would be silently lost if anything ever forces a full clean resync of this secret
+  (same failure mode that caused this in the first place).
+- **Proper fix, not done:** migrate the Discord receiver and its routing
+  (`severity = critical`, the `ProxmoxHostHighTemp`/`RpiHighTemp` special-case route,
+  the inhibit rule) from the raw `alertmanager.config:` Helm block to a proper
+  `AlertmanagerConfig` CRD referencing the existing `alertmanager-discord-webhook`
+  Secret via `discordConfigs[].apiURL.{name,key}` — confirmed via `kubectl explain` this
+  is exactly the field Prometheus Operator expects, and per its own docs this path
+  validates secrets directly via the Kubernetes API, not file-path reading. **Deliberately
+  not attempted live tonight**: doing this safely also means porting the *entire*
+  existing routing tree (not just the receiver) to CRD format to avoid an
+  AlertmanagerConfig getting awkwardly nested under the still-present raw config's
+  routes, and that interaction needed more careful testing than was responsible to do
+  blind, on live alerting infrastructure, this late in a long session that had already
+  hit several other incidents.
+- **Lesson:** the same one as REL-014, reinforced — a Secret/config object existing
+  with no errors from `kubectl apply` (or even a `config-reloader` "Reload triggered"
+  log line) is not evidence the *content* is correct or that the producing controller
+  is healthy. Check the actual producing controller's own logs for sync/reconcile
+  errors before trusting that a generated artifact reflects current source config.
+
+---
+
 ### REL-013 — Redundant monitoring: two systems probing the same ~20 endpoints, too aggressively · **RESOLVED** (2026-06-24)
 
 Found while investigating unusually high DNS query volume reported live (AdGuard:
@@ -1276,6 +1339,7 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | REL-012 | Reliability | **PARTIAL** | k3s control plane (etcd) crash-looping, now 87 restarts (was 39) -- etcd apply latency up to 14.3s under disk I/O contention; alerting added 2026-06-24, root cause (disk contention) still unresolved and getting worse |
 | REL-013 | Reliability | **RESOLVED** | Uptime Kuma (23 monitors @ 60s) and Prometheus blackbox-exporter (9 targets @ 30s) both probing largely the same domains, doubled again by a `search home.lan` DNS suffix -- bumped both intervals (2026-06-24) |
 | REL-014 | Reliability | **RESOLVED** | Every custom PrometheusRule (SLO alerts, hardware-temp alerts) was silently never evaluated -- missing `release: kube-prometheus-stack` label never matched Prometheus's ruleSelector. Fixed, verified live via /api/v1/rules (2026-06-24) |
+| REL-015 | Reliability | **PARTIAL** | Discord alerting silently broken -- Prometheus Operator can't validate `webhook_url_file` in raw Helm config (tries reading the file from its own pod, which never has it mounted), generated secret was 24 days stale. Manual stopgap restores delivery; durable fix (AlertmanagerConfig CRD) not attempted live (2026-06-24) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
