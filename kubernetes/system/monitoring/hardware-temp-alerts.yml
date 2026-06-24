@@ -6,6 +6,7 @@ metadata:
   labels:
     prometheus: kube-prometheus
     role: alert-rules
+    release: kube-prometheus-stack
 spec:
   groups:
     - name: hardware.temperature

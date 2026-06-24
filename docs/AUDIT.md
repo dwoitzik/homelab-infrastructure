@@ -435,7 +435,7 @@ the 120 GB allocated, available space will tighten as workloads grow.
 
 ---
 
-### REL-012 — k3s control plane (etcd) crash-looping all day, 39 restarts · **CRITICAL** (discovered live 2026-06-23, not yet fixed)
+### REL-012 — k3s control plane (etcd) crash-looping all day, 39 restarts · **PARTIAL** (discovered live 2026-06-23, alerting added 2026-06-24, root cause still unresolved)
 
 Caught live while checking the homepage dashboard: `kubectl` against the API VIP and
 against `vm-srv-k3s-11` directly both got connection-refused. SSH'd in and found
@@ -463,17 +463,60 @@ notes) being starved of disk I/O badly enough to blow through raft's read-index 
   times per day, completely silently — no alert fired despite Blackbox/Prometheus already
   monitoring most services. The 39-restart count alone makes this more severe than several
   other CRITICAL-tier findings in this doc.
-- **Fix (not yet done):** (1) Add alerting on `kube_node_status_condition` / API server
-  reachability and on `k3s.service` restart count — this should have paged immediately.
-  (2) Resolve REL-005 (free up rpool headroom) as a likely contributing factor.
+- **Fix:** (1) **Done 2026-06-24** — added `KubeAPIServerDown` (`up{job="apiserver"}==0`)
+  and `KubeAPIServerHighLatency` (p99 request duration >5s) alerts
+  (`kubernetes/system/monitoring/control-plane-alerts.yml`), `severity: critical` so they
+  route to Discord. Finding this gap also surfaced REL-014 — the *existing* SLO/hardware
+  alert rules had never been evaluated either, a separate and arguably worse problem
+  than just missing this one alert. (2) Resolve REL-005 (free up rpool headroom) as a
+  likely contributing factor — confirmed still at 82.5% as of 2026-06-24, not improved.
   (3) Consider `etcdctl defrag` (etcd hasn't been compacted in the 24 days since the node
   last restarted cleanly) and/or moving etcd's WAL to a less-contended disk if one becomes
-  available. (4) Re-evaluate whether single-node etcd on this hardware needs a lower
-  `--etcd-arg` heartbeat/election-timeout tolerance, or whether the real fix is just less
-  disk pressure.
+  available — not yet done. (4) Re-evaluate whether single-node etcd on this hardware
+  needs a lower `--etcd-arg` heartbeat/election-timeout tolerance, or whether the real fix
+  is just less disk pressure — not yet done. Confirmed live 2026-06-24 this is still
+  actively recurring and getting worse, not better: 87 restarts (up from 39 the prior day),
+  407 "apply request took too long" warnings in just a 6-hour window, with latencies up to
+  10.8s observed directly while investigating this.
 - **Effort:** Alerting is small (1-2h); root-causing the I/O contention properly is
   larger and probably needs to wait for calmer conditions to test against (it's hard to
   diagnose disk contention while intentionally generating disk contention).
+
+---
+
+### REL-014 — Every custom PrometheusRule in this repo was silently never evaluated · **RESOLVED** (2026-06-24)
+
+Found while adding the alerting REL-012 calls for ("should have paged immediately") --
+went to verify the new alert actually loaded in Prometheus and it didn't show up in
+`/api/v1/rules` at all. Checked the two *existing* custom rule files
+(`homelab-slo-alerts`/`homelab-slo-recording-rules` and `homelab-hardware-temp-alerts`)
+the same way: **neither had ever been loaded either**, despite both being merged days
+ago and `ROADMAP.md` claiming the SLO definitions were done.
+
+- **Root cause:** the Prometheus custom resource's `ruleSelector` requires
+  `release: kube-prometheus-stack` (confirmed by checking the label on a chart-managed
+  rule that *was* loading correctly, `kube-prometheus-stack-kube-apiserver-slos`). The
+  three homelab-authored `PrometheusRule` files only had `prometheus: kube-prometheus`
+  and `role: alert-rules` -- labels that looked plausible (and matched each other) but
+  never matched the actual selector. Confirmed via the live API: 0 of these 3 files'
+  rule groups appeared in `/api/v1/rules` before the fix, all 4 appeared immediately
+  after adding the missing label (recording rules + SLO alerts + hardware-temp alerts +
+  the new control-plane alerts from REL-012).
+- **Impact:** this means `SLOAvailabilityFastBurn`/`SLOAvailabilitySlowBurn`,
+  `ProxmoxHostHighTemp`, and `RpiHighTemp` have never fired even once, no matter what
+  happened to availability or hardware temperatures since these were written --
+  directly relevant to REL-012 (the etcd crash-looping went unnoticed "despite Blackbox/
+  Prometheus already monitoring most services," but the SLO alerts meant to catch
+  exactly that kind of availability drop were dead on arrival the whole time).
+- **Fix:** added `release: kube-prometheus-stack` to all three files' `PrometheusRule`
+  labels. Verified live, not just via `kubectl apply` succeeding: queried
+  `/api/v1/rules` directly before and after, confirmed all 4 rule groups present with
+  no `lastError` on any rule.
+- **Lesson:** a `PrometheusRule` object existing in the cluster with no errors from
+  `kubectl apply` is not evidence it's actually being evaluated -- the operator's
+  `ruleSelector`/`ruleNamespaceSelector` match is a separate, silent gate. Check
+  `/api/v1/rules` (or the Prometheus UI's Status > Rules page) directly to confirm any
+  new alerting rule is actually live, every time.
 
 ---
 
@@ -1199,8 +1242,9 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | REL-007 | Reliability | **RESOLVED** | Vault seal gap causes cascading ExternalSecret failures on restart — mitigated via faster unseal polling + wait-for-secret initContainers |
 | REL-009 | Reliability | **RESOLVED** | Vault's raft storage migrated from `nfs-client` to `local-path` (same BoltDB-on-NFS risk as GIT-006), zero downtime to ExternalSecrets cluster-wide, verified byte-identical data at every copy step (2026-06-24) |
 | REL-011 | Reliability | **RESOLVED** | `postgres-authelia` (CNPG) had barman WAL archiving configured but no `ScheduledBackup` resource — no base backup existed to restore from via barman alone, only the PVC itself (Velero/PBS). Added `ScheduledBackup` (`kubernetes/system/postgres/scheduled-backup.yml`), daily `0 2 * * *`, targeting the existing `barmanObjectStore` already on the Cluster; also fixed the `postgres-cluster` Application's `directory.include` glob so the new file is picked up by ArgoCD |
-| REL-012 | Reliability | **CRITICAL** | k3s control plane (etcd) crash-looping all day, 39 restarts -- etcd apply latency up to 14.3s under disk I/O contention, no alerting fired |
+| REL-012 | Reliability | **PARTIAL** | k3s control plane (etcd) crash-looping, now 87 restarts (was 39) -- etcd apply latency up to 14.3s under disk I/O contention; alerting added 2026-06-24, root cause (disk contention) still unresolved and getting worse |
 | REL-013 | Reliability | **RESOLVED** | Uptime Kuma (23 monitors @ 60s) and Prometheus blackbox-exporter (9 targets @ 30s) both probing largely the same domains, doubled again by a `search home.lan` DNS suffix -- bumped both intervals (2026-06-24) |
+| REL-014 | Reliability | **RESOLVED** | Every custom PrometheusRule (SLO alerts, hardware-temp alerts) was silently never evaluated -- missing `release: kube-prometheus-stack` label never matched Prometheus's ruleSelector. Fixed, verified live via /api/v1/rules (2026-06-24) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |

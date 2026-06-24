@@ -15,6 +15,7 @@ metadata:
   labels:
     prometheus: kube-prometheus
     role: alert-rules
+    release: kube-prometheus-stack
 spec:
   groups:
     - name: slo.availability.1m
@@ -56,6 +57,7 @@ metadata:
   labels:
     prometheus: kube-prometheus
     role: alert-rules
+    release: kube-prometheus-stack
 spec:
   groups:
     - name: slo.burn-rate.page

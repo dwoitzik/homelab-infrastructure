@@ -85,7 +85,7 @@ These items directly signal DevOps/Cloud maturity to employers and interviewers.
 | ~~**Trivy in CI**~~ ✅ | `aquasecurity/trivy-action` in GitHub Actions — misconfig scan + SARIF to the GitHub Security tab |
 | ~~**PodDisruptionBudgets**~~ ✅ | PDBs for Authelia (2 replicas), cloudflared (2 replicas), Vaultwarden, Nextcloud, Home Assistant |
 | ~~**Chaos Mesh**~~ ✅ | Weekly schedules: pod-kill Sunday 03:00 UTC + 100ms network latency Sunday 03:30 UTC on labelled `apps` namespace pods |
-| ~~**SLO definitions**~~ ✅ | PrometheusRules deployed: 99.9% availability + p95≤2s latency SLOs with error-budget dashboard in Grafana. Blackbox exporter probing all public services. |
+| ~~**SLO definitions**~~ ✅ | PrometheusRules deployed: 99.9% availability + p95≤2s latency SLOs with error-budget dashboard in Grafana. Blackbox exporter probing all public services. Fixed 2026-06-24 (REL-014): the rules were deployed but never actually evaluated — missing `release: kube-prometheus-stack` label meant Prometheus's `ruleSelector` never matched them. Same gap silently affected the hardware-temp alerts. |
 
 ### Tier 3 — Nice to Have
 
