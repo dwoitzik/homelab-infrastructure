@@ -1,0 +1,49 @@
+# REL-012: k3s control plane (etcd) was found crash-looping all day on 2026-06-23
+# (39 restarts, recovering on its own within ~2min each time) with zero alerting --
+# only caught by chance while checking the homepage dashboard. Root cause is etcd
+# apply latency (disk I/O contention on the single shared NVMe behind every VM/LXC
+# on mini) blowing through raft's read-index timeout, which is fatal to k3s's
+# embedded etcd process. These two alerts close the "should have paged immediately"
+# gap noted in docs/AUDIT.md -- they don't fix the underlying disk contention, just
+# make sure it's never silent again.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-control-plane-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: control-plane.health
+      rules:
+        - alert: KubeAPIServerDown
+          expr: up{job="apiserver"} == 0
+          for: 30s
+          labels:
+            severity: critical
+          annotations:
+            summary: "Kubernetes API server is unreachable"
+            description: >
+              Prometheus can't scrape the API server (job=apiserver). This is single-node
+              control plane on this homelab -- when this fires, kubectl/ArgoCD/Atlantis
+              are all down too. Known recurring cause: etcd apply latency under disk I/O
+              contention (REL-012 in docs/AUDIT.md) -- check `journalctl -u k3s` on
+              vm-srv-k3s-11 for "apply request took too long" warnings.
+
+        - alert: KubeAPIServerHighLatency
+          expr: |
+            histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket[5m])) by (le)) > 5
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "API server p99 request latency is {{ $value | printf \"%.1f\" }}s"
+            description: >
+              p99 API server request latency has been above 5s for 2+ minutes -- the same
+              symptom that preceded every REL-012 etcd crash-loop episode (etcd "apply
+              request took too long" warnings up to 14.3s, expected ~100ms). Catches the
+              slow-but-not-yet-down window, which is far more common than full outages.
