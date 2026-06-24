@@ -40,7 +40,7 @@ spec:
         - name: VISION_LLM_PROVIDER
           value: ollama
         - name: VISION_LLM_MODEL
-          value: qwen2.5-coder:7b
+          value: minicpm-v
         - name: AUTO_TAG
           value: paperless-gpt-to-process
         - name: LANGUAGE

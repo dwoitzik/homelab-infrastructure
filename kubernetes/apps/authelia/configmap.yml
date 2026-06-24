@@ -12,7 +12,7 @@ data:
 
     identity_validation:
       reset_password:
-        jwt_secret: '/config/secrets/jwt-secret'
+        jwt_secret: {{ secret "/config/secrets/jwt-secret" | msquote }}
 
     default_redirection_url: 'https://auth.woitzik.dev'
 
@@ -23,7 +23,7 @@ data:
     session:
       name: 'authelia_session'
       domain: 'woitzik.dev'
-      secret: '/config/secrets/session-secret'
+      secret: {{ secret "/config/secrets/session-secret" | msquote }}
       same_site: 'lax'
       expiration: '1h'
       inactivity: '5m'
@@ -34,7 +34,7 @@ data:
         database_index: 0
 
     storage:
-      encryption_key: '/config/secrets/storage-key'
+      encryption_key: {{ secret "/config/secrets/storage-key" | msquote }}
       postgres:
         address: 'tcp://postgres-authelia-rw.database.svc.cluster.local:5432'
         database: 'authelia'
@@ -58,7 +58,7 @@ data:
 
     identity_providers:
       oidc:
-        hmac_secret: '/config/secrets/hmac-secret'
+        hmac_secret: {{ secret "/config/secrets/hmac-secret" | msquote }}
         jwks:
           - key_id: 'authelia-main'
             algorithm: 'RS256'
