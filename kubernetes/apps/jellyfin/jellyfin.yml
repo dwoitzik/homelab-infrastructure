@@ -1,9 +1,17 @@
 # WRK-007: Jellyfin moved to a dedicated GPU-passthrough LXC (ct-srv-jellyfin-01,
 # 10.0.20.254) for VAAPI hardware transcode access to mini's APU -- the k3s
 # Deployment had no GPU passthrough at all (pure software transcode). Provisioning
-# is Ansible (ansible/roles/jellyfin), not k8s; this Service+EndpointSlice exists
-# purely so Traefik's existing IngressRoute (services: [{name: jellyfin, port: 8096}])
-# keeps working unchanged, routing to the external LXC instead of a cluster pod.
+# is Ansible (ansible/roles/jellyfin), not k8s; this Service+Endpoints exists purely
+# so Traefik's existing IngressRoute (services: [{name: jellyfin, port: 8096}]) keeps
+# working unchanged, routing to the external LXC instead of a cluster pod.
+#
+# A bare EndpointSlice was tried first and looked fine via kubectl (Service+
+# EndpointSlice both existed, endpoint listed correctly) but Traefik's Kubernetes CRD
+# provider still 404'd everything with "subset not found for apps/jellyfin" --
+# confirmed live via its logs. Traefik's provider resolves Service backends through
+# the legacy v1/Endpoints API ("subsets"), not EndpointSlice, regardless of whether
+# EndpointSlice is otherwise the modern/preferred object. Endpoints is what actually
+# gets read.
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,17 +22,13 @@ spec:
     - port: 8096
       targetPort: 8096
 ---
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
+apiVersion: v1
+kind: Endpoints
 metadata:
   name: jellyfin
   namespace: apps
-  labels:
-    kubernetes.io/service-name: jellyfin
-addressType: IPv4
-ports:
-  - name: ""
-    port: 8096
-endpoints:
+subsets:
   - addresses:
-      - 10.0.20.254
+      - ip: 10.0.20.254
+    ports:
+      - port: 8096
