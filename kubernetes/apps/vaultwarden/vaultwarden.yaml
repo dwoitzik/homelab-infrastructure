@@ -20,6 +20,8 @@ spec:
         image: vaultwarden/server:1.36.0
         securityContext:
           allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
         ports:

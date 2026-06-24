@@ -36,6 +36,8 @@ spec:
         # live pod when caught, fixed here before it could.
         securityContext:
           allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
         env:
