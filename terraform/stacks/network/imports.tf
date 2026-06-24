@@ -347,6 +347,14 @@ import {
   to = routeros_ip_firewall_nat.dstnat_cobblemon
   id = "*9"
 }
+import {
+  to = routeros_ip_firewall_nat.srcnat_masquerade_wan
+  id = "*5"
+}
+import {
+  to = routeros_ip_firewall_nat.srcnat_masquerade_mgmt_to_srv
+  id = "*8"
+}
 
 # --- Firewall filters: anchors & deterministic chain (firewall_deterministic.tf) ---
 import {
