@@ -42,8 +42,9 @@ redundancy plus Velero backups (see `docs/backup-strategy.md`).
 locking/WAL model is incompatible with how these engines manage concurrent access.
 Garage's metadata store corrupted this way on 2026-06-23 (see GIT-006 in `docs/AUDIT.md`).
 Every app found to be SQLite-backed was migrated to `local-path` instead: Garage
-(`garage-meta`), Headscale, Vaultwarden, Gitea, Mealie, Open WebUI, paperless-ai, Home
-Assistant. **`local-path` PVs are node-pinned** — a pod using one can only ever schedule
+(`garage-meta`), Headscale, Vaultwarden, Gitea, Mealie, Open WebUI, Home Assistant
+(paperless-ai was removed entirely in WRK-005, see `docs/AUDIT.md`). **`local-path`
+PVs are node-pinned** — a pod using one can only ever schedule
 back onto the node it first bound to; if that node is lost, the data is gone unless
 restored from a Velero backup. New apps with an embedded DB should default to
 `local-path`, not `nfs-client`.
