@@ -1,0 +1,31 @@
+# REL-018: same gap as REL-014 (kubernetes/system/monitoring), found while removing
+# paperless-ai's IngressRoute -- the kubectl apply correctly updated existing
+# resources but didn't prune the removed one, and there was no ArgoCD Application
+# tracking these top-level kubernetes/system/*.yml files at all to do that pruning
+# automatically. kubernetes/apps/* is auto-discovered by the homelab-apps
+# ApplicationSet; kubernetes/system/* is not. Every IngressRoute (most production
+# ingress for the whole homelab) and PodDisruptionBudget defined directly under
+# kubernetes/system/ was live only because someone applied it manually at some
+# point -- a full cluster rebuild from git alone would never have created any of it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: system-manifests
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dwoitzik/homelab-infrastructure.git
+    targetRevision: main
+    path: kubernetes/system
+    directory:
+      include: "{apps-ingressroute,other-ingressroute,pod-disruption-budgets}.yml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: apps
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
