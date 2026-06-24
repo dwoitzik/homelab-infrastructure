@@ -786,6 +786,42 @@ on this chip, abandoned at some earlier point without anyone reverting the Ansib
 
 ---
 
+### WRK-005 — Paperless data-quality pass: missing archives (NFS) + upside-down scans · **RESOLVED** (2026-06-24)
+
+Two unrelated, real findings from the WRK-004 follow-up data-quality pass:
+
+**1. 41 of 57 documents had a missing archived PDF.** `download/?original=true` worked
+fine (raw scans intact) but `preview/`/`download/` (which serve the post-processing
+`archive` copy) 404'd — confirmed the entire `archive/2024/` directory and most of
+`archive/2023` etc. didn't exist on disk at all, while the DB still had
+`archived_file_name` set. `paperless-media` is on the `nfs-client` StorageClass — same
+storage class already implicated in GIT-006's SQLite corruption findings; this is very
+likely the same family of NFS reliability issue, just affecting plain files instead of a
+locked database this time. No data was actually lost (originals survived) — regenerated
+all 41 archives via Paperless's own `python3 manage.py document_archiver -d <id> -f`
+(re-derives the archive from the existing original + OCR text, no LLM involved).
+
+**2. The 5 "hallucinated" documents (26, 44, 55, 57, 58) from WRK-004 were never actually
+hallucinated — they're scanned upside down (180°).** Confirmed by pulling each original
+PDF and reading it directly: all 5 are genuine, perfectly legible German documents (a
+sick note, an IHK letter, a reference letter, a tax ID notice, an IHK membership notice)
+that just happen to be rotated 180° in the scan. *Both* the broken text-only model
+(WRK-004's root cause) *and* the now-working `minicpm-v` vision model produced fluent
+nonsense when fed an upside-down page — garbled German-looking anagrams from one,
+random Thai script from the other — because neither could actually read the orientation,
+not because either model is fundamentally broken.
+
+- **Fix:** `POST /api/documents/bulk_edit/` with `{"method": "rotate", "parameters":
+  {"degrees": 180}}` (Paperless's native rotate action) on all 5, then re-tagged for
+  OCR. Verified doc 26's rotated original renders right-side-up and fully legible.
+- **Lesson for any future "AI hallucinated this" report:** check the source image's
+  orientation/quality first — a vision model failing to read upside-down or badly
+  skewed text looks identical to a model that's broken, but the fix is completely
+  different (rotate the page vs. swap the model).
+- **Effort:** Small once root-caused; the root-causing itself was the real work.
+
+---
+
 ## Summary Table
 
 | ID | Category | Severity | Title |
@@ -832,6 +868,7 @@ on this chip, abandoned at some earlier point without anyone reverting the Ansib
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed or backed up |
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
 | WRK-004 | Workloads | **RESOLVED** | paperless-gpt failing on every document; Ollama iGPU (Vulkan) crashing constantly under load -- switched to CPU-only |
+| WRK-005 | Workloads | **RESOLVED** | Paperless data-quality pass: 41 documents missing their archived PDF (nfs-client related, originals intact, regenerated via document_archiver) + the 5 "hallucinated" docs from WRK-004 were actually just scanned upside-down, not a model problem (2026-06-24) |
 
 ---
 
