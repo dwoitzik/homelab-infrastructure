@@ -1,0 +1,23 @@
+# Deliberate, justified exceptions to Trivy's Kubernetes misconfiguration
+# checks -- each entry below is a real, necessary requirement for what that
+# specific workload does, not an oversight. IDs and path-scoping verified by
+# running `trivy config` locally against the exact file before adding.
+# See docs/AUDIT.md (SEC-012) for the broader hardening pass that addresses
+# everything else Trivy flags across the rest of the repo.
+
+# sysctl-fix DaemonSet: applies host-level sysctls (disabling ICMP redirects)
+# to every k3s node. Genuinely requires hostNetwork, hostPID, and privileged --
+# there is no less-privileged way to reach the host's sysctl namespace from
+# inside a container.
+KSV-0009 path:kubernetes/system/infrastructure/sysctl-fix.yml
+KSV-0010 path:kubernetes/system/infrastructure/sysctl-fix.yml
+KSV-0017 path:kubernetes/system/infrastructure/sysctl-fix.yml
+KSV-0118 path:kubernetes/system/infrastructure/sysctl-fix.yml
+
+# SABnzbd's Mullvad WireGuard kill-switch init container: NET_ADMIN is needed
+# to create the wg0 interface and manage iptables; SYS_MODULE is needed to
+# load the wireguard kernel module. This whole stack is moving to a dedicated
+# LXC (WRK-006) where this same requirement applies at the LXC level instead --
+# the manifest here stays live until that cutover completes.
+KSV-0022 path:kubernetes/apps/jellyfin/usenet.yml
+KSV-0120 path:kubernetes/apps/jellyfin/usenet.yml
