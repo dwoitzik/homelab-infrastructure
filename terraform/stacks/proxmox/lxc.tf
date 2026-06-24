@@ -265,6 +265,19 @@ resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
     type             = "debian"
   }
 
+  # Media library bind-mount: /mnt/media is a local ZFS dataset (archive
+  # pool) on this same Proxmox host -- the NFS export to k8s pods is
+  # incidental, the host itself doesn't need NFS to reach its own disk.
+  # Mounting NFS *from inside* this unprivileged LXC fails with EPERM
+  # regardless of the mount=nfs feature flag (confirmed live: a deeper
+  # unprivileged-userns kernel restriction, not an AppArmor/seccomp gap --
+  # showmount/RPC queries succeed fine, ruling out a network/export-ACL
+  # problem), so this native bind-mount sidesteps NFS entirely instead.
+  mount_point {
+    volume = "/mnt/media"
+    path   = "/media"
+  }
+
   # /dev/net/tun passthrough (needed for WireGuard/Mullvad inside this
   # unprivileged container) is NOT declared here on purpose: the Atlantis
   # Terraform API token isn't root@pam, and Proxmox only allows configuring

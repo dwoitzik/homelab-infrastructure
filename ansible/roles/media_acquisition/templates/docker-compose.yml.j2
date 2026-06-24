@@ -55,7 +55,7 @@ services:
       - TZ={{ media_acquisition_tz }}
     volumes:
       - {{ media_acquisition_base_dir }}/sonarr/config:/config
-      - {{ media_acquisition_base_dir }}/media:/media
+      - /media:/media
     restart: unless-stopped
 
   radarr:
@@ -70,7 +70,7 @@ services:
       - TZ={{ media_acquisition_tz }}
     volumes:
       - {{ media_acquisition_base_dir }}/radarr/config:/config
-      - {{ media_acquisition_base_dir }}/media:/media
+      - /media:/media
     restart: unless-stopped
 
   bazarr:
@@ -85,7 +85,7 @@ services:
       - TZ={{ media_acquisition_tz }}
     volumes:
       - {{ media_acquisition_base_dir }}/bazarr/config:/config
-      - {{ media_acquisition_base_dir }}/media:/media
+      - /media:/media
     restart: unless-stopped
 
   sabnzbd:
@@ -100,7 +100,7 @@ services:
       - TZ={{ media_acquisition_tz }}
     volumes:
       - {{ media_acquisition_base_dir }}/sabnzbd/config:/config
-      - {{ media_acquisition_base_dir }}/media:/media
+      - /media:/media
     restart: unless-stopped
 
   nzbhydra2:
