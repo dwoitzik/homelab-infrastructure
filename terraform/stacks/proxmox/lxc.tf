@@ -6,6 +6,13 @@ locals {
 
 # --- Management Stack ---
 
+# REL-016: onboot=1 is applied manually (`pct set 110 -onboot 1`) and NOT via
+# Terraform's start_on_boot attribute -- confirmed live that bpg/proxmox 0.100.0
+# doesn't read this attribute back from the API into state, so any value set
+# here always shows as "No changes" regardless of the live onboot value,
+# silently not applying. Same gap on ct_srv_docker_01/ct_srv_ai_01/
+# ct_dmz_proxy_01/ct_dmz_games_01 below. If any of these containers are ever
+# recreated, onboot needs to be set manually again afterward.
 resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
   vm_id        = 110
   node_name    = local.target_node
@@ -63,6 +70,7 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
 
 # --- Server Stack ---
 
+# REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
 resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
   vm_id                 = 200
   node_name             = local.target_node
@@ -124,6 +132,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
 
 # --- AI & LLM Stack ---
 
+# REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
 resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   vm_id                 = 201
   node_name             = local.target_node
@@ -413,6 +422,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_jellyfin_01" {
 
 # --- DMZ Stack ---
 
+# REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
 resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
   vm_id                 = 301
   node_name             = local.target_node
@@ -570,6 +580,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
   }
 }
 
+# REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
 resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   vm_id                 = 302
   node_name             = local.target_node
