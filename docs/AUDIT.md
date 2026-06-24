@@ -159,6 +159,39 @@ verification when talking to the Proxmox API.
 
 ---
 
+### SEC-008 — Atlantis had zero authentication and was reachable over plain HTTP · **CRITICAL** (fixed 2026-06-23)
+
+Found while auditing Authelia coverage across all `IngressRoute`s (prompted by a request to
+harden privacy/security across the board, not Atlantis-specific). Of 28 `IngressRoute`s,
+`atlantis-final` was the only one with `entryPoints: [web, websecure]` — reachable over
+unencrypted HTTP, not just HTTPS — and the only one with **no auth layer of any kind**: no
+Authelia middleware, no `ATLANTIS_WEB_BASIC_AUTH`/username/password env vars on the
+Deployment. Confirmed live: `curl -sk https://atlantis.woitzik.dev/` returned the full
+Atlantis UI (PR list, plan history, repo config) with a plain `200`, no redirect to Authelia,
+no password prompt.
+
+- **Impact:** Atlantis holds the credentials and drives `terraform apply` for the entire
+  homelab (Proxmox root-capable API token, MikroTik router credentials, AWS/Garage S3 keys —
+  all visible to it as env vars, and plan output can echo non-`sensitive`-marked values).
+  Anyone who could reach `atlantis.woitzik.dev` — any device on the LAN, or the internet if
+  the domain resolves publicly — could view full Terraform plan/apply history and repo
+  config with zero credentials required.
+- **Why it wasn't just "add Authelia and move on":** Atlantis's GitHub webhook (`POST
+  /events`, used to trigger plan/apply from PR comments) is itself authenticated via
+  `ATLANTIS_GH_WEBHOOK_SECRET` (HMAC signature) — gating the whole host behind Authelia's
+  forward-auth would have broken GitHub's webhook delivery, silently killing the entire
+  GitOps Terraform workflow.
+- **Fix (2026-06-23):** Split `atlantis-final` into two routes in
+  `kubernetes/system/apps-ingressroute.yml`: `Host(...) && PathPrefix(/events)` (priority
+  10, no middleware — webhook keeps its own HMAC auth) and the catch-all `Host(...)`
+  (priority 1, `authelia` middleware — same pattern as every other internal tool). Also
+  dropped the `web` entrypoint so it's `websecure`-only like every other service.
+- **Blast radius:** UI access now requires an Authelia session; GitHub webhook delivery
+  unaffected (still hits `/events` directly, still HMAC-verified).
+- **Effort:** Small (1h) — done.
+
+---
+
 ## 2. Reliability / Recoverability
 
 ### REL-001 — 2 of 3 k3s nodes stopped; cluster running single-node · **RESOLVED** (2026-06-23)
@@ -554,6 +587,7 @@ contains `postgres-password`, instead of crash-looping. See REL-007 for the full
 | SEC-005 | Security | **MEDIUM** | 14 images on `:latest` / floating tags |
 | SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
+| SEC-008 | Security | **RESOLVED** | Atlantis had zero auth + plain-HTTP entrypoint -- added Authelia (webhook path excluded), HTTPS-only (2026-06-23) |
 | REL-001 | Reliability | **RESOLVED** | All 3 k3s nodes run continuously (`on_boot=true`); single-server topology by deliberate design, not an HA gap -- see `docs/k3s-architecture.md` |
 | REL-002 | Reliability | **RESOLVED** | PBS running with `onboot=1`; `all: 1` backup job covers every VM/CT incl. k3s nodes + NFS LXC; verified successful 2026-06-23 03:00 run |
 | REL-003 | Reliability | **HIGH** | Velero backend (Garage) is in-cluster; circular recovery dependency |
