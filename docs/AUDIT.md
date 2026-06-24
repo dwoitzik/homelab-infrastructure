@@ -1294,18 +1294,53 @@ not because either model is fundamentally broken.
   different (rotate the page vs. swap the model).
 - **Effort:** Small once root-caused; the root-causing itself was the real work.
 
-**3. Separate, not-yet-fixed issue found while watching the queue process: `LLM_MODEL`
-(`qwen2.5-coder:7b`, used for title/correspondent/tag/document-type generation, distinct
-from `VISION_LLM_MODEL`) occasionally responds in chatty-assistant style instead of
-returning the requested short value** — e.g. for document 36, it returned a multi-
-paragraph "I apologize, but I'm not able to fully understand..." explanation as the
-*correspondent name*, which Paperless then rejected (`Ensure this field has no more
-than 128 characters`), and a similarly long paragraph as the suggested document type
-(silently ignored since it didn't match any configured type). Confirmed low-frequency
-(1 failed correspondent creation, 2 chatty-refusal responses in the prior 24h of logs)
-rather than systemic, but real — worth a prompt-engineering pass (more directive
-system prompt, and/or truncate-and-validate suggested values before using them as
-field input) if it recurs. Not fixed in this pass.
+**3. `LLM_MODEL` (`qwen2.5-coder:7b`) was systemically broken, not just occasionally
+chatty — resolved.** What looked low-frequency in the first pass turned out to be the
+steady state: confirmed via a longer log window that it was *routinely* ignoring the
+prompt's explicit "title only" and "respond in German" instructions, writing multi-
+paragraph English essay summaries instead of titles, and in one case hallucinated a
+completely unrelated personal-advice response. Every one of these also failed
+correspondent creation (`Ensure this field has no more than 128 characters`), since the
+same broken text got reused as the correspondent name. Switched `LLM_MODEL` to
+`minicpm-v` (already loaded for vision, same 7.6B size class, zero new resource risk)
+— tested clean via a direct Ollama API call before deploying.
+
+**4. Switching models didn't fully fix it — found a deeper design problem.** Minutes
+after the model swap, `minicpm-v` silently corrupted a real document: replaced
+correspondent "NRW" with a freshly-*created* garbage correspondent literally named
+"Yes", and the title with just "The" — applied with zero human review via
+`paperless-gpt`'s fully-automatic `AUTO_TAG` pipeline. Reverted the document and
+deleted the garbage correspondent manually. **Two different models now producing bad
+output that gets auto-applied unreviewed means the auto-apply pipeline itself isn't
+safe to run unattended, regardless of which model sits behind it.** Disabled it by
+pointing `AUTO_TAG` at a tag name that doesn't exist (so the auto-scan always matches
+zero documents) — the manual `paperless-gpt` tag, where a human reviews suggestions
+before they're applied, is the only enabled workflow now.
+
+**5. A third, separate AI tool (`paperless-ai`) had the same design flaw plus a live
+landmine — removed entirely (user's call).** Found while extending this audit:
+`paperless-ai`'s entire config lives in a runtime data volume (a `.env` file + SQLite,
+invisible to git — its own form of drift from "if it's not in git it doesn't belong
+here"), had `AUTO_TAG`/`AUTO_CORRESPONDENT`/`AUTO_TITLE` all enabled with zero review
+(same flaw as #4), and — found directly inside that `.env` — was configured to use
+`gemma2:27b`, the exact model that froze the entire host during REL-016 hours earlier.
+Currently dormant only because its own setup is incomplete (`"Failed to get own user
+ID. Abort scanning"`, a `PAPERLESS_API_URL` vs. `PAPERLESS_URL` naming mismatch) — not
+dormant by design, and would have started auto-applying with that model the moment
+anyone completed its `/setup` step or an image update fixed the env var bug. Swapped
+the model to `minicpm-v` immediately as a precaution regardless of outcome, then asked
+the user whether the tool was wanted at all (duplicates `paperless-gpt`'s function,
+already broken, config outside IaC). Answer: remove it entirely. Deleted the
+Deployment/Service/PVC and the matching `paperless-ai-final` IngressRoute (the only
+other reference to it in the repo); confirmed the PVC held nothing but its own
+regenerable index/cache data (a ChromaDB vector store + its own SQLite document cache),
+no source documents.
+
+- **Lesson, broader than Paperless:** "AI suggests, human approves" and "AI decides,
+  no review" look identical in a Deployment's env vars until something goes wrong —
+  the risk lives in the *auto-apply* design itself, not in which model is configured.
+  Any tool with an unattended write-back path to real data needs that path checked
+  explicitly, not just the model quality.
 
 ---
 
