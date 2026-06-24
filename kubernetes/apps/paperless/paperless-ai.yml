@@ -34,6 +34,10 @@ spec:
       containers:
       - name: paperless-ai
         image: clusterzx/paperless-ai:3.0.9
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         resources:
           requests:
             cpu: 50m

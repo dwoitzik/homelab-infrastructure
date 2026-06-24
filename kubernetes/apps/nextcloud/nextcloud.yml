@@ -41,6 +41,10 @@ spec:
       containers:
         - name: postgres
           image: postgres:16-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: POSTGRES_DB
               value: nextcloud
@@ -98,6 +102,11 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 6379
           resources:
@@ -143,6 +152,10 @@ spec:
       containers:
         - name: nextcloud
           image: nextcloud:30-apache
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 80
           env:
@@ -233,6 +246,10 @@ spec:
             - name: nextcloud-cron
               image: nextcloud:30-apache
               command: [php, -f, /var/www/html/cron.php]
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
               volumeMounts:
                 - name: data
                   mountPath: /var/www/html

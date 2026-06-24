@@ -54,6 +54,10 @@ spec:
         - name: keel
           image: keelhq/keel:0.19.1
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 9300
           env:

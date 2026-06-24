@@ -61,6 +61,10 @@ spec:
       containers:
       - name: atlantis
         image: ghcr.io/runatlantis/atlantis:v0.33.0
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         ports:
         - containerPort: 4141
         env:

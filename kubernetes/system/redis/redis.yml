@@ -30,6 +30,11 @@ spec:
       - name: redis
         image: redis:7-alpine
         command: ["redis-server", "--requirepass", "$(REDIS_PASSWORD)", "--appendonly", "yes"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop: ["ALL"]
         env:
         - name: REDIS_PASSWORD
           valueFrom:
