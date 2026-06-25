@@ -36,6 +36,7 @@ spec:
           # with "creating directory failed with permission error".
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           args:
@@ -55,6 +56,10 @@ spec:
               readOnly: true
             - name: data
               mountPath: /var/lib/headscale
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /var/run/headscale
           resources:
             requests:
               cpu: 50m
@@ -69,6 +74,10 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: headscale-data
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
