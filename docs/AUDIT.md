@@ -986,6 +986,85 @@ were in `CrashLoopBackOff` with 35+ restarts over roughly 2.5 hours.
 
 ---
 
+### REL-022 — Third SEC-012 readOnlyRootFilesystem regression: open-webui static assets · **RESOLVED** (2026-06-25)
+
+Found in a full-homelab log sweep the user explicitly requested after REL-021
+("look at everything... you can't tell me there is not more to do?"). Same root
+cause class as Authelia and homepage in REL-021: open-webui rewrites several of
+its own static branding assets (`splash.png`, `splash-dark.png`, favicon
+variants, `loader.js`, `logo.png`, `custom.css`, `apple-touch-icon.png`,
+`user.png`) under `/app/backend/open_webui/static/` at startup, and
+`readOnlyRootFilesystem` (merged earlier in the SEC-012 pass) broke every one of
+those writes with `EROFS` on every boot.
+
+- **Why not the same fix as homepage:** homepage's regression was one missing
+  config file, safe to add via a ConfigMap subPath. open-webui's static
+  directory ships real, required assets (`fonts/`, `swagger-ui/`, multiple
+  icons) that a bare `emptyDir` overlay would silently wipe, breaking the whole
+  UI (404s on every asset) -- a much worse outcome than the cosmetic EROFS
+  errors being fixed.
+- **Fix:** added an init container that `cp -a`s the image's own static
+  directory into an `emptyDir`, then mounts that `emptyDir` over the same path
+  in the main container. Preserves every existing file while making the
+  directory writable. Verified post-merge: no more EROFS errors in logs, pod
+  rollout clean.
+- **Process note confirming the REL-021 lesson:** attempted to live-test this
+  fix the same way as before (`kubectl apply` then observe) -- ArgoCD's
+  `selfHeal` reverted the live patch back to the old (broken) spec within
+  seconds, before there was any chance to observe results, because the change
+  wasn't in git yet. Skipped the live-test step entirely this time and went
+  straight to commit-merge-verify, since the fix mirrored the already-proven
+  homepage pattern. Live-testing against a `selfHeal: true` Application without
+  committing first doesn't just risk false confidence (REL-021's lesson) -- it
+  can fail to test anything at all.
+
+---
+
+### REL-023 — Garage backup chunk corruption + nfs-provisioner-root backup gap · **PARTIAL** (2026-06-25)
+
+Found in the same full-homelab sweep: Garage logging `Unable to decode entry of
+object` / `Error in worker object lifecycle worker` roughly every minute.
+Investigated given Garage had just undergone a live data migration (REL-019) --
+needed to rule out the migration itself having lost data.
+
+- **What's actually wrong:** `garage block list-errors` showed 8 blocks with
+  persistent resync failures ("no node returned a valid block" -- this is a
+  single-node Garage instance, so "no node" means the block is genuinely absent
+  locally). `garage block info <hash>` traced every one of them to `kopia`
+  (Velero's filesystem-backup tool) backup chunks for exactly two volumes: the
+  `nfs-subdir-external-provisioner` pod's own PV (the literal root of the NFS
+  export, not just bookkeeping) and two PVs in the `apps` namespace. No live
+  application data is missing -- this is backup-repository corruption, not a
+  live data loss.
+- **Likely cause:** the timing point to the disk-full crisis window (REL-019,
+  `rpool` at 0% free) -- writes into Garage's old `rpool`-backed data directory
+  during that window could have been silently truncated before the migration
+  moved everything to the archive pool. Not confirmed beyond strong
+  correlation; Garage's block store doesn't keep enough history to prove it
+  definitively.
+- **Verification taken:** ran an ad-hoc full `apps` + `nfs-provisioner`
+  namespace backup (`defaultVolumesToFsBackup: true`) to get a clean,
+  post-migration restore point. Result: `PartiallyFailed`, 1078/1078 items
+  attempted. Two of three failures were harmless collateral from an open-webui
+  pod rollout happening concurrently (`Pod not found` -- expected, not a bug).
+  The third reproduced live: `nfs-subdir-external-provisioner-root`'s volume
+  backup was canceled (`data path backup canceled: PVB is canceled`) -- same
+  volume implicated in the historical corruption, now failing again on a fresh
+  attempt.
+- **Not fixed:** root cause of why `nfs-provisioner-root`'s volume backup gets
+  canceled is still unknown -- not a "pod not found" collateral issue like the
+  other two, a real, repeatable failure on a volume that (per the migrated
+  state, see the SQLite-on-NFS migration memory) may still hold live data for
+  whatever's left on the `nfs-client` storage class. Needs investigation into
+  Velero node-agent resource limits/timeouts or file-lock contention with the
+  provisioner's own active writes before this volume's backups can be trusted.
+- **Recommendation, not yet actioned:** once the cause of the cancellation is
+  understood, consider whether `nfs-provisioner-root` even needs fs-backup at
+  all (if everything still on `nfs-client` is non-critical/replaceable) versus
+  fixing the cancellation. Decide before relying on it for a restore.
+
+---
+
 ### REL-013 — Redundant monitoring: two systems probing the same ~20 endpoints, too aggressively · **RESOLVED** (2026-06-24)
 
 Found while investigating unusually high DNS query volume reported live (AdGuard:
@@ -1753,6 +1832,8 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | REL-019 | Reliability | **RESOLVED** | `rpool` hit hard ENOSPC, pausing all three k3s VMs (`qm status: io-error`) -- root cause was Velero's `daily-backup` (30-day TTL, `defaultVolumesToFsBackup: true`) backing up Garage's own data volume into Garage's own S3 backend nightly, an unbounded circular write. Excluded Garage's volumes from FS backup, paused the schedule pending verification, fixed `pve-exporter`'s never-completed auth token (had shipped with a plaintext `REPLACE_WITH_TOKEN_VALUE` placeholder, 401 since deployment), added ZFS capacity alerting (2026-06-25) |
 | REL-020 | Reliability | **PARTIAL** | Radarr's database hit a transient NFS I/O error on restart (no liveness probe, so Kubernetes reported it healthy while actually down) -- `integrity_check` came back clean, a WAL checkpoint fixed it with zero data loss. Surfaced that `sonarr/radarr/bazarr/sabnzbd-config` are still on `nfs-client`, the same storage class already documented unsafe for SQLite -- missed by the original migration audit, not fixed here (stack is slated for removal via WRK-006) (2026-06-25) |
 | REL-021 | Reliability/Security | **PARTIAL** | Authelia's readOnlyRootFilesystem (SEC-012) passed a live test, then crash-looped in production hours later (35+ restarts, generic fatal error, no detail) -- a live outage on home.woitzik.dev. Reverted; root cause of the intermittent failure still unknown. Also found and fixed a related but separate SEC-012 regression on homepage (EROFS creating docker.yaml) in the same response (2026-06-25) |
+| REL-022 | Reliability/Security | **RESOLVED** | Third SEC-012 readOnlyRootFilesystem regression, same class as REL-021: open-webui's static branding assets (favicons, splash, loader.js) failed to write under EROFS on every boot. Fixed with an init container that copies the existing static dir into an emptyDir before overlaying it, preserving required assets (fonts/, swagger-ui/) that a bare emptyDir would have wiped (2026-06-25) |
+| REL-023 | Reliability | **PARTIAL** | Garage logging recurring "Unable to decode entry of object" -- traced to 8 corrupted Velero/kopia backup chunks for nfs-provisioner-root and two apps PVs, likely from the REL-019 disk-full window. No live data affected, but a fresh ad-hoc backup reproduced a real, repeatable failure backing up nfs-provisioner-root specifically. Root cause of that cancellation not yet found (2026-06-25) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
