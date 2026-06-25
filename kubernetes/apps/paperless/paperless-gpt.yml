@@ -18,6 +18,7 @@ spec:
         image: icereed/paperless-gpt:v0.25.1
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -82,10 +83,43 @@ spec:
         - name: LOG_LEVEL
           value: info
         volumeMounts:
+        # SEC-012: at startup the app creates any *missing* default prompt
+        # files (tag_prompt.tmpl etc.) directly under /app/prompts -- a
+        # plain subPath mount only covers title_prompt.tmpl, leaving the
+        # rest of the directory read-only. Mounting the whole directory as
+        # a writable emptyDir instead, seeded by the initContainer below
+        # (copies the image's defaults, then overlays the ConfigMap's
+        # custom title_prompt.tmpl on top).
         - name: prompts
-          mountPath: /app/prompts/title_prompt.tmpl
-          subPath: title_prompt.tmpl
+          mountPath: /app/prompts
+        - name: tmp
+          mountPath: /tmp
+        # settings.json and the local db -- both created fresh on first run
+        - name: config
+          mountPath: /app/config
+        - name: db
+          mountPath: /app/db
+      initContainers:
+      - name: seed-prompts
+        image: icereed/paperless-gpt:v0.25.1
+        command:
+        - sh
+        - -c
+        - cp -a /app/prompts/. /writable-prompts/ 2>/dev/null; cp /configmap/title_prompt.tmpl /writable-prompts/title_prompt.tmpl
+        volumeMounts:
+        - name: prompts
+          mountPath: /writable-prompts
+        - name: prompts-configmap
+          mountPath: /configmap
       volumes:
       - name: prompts
+        emptyDir: {}
+      - name: prompts-configmap
         configMap:
           name: paperless-gpt-prompts
+      - name: tmp
+        emptyDir: {}
+      - name: config
+        emptyDir: {}
+      - name: db
+        emptyDir: {}
