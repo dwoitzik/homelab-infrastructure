@@ -1,0 +1,46 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-storage-capacity-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: storage.capacity
+      rules:
+        # REL-019: rpool (the only fast SSD on `mini`, shared by every VM/LXC)
+        # silently filled to 96% and then hard 0% available, pausing all three
+        # k3s VMs on disk I/O error with zero advance warning -- pve-exporter
+        # itself had been failing 401 Unauthorized since deployment, so there
+        # was no metric to alert on even if a rule had existed. Both gaps are
+        # fixed now; this rule is the actual "catch it before ENOSPC" piece.
+        - alert: ProxmoxStorageCapacityHigh
+          expr: (pve_disk_usage_bytes{id=~"storage/.+"} / pve_disk_size_bytes{id=~"storage/.+"}) > 0.85
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Proxmox storage {{ $labels.id }} is {{ $value | humanizePercentage }} full"
+            description: >
+              {{ $labels.id }} on the Proxmox host has been above 85% capacity for 10+
+              minutes. rpool (local-zfs) has hit hard ENOSPC before and paused every k3s VM
+              with no warning (REL-019 in docs/AUDIT.md) -- ZFS write performance also
+              degrades sharply well before 100% full. Investigate now, not after it locks up.
+
+        - alert: ProxmoxStorageCapacityCritical
+          expr: (pve_disk_usage_bytes{id=~"storage/.+"} / pve_disk_size_bytes{id=~"storage/.+"}) > 0.93
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Proxmox storage {{ $labels.id }} is {{ $value | humanizePercentage }} full -- ENOSPC imminent"
+            description: >
+              {{ $labels.id }} is above 93% capacity for 5+ minutes. At this level ZFS slop
+              reservation is close to exhausted -- the next sustained write burst (a Velero
+              backup, an Ollama model pull, anything) can pause every VM on this pool with an
+              I/O error (status: io-error in `qm status`), as happened in REL-019. Free space
+              now: check `zfs list -o name,used,avail -s used` on mini for the largest
+              consumers.
