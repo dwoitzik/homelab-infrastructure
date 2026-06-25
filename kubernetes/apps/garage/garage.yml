@@ -1,7 +1,35 @@
-# nfs-client (nfs-subdir-external-provisioner) does not enforce quotas -- this
-# request is informational only. Actual usage was found at 115G+ during the
-# REL-019 incident (see docs/AUDIT.md) vs. the 10Gi originally declared here;
-# raised to reflect real usage so the number isn't actively misleading.
+# REL-019: garage-data migrated off rpool (the fast SSD shared by every
+# VM/LXC) onto the archive pool's 2TB USB HDD -- the storage CLAUDE.local.md
+# always intended for Garage/backups, and the structural fix for the chronic
+# disk I/O contention behind REL-005/REL-012/REL-016/REL-019. Data moved
+# live via rsync --remove-source-files directly on the host (~176GB,
+# verified file-count and a final delta sync after the cluster came back
+# up); this static PV/PVC pair replaces the old nfs-client-provisioned one
+# (deleted, but its underlying NFS directory survives untouched --
+# reclaimPolicy was Retain). nfs-subdir-external-provisioner only manages a
+# single fixed NFS root, so a second storage class wasn't an option without
+# standing up a whole second provisioner instance for one PVC -- a static
+# PV pointed directly at the new export (same pattern already used for
+# jellyfin/usenet's media-nfs-v2) is simpler for this one-off.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: garage-data-archive
+spec:
+  capacity:
+    storage: 150Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    server: 10.0.20.100
+    path: /archive-garage-data
+  mountOptions:
+    - nfsvers=4.1
+    - hard
+    - timeo=600
+    - retrans=3
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -10,7 +38,8 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: nfs-client
+  storageClassName: ""
+  volumeName: garage-data-archive
   resources:
     requests:
       storage: 150Gi
@@ -61,6 +90,7 @@ spec:
           args: ["/garage", "server"]
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
             capabilities:
@@ -90,6 +120,8 @@ spec:
               mountPath: /var/lib/garage/data
             - name: meta
               mountPath: /var/lib/garage/meta
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m
@@ -111,6 +143,8 @@ spec:
         - name: meta
           persistentVolumeClaim:
             claimName: garage-meta
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
