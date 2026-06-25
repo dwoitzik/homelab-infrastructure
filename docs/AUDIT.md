@@ -435,7 +435,7 @@ the 120 GB allocated, available space will tighten as workloads grow.
 
 ---
 
-### REL-012 — k3s control plane (etcd) crash-looping all day, 39 restarts · **PARTIAL** (discovered live 2026-06-23, alerting added 2026-06-24, root cause still unresolved)
+### REL-012 — k3s control plane (etcd) crash-looping all day, 39 restarts · **PARTIAL, likely improved** (discovered live 2026-06-23, alerting added 2026-06-24, root cause possibly addressed 2026-06-25 -- see update below)
 
 Caught live while checking the homepage dashboard: `kubectl` against the API VIP and
 against `vm-srv-k3s-11` directly both got connection-refused. SSH'd in and found
@@ -490,6 +490,21 @@ notes) being starved of disk I/O badly enough to blow through raft's read-index 
 - **Effort:** Alerting is small (1-2h); root-causing the I/O contention properly is
   larger and probably needs to wait for calmer conditions to test against (it's hard to
   diagnose disk contention while intentionally generating disk contention).
+- **Update 2026-06-25, after REL-019:** REL-005's `rpool` utilization (the "likely
+  contributing factor" above, confirmed unimproved at 82.5% as of 2026-06-24) is now at
+  60% (was 96-100% during REL-019's crisis) after Garage's ~176GB data migrated off
+  `rpool` onto the archive pool. `journalctl -u k3s | grep "apply request took too
+  long"` counts by hour, measured right after: 4h ago (during the crisis) 1608, 3h ago
+  337, 2h ago 23, 1h ago 2 -- a clean trend tracking exactly with the migration
+  timeline, not a random fluctuation. Current `zpool iostat` is calm (single-digit
+  MB/s). **Not marking this RESOLVED yet** -- this doc already recorded one prior false
+  calm window (0 warnings in 30 minutes on 2026-06-24, with the problem recurring
+  again later that same day), so one hour of clean data isn't enough on its own. If
+  this holds over the following days without intentionally generating disk load, the
+  likely conclusion is that REL-012 was never an independent problem -- it was REL-005
+  (which was itself downstream of REL-019's actual root cause, Garage living on the
+  wrong pool) the whole time. Revisit and downgrade to RESOLVED if the warning rate
+  stays low through a normal day's activity (Velero's daily-backup running, etc.).
 
 ---
 
@@ -1666,7 +1681,7 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | REL-007 | Reliability | **RESOLVED** | Vault seal gap causes cascading ExternalSecret failures on restart — mitigated via faster unseal polling + wait-for-secret initContainers |
 | REL-009 | Reliability | **RESOLVED** | Vault's raft storage migrated from `nfs-client` to `local-path` (same BoltDB-on-NFS risk as GIT-006), zero downtime to ExternalSecrets cluster-wide, verified byte-identical data at every copy step (2026-06-24) |
 | REL-011 | Reliability | **RESOLVED** | `postgres-authelia` (CNPG) had barman WAL archiving configured but no `ScheduledBackup` resource — no base backup existed to restore from via barman alone, only the PVC itself (Velero/PBS). Added `ScheduledBackup` (`kubernetes/system/postgres/scheduled-backup.yml`), daily `0 2 * * *`, targeting the existing `barmanObjectStore` already on the Cluster; also fixed the `postgres-cluster` Application's `directory.include` glob so the new file is picked up by ArgoCD |
-| REL-012 | Reliability | **PARTIAL** | k3s control plane (etcd) crash-looping, now 87 restarts (was 39) -- etcd apply latency up to 14.3s under disk I/O contention; alerting added 2026-06-24, root cause (disk contention) still unresolved and getting worse |
+| REL-012 | Reliability | **PARTIAL, likely improved** | k3s control plane (etcd) crash-looping, etcd apply latency up to 14.3s under disk I/O contention; alerting added 2026-06-24. After REL-019's Garage migration freed rpool from 96-100% to 60%, hourly "apply request took too long" counts dropped 1608->337->23->2 tracking the migration timeline -- not yet marked RESOLVED (one prior false-calm window already on record), revisit after a full day clean (2026-06-25) |
 | REL-013 | Reliability | **RESOLVED** | Uptime Kuma (23 monitors @ 60s) and Prometheus blackbox-exporter (9 targets @ 30s) both probing largely the same domains, doubled again by a `search home.lan` DNS suffix -- bumped both intervals (2026-06-24) |
 | REL-014 | Reliability | **RESOLVED** | Every custom PrometheusRule (SLO alerts, hardware-temp alerts) was silently never evaluated -- missing `release: kube-prometheus-stack` label never matched Prometheus's ruleSelector. Fixed, verified live via /api/v1/rules (2026-06-24) |
 | REL-015 | Reliability | **PARTIAL** | Discord alerting silently broken -- Prometheus Operator can't validate `webhook_url_file` in raw Helm config (tries reading the file from its own pod, which never has it mounted), generated secret was 24 days stale. Manual stopgap restores delivery; durable fix (AlertmanagerConfig CRD) not attempted live (2026-06-24) |
