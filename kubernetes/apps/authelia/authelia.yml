@@ -34,6 +34,7 @@ spec:
         image: busybox:1.36
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -66,6 +67,7 @@ spec:
         # crash-loops it ("su-exec: setgroups(0): Operation not permitted").
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
         ports:
@@ -79,6 +81,10 @@ spec:
         - name: users-db
           mountPath: /config/users
           readOnly: true
+        # the filesystem notifier writes here (configuration.yml ->
+        # notifier.filesystem.filename: /tmp/notification.txt)
+        - name: tmp
+          mountPath: /tmp
         env:
         - name: AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE
           value: /config/secrets/storage-password
@@ -104,6 +110,8 @@ spec:
       - name: users-db
         secret:
           secretName: authelia-users-db
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
