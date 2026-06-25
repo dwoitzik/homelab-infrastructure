@@ -36,6 +36,7 @@ spec:
         # live pod when caught, fixed here before it could.
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -58,6 +59,11 @@ spec:
         volumeMounts:
         - name: redis-data
           mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
   volumeClaimTemplates:
   - metadata:
       name: redis-data

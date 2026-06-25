@@ -23,6 +23,7 @@ spec:
           # runAsNonRoot and image will run as root").
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
             capabilities:
@@ -61,6 +62,12 @@ spec:
             limits:
               cpu: 50m
               memory: 64Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
