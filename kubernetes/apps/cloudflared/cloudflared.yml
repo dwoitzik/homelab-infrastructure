@@ -18,11 +18,15 @@ spec:
         image: cloudflare/cloudflared:2026.6.1
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           runAsNonRoot: true
           capabilities:
             drop: ["ALL"]
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         args:
         - tunnel
         - "--no-autoupdate"
@@ -40,3 +44,6 @@ spec:
           limits:
             cpu: 200m
             memory: 128Mi
+      volumes:
+      - name: tmp
+        emptyDir: {}
