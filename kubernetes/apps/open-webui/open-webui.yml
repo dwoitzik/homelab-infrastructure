@@ -44,6 +44,26 @@ spec:
       labels:
         app: open-webui
     spec:
+      # SEC-012: open-webui rewrites some of its own static branding assets
+      # (splash.png, favicon*.png, loader.js) at startup -- under
+      # readOnlyRootFilesystem this failed with EROFS. /app/backend/open_webui/static
+      # also ships real, required assets (fonts/, swagger-ui/, icons) that
+      # an empty emptyDir overlay would wipe, so we copy the image's own
+      # static dir into an emptyDir first, then overlay that -- preserves
+      # existing files while making the directory writable.
+      initContainers:
+      - name: copy-static
+        image: ghcr.io/open-webui/open-webui:main
+        command: ["sh", "-c", "cp -a /app/backend/open_webui/static/. /static-init/"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: static
+          mountPath: /static-init
       containers:
       - name: open-webui
         image: ghcr.io/open-webui/open-webui:main
@@ -92,11 +112,15 @@ spec:
           mountPath: /app/backend/data
         - name: tmp
           mountPath: /tmp
+        - name: static
+          mountPath: /app/backend/open_webui/static
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: open-webui-data
       - name: tmp
+        emptyDir: {}
+      - name: static
         emptyDir: {}
 ---
 apiVersion: v1
