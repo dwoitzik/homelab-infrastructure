@@ -20,6 +20,7 @@ spec:
         image: prompve/prometheus-pve-exporter:3.9.0
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -32,6 +33,8 @@ spec:
         - name: config
           mountPath: /etc/pve
           readOnly: true
+        - name: tmp
+          mountPath: /tmp
         env:
         - name: PVE_URL
           value: "https://10.0.10.10:8006"
@@ -46,6 +49,8 @@ spec:
       - name: config
         secret:
           secretName: pve-exporter-config
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
