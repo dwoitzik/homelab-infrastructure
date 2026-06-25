@@ -420,7 +420,7 @@ protects against corruption, not disk failure.
 
 ---
 
-### REL-005 — rpool data volume at 70% utilization · **HIGH**
+### REL-005 — rpool data volume at 70% utilization · **RESOLVED** (2026-06-25, via REL-019)
 
 `rpool/data`: 292 GB used, 129 GB available (out of ~420 GB). The AI LXC alone uses 43 GB
 (`subvol-201-disk-0`) and the Docker LXC uses 16 GB. With k3s VMs each using 72–74 GB of
@@ -428,10 +428,19 @@ the 120 GB allocated, available space will tighten as workloads grow.
 
 - **Impact:** When rpool fills, ZFS writes fail, which freezes the host. This contributed
   to the June 2026 freeze investigation.
-- **Fix:** Clean up unused snapshot space (`zfs list -t snapshot`), review AI LXC disk
-  allocation (42.9 GB used of allocated), consider compressing large volumes with
-  `zfs set compression=zstd`. Alert when rpool exceeds 80% (`zpool list` Prometheus metric).
-- **Effort:** Medium.
+- **What actually happened:** this is exactly what occurred in REL-019 (2026-06-25) --
+  rpool filled completely (96-100%), paused all three k3s VMs on disk I/O error. Root
+  cause was Garage's ~176GB living on rpool plus Velero backing it up into itself.
+- **Fix, finally done:** Garage's data migrated to the archive pool (REL-019). rpool is
+  now at 60% utilization (was stuck at 70-100% the whole time this finding sat open).
+  The recommended alert ("Alert when rpool exceeds 80%") is now live:
+  `ProxmoxStorageCapacityHigh`/`Critical` in
+  `kubernetes/system/monitoring/storage-capacity-alerts.yml`.
+- **Lesson:** this finding was identified and correctly diagnosed back on 2026-06-23/24
+  but left as "Medium effort, todo" for two days while the underlying disk kept filling
+  -- it eventually caused a full incident (REL-019) and very likely was the actual root
+  cause of REL-012's etcd flapping the whole time too. A HIGH-severity capacity finding
+  with a known fix and no alert in place shouldn't sit open this long next time.
 
 ---
 
@@ -1676,7 +1685,7 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | REL-002 | Reliability | **RESOLVED** | PBS running with `onboot=1`; `all: 1` backup job covers every VM/CT incl. k3s nodes + NFS LXC; verified successful 2026-06-23 03:00 run |
 | REL-003 | Reliability | **HIGH** | Velero backend (Garage) is in-cluster; circular recovery dependency |
 | REL-004 | Reliability | **HIGH** | NFS single point of failure for all PVCs |
-| REL-005 | Reliability | **HIGH** | rpool at 70% utilization with no alert |
+| REL-005 | Reliability | **RESOLVED** | rpool at 70% utilization with no alert -- this is what eventually caused REL-019; Garage's data migrated off rpool (now 60%), capacity alerting added (2026-06-25) |
 | REL-006 | Reliability | **HIGH** | No Proxmox VM snapshots for k3s nodes |
 | REL-007 | Reliability | **RESOLVED** | Vault seal gap causes cascading ExternalSecret failures on restart — mitigated via faster unseal polling + wait-for-secret initContainers |
 | REL-009 | Reliability | **RESOLVED** | Vault's raft storage migrated from `nfs-client` to `local-path` (same BoltDB-on-NFS risk as GIT-006), zero downtime to ExternalSecrets cluster-wide, verified byte-identical data at every copy step (2026-06-24) |
@@ -1705,7 +1714,7 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | IAC-001 | IaC | **RESOLVED** | ~50% of app Deployments lack resource limits |
 | IAC-002 | IaC | **MEDIUM** | MikroTik firewall hardening apply still pending Atlantis |
 | IAC-003 | IaC | **LOW** | No automated k3s VM rebuild procedure |
-| DOC-001 | Docs | **HIGH** | DISASTER-RECOVERY.md does not exist |
+| DOC-001 | Docs | **RESOLVED** | DISASTER-RECOVERY.md does not exist -- added at repo root covering all 6 required tiers + per-service restore table (2026-06-23); this summary row was stale, the detailed entry already said RESOLVED |
 | DOC-002 | Docs | **LOW** | ROADMAP.md is partially in German |
 | DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |
 | DOC-004 | Docs | **RESOLVED** | 4 architectural decisions without ADRs — added ADR-006..009 |
