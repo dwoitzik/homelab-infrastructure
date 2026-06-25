@@ -63,6 +63,7 @@ spec:
         image: ghcr.io/runatlantis/atlantis:v0.33.0
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -146,6 +147,8 @@ spec:
           mountPath: /etc/atlantis/repos.yaml
           subPath: repos.yaml
           readOnly: true
+        - name: tmp
+          mountPath: /tmp
       volumes:
       - name: data
         persistentVolumeClaim:
@@ -153,6 +156,8 @@ spec:
       - name: config
         configMap:
           name: atlantis-config
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
