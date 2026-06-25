@@ -48,6 +48,7 @@ spec:
           # crash-loops it.
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           env:
@@ -66,6 +67,10 @@ spec:
             - name: data
               mountPath: /var/lib/postgresql/data
               subPath: data
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m
@@ -77,6 +82,10 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: nextcloud-db-data
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -115,10 +124,14 @@ spec:
           # command: with redis-server directly, skipping that entrypoint.
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           ports:
             - containerPort: 6379
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 50m
@@ -126,6 +139,9 @@ spec:
             limits:
               cpu: 200m
               memory: 128Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -164,6 +180,7 @@ spec:
           image: nextcloud:30-apache
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
             capabilities:
@@ -204,6 +221,15 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/www/html
+            - name: tmp
+              mountPath: /tmp
+            # entrypoint writes redis-session.ini etc. here on every start --
+            # a plain emptyDir loses the base image's default PHP module
+            # configs, so an initContainer seeds a writable copy first.
+            - name: php-conf
+              mountPath: /usr/local/etc/php/conf.d
+            - name: apache-run
+              mountPath: /var/run/apache2
           resources:
             requests:
               cpu: 200m
@@ -211,10 +237,23 @@ spec:
             limits:
               cpu: 1000m
               memory: 1Gi
+      initContainers:
+        - name: copy-php-conf
+          image: nextcloud:30-apache
+          command: ["sh", "-c", "cp -a /usr/local/etc/php/conf.d/. /writable-conf/"]
+          volumeMounts:
+            - name: php-conf
+              mountPath: /writable-conf
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: nextcloud-data
+        - name: tmp
+          emptyDir: {}
+        - name: php-conf
+          emptyDir: {}
+        - name: apache-run
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -260,6 +299,7 @@ spec:
               command: [php, -f, /var/www/html/cron.php]
               securityContext:
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
                 seccompProfile:
                   type: RuntimeDefault
                 capabilities:
@@ -267,6 +307,8 @@ spec:
               volumeMounts:
                 - name: data
                   mountPath: /var/www/html
+                - name: tmp
+                  mountPath: /tmp
               resources:
                 requests:
                   cpu: 50m
@@ -278,3 +320,5 @@ spec:
             - name: data
               persistentVolumeClaim:
                 claimName: nextcloud-data
+            - name: tmp
+              emptyDir: {}
