@@ -1701,6 +1701,7 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | WRK-005 | Workloads | **PARTIAL** | Paperless data-quality pass: missing archives (nfs-client related, fixed) + 5 "hallucinated" docs were actually scanned upside-down (fixed) + LLM_MODEL occasionally returns chatty-assistant text instead of short field values (low-frequency, not fixed) (2026-06-24) |
 | WRK-006 | Workloads | **IN PROGRESS** | Media acquisition stack moved to a dedicated gluetun/Mullvad-isolated LXC -- provisioned, deployed, kill-switch verified failing closed; blocked on a real Mullvad config + final cutover (2026-06-24, ADR-010) |
 | WRK-007 | Workloads | **RESOLVED** | Jellyfin moved to a dedicated GPU-passthrough LXC for VAAPI hardware transcode (shares mini's APU render node with ct-srv-ai-01's ROCm passthrough); config migrated and verified, old k8s resources removed (2026-06-24) |
+| WRK-008 | Workloads | **LOW** | Offsite backup to Cloudflare R2 (`kubernetes/system/velero/offsite-schedule.yml`/`r2-backuplocation.yml`) was scaffolded but never finished -- `r2-backuplocation.yml` has a literal `ACCOUNT_ID` placeholder and its referenced credential secret (`velero-r2-credentials`) doesn't exist anywhere (not Ansible Vault, not HashiCorp Vault). Confirmed not actively broken (Velero/ArgoCD just silently never create the BackupStorageLocation/Schedule, no error state) -- local backups to Garage/archive pool work fine. User decided to leave it deferred rather than complete or remove it now (2026-06-25) |
 
 ---
 
