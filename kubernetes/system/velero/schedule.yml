@@ -4,6 +4,13 @@ metadata:
   name: daily-backup
   namespace: velero
 spec:
+  # REL-019: paused after this schedule's filesystem backup of Garage's own
+  # data/meta volumes (defaultVolumesToFsBackup + includedNamespaces: "*")
+  # wrote backup chunks into Garage's own S3 backend, growing unbounded until
+  # it filled rpool and paused the whole k3s cluster. Re-enable once the
+  # garage.yml backup-volumes-excludes annotation fix has been live for at
+  # least one full run and confirmed to skip Garage's volumes. See AUDIT.md.
+  paused: true
   schedule: "0 3 * * *"
   template:
     ttl: 720h0m0s
