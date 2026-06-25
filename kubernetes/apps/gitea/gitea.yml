@@ -38,6 +38,7 @@ spec:
           # privilege-escalation flag is safe to set here.
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           ports:
@@ -81,6 +82,21 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            # s6-svscan is invoked directly on /etc/s6 (not s6-overlay v3's
+            # init wrapper, so S6_READ_ONLY_ROOT has no effect here) and
+            # writes its lock file relative to that directory -- confirmed
+            # live: a plain emptyDir at /etc/s6 fails startup entirely
+            # (service run-scripts missing), so an initContainer seeds a
+            # writable copy of the image's baked-in /etc/s6 instead.
+            - name: s6
+              mountPath: /etc/s6
+            # sshd (git-over-SSH, port 22) needs to chmod/regenerate
+            # /etc/ssh/sshd_config and host keys on every start -- same
+            # seed-then-mount pattern as /etc/s6 above.
+            - name: ssh-etc
+              mountPath: /etc/ssh
           resources:
             requests:
               cpu: 100m
@@ -88,7 +104,26 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+      initContainers:
+        - name: copy-s6
+          image: gitea/gitea:1.22
+          command: ["sh", "-c", "cp -a /etc/s6/. /writable-s6/"]
+          volumeMounts:
+            - name: s6
+              mountPath: /writable-s6
+        - name: copy-ssh
+          image: gitea/gitea:1.22
+          command: ["sh", "-c", "cp -a /etc/ssh/. /writable-ssh/"]
+          volumeMounts:
+            - name: ssh-etc
+              mountPath: /writable-ssh
       volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: s6
+          emptyDir: {}
+        - name: ssh-etc
+          emptyDir: {}
         - name: data
           persistentVolumeClaim:
             claimName: gitea-data
