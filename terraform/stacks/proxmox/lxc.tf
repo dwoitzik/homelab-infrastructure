@@ -543,6 +543,21 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
     replicate = true
   }
 
+  # REL-019: Garage's bulk S3 data (115GB+) was found living on rpool (the
+  # single fast SSD shared by every VM/LXC) via the main /nfs-data mount
+  # above, despite CLAUDE.local.md stating the archive pool (this 2TB USB
+  # HDD) is the intended Garage/backup target. That misplacement is the
+  # most likely dominant contributor to the chronic disk I/O contention
+  # behind REL-005/REL-012/REL-016/REL-019 and repeated Minecraft server
+  # watchdog restarts on the same host. This second mount exposes a
+  # dedicated archive-pool dataset for Garage's data to migrate onto.
+  mount_point {
+    volume    = "/mnt/pbs-storage/garage-data"
+    path      = "/archive-garage-data"
+    backup    = false
+    replicate = false
+  }
+
   features {
     nesting = true
   }
