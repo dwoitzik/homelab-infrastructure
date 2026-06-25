@@ -38,6 +38,7 @@ spec:
           # permitted"). Same failure class as the other apps in this pass.
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           env:
@@ -55,10 +56,14 @@ spec:
           volumeMounts:
             - name: uptime-kuma-data
               mountPath: /app/data
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: uptime-kuma-data
           persistentVolumeClaim:
             claimName: uptime-kuma-data
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
