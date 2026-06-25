@@ -19,6 +19,7 @@ spec:
         image: busybox:1.36
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -52,6 +53,7 @@ spec:
         # not permitted").
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
         env:
@@ -77,6 +79,10 @@ spec:
         - name: data
           mountPath: /var/lib/postgresql/data
           subPath: data
+        - name: run
+          mountPath: /var/run/postgresql
+        - name: tmp
+          mountPath: /tmp
       volumes:
       - name: data
         persistentVolumeClaim:
@@ -85,6 +91,10 @@ spec:
         secret:
           secretName: paperless-secrets
           optional: true
+      - name: run
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -123,10 +133,14 @@ spec:
         # command: with redis-server directly, skipping that entrypoint.
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
         ports:
         - containerPort: 6379
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         resources:
           requests:
             cpu: 25m
@@ -134,6 +148,9 @@ spec:
           limits:
             cpu: 250m
             memory: 256Mi
+      volumes:
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -167,12 +184,16 @@ spec:
         command: ["gotenberg", "--chromium-allow-list=file:///tmp/.*"]
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
         ports:
         - containerPort: 3000
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         resources:
           requests:
             cpu: 100m
@@ -184,12 +205,16 @@ spec:
         image: apache/tika:3.3.1.0
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
         ports:
         - containerPort: 9998
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         resources:
           requests:
             cpu: 100m
@@ -197,6 +222,9 @@ spec:
           limits:
             cpu: 1000m
             memory: 1536Mi
+      volumes:
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
