@@ -34,7 +34,6 @@ spec:
         image: busybox:1.36
         securityContext:
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -65,9 +64,14 @@ spec:
         # CAP_SETGID/CAP_SETUID to chown /config and su-exec into its
         # runtime user -- confirmed live, dropping all capabilities
         # crash-loops it ("su-exec: setgroups(0): Operation not permitted").
+        # SEC-012: readOnlyRootFilesystem reverted live 2026-06-25 -- worked
+        # in an initial manual test, then crash-looped in production with a
+        # generic "Errors occurred performing startup checks" fatal (no
+        # further detail logged) after surviving ~2.5h, 35+ restarts. The
+        # initial test's apparent success was a false positive, not a real
+        # fix -- see REL-021 in docs/AUDIT.md for the investigation.
         securityContext:
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
         ports:

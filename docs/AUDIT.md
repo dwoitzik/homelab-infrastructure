@@ -933,6 +933,59 @@ healthy. Radarr was silently down until this was caught.
 
 ---
 
+### REL-021 — Authelia's readOnlyRootFilesystem fix passed a live test, then crash-looped in production hours later · **PARTIAL** (2026-06-25)
+
+Caught because of a real outage report: `home.woitzik.dev` (and presumably every other
+Authelia-protected route) returned Service Unavailable. Two of three Authelia replicas
+were in `CrashLoopBackOff` with 35+ restarts over roughly 2.5 hours.
+
+- **What happened:** the `readOnlyRootFilesystem` change for Authelia (part of the
+  SEC-012 pass, merged in #133) was tested live before committing -- patched the
+  Deployment, watched it fail once with a generic `fatal: Errors occurred performing
+  startup checks`, retried, watched it succeed (`Startup complete`, `/api/health`
+  returned `{"status":"OK"}`) -- and was committed and merged on that basis. Hours
+  later, in production, the exact same config started crash-looping persistently. The
+  fatal error message gives no further detail in either case (Authelia logs nothing
+  more specific before the generic "Errors occurred performing startup checks" line),
+  so the underlying cause is still unknown.
+- **What this means for the "test live, then commit" discipline:** a single successful
+  retry after one failure is not sufficient evidence that a fix works, if the failure
+  mode is intermittent rather than deterministic. The original incident (the blind
+  capabilities/runAsNonRoot rollout) was about not testing live at all; this is the
+  opposite failure -- testing live, getting a result that looked like a pass, and
+  trusting it without enough repetition or a long enough observation window. Both are
+  the same root mistake: declaring success from too little evidence.
+- **Fix:** reverted `readOnlyRootFilesystem` on Authelia's main container (kept it on
+  the `wait-for-vault-secret` initContainer, which was never implicated). Verified the
+  Service's endpoints only ever routed to the two healthy replicas throughout --
+  `home.woitzik.dev` was very likely never actually down end-to-end, just degraded to
+  whatever capacity the surviving replicas could handle, which is still bad (no
+  redundancy, and a full Authelia outage was one bad rollout away).
+- **Found in the same response:** a second, unrelated SEC-012 regression on
+  `homepage` -- its entrypoint auto-creates `/app/config/docker.yaml` if missing, and
+  that directory turned out to be a plain writable directory (not itself a ConfigMap
+  mount, only the individual files inside it are subPath-mounted), so
+  readOnlyRootFilesystem broke that specific write with `EROFS`. Fixed by adding an
+  empty `docker.yaml` to the ConfigMap, mounted the same way as the others -- Docker
+  integration isn't actually used here.
+- **Not fixed:** the actual root cause of Authelia's intermittent failure under
+  readOnlyRootFilesystem. Candidates not yet ruled out: a periodic internal task
+  (TOTP/WebAuthn cleanup, session GC, certificate reload) that needs to write
+  somewhere not covered by the `/tmp` mount added for the notifier; a race between the
+  three replicas' chown attempts on the shared `secrets`/`users-db` mounts (read-only
+  regardless, but the *attempt* itself might behave differently under load); or
+  something unrelated to the filesystem entirely that just happened to correlate.
+  Needs a debug-level Authelia log capture during an actual failure (not a retry after
+  one) before attempting this again -- not done here, given the priority was restoring
+  service, not root-causing while it was down.
+- **Lesson:** for a service that gates access to *every other* Authelia-protected app
+  in this homelab, the bar for "tested enough" before merging a security-hardening
+  change should be higher than one pass after one retry. Worth revisiting with a
+  proper soak test (leave the live patch running, unwatched, for an hour+) before
+  re-attempting readOnlyRootFilesystem on Authelia.
+
+---
+
 ### REL-013 — Redundant monitoring: two systems probing the same ~20 endpoints, too aggressively · **RESOLVED** (2026-06-24)
 
 Found while investigating unusually high DNS query volume reported live (AdGuard:
@@ -1699,6 +1752,7 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | REL-018 | Reliability/Security | **RESOLVED** | `kubernetes/system/*.yml` had zero ArgoCD tracking -- `kubectl apply` couldn't prune removed resources. Found a live regression in the gap: a duplicate, unrestricted `traefik-dashboard` IngressRoute was periodically overwriting the correct path-restricted one via selfHeal. Added `system-manifests` Application, removed the duplicates (2026-06-24, #124) |
 | REL-019 | Reliability | **RESOLVED** | `rpool` hit hard ENOSPC, pausing all three k3s VMs (`qm status: io-error`) -- root cause was Velero's `daily-backup` (30-day TTL, `defaultVolumesToFsBackup: true`) backing up Garage's own data volume into Garage's own S3 backend nightly, an unbounded circular write. Excluded Garage's volumes from FS backup, paused the schedule pending verification, fixed `pve-exporter`'s never-completed auth token (had shipped with a plaintext `REPLACE_WITH_TOKEN_VALUE` placeholder, 401 since deployment), added ZFS capacity alerting (2026-06-25) |
 | REL-020 | Reliability | **PARTIAL** | Radarr's database hit a transient NFS I/O error on restart (no liveness probe, so Kubernetes reported it healthy while actually down) -- `integrity_check` came back clean, a WAL checkpoint fixed it with zero data loss. Surfaced that `sonarr/radarr/bazarr/sabnzbd-config` are still on `nfs-client`, the same storage class already documented unsafe for SQLite -- missed by the original migration audit, not fixed here (stack is slated for removal via WRK-006) (2026-06-25) |
+| REL-021 | Reliability/Security | **PARTIAL** | Authelia's readOnlyRootFilesystem (SEC-012) passed a live test, then crash-looped in production hours later (35+ restarts, generic fatal error, no detail) -- a live outage on home.woitzik.dev. Reverted; root cause of the intermittent failure still unknown. Also found and fixed a related but separate SEC-012 regression on homepage (EROFS creating docker.yaml) in the same response (2026-06-25) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |

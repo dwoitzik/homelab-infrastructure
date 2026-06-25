@@ -179,6 +179,12 @@ data:
             description: Log Aggregation · Promtail
   kubernetes.yaml: |
     mode: cluster
+  # SEC-012: under readOnlyRootFilesystem, homepage can no longer
+  # auto-create this file if missing (EROFS, /app/config is otherwise a
+  # plain writable directory, not actually a ConfigMap mount at the
+  # directory level -- only the individual files are subPath-mounted).
+  # Docker integration isn't used here, so an empty config is enough.
+  docker.yaml: ""
   widgets.yaml: |
     - kubernetes:
         cluster:
@@ -363,6 +369,9 @@ spec:
         - name: config
           mountPath: /app/config/kubernetes.yaml
           subPath: kubernetes.yaml
+        - name: config
+          mountPath: /app/config/docker.yaml
+          subPath: docker.yaml
         - name: logs
           mountPath: /app/config/logs
         - name: tmp
