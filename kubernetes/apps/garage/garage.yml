@@ -1,3 +1,7 @@
+# nfs-client (nfs-subdir-external-provisioner) does not enforce quotas -- this
+# request is informational only. Actual usage was found at 115G+ during the
+# REL-019 incident (see docs/AUDIT.md) vs. the 10Gi originally declared here;
+# raised to reflect real usage so the number isn't actively misleading.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -9,7 +13,7 @@ spec:
   storageClassName: nfs-client
   resources:
     requests:
-      storage: 10Gi
+      storage: 150Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -38,6 +42,16 @@ spec:
       app: garage
   template:
     metadata:
+      annotations:
+        # REL-019: Velero's daily-backup Schedule (includedNamespaces: "*",
+        # defaultVolumesToFsBackup: true) was backing up Garage's own data/meta
+        # volumes via kopia INTO Garage itself (its S3 backend) -- a circular
+        # write that grew unbounded (30-day TTL) until it filled rpool and
+        # paused the whole k3s cluster. Garage is the backup target, not
+        # something that needs filesystem-level backup; its content should be
+        # protected via S3-level replication/snapshots instead, not Velero FS
+        # backup of its own backing store. See docs/AUDIT.md REL-019.
+        backup.velero.io/backup-volumes-excludes: data,meta
       labels:
         app: garage
     spec:

@@ -715,6 +715,156 @@ unreachable, and a direct TCP connect test confirmed it — repeatable, includin
 
 ---
 
+### REL-018 — `kubernetes/system/*.yml` had zero ArgoCD tracking; a live security regression hid in the gap · **RESOLVED** (2026-06-24, #124)
+
+Found while removing `paperless-ai`'s IngressRoute (WRK-005 follow-up): `kubectl apply
+-f` updated the existing resources in `kubernetes/system/apps-ingressroute.yml` but did
+not prune the one I'd deleted from the file — it stayed live until I deleted it by hand.
+
+- **Root cause:** `kubernetes/apps/*` is auto-discovered by the `homelab-apps`
+  ApplicationSet, but `kubernetes/system/*` was never wired to anything — every
+  IngressRoute (most production ingress for the whole homelab) and PodDisruptionBudget
+  defined directly under `kubernetes/system/` was live only because someone (me, earlier
+  sessions) had applied it manually at some point. A full cluster rebuild from git alone
+  would never have created any of it, and nothing was ever pruning resources removed
+  from these files.
+- **Live security regression found in the process:** `kubernetes/system/infrastructure/
+  external.yml` (tracked by the `infrastructure` Application, `selfHeal: true`)
+  contained a *second*, less-restrictive `traefik-dashboard` IngressRoute — same name,
+  same namespace as the correct one in `other-ingressroute.yml`, but missing the
+  `PathPrefix(`/api`) || PathPrefix(`/dashboard`)` restriction. With nothing tracking
+  `other-ingressroute.yml`, `infrastructure`'s selfHeal was periodically overwriting the
+  correct, path-restricted definition with this unrestricted one — confirmed live by
+  checking the resource's `match` field twice within minutes and seeing it flip. A
+  third, differently-named, unused duplicate (`traefik-dashboard-websecure` in
+  `kubernetes/system/traefik/dashboard-route.yml`) was pure leftover risk and deleted.
+- **Fix:** added `kubernetes/system/manifests-application.yml`, a new ArgoCD
+  Application (`system-manifests`, `prune: true`, `selfHeal: true`) tracking
+  `apps-ingressroute.yml`, `other-ingressroute.yml`, and `pod-disruption-budgets.yml`.
+  Removed the duplicate, unrestricted `traefik-dashboard` block from `external.yml` and
+  the unused third copy entirely — the path-restricted version is now the only one,
+  exclusively owned by `system-manifests`.
+- **Lesson:** "is this file under `kubernetes/apps/`" is not the same question as "is
+  this file tracked by ArgoCD" — the second one needs to be checked explicitly for
+  anything under `kubernetes/system/`, since the ApplicationSet pattern doesn't reach
+  there at all.
+
+---
+
+### REL-019 — `rpool` hit hard ENOSPC, paused all three k3s VMs; root cause was a backup job circularly backing itself up · **RESOLVED** (2026-06-25)
+
+Surfaced while testing the `readOnlyRootFilesystem` rollout (SEC-012 follow-up, see
+below): a routine `kubectl create job --from=cronjob/renovate` test, running
+concurrently with an already-scheduled Velero backup, tipped `rpool` (the single 472GB
+SSD shared by every VM/LXC on `mini` — already flagged at 82%+ contention in REL-005/
+REL-012) over its last few GB of headroom. `kubectl` started failing with `no route to
+host`; the games LXC's Minecraft server lagged badly (same host, same starved disk) and
+the user noticed before I'd finished diagnosing it.
+
+- **Immediate symptom:** `qm status` showed `io-error` for all three k3s VMs
+  (`vm-srv-k3s-11/12/13`) — QEMU's block layer correctly paused every vCPU on ENOSPC
+  rather than crash or corrupt data, but this meant the *entire* k3s cluster (API
+  server, etcd, every pod) was simultaneously down with no remote recovery path other
+  than freeing pool space and issuing `qm resume` (found via raw QMP socket commands —
+  `qm resume` itself failed with "No space left on device" because even Proxmox's own
+  task-log writes to `/var/log/pve/tasks` go through the same full pool).
+- **Root cause, in order of how much each one mattered:**
+  1. **Garage's `garage-data` PVC (10Gi requested, 115GB+ actually used — `nfs-client`
+     enforces no quota at all) lives on `rpool`.** Per `CLAUDE.local.md` the 2TB USB
+     archive pool is explicitly meant as "the backup/Garage target," but Garage's real
+     data has been on the scarce fast SSD the whole time.
+  2. **The `daily-backup` Velero Schedule (`includedNamespaces: "*"`,
+     `defaultVolumesToFsBackup: true`, `ttl: 720h` = 30 days) was backing up Garage's
+     own `data`/`meta` volumes via kopia *into Garage's own S3 backend* every night** —
+     a circular write, accumulating for a month before any chunk expired. This was
+     always going to eventually fill the pool; 2026-06-25 03:00 UTC was just the day the
+     accumulated backups crossed the line. Confirmed via `kubectl get podvolumebackups
+     -n velero`: the in-progress `daily-backup-20260625030032-ttntq` PodVolumeBackup was
+     backing up pod `garage-76dbb5dc5b-48qtb`'s `data` volume, 120 minutes in.
+  3. **No alert existed for ZFS pool capacity at all**, and the one exporter that could
+     have provided the metric (`pve-exporter`) had been failing **401 Unauthorized**
+     since the day it was deployed — its `pve-exporter-config` Secret had shipped with
+     a literal plaintext placeholder, `token_value: REPLACE_WITH_TOKEN_VALUE`, committed
+     directly to git and never actually completed. Zero Proxmox host metrics (disk,
+     CPU, anything) had ever reached Prometheus.
+- **Recovery (in order attempted, several dead ends kept on record deliberately):**
+  - Deleted two already-obsolete VM snapshots (10.5GB) and pruned Docker images on the
+    Docker LXC (1GB) — bought a few minutes, immediately reconsumed by the in-progress
+    backup once `qm resume` brought the VMs back.
+  - `kubectl scale deployment velero --replicas=0` did **not** stop the bleed — ArgoCD's
+    `selfHeal` silently reverted it within its reconcile cycle (the same "git is the
+    only place a fix sticks" lesson from REL-018, again). The actual writer was a
+    `PodVolumeBackup` being executed directly by the `node-agent` DaemonSet pod via an
+    embedded kopia subprocess — independent of the Velero Deployment's replica count and
+    still running via the kubelet even while the API server itself was unreachable.
+  - Stopped the NFS LXC (`ct-srv-nfs-01`, vmid 220) directly via `lxc-stop -n 220 -k`
+    (bypassing `pct stop`, which itself failed with "No space left on device" trying to
+    write its own task log) — this cut off the write *destination* and was the only
+    action that actually halted the growth.
+  - Deleted the in-progress `Backup` CR (`kubectl delete backup.velero.io
+    daily-backup-20260625030032`) and patched `Schedule daily-backup` to
+    `paused: true`.
+  - Freed real headroom by deleting `gemma2:27b` (15GB — the exact model that caused
+    REL-016's host freeze, no longer used) and `gemma4:26b` (17GB, same risk profile,
+    never used in production) and `qwen2.5-coder:7b` (4.7GB, already deprecated in
+    WRK-005) from the AI LXC's Ollama cache — all three freely re-pullable,
+    `minicpm-v` (the one model actually in production use) untouched. `zpool list`
+    didn't reflect the free space until an explicit `sync` — a stale read had me
+    convinced deletions weren't working for several minutes before realizing it was
+    just an unflushed txg.
+  - `pveum` itself then hung indefinitely on `cfs-lock 'file-user_cfg'` — pmxcfs's own
+    SQLite-backed config store had hit "database or disk is full" mid-transaction
+    during the crisis and was stuck. `systemctl restart pve-cluster` cleared it (does
+    not affect running VMs/LXCs).
+  - Resumed all three VMs, restarted the NFS LXC, confirmed stable at 35GB+ free and
+    host load back to 1.04 (from 27.8 at the peak).
+- **Fixed, permanently:**
+  - `kubernetes/apps/garage/garage.yml`: added
+    `backup.velero.io/backup-volumes-excludes: data,meta` to the Garage pod template —
+    Velero will no longer attempt to back up Garage's own backing store at all. Also
+    corrected the `garage-data` PVC's declared size from the misleading `10Gi` to
+    `150Gi` to reflect real usage (still unenforced by `nfs-client`, but no longer
+    actively lying).
+  - `kubernetes/system/velero/schedule.yml`: `daily-backup` committed to git as
+    `paused: true` for now — re-enable once the exclusion fix above has run clean at
+    least once.
+  - `kubernetes/system/monitoring/external-secret.yml`: replaced the plaintext
+    placeholder Secret in `pve-exporter.yml` with a proper `ExternalSecret` (Vault-
+    backed, matching the existing pattern used by `grafana-admin-secret` etc.),
+    regenerated the `prometheus@pve` API token (the old value had never been captured
+    anywhere retrievable), and verified live: the `proxmox-pve` Prometheus target is
+    now `up` and `pve_disk_usage_bytes`/`pve_disk_size_bytes` are flowing.
+  - `kubernetes/system/monitoring/storage-capacity-alerts.yml` (new): two alerts,
+    `ProxmoxStorageCapacityHigh` (>85% for 10m, warning) and
+    `ProxmoxStorageCapacityCritical` (>93% for 5m, critical), on
+    `pve_disk_usage_bytes / pve_disk_size_bytes` per storage. Verified live via
+    `/api/v1/rules` — `ProxmoxStorageCapacityHigh` is correctly `pending` for
+    `storage/pve-mgmt-01/local-zfs` at the post-cleanup ~88% usage.
+- **Found but not fixed (separate, pre-existing gaps):**
+  - `daily-offsite` (`kubernetes/system/velero/offsite-schedule.yml`) exists in git but
+    was never actually applied/live — a second, smaller GitOps-coverage gap on top of
+    REL-018, not yet investigated further.
+  - `node_exporter` is not installed on the bare Proxmox host (`mini`) at all — only
+    inside the k3s VMs via DaemonSet. This means `ProxmoxHostHighTemp`
+    (`hardware-temp-alerts.yml`, written assuming `node_hwmon_temp_celsius{group=
+    "pve_hosts"}` exists) has been silently dead since it was written; confirmed zero
+    series returned for that metric. Needs its own Ansible-managed install (the host
+    isn't currently in any existing inventory group) — out of scope for this incident's
+    fix, tracked here so it doesn't get silently re-lost.
+  - The bigger structural question — should Garage's bulk S3 data move off `rpool`
+    entirely onto the archive pool, matching `CLAUDE.local.md`'s stated intent — is
+    *not* done. The exclusion fix above stops the bleeding (no more circular backup
+    growth) but Garage's 115GB+ still lives on the scarce fast SSD. A live migration of
+    a real S3 backend (used by Velero as its only backup target) needs its own careful,
+    backed-up, verified pass, not something to rush as part of incident recovery.
+- **Lesson:** a backup system that includes its own backup target in what it backs up,
+  with no exclusion and a multi-week retention, has an unbounded growth bug baked into
+  its design — it doesn't matter how much headroom exists on day one, only when it runs
+  out. Also: ZFS `zpool list`'s "FREE" column can lag actual writes by a full
+  transaction group; `sync` before trusting it during an active space crisis.
+
+---
+
 ### REL-013 — Redundant monitoring: two systems probing the same ~20 endpoints, too aggressively · **RESOLVED** (2026-06-24)
 
 Found while investigating unusually high DNS query volume reported live (AdGuard:
@@ -1478,6 +1628,8 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | REL-015 | Reliability | **PARTIAL** | Discord alerting silently broken -- Prometheus Operator can't validate `webhook_url_file` in raw Helm config (tries reading the file from its own pod, which never has it mounted), generated secret was 24 days stale. Manual stopgap restores delivery; durable fix (AlertmanagerConfig CRD) not attempted live (2026-06-24) |
 | REL-016 | Reliability | **PARTIAL** | `mini` froze solid during an Ollama CPU inference test (18GB model, likely disk-contention cascade per REL-005/REL-012), needed a manual power-cycle; 5 LXCs had `onboot=0` and didn't auto-recover. Capped AI LXC CPU (6 cores + manual cpulimit, bpg/proxmox has no `limit` attribute), set onboot=1 manually (provider doesn't read this attribute back either). Root disk contention still unresolved (2026-06-24) |
 | REL-017 | Reliability | **RESOLVED** | `mc-server-2` (Minecraft, port 25565) had no DNAT rule at all on the live router -- only the forward-filter ALLOW rule existed, never the actual NAT rewrite. Confirmed via the router's own REST API, fixed, verified with a real protocol-level handshake against the public IP (2026-06-24) |
+| REL-018 | Reliability/Security | **RESOLVED** | `kubernetes/system/*.yml` had zero ArgoCD tracking -- `kubectl apply` couldn't prune removed resources. Found a live regression in the gap: a duplicate, unrestricted `traefik-dashboard` IngressRoute was periodically overwriting the correct path-restricted one via selfHeal. Added `system-manifests` Application, removed the duplicates (2026-06-24, #124) |
+| REL-019 | Reliability | **RESOLVED** | `rpool` hit hard ENOSPC, pausing all three k3s VMs (`qm status: io-error`) -- root cause was Velero's `daily-backup` (30-day TTL, `defaultVolumesToFsBackup: true`) backing up Garage's own data volume into Garage's own S3 backend nightly, an unbounded circular write. Excluded Garage's volumes from FS backup, paused the schedule pending verification, fixed `pve-exporter`'s never-completed auth token (had shipped with a plaintext `REPLACE_WITH_TOKEN_VALUE` placeholder, 401 since deployment), added ZFS capacity alerting (2026-06-25) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
