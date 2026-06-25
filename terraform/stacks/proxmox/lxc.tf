@@ -543,6 +543,21 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
     replicate = true
   }
 
+  # REL-019: Garage's bulk S3 data (115GB+) was found living on rpool via the
+  # /nfs-data mount above, despite CLAUDE.local.md stating the archive pool
+  # (this host's 2TB USB HDD) is the intended Garage/backup target -- the
+  # most likely dominant contributor to the chronic disk I/O contention
+  # behind REL-005/REL-012/REL-016/REL-019. A second mount_point block here
+  # to expose an archive-pool dataset for the migration was attempted and
+  # rejected: bpg/proxmox 0.100.0's mount_point.volume is ForceNew, so ANY
+  # change to the set of mount_point blocks (not just editing an existing
+  # one) replaces the entire container -- confirmed via a real `terraform
+  # plan` showing "1 to add, 0 to change, 1 to destroy" for this LXC, which
+  # serves NFS for nearly every PVC in the cluster. Applied manually instead:
+  # `pct set 220 -mp1 /mnt/pbs-storage/garage-data,mp=/archive-garage-data`.
+  # If this container is ever recreated, that manual step needs to be redone
+  # (same category of gap as the onboot/cpulimit notes elsewhere in this file).
+
   features {
     nesting = true
   }
@@ -568,6 +583,11 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
   # NFS CT holds live PVC data — ignore drift on fields that risk a destructive
   # recreate. memory is intentionally NOT ignored: it's safe to resize live and
   # needs to stay Terraform-managed after the 512MB incident above.
+  # mount_point added 2026-06-25 (REL-019): without this, Terraform sees the
+  # manually-added archive-pool mount (mp1, not declared above) as drift and
+  # plans to remove it -- but mount_point.volume is ForceNew, so "removing"
+  # it via Terraform would ALSO destroy-and-recreate this LXC. Confirmed live
+  # via `terraform plan` before this was added (showed "1 to destroy").
   lifecycle {
     ignore_changes = [
       description,
@@ -576,6 +596,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
       network_interface[0].mac_address,
       disk,
       features,
+      mount_point,
     ]
   }
 }
