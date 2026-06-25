@@ -42,10 +42,14 @@ spec:
               # of the next scheduled run failing unattended.
               securityContext:
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
                 seccompProfile:
                   type: RuntimeDefault
                 capabilities:
                   drop: ["ALL"]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
               env:
                 - name: RENOVATE_TOKEN
                   valueFrom:
@@ -73,3 +77,6 @@ spec:
                 limits:
                   cpu: 500m
                   memory: 1Gi
+          volumes:
+            - name: tmp
+              emptyDir: {}
