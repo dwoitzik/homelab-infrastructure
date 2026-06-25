@@ -15,6 +15,22 @@ spec:
           crds:
             enabled: false
 
+        # k3s bundles kube-proxy/scheduler/controller-manager into the single
+        # k3s server binary -- they're never exposed as separately-scrapable
+        # endpoints the way kubeadm clusters expose them, so the chart's
+        # default ServiceMonitors for these can never succeed and their
+        # paired alert rules (KubeProxyDown, KubeSchedulerDown,
+        # KubeControllerManagerDown, severity=critical) fire permanently.
+        # Found firing continuously since 2026-06-22 in a full alert sweep --
+        # disabling rather than fixing the target, since there is no real
+        # target to fix on k3s. See REL-022 in docs/AUDIT.md.
+        kubeControllerManager:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeProxy:
+          enabled: false
+
         prometheus-blackbox-exporter:
           enabled: true
           serviceMonitor:
