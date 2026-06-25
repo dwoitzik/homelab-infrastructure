@@ -26,7 +26,17 @@ spec:
           volumeBindingMode: Immediate
           pathPattern: "${.PVC.namespace}/${.PVC.name}"
           onDelete: retain
-        replicaCount: 2
+        # nfs-subdir-external-provisioner has no leader election in its
+        # provision/delete controller loop -- running 2 replicas (as this was
+        # set to, with no documented rationale) means both processes race on
+        # the same NFS directory. Found while investigating REL-023: both
+        # replicas had 68-74 restarts with exit code 255 ("Unknown"
+        # termination, consistent with unhandled panics from the race), and
+        # Velero's fs-backup of this pod's own PV was failing/canceling on a
+        # fresh attempt -- plausibly because there were two candidate pods
+        # for the same single-writer PV instead of one. This chart has never
+        # supported >1 replica; see upstream project docs/issues.
+        replicaCount: 1
         resources:
           requests:
             cpu: 10m
