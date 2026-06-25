@@ -583,6 +583,11 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
   # NFS CT holds live PVC data — ignore drift on fields that risk a destructive
   # recreate. memory is intentionally NOT ignored: it's safe to resize live and
   # needs to stay Terraform-managed after the 512MB incident above.
+  # mount_point added 2026-06-25 (REL-019): without this, Terraform sees the
+  # manually-added archive-pool mount (mp1, not declared above) as drift and
+  # plans to remove it -- but mount_point.volume is ForceNew, so "removing"
+  # it via Terraform would ALSO destroy-and-recreate this LXC. Confirmed live
+  # via `terraform plan` before this was added (showed "1 to destroy").
   lifecycle {
     ignore_changes = [
       description,
@@ -591,6 +596,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
       network_interface[0].mac_address,
       disk,
       features,
+      mount_point,
     ]
   }
 }
