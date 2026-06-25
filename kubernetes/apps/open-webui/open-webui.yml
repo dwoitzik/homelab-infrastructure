@@ -1,3 +1,22 @@
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: open-webui-secrets
+  namespace: apps
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault
+    kind: ClusterSecretStore
+  target:
+    name: open-webui-secrets
+    creationPolicy: Owner
+  data:
+    - secretKey: webui-secret-key
+      remoteRef:
+        key: secret/open-webui
+        property: webui-secret-key
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -30,6 +49,7 @@ spec:
         image: ghcr.io/open-webui/open-webui:main
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -56,13 +76,28 @@ spec:
           value: "Remote-Email"
         - name: WEBUI_AUTH_TRUSTED_NAME_HEADER
           value: "Remote-Name"
+        # SEC-012: with readOnlyRootFilesystem, the entrypoint's fallback
+        # (write a random key to ./.webui_secret_key in CWD) fails -- and
+        # CWD (/app/backend) is the app code itself, not safe to overlay
+        # with an emptyDir. Setting this directly also fixes a pre-existing
+        # issue: every pod restart was already generating a NEW random key
+        # each time (never persisted), silently invalidating all sessions.
+        - name: WEBUI_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-secrets
+              key: webui-secret-key
         volumeMounts:
         - name: data
           mountPath: /app/backend/data
+        - name: tmp
+          mountPath: /tmp
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: open-webui-data
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
