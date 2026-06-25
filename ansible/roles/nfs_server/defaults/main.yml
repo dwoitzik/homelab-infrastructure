@@ -42,3 +42,11 @@ nfs_server_shares:
     description: Atlantis workspace
   - name: loki
     description: Loki storage
+
+# REL-019: Garage's data PVC is migrating off rpool (mounted at
+# nfs_server_data_dir above) onto the archive pool instead -- a separate
+# mount point on this LXC (/archive-garage-data), not a subdirectory of
+# nfs_server_data_dir, so it needs its own absolute-path export.
+nfs_server_extra_exports:
+  - path: /archive-garage-data
+    description: Garage S3 data (migrated off rpool, archive pool)

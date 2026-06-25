@@ -46,7 +46,21 @@ spec:
   syncPolicy:
     automated:
       prune: true
-      selfHeal: true
+      # REL-019: selfHeal disabled (not removed entirely, so this stays
+      # visible/intentional) while the velero Deployment is manually scaled
+      # to 0 (`kubectl scale deployment velero -n velero --replicas=0`).
+      # Found live: the velero Deployment's controller spawns per-namespace
+      # BackupRepository maintenance Jobs every ~1.5-2h *independently* of
+      # the daily-backup Schedule's paused state (that only stops new
+      # backups, not ongoing repo maintenance/repacking) -- these jobs do
+      # heavy read/write against Garage's data on rpool and were still
+      # actively driving disk contention hours after daily-backup was
+      # paused. Couldn't find a Helm value for this chart that maps to
+      # replicas (no helm CLI available to check `helm show values`
+      # locally; guessing a wrong key in git would be worse than not having
+      # one). Re-enable selfHeal and scale back to 1 once Garage's data has
+      # migrated off rpool onto the archive pool.
+      selfHeal: false
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true

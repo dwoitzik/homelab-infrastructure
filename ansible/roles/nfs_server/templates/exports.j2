@@ -4,3 +4,7 @@
 {{ nfs_server_data_dir }}/{{ share.name }} {% for client in nfs_server_export_clients %}{{ client }}({{ nfs_server_export_options }}){% if not loop.last %} {% endif %}{% endfor %}
 
 {% endfor %}
+{% for share in nfs_server_extra_exports %}
+{{ share.path }} {% for client in nfs_server_export_clients %}{{ client }}({{ nfs_server_export_options }}){% if not loop.last %} {% endif %}{% endfor %}
+
+{% endfor %}
