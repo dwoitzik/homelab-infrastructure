@@ -865,6 +865,50 @@ the user noticed before I'd finished diagnosing it.
 
 ---
 
+### REL-020 — Radarr's database hit a transient NFS I/O error on restart; surfaced a live, un-migrated SQLite-on-NFS risk · **PARTIAL** (2026-06-25)
+
+Found while testing `readOnlyRootFilesystem` on the jellyfin/usenet media stack (SEC-012):
+restarting Radarr's pod (to apply the patch) made it fail to start with `Database file:
+/config/radarr.db is corrupt... disk I/O error`. Kubernetes still reported the pod as
+`1/1 Running` throughout — no liveness probe is configured for this Deployment, so a
+.NET process hung at "Press enter to exit... waiting for user intervention" counts as
+healthy. Radarr was silently down until this was caught.
+
+- **Root cause:** `radarr-config`'s PVC uses the `nfs-client` storage class — the exact
+  class already documented elsewhere in this repo (`docs/k3s-architecture.md`) as unsafe
+  for embedded SQLite databases, due to NFS's locking/WAL model. This whole media-
+  acquisition stack predates GitOps tracking and was missed by the original
+  SQLite-on-NFS migration audit (`[[project_sqlite_nfs_risk]]`, RESOLVED 2026-06-23 for
+  8 *other* apps). `sonarr-config`, `bazarr-config`, and `sabnzbd-config` are on the
+  same storage class and share the same exposure, even though only Radarr happened to
+  hit it this time.
+- **Recovery:** backed up the live `radarr.db`/`-wal`/`-shm` files first, then ran
+  `sqlite3 radarr.db 'PRAGMA integrity_check;'` directly against the NFS-mounted path on
+  the host — came back `ok`. This was a transient NFS I/O glitch during SQLite's startup
+  migration check, not actual bit-level corruption. `PRAGMA wal_checkpoint(TRUNCATE)`
+  cleared the pending WAL cleanly (`0|0|0`), and Radarr started normally afterward with
+  zero data loss. A 2-day-old internal Radarr backup
+  (`Backups/scheduled/radarr_backup_*.zip`) existed as a fallback but wasn't needed.
+  sonarr's and bazarr's databases were also checked (`integrity_check: ok`) as a
+  precaution.
+- **Not fixed:** the four PVCs (`sonarr-config`, `radarr-config`, `bazarr-config`,
+  `sabnzbd-config`) are still on `nfs-client`. Migrating them to `local-path` (the
+  established fix for every other SQLite app in this repo) is real, separate work —
+  deferred here since this whole stack is already scheduled for removal once the
+  media-acq LXC cutover lands (WRK-006, blocked on a real Mullvad config). If the
+  cutover slips, this should be revisited on its own rather than left as a live,
+  known risk indefinitely.
+- **Also missing:** none of these five Deployments have a liveness probe, which is why
+  Radarr's failure was invisible to Kubernetes. Not added here (would need per-app
+  endpoint/auth research, out of scope for this incident) but worth doing regardless of
+  whether the storage migration happens.
+- **Lesson:** a `1/1 Running` Deployment with no liveness probe proves the container
+  process didn't exit — it proves nothing about whether the application inside is
+  actually working. Always check the *current* pod's logs and a real functional
+  request, not just `kubectl get pods`, especially right after triggering a restart.
+
+---
+
 ### REL-013 — Redundant monitoring: two systems probing the same ~20 endpoints, too aggressively · **RESOLVED** (2026-06-24)
 
 Found while investigating unusually high DNS query volume reported live (AdGuard:
@@ -1630,6 +1674,7 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | REL-017 | Reliability | **RESOLVED** | `mc-server-2` (Minecraft, port 25565) had no DNAT rule at all on the live router -- only the forward-filter ALLOW rule existed, never the actual NAT rewrite. Confirmed via the router's own REST API, fixed, verified with a real protocol-level handshake against the public IP (2026-06-24) |
 | REL-018 | Reliability/Security | **RESOLVED** | `kubernetes/system/*.yml` had zero ArgoCD tracking -- `kubectl apply` couldn't prune removed resources. Found a live regression in the gap: a duplicate, unrestricted `traefik-dashboard` IngressRoute was periodically overwriting the correct path-restricted one via selfHeal. Added `system-manifests` Application, removed the duplicates (2026-06-24, #124) |
 | REL-019 | Reliability | **RESOLVED** | `rpool` hit hard ENOSPC, pausing all three k3s VMs (`qm status: io-error`) -- root cause was Velero's `daily-backup` (30-day TTL, `defaultVolumesToFsBackup: true`) backing up Garage's own data volume into Garage's own S3 backend nightly, an unbounded circular write. Excluded Garage's volumes from FS backup, paused the schedule pending verification, fixed `pve-exporter`'s never-completed auth token (had shipped with a plaintext `REPLACE_WITH_TOKEN_VALUE` placeholder, 401 since deployment), added ZFS capacity alerting (2026-06-25) |
+| REL-020 | Reliability | **PARTIAL** | Radarr's database hit a transient NFS I/O error on restart (no liveness probe, so Kubernetes reported it healthy while actually down) -- `integrity_check` came back clean, a WAL checkpoint fixed it with zero data loss. Surfaced that `sonarr/radarr/bazarr/sabnzbd-config` are still on `nfs-client`, the same storage class already documented unsafe for SQLite -- missed by the original migration audit, not fixed here (stack is slated for removal via WRK-006) (2026-06-25) |
 | REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
