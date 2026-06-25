@@ -36,6 +36,7 @@ spec:
           # permitted" on chown and the user switch).
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           ports:
@@ -54,6 +55,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /app/data
+            - name: tmp
+              mountPath: /tmp
+            # ingredient-parser downloads NLTK resources to this hardcoded
+            # path on every start -- confirmed live, fails with "Read-only
+            # file system" otherwise.
+            - name: nltk-data
+              mountPath: /app/nltk_data
           resources:
             requests:
               cpu: 100m
@@ -65,6 +73,10 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: mealie-data
+        - name: tmp
+          emptyDir: {}
+        - name: nltk-data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
