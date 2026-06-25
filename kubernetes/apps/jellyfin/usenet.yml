@@ -61,6 +61,7 @@ spec:
           image: fallenbagel/jellyseerr:2.7.3
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           env:
@@ -73,6 +74,8 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /app/config
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m
@@ -84,6 +87,8 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: jellyseerr-config
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -143,6 +148,11 @@ spec:
         app: sabnzbd
     spec:
       # Init container sets up WireGuard tunnel; kernel interface persists for main container
+      # SEC-012: not given readOnlyRootFilesystem -- it runs `apk add` at
+      # startup to install wireguard-tools/iptables, which fundamentally
+      # needs a writable root to unpack packages. This whole VPN sidecar
+      # pattern is slated for removal once the media-acq LXC cutover lands
+      # (see WRK-006/ROADMAP.md), not worth a custom pre-baked image for.
       initContainers:
         - name: mullvad-setup
           image: alpine:3
@@ -208,6 +218,7 @@ spec:
           image: lscr.io/linuxserver/sabnzbd:5.0.4-ls259
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           env:
@@ -224,6 +235,10 @@ spec:
               mountPath: /config
             - name: media
               mountPath: /media
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /run
           resources:
             requests:
               cpu: 100m
@@ -238,6 +253,10 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: media-v2
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
         - name: mullvad-config
           secret:
             secretName: mullvad-wg-config
@@ -290,6 +309,7 @@ spec:
           image: lscr.io/linuxserver/sonarr:4.0.17.2952-ls314
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           env:
@@ -306,6 +326,13 @@ spec:
               mountPath: /config
             - name: media
               mountPath: /media
+            - name: tmp
+              mountPath: /tmp
+            # s6-overlay v3's init tries to rm -rf /run/s6 on startup --
+            # confirmed live, fails with "Read-only file system" otherwise
+            # (same pattern as home-assistant/paperless in this pass).
+            - name: run
+              mountPath: /run
           resources:
             requests:
               cpu: 100m
@@ -320,6 +347,10 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: media-v2
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -369,6 +400,7 @@ spec:
           image: lscr.io/linuxserver/radarr:6.2.1.10461-ls307
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           env:
@@ -385,6 +417,10 @@ spec:
               mountPath: /config
             - name: media
               mountPath: /media
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /run
           resources:
             requests:
               cpu: 100m
@@ -399,6 +435,10 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: media-v2
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -448,6 +488,7 @@ spec:
           image: lscr.io/linuxserver/bazarr:v1.5.6-ls351
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           env:
@@ -464,6 +505,10 @@ spec:
               mountPath: /config
             - name: media
               mountPath: /media
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /run
           resources:
             requests:
               cpu: 50m
@@ -478,6 +523,10 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: media-v2
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -527,6 +576,7 @@ spec:
           image: lscr.io/linuxserver/nzbhydra2:v8.8.4-ls93
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
           env:
@@ -541,6 +591,10 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /run
           resources:
             requests:
               cpu: 100m
@@ -552,6 +606,10 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: nzbhydra2-config
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
