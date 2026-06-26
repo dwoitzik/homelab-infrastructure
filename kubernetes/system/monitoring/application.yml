@@ -292,7 +292,7 @@ spec:
                 scrape_interval: 60s
                 metrics_path: /probe
                 params:
-                  module: [http_2xx]
+                  module: [http_auth_ok]
                 static_configs:
                   - targets:
                       - https://auth.woitzik.dev

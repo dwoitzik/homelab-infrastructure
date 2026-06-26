@@ -22,6 +22,18 @@ data:
           method: GET
           follow_redirects: true
           preferred_ip_protocol: ip4
+      # For endpoints protected by Authelia: Authelia returns 401 for
+      # unauthenticated probes (forward-auth mode, no browser session).
+      # A 401 means the service IS reachable and the auth layer IS working --
+      # that is what endpoint monitoring cares about, not the auth result.
+      http_auth_ok:
+        prober: http
+        timeout: 5s
+        http:
+          valid_status_codes: [200, 301, 302, 401, 403]
+          method: GET
+          follow_redirects: false
+          preferred_ip_protocol: ip4
       http_2xx_skip_tls:
         prober: http
         timeout: 5s
