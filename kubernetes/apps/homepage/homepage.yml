@@ -308,6 +308,10 @@ data:
     }
     /* Widget stats — orange accent */
     .widget-stats span { color: #FF8C00 !important; }
+  # v1.13.2 added custom.js support and copies the skeleton into /app/config
+  # on startup; with readOnlyRootFilesystem:true the copy fails (EROFS) unless
+  # we pre-supply the file via subPath mount (same fix applied to docker.yaml).
+  custom.js: ""
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -372,6 +376,9 @@ spec:
         - name: config
           mountPath: /app/config/docker.yaml
           subPath: docker.yaml
+        - name: config
+          mountPath: /app/config/custom.js
+          subPath: custom.js
         - name: logs
           mountPath: /app/config/logs
         - name: tmp
