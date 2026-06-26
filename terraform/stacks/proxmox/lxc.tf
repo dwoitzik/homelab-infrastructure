@@ -555,8 +555,11 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
   # plan` showing "1 to add, 0 to change, 1 to destroy" for this LXC, which
   # serves NFS for nearly every PVC in the cluster. Applied manually instead:
   # `pct set 220 -mp1 /mnt/pbs-storage/garage-data,mp=/archive-garage-data`.
-  # If this container is ever recreated, that manual step needs to be redone
+  # `pct set 220 -mp2 /mnt/pbs-storage/immich-library,mp=/archive-immich-library`.
+  # If this container is ever recreated, both manual steps need to be redone
   # (same category of gap as the onboot/cpulimit notes elsewhere in this file).
+  # Note: if pct set fails with "Input/output error", check for stale migration
+  # lock files in /run/lock/pve-manager/ and remove them, then restart pve-cluster.
 
   features {
     nesting = true
