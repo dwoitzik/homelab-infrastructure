@@ -72,6 +72,10 @@ data:
               username: dw
               password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
     - Apps:
+        - Immich:
+            icon: immich.png
+            href: https://photos.woitzik.dev
+            description: Photo Library · ML face recognition
         - Paperless-ngx:
             icon: paperless-ngx.png
             href: https://docs.woitzik.dev

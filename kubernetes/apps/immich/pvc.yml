@@ -1,0 +1,70 @@
+# Immich photo library → archive pool (2TB USB HDD on mini).
+# Large sequential reads/writes are safe on this HDD; databases and
+# random-write workloads must NOT go here (see CLAUDE.local.md storage rules).
+#
+# Storage setup (imperative, same pattern as Garage REL-019):
+#   On Proxmox host:
+#     zfs create archive/immich-library
+#     pct set 220 -mp2 /mnt/pbs-storage/immich-library,mp=/archive-immich-library
+#   Then run Ansible to reload NFS exports:
+#     ansible-playbook ansible/site.yml --limit nfs_nodes
+#   Vault secret (seed once):
+#     vault kv put secret/immich db-password=<random32> jwt-secret=<random64>
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: immich-library-archive
+spec:
+  capacity:
+    storage: 500Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    server: 10.0.20.100
+    path: /archive-immich-library
+  mountOptions:
+    - nfsvers=4.1
+    - hard
+    - timeo=600
+    - retrans=3
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-library
+  namespace: apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  volumeName: immich-library-archive
+  resources:
+    requests:
+      storage: 500Gi
+---
+# Immich PostgreSQL data — SSD-backed NFS (metadata + pgvecto.rs face vectors).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-db
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 20Gi
+---
+# ML model cache — downloaded once (~3GB), re-downloadable, SSD-backed NFS.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-ml-cache
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 10Gi
