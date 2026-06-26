@@ -14,10 +14,10 @@ spec:
         # Fail-open: when Kyverno is unavailable the API server must not block
         # requests. With failurePolicy:Fail every admission call waits up to 30s
         # before timing out, driving p99 latency to 60s+ (REL-024 pattern).
-        # webhookFailurePolicy is not a valid 3.5.x chart key;
-        # forceFailurePolicyIgnore maps to --forceFailurePolicyIgnore CLI arg.
+        features:
+          forceFailurePolicyIgnore:
+            enabled: true
         admissionController:
-          forceFailurePolicyIgnore: true
           replicas: 1
           tolerations:
             - key: node-role.kubernetes.io/control-plane
