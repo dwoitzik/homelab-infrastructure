@@ -324,20 +324,17 @@
     timeout: 60
 
 - name: Check whether Eweka server block already exists in SABnzbd config
-  ansible.builtin.lineinfile:
-    path: "{{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
-    regexp: "^\\[\\[{{ media_acquisition_eweka_host }}\\]\\]"
-    line: "[[{{ media_acquisition_eweka_host }}]]"
-    state: present
-  check_mode: true
+  ansible.builtin.command:
+    cmd: "grep -qF '[[{{ media_acquisition_eweka_host }}]]' {{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
   register: media_acquisition_sab_server_check
   changed_when: false
+  failed_when: false
 
 - name: Stop SABnzbd before modifying its config
   community.docker.docker_container:
     name: sabnzbd
     state: stopped
-  when: media_acquisition_sab_server_check.found is defined and not media_acquisition_sab_server_check.found
+  when: media_acquisition_sab_server_check.rc != 0
 
 - name: Inject Eweka server into SABnzbd config
   ansible.builtin.blockinfile:
@@ -363,18 +360,15 @@
       expire_date = ""
       quota = ""
       notes = ""
-  when: media_acquisition_sab_server_check.found is defined and not media_acquisition_sab_server_check.found
+  when: media_acquisition_sab_server_check.rc != 0
   notify: Start sabnzbd
 
 - name: Check whether download categories already exist in SABnzbd config
-  ansible.builtin.lineinfile:
-    path: "{{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
-    regexp: "^\\[\\[tv\\]\\]"
-    line: "[[tv]]"
-    state: present
-  check_mode: true
+  ansible.builtin.command:
+    cmd: "grep -qF '[[tv]]' {{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
   register: media_acquisition_sab_categories_check
   changed_when: false
+  failed_when: false
 
 - name: Inject download categories into SABnzbd config
   ansible.builtin.blockinfile:
@@ -407,18 +401,21 @@
       dir = movies
       newzbin = ""
       priority = -100
-  when: media_acquisition_sab_categories_check.found is defined and not media_acquisition_sab_categories_check.found
+  when: media_acquisition_sab_categories_check.rc != 0
   notify: Start sabnzbd
 
 - name: Flush handlers to start SABnzbd before Sonarr/Radarr client tests
   ansible.builtin.meta: flush_handlers
 
-# ── NZBHydra2: Tor SOCKS5 proxy (fail-closed) ───────────────────
-# NZBHydra2 stores config in nzbhydra.yml. We patch the proxy settings
-# directly so that indexer search queries are routed through the Tor
-# container (172.28.1.10:9050) on the same bridge network.
-# proxyIgnoreLocal: false enforces fail-closed -- if Tor is down,
-# queries fail rather than leaking the home IP to indexer sites.
+# ── NZBHydra2: Tor SOCKS5 proxy ──────────────────────────────────
+# Route indexer search queries through the Tor container (172.28.1.10:9150).
+# peterdavehello/tor-socks-proxy listens on 9150 (not 9050).
+# proxyIgnoreLocal: true is required so OkHttp can reach Docker's internal
+# DNS resolver at 127.0.0.11 to resolve container hostnames; without it,
+# the proxy-bypass check itself does a local DNS lookup that fails for
+# external FQDNs and prevents Tor from being used at all.
+# proxyIgnoreDomains: nzbfinder.ws bypasses Tor for NZBFinder because
+# Cloudflare blocks Tor exit nodes for that domain.
 
 - name: Configure NZBHydra2 Tor SOCKS5 proxy type
   ansible.builtin.replace:
@@ -436,13 +433,13 @@
   ansible.builtin.replace:
     path: "{{ media_acquisition_base_dir }}/nzbhydra2/config/nzbhydra.yml"
     regexp: '^  proxyPort: 1080'
-    replace: '  proxyPort: 9050'
+    replace: '  proxyPort: 9150'
 
-- name: Enforce NZBHydra2 proxy fail-closed (no local bypass)
+- name: Allow Docker DNS to bypass Tor proxy
   ansible.builtin.replace:
     path: "{{ media_acquisition_base_dir }}/nzbhydra2/config/nzbhydra.yml"
-    regexp: '^  proxyIgnoreLocal: true'
-    replace: '  proxyIgnoreLocal: false'
+    regexp: '^  proxyIgnoreLocal: false'
+    replace: '  proxyIgnoreLocal: true'
 
 # ── Jellyseerr: point at local Docker services ────────────────────
 # Jellyseerr settings.json stores Sonarr/Radarr hostnames which initially
