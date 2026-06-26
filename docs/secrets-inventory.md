@@ -33,6 +33,7 @@ Decrypt with: `ansible-vault view ansible/group_vars/all/vault.yml` (needs `ansi
 | `pbs_rclone_gdrive_token` | PBS → Google Drive offsite backup (rclone) |
 | `pbs_healthcheck_url` | healthchecks.io ping for PBS backup job |
 | `paperless_db_password` | Paperless PostgreSQL |
+| `vault_eweka_username`, `vault_eweka_password` | SABnzbd NNTP auth (media_acquisition role, ct-srv-media-acq-01) |
 | `vault_unseal_key_1/2/3` | HashiCorp Vault Shamir unseal (3 keys generated, 2-of-3 threshold). Key 1+2 are mirrored to k8s Secret `vault-unseal-keys` for auto-unseal; key 3 is the offline/recovery key — **keep it only in the vault file**. |
 | `vault_root_token` | Vault root token — emergency access only, day-to-day access goes through ExternalSecrets/OIDC |
 | `vault_tailscale_authkey` | Headscale pre-auth key used by the `tailscale` Ansible role |
@@ -69,7 +70,7 @@ attention. These are the ones worth knowing about:
 | `vault-unseal-keys` | `vault` | Created manually (not via ExternalSecret — chicken/egg with Vault being sealed). Re-create after key rotation: `ansible-playbook ansible/vault-unseal-secret.yml` |
 | `velero-s3-credentials` | `velero` | Garage S3 (local) access key — via ExternalSecret as of 2026-06-21 (`kubernetes/system/velero/external-secret.yml`), reads `secret/garage` in Vault. Old key is still live until the Garage rotation below happens. |
 | `velero-r2-credentials` | `velero` | **Not yet created** — Cloudflare R2 offsite backup is configured (`kubernetes/system/velero/r2-backuplocation.yml`) but waiting on real R2 Account ID + API token from David |
-| `mullvad-wg-config` | `apps` | Placeholder — SABnzbd needs the real WireGuard config from mullvad.net |
+| `mullvad-wg-config` | `apps` | **Obsolete** — SABnzbd moved to LXC (ct-srv-media-acq-01), no VPN; delete when old k8s stack is torn down |
 | `renovate-token` | `apps` | GitHub PAT — expires periodically, watch for `401` in renovate job logs |
 | `cloudflare-api-token-secret` | `cert-manager` | DNS-01 challenge token for the wildcard cert |
 | `wildcard-woitzik-dev-tls` | replicated to every namespace with an IngressRoute | Single source: cert-manager Certificate in `kube-system`, copied via `cert-manager` namespace-sync or manual `kubectl get/apply` if a new namespace needs it |
