@@ -58,6 +58,26 @@ configuration matters more than GitOps/Helm uniformity.
 - Modest additional load on `rpool` (REL-005 is already at ~80%) — root disk only
   (~25GB), media itself stays on the existing NFS mount, not duplicated.
 
+## Amendment — 2026-06-26: VPN approach revised
+
+After analysis, the gluetun/Mullvad approach was dropped in favour of a simpler two-layer
+model:
+
+- **SABnzbd → Eweka over SSL (port 563) directly.** Transport is encrypted; the ISP sees
+  only "connected to news.eweka.nl", not content. No VPN needed: Usenet copyright
+  enforcement operates exclusively via BitTorrent peer-list monitoring — there is no
+  mechanism by which an ISP or rights-holder can observe or report Usenet downloads. VPN
+  on the download path would also halve throughput and risk Eweka flagging the account for
+  apparent multi-subscriber IP sharing.
+- **NZBHydra2 indexer queries → Tor SOCKS5 (172.28.1.10:9050, `tor` container).** Search
+  queries are small and latency-tolerant; Tor is a better fit than a free commercial VPN
+  (no single operator to trust, no throttling concern for metadata-only traffic). Configured
+  in NZBHydra2 with "fail closed" — Tor outage blocks queries rather than leaking the home
+  IP to indexers.
+
+gluetun and Mullvad credentials have been removed from the role. `vault_eweka_username`
+and `vault_eweka_password` in Ansible Vault replace the Mullvad placeholders.
+
 ## Consequences
 
 - New Terraform resource `ct_srv_media_acq_01` (`terraform/stacks/proxmox/lxc.tf`),
@@ -69,6 +89,5 @@ configuration matters more than GitOps/Helm uniformity.
   Ansible has run successfully, and the stack is verified working — only then should
   Traefik's IngressRoutes be repointed and the old k8s resources removed. Doing both in
   one shot would risk an outage window with no acquisition stack running at all.
-- Still blocked on a real Mullvad WireGuard config (placeholder in Vault currently) —
-  gluetun's kill switch will fail closed exactly like the old sidecar did until a real
-  config is supplied.
+- Blocked on Eweka credentials (placeholders in Vault) — fill in after Eweka signup, then
+  re-run `ansible-playbook ansible/site.yml --limit media_acq_nodes`.
