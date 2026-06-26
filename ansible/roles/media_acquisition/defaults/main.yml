@@ -4,19 +4,15 @@ media_acquisition_puid: "1000"
 media_acquisition_pgid: "1000"
 media_acquisition_tz: "Europe/Berlin"
 
-media_acquisition_nfs_server: "10.0.20.100"
-media_acquisition_media_nfs_server: "10.0.10.10"
-media_acquisition_media_nfs_path: "/mnt/media"
-
-# Mullvad WireGuard, via gluetun. Real values come from
-# ansible/group_vars/all/vault.yml (vault_mullvad_*) -- placeholders until
-# a real Mullvad config is generated at mullvad.net/account/wireguard-config.
-media_acquisition_mullvad_private_key: "{{ vault_mullvad_private_key | default('PLACEHOLDER') }}"
-media_acquisition_mullvad_addresses: "{{ vault_mullvad_addresses | default('10.x.x.x/32') }}"
-media_acquisition_mullvad_country: "{{ vault_mullvad_country | default('Germany') }}"
-
-# Gluetun's kill switch blocks everything except the VPN tunnel by default --
-# these subnets are explicitly allowed to bypass it for LAN/NFS access.
-media_acquisition_firewall_outbound_subnets:
-  - "10.0.20.0/24"
-  - "10.0.10.0/24"
+# Eweka NNTP server -- SSL on port 563, credentials from Vault.
+# SABnzbd connects directly (no VPN): Usenet over SSL is encrypted at the
+# transport layer so the ISP sees only "connected to news.eweka.nl", not
+# content. No VPN kill-switch needed for downloads; Eweka's own SSL IS the
+# protection. Indexer search queries (NZBHydra2) are routed through Tor instead
+# (see docker-compose template) to avoid exposing the home IP to indexer sites.
+media_acquisition_eweka_host: "news.eweka.nl"
+media_acquisition_eweka_port: "563"
+media_acquisition_eweka_ssl: "1"
+media_acquisition_eweka_connections: "20"
+media_acquisition_eweka_username: "{{ vault_eweka_username }}"
+media_acquisition_eweka_password: "{{ vault_eweka_password }}"
