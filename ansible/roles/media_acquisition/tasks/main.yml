@@ -46,3 +46,144 @@
   community.docker.docker_compose_v2:
     project_src: "{{ media_acquisition_base_dir }}"
     state: present
+
+# --- Sonarr quality + language configuration via API ---
+# Sonarr generates a random API key on first start and writes it to
+# /config/config.xml. We wait for it, read it, then use it to push
+# a 1080p quality profile (with German preferred) via the REST API.
+# Idempotent: profile creation is skipped if "HD-1080p-DE" already exists.
+
+- name: Wait for Sonarr to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/system/status"
+    status_code: 200
+  register: media_acquisition_sonarr_health
+  until: media_acquisition_sonarr_health.status == 200
+  retries: 20
+  delay: 5
+
+- name: Read Sonarr API key from config.xml
+  community.general.xml:
+    path: "{{ media_acquisition_base_dir }}/sonarr/config/config.xml"
+    xpath: /Config/ApiKey
+    content: text
+  register: media_acquisition_sonarr_apikey_xml
+
+- name: Set Sonarr API key fact
+  ansible.builtin.set_fact:
+    media_acquisition_sonarr_api_key: "{{ media_acquisition_sonarr_apikey_xml.matches[0].ApiKey }}"
+
+- name: Get existing Sonarr quality profiles
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/qualityprofile"
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+  register: media_acquisition_sonarr_profiles
+
+- name: Create Sonarr HD-1080p quality profile (German preferred)
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/qualityprofile"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: "HD-1080p-DE"
+      upgradeAllowed: true
+      cutoff: 7
+      items:
+        - quality: {id: 7, name: "Bluray-1080p"}
+          allowed: true
+        - quality: {id: 15, name: "WEB 1080p"}
+          allowed: true
+        - quality: {id: 3, name: "WEBDL-1080p"}
+          allowed: true
+        - quality: {id: 10, name: "Raw-HD"}
+          allowed: false
+      minFormatScore: 0
+      cutoffFormatScore: 0
+      formatItems: []
+      language: {id: 4, name: "German"}
+    status_code: 201
+  when: media_acquisition_sonarr_profiles.json | selectattr('name','equalto','HD-1080p-DE') | list | length == 0
+
+# --- Radarr quality + language configuration via API ---
+
+- name: Wait for Radarr to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/system/status"
+    status_code: 200
+  register: media_acquisition_radarr_health
+  until: media_acquisition_radarr_health.status == 200
+  retries: 20
+  delay: 5
+
+- name: Read Radarr API key from config.xml
+  community.general.xml:
+    path: "{{ media_acquisition_base_dir }}/radarr/config/config.xml"
+    xpath: /Config/ApiKey
+    content: text
+  register: media_acquisition_radarr_apikey_xml
+
+- name: Set Radarr API key fact
+  ansible.builtin.set_fact:
+    media_acquisition_radarr_api_key: "{{ media_acquisition_radarr_apikey_xml.matches[0].ApiKey }}"
+
+- name: Get existing Radarr quality profiles
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/qualityprofile"
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+  register: media_acquisition_radarr_profiles
+
+- name: Create Radarr 4K-HDR quality profile (German preferred)
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/qualityprofile"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: "4K-HDR-DE"
+      upgradeAllowed: true
+      cutoff: 19
+      items:
+        - quality: {id: 19, name: "Remux-2160p"}
+          allowed: true
+        - quality: {id: 18, name: "Bluray-2160p"}
+          allowed: true
+        - quality: {id: 17, name: "WEB 2160p"}
+          allowed: true
+        - quality: {id: 16, name: "WEBDL-2160p"}
+          allowed: true
+        - quality: {id: 7, name: "Bluray-1080p"}
+          allowed: true
+        - quality: {id: 15, name: "WEB 1080p"}
+          allowed: true
+        - quality: {id: 3, name: "WEBDL-1080p"}
+          allowed: true
+      minFormatScore: 0
+      cutoffFormatScore: 0
+      formatItems: []
+      language: {id: 4, name: "German"}
+    status_code: 201
+  when: media_acquisition_radarr_profiles.json | selectattr('name','equalto','4K-HDR-DE') | list | length == 0
+
+# --- Bazarr subtitle language configuration ---
+# Bazarr stores config in config/config.ini on disk.
+# Set German as primary subtitle language with English fallback.
+
+- name: Configure Bazarr subtitle languages
+  community.general.ini_file:
+    path: "{{ media_acquisition_base_dir }}/bazarr/config/config.ini"
+    section: general
+    option: "{{ item.key }}"
+    value: "{{ item.value }}"
+    mode: '0640'
+    create: false
+  loop:
+    - {key: languages, value: "['de', 'en']"}
+    - {key: single_language, value: "False"}
+  notify: Restart bazarr

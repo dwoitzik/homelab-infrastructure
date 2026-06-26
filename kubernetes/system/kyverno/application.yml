@@ -11,6 +11,10 @@ spec:
     chart: kyverno
     helm:
       values: |
+        # Fail-open: when Kyverno is unavailable the API server must not block
+        # requests. With failurePolicy:Fail every admission call waits up to 30s
+        # before timing out, driving p99 latency to 60s+ (REL-024 pattern).
+        webhookFailurePolicy: Ignore
         admissionController:
           replicas: 1
           tolerations:
@@ -24,19 +28,12 @@ spec:
             limits:
               cpu: 500m
               memory: 384Mi
+        # Background controller scans all existing resources and generates/updates
+        # policyreports in etcd — 357 reports in apps/monitoring alone, each an
+        # etcd write. On a single-node etcd this is a significant fraction of all
+        # write traffic. Disable: enforcement is handled by the admission webhook.
         backgroundController:
-          enabled: true
-          tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 250m
-              memory: 256Mi
+          enabled: false
         cleanupController:
           tolerations:
             - key: node-role.kubernetes.io/control-plane
@@ -50,18 +47,7 @@ spec:
               cpu: 100m
               memory: 128Mi
         reportsController:
-          enabled: true
-          tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 250m
-              memory: 256Mi
+          enabled: false
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno
