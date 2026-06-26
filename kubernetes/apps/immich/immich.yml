@@ -22,13 +22,6 @@ spec:
       - name: postgres
         image: tensorchord/pgvecto-rs:pg16-v0.2.1
         args: ["-c", "shared_preload_libraries=vectors.so", "-c", "search_path=\"$user\",public,vectors"]
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          seccompProfile:
-            type: RuntimeDefault
-          capabilities:
-            drop: ["ALL"]
         ports:
         - containerPort: 5432
         env:
@@ -55,15 +48,11 @@ spec:
           mountPath: /var/lib/postgresql/data
         - name: tmp
           mountPath: /tmp
-        - name: run
-          mountPath: /run/postgresql
       volumes:
       - name: db
         persistentVolumeClaim:
           claimName: immich-db
       - name: tmp
-        emptyDir: {}
-      - name: run
         emptyDir: {}
 ---
 apiVersion: v1
@@ -98,6 +87,9 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
           seccompProfile:
             type: RuntimeDefault
           capabilities:
