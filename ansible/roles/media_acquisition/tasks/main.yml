@@ -47,31 +47,32 @@
     project_src: "{{ media_acquisition_base_dir }}"
     state: present
 
-# --- Sonarr quality + language configuration via API ---
-# Sonarr generates a random API key on first start and writes it to
-# /config/config.xml. We wait for it, read it, then use it to push
-# a 1080p quality profile (with German preferred) via the REST API.
-# Idempotent: profile creation is skipped if "HD-1080p-DE" already exists.
+# ── Sonarr quality profile + download client + indexer ────────────
+# Sonarr v4 requires auth on ALL endpoints (returns 401 without a key),
+# so we check health via docker exec curl and treat both 200 and 401 as ready.
+# Quality profiles must include the complete items list -- we clone profile 1
+# (the default "Any" profile which contains every quality item) and rename it,
+# rather than hand-crafting the items array which would fail with
+# "Must contain all qualities".
 
 - name: Wait for Sonarr to be ready
-  ansible.builtin.uri:
-    url: "http://localhost:8989/api/v3/system/status"
-    status_code: 200
+  ansible.builtin.shell:
+    cmd: docker exec sonarr curl -sf -o /dev/null -w '%{http_code}' http://localhost:8989/api/v3/system/status
   register: media_acquisition_sonarr_health
-  until: media_acquisition_sonarr_health.status == 200
+  until: media_acquisition_sonarr_health.stdout in ['200', '401']
   retries: 20
   delay: 5
+  changed_when: false
 
 - name: Read Sonarr API key from config.xml
-  community.general.xml:
-    path: "{{ media_acquisition_base_dir }}/sonarr/config/config.xml"
-    xpath: /Config/ApiKey
-    content: text
+  ansible.builtin.shell:
+    cmd: "grep -oP '(?<=<ApiKey>)[^<]+' {{ media_acquisition_base_dir }}/sonarr/config/config.xml"
   register: media_acquisition_sonarr_apikey_xml
+  changed_when: false
 
 - name: Set Sonarr API key fact
   ansible.builtin.set_fact:
-    media_acquisition_sonarr_api_key: "{{ media_acquisition_sonarr_apikey_xml.matches[0].ApiKey }}"
+    media_acquisition_sonarr_api_key: "{{ media_acquisition_sonarr_apikey_xml.stdout }}"
 
 - name: Get existing Sonarr quality profiles
   ansible.builtin.uri:
@@ -80,7 +81,15 @@
       X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
   register: media_acquisition_sonarr_profiles
 
-- name: Create Sonarr HD-1080p quality profile (German preferred)
+- name: Get Sonarr base quality profile for cloning
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/qualityprofile/1"
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+  register: media_acquisition_sonarr_base_profile
+  when: media_acquisition_sonarr_profiles.json | selectattr('name', 'equalto', 'HD-1080p-DE') | list | length == 0
+
+- name: Create Sonarr HD-1080p-DE quality profile (German preferred, 1080p cutoff)
   ansible.builtin.uri:
     url: "http://localhost:8989/api/v3/qualityprofile"
     method: POST
@@ -88,47 +97,116 @@
       X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
       Content-Type: application/json
     body_format: json
-    body:
-      name: "HD-1080p-DE"
-      upgradeAllowed: true
-      cutoff: 7
-      items:
-        - quality: {id: 7, name: "Bluray-1080p"}
-          allowed: true
-        - quality: {id: 15, name: "WEB 1080p"}
-          allowed: true
-        - quality: {id: 3, name: "WEBDL-1080p"}
-          allowed: true
-        - quality: {id: 10, name: "Raw-HD"}
-          allowed: false
-      minFormatScore: 0
-      cutoffFormatScore: 0
-      formatItems: []
-      language: {id: 4, name: "German"}
+    body: >-
+      {{
+        media_acquisition_sonarr_base_profile.json
+        | combine({'name': 'HD-1080p-DE', 'cutoff': 7, 'upgradeAllowed': true})
+        | dict2items | rejectattr('key', 'equalto', 'id') | items2dict
+      }}
     status_code: 201
-  when: media_acquisition_sonarr_profiles.json | selectattr('name','equalto','HD-1080p-DE') | list | length == 0
+  when: media_acquisition_sonarr_profiles.json | selectattr('name', 'equalto', 'HD-1080p-DE') | list | length == 0
 
-# --- Radarr quality + language configuration via API ---
+- name: Get Sonarr existing download clients
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/downloadclient"
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+  register: media_acquisition_sonarr_download_clients
+
+- name: Read SABnzbd API key from config ini
+  ansible.builtin.shell:
+    cmd: "grep -oP '(?<=^api_key = )\\S+' {{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
+  register: media_acquisition_sabnzbd_apikey_ini
+  changed_when: false
+
+- name: Set SABnzbd API key fact
+  ansible.builtin.set_fact:
+    media_acquisition_sabnzbd_api_key: "{{ media_acquisition_sabnzbd_apikey_ini.stdout }}"
+
+- name: Add SABnzbd as Sonarr download client
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/downloadclient"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: SABnzbd
+      enable: true
+      protocol: usenet
+      priority: 1
+      removeCompletedDownloads: true
+      removeFailedDownloads: true
+      implementation: Sabnzbd
+      configContract: SabnzbdSettings
+      tags: []
+      fields:
+        - {name: host, value: sabnzbd}
+        - {name: port, value: 8080}
+        - {name: apiKey, value: "{{ media_acquisition_sabnzbd_api_key }}"}
+        - {name: tvCategory, value: tv}
+        - {name: tvImportedCategory, value: ""}
+        - {name: recentTvPriority, value: 0}
+        - {name: olderTvPriority, value: 0}
+        - {name: useSsl, value: false}
+    status_code: 201
+  when: media_acquisition_sonarr_download_clients.json | selectattr('name', 'equalto', 'SABnzbd') | list | length == 0
+
+- name: Get Sonarr existing indexers
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/indexer"
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+  register: media_acquisition_sonarr_indexers
+
+- name: Add NZBHydra2 as Sonarr indexer
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/indexer"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: NZBHydra2
+      enable: true
+      supportsRss: true
+      supportsSearch: true
+      priority: 25
+      implementation: Newznab
+      configContract: NewznabSettings
+      tags: []
+      fields:
+        - {name: baseUrl, value: "http://nzbhydra2:5076"}
+        - {name: apiPath, value: /api}
+        - {name: apiKey, value: ""}
+        - {name: categories, value: [5030, 5040]}
+        - {name: animeCategories, value: [5070]}
+        - {name: additionalParameters, value: ""}
+    status_code: 201
+  when: media_acquisition_sonarr_indexers.json | selectattr('name', 'equalto', 'NZBHydra2') | list | length == 0
+
+# ── Radarr quality profile + download client + indexer ────────────
 
 - name: Wait for Radarr to be ready
-  ansible.builtin.uri:
-    url: "http://localhost:7878/api/v3/system/status"
-    status_code: 200
+  ansible.builtin.shell:
+    cmd: docker exec radarr curl -sf -o /dev/null -w '%{http_code}' http://localhost:7878/api/v3/system/status
   register: media_acquisition_radarr_health
-  until: media_acquisition_radarr_health.status == 200
+  until: media_acquisition_radarr_health.stdout in ['200', '401']
   retries: 20
   delay: 5
+  changed_when: false
 
 - name: Read Radarr API key from config.xml
-  community.general.xml:
-    path: "{{ media_acquisition_base_dir }}/radarr/config/config.xml"
-    xpath: /Config/ApiKey
-    content: text
+  ansible.builtin.shell:
+    cmd: "grep -oP '(?<=<ApiKey>)[^<]+' {{ media_acquisition_base_dir }}/radarr/config/config.xml"
   register: media_acquisition_radarr_apikey_xml
+  changed_when: false
 
 - name: Set Radarr API key fact
   ansible.builtin.set_fact:
-    media_acquisition_radarr_api_key: "{{ media_acquisition_radarr_apikey_xml.matches[0].ApiKey }}"
+    media_acquisition_radarr_api_key: "{{ media_acquisition_radarr_apikey_xml.stdout }}"
 
 - name: Get existing Radarr quality profiles
   ansible.builtin.uri:
@@ -137,7 +215,15 @@
       X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
   register: media_acquisition_radarr_profiles
 
-- name: Create Radarr 4K-HDR quality profile (German preferred)
+- name: Get Radarr base quality profile for cloning
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/qualityprofile/1"
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+  register: media_acquisition_radarr_base_profile
+  when: media_acquisition_radarr_profiles.json | selectattr('name', 'equalto', '4K-HDR-DE') | list | length == 0
+
+- name: Create Radarr 4K-HDR-DE quality profile (German preferred, Remux-2160p cutoff)
   ansible.builtin.uri:
     url: "http://localhost:7878/api/v3/qualityprofile"
     method: POST
@@ -145,37 +231,284 @@
       X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
       Content-Type: application/json
     body_format: json
-    body:
-      name: "4K-HDR-DE"
-      upgradeAllowed: true
-      cutoff: 19
-      items:
-        - quality: {id: 19, name: "Remux-2160p"}
-          allowed: true
-        - quality: {id: 18, name: "Bluray-2160p"}
-          allowed: true
-        - quality: {id: 17, name: "WEB 2160p"}
-          allowed: true
-        - quality: {id: 16, name: "WEBDL-2160p"}
-          allowed: true
-        - quality: {id: 7, name: "Bluray-1080p"}
-          allowed: true
-        - quality: {id: 15, name: "WEB 1080p"}
-          allowed: true
-        - quality: {id: 3, name: "WEBDL-1080p"}
-          allowed: true
-      minFormatScore: 0
-      cutoffFormatScore: 0
-      formatItems: []
-      language: {id: 4, name: "German"}
+    body: >-
+      {{
+        media_acquisition_radarr_base_profile.json
+        | combine({'name': '4K-HDR-DE', 'cutoff': 19, 'upgradeAllowed': true})
+        | dict2items | rejectattr('key', 'equalto', 'id') | items2dict
+      }}
     status_code: 201
-  when: media_acquisition_radarr_profiles.json | selectattr('name','equalto','4K-HDR-DE') | list | length == 0
+  when: media_acquisition_radarr_profiles.json | selectattr('name', 'equalto', '4K-HDR-DE') | list | length == 0
 
-# --- Bazarr subtitle language configuration ---
+- name: Get Radarr existing download clients
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/downloadclient"
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+  register: media_acquisition_radarr_download_clients
+
+- name: Add SABnzbd as Radarr download client
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/downloadclient"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: SABnzbd
+      enable: true
+      protocol: usenet
+      priority: 1
+      removeCompletedDownloads: true
+      removeFailedDownloads: true
+      implementation: Sabnzbd
+      configContract: SabnzbdSettings
+      tags: []
+      fields:
+        - {name: host, value: sabnzbd}
+        - {name: port, value: 8080}
+        - {name: apiKey, value: "{{ media_acquisition_sabnzbd_api_key }}"}
+        - {name: movieCategory, value: movies}
+        - {name: movieImportedCategory, value: ""}
+        - {name: recentMoviePriority, value: 0}
+        - {name: olderMoviePriority, value: 0}
+        - {name: useSsl, value: false}
+    status_code: 201
+  when: media_acquisition_radarr_download_clients.json | selectattr('name', 'equalto', 'SABnzbd') | list | length == 0
+
+- name: Get Radarr existing indexers
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/indexer"
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+  register: media_acquisition_radarr_indexers
+
+- name: Add NZBHydra2 as Radarr indexer
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/indexer"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: NZBHydra2
+      enable: true
+      supportsRss: true
+      supportsSearch: true
+      priority: 25
+      implementation: Newznab
+      configContract: NewznabSettings
+      tags: []
+      fields:
+        - {name: baseUrl, value: "http://nzbhydra2:5076"}
+        - {name: apiPath, value: /api}
+        - {name: apiKey, value: ""}
+        - {name: categories, value: [2060, 2040, 2030]}
+        - {name: additionalParameters, value: ""}
+    status_code: 201
+  when: media_acquisition_radarr_indexers.json | selectattr('name', 'equalto', 'NZBHydra2') | list | length == 0
+
+# ── SABnzbd: Eweka server + download categories ───────────────────
+# SABnzbd writes its config on first start. We wait for the ini to exist,
+# then stop the container before injecting config (so SABnzbd cannot
+# overwrite our changes on its own shutdown). The [[server]] format is
+# Python configobj nested-section syntax -- standard for SABnzbd ini files.
+# Idempotent: the block is inserted only if [[{{ eweka_host }}]] is absent.
+
+- name: Wait for SABnzbd to initialize its config file
+  ansible.builtin.wait_for:
+    path: "{{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
+    state: present
+    timeout: 60
+
+- name: Check whether Eweka server block already exists in SABnzbd config
+  ansible.builtin.lineinfile:
+    path: "{{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
+    regexp: "^\\[\\[{{ media_acquisition_eweka_host }}\\]\\]"
+    line: "[[{{ media_acquisition_eweka_host }}]]"
+    state: present
+  check_mode: true
+  register: media_acquisition_sab_server_check
+  changed_when: false
+
+- name: Stop SABnzbd before modifying its config
+  community.docker.docker_container:
+    name: sabnzbd
+    state: stopped
+  when: media_acquisition_sab_server_check.found is defined and not media_acquisition_sab_server_check.found
+
+- name: Inject Eweka server into SABnzbd config
+  ansible.builtin.blockinfile:
+    path: "{{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK eweka-server"
+    insertafter: EOF
+    block: |
+      [servers]
+      [[{{ media_acquisition_eweka_host }}]]
+      displayname = Eweka SSL
+      host = {{ media_acquisition_eweka_host }}
+      port = {{ media_acquisition_eweka_port }}
+      timeout = 60
+      username = {{ media_acquisition_eweka_username }}
+      password = {{ media_acquisition_eweka_password }}
+      connections = {{ media_acquisition_eweka_connections }}
+      ssl = {{ media_acquisition_eweka_ssl }}
+      ssl_verify = 2
+      ssl_ciphers = ""
+      enable = 1
+      priority = 0
+      retention = 0
+      expire_date = ""
+      quota = ""
+      notes = ""
+  when: media_acquisition_sab_server_check.found is defined and not media_acquisition_sab_server_check.found
+  notify: Start sabnzbd
+
+- name: Check whether download categories already exist in SABnzbd config
+  ansible.builtin.lineinfile:
+    path: "{{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
+    regexp: "^\\[\\[tv\\]\\]"
+    line: "[[tv]]"
+    state: present
+  check_mode: true
+  register: media_acquisition_sab_categories_check
+  changed_when: false
+
+- name: Inject download categories into SABnzbd config
+  ansible.builtin.blockinfile:
+    path: "{{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK sabnzbd-categories"
+    insertafter: EOF
+    block: |
+      [categories]
+      [[*]]
+      name = *
+      order = 0
+      pp = ""
+      script = Default
+      dir = ""
+      newzbin = ""
+      priority = -100
+      [[tv]]
+      name = tv
+      order = 1
+      pp = ""
+      script = Default
+      dir = tv
+      newzbin = ""
+      priority = -100
+      [[movies]]
+      name = movies
+      order = 2
+      pp = ""
+      script = Default
+      dir = movies
+      newzbin = ""
+      priority = -100
+  when: media_acquisition_sab_categories_check.found is defined and not media_acquisition_sab_categories_check.found
+  notify: Start sabnzbd
+
+- name: Flush handlers to start SABnzbd before Sonarr/Radarr client tests
+  ansible.builtin.meta: flush_handlers
+
+# ── NZBHydra2: Tor SOCKS5 proxy (fail-closed) ───────────────────
+# NZBHydra2 stores config in nzbhydra.yml. We patch the proxy settings
+# directly so that indexer search queries are routed through the Tor
+# container (172.28.1.10:9050) on the same bridge network.
+# proxyIgnoreLocal: false enforces fail-closed -- if Tor is down,
+# queries fail rather than leaking the home IP to indexer sites.
+
+- name: Configure NZBHydra2 Tor SOCKS5 proxy type
+  ansible.builtin.replace:
+    path: "{{ media_acquisition_base_dir }}/nzbhydra2/config/nzbhydra.yml"
+    regexp: '^  proxyType: "NONE"'
+    replace: '  proxyType: "SOCKS"'
+
+- name: Configure NZBHydra2 Tor SOCKS5 proxy host
+  ansible.builtin.replace:
+    path: "{{ media_acquisition_base_dir }}/nzbhydra2/config/nzbhydra.yml"
+    regexp: '^  proxyHost: null'
+    replace: '  proxyHost: "172.28.1.10"'
+
+- name: Configure NZBHydra2 Tor SOCKS5 proxy port
+  ansible.builtin.replace:
+    path: "{{ media_acquisition_base_dir }}/nzbhydra2/config/nzbhydra.yml"
+    regexp: '^  proxyPort: 1080'
+    replace: '  proxyPort: 9050'
+
+- name: Enforce NZBHydra2 proxy fail-closed (no local bypass)
+  ansible.builtin.replace:
+    path: "{{ media_acquisition_base_dir }}/nzbhydra2/config/nzbhydra.yml"
+    regexp: '^  proxyIgnoreLocal: true'
+    replace: '  proxyIgnoreLocal: false'
+
+# ── Jellyseerr: point at local Docker services ────────────────────
+# Jellyseerr settings.json stores Sonarr/Radarr hostnames which initially
+# point at the old Kubernetes service DNS. Update them to use Docker
+# service names (sonarr, radarr) on the shared bridge network, and set
+# the correct quality profile IDs created above.
+# The 4K-HDR-DE profile is profile id=7 in Radarr; is4k=true routes
+# Ultra HD requests from Jellyseerr to this server.
+
+- name: Update Jellyseerr server configuration
+  ansible.builtin.shell:
+    cmd: |
+      python3 -c "
+      import json, sys
+      path = '{{ media_acquisition_base_dir }}/jellyseerr/config/settings.json'
+      with open(path) as f:
+          d = json.load(f)
+      d['jellyfin']['ip'] = '10.0.20.254'
+      seen_sonarr, seen_radarr = False, False
+      new_sonarr = []
+      for s in d.get('sonarr', []):
+          if seen_sonarr:
+              continue
+          s['hostname'] = 'sonarr'
+          s['activeProfileId'] = 7
+          s['activeProfileName'] = 'HD-1080p-DE'
+          s['activeAnimeProfileId'] = 7
+          s['activeAnimeProfileName'] = 'HD-1080p-DE'
+          s['isDefault'] = True
+          s['enabled'] = True
+          new_sonarr.append(s)
+          seen_sonarr = True
+      d['sonarr'] = new_sonarr
+      new_radarr = []
+      for r in d.get('radarr', []):
+          if seen_radarr:
+              continue
+          r['hostname'] = 'radarr'
+          r['activeProfileId'] = 7
+          r['activeProfileName'] = '4K-HDR-DE'
+          r['is4k'] = True
+          r['isDefault'] = True
+          r['enabled'] = True
+          new_radarr.append(r)
+          seen_radarr = True
+      d['radarr'] = new_radarr
+      with open(path, 'w') as f:
+          json.dump(d, f, indent=2)
+      print('ok')
+      "
+  register: media_acquisition_jellyseerr_result
+  changed_when: "'ok' in media_acquisition_jellyseerr_result.stdout"
+  notify: Restart jellyseerr
+
+# ── Bazarr: subtitle language configuration ───────────────────────
 # Bazarr stores config in config/config.ini on disk.
 # Set German as primary subtitle language with English fallback.
+# The ini file exists only after Bazarr's first start.
 
-- name: Configure Bazarr subtitle languages
+- name: Wait for Bazarr to initialize its config file
+  ansible.builtin.wait_for:
+    path: "{{ media_acquisition_base_dir }}/bazarr/config/config.ini"
+    state: present
+    timeout: 60
+
+- name: Configure Bazarr subtitle languages (German primary, English fallback)
   community.general.ini_file:
     path: "{{ media_acquisition_base_dir }}/bazarr/config/config.ini"
     section: general
