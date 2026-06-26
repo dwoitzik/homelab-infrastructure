@@ -1,0 +1,288 @@
+# PostgreSQL 16 with pgvecto.rs for Immich face-recognition / CLIP vectors.
+# shared_preload_libraries is passed as a flag so no custom postgresql.conf is needed.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: immich-postgres
+  namespace: apps
+spec:
+  serviceName: immich-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-postgres
+  template:
+    metadata:
+      labels:
+        app: immich-postgres
+      annotations:
+        backup.velero.io/backup-volumes: db
+    spec:
+      containers:
+      - name: postgres
+        image: tensorchord/pgvecto-rs:pg16-v0.2.1
+        args: ["-c", "shared_preload_libraries=vectors.so", "-c", "search_path=\"$user\",public,vectors"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: immich
+        - name: POSTGRES_USER
+          value: immich
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: immich-secrets
+              key: db-password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        volumeMounts:
+        - name: db
+          mountPath: /var/lib/postgresql/data
+        - name: tmp
+          mountPath: /tmp
+        - name: run
+          mountPath: /run/postgresql
+      volumes:
+      - name: db
+        persistentVolumeClaim:
+          claimName: immich-db
+      - name: tmp
+        emptyDir: {}
+      - name: run
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-postgres
+  namespace: apps
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: immich-postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-redis
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-redis
+  template:
+    metadata:
+      labels:
+        app: immich-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.4-alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-redis
+  namespace: apps
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: immich-redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-server
+  namespace: apps
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: immich-server
+  template:
+    metadata:
+      labels:
+        app: immich-server
+      annotations:
+        # library lives on the 2TB HDD archive pool — large cold storage, not
+        # worth backing up as a filesystem blob (re-upload source from phone).
+        backup.velero.io/backup-volumes-excludes: library
+    spec:
+      containers:
+      - name: immich-server
+        image: ghcr.io/immich-app/immich-server:v1.109.2
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+        ports:
+        - containerPort: 2283
+        env:
+        - name: TZ
+          value: Europe/Berlin
+        - name: DB_HOSTNAME
+          value: immich-postgres
+        - name: DB_USERNAME
+          value: immich
+        - name: DB_DATABASE_NAME
+          value: immich
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: immich-secrets
+              key: db-password
+        - name: REDIS_HOSTNAME
+          value: immich-redis
+        - name: IMMICH_MACHINE_LEARNING_URL
+          value: http://immich-ml:3003
+        - name: IMMICH_MEDIA_LOCATION
+          value: /usr/src/app/upload
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: immich-secrets
+              key: jwt-secret
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        volumeMounts:
+        - name: library
+          mountPath: /usr/src/app/upload
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: library
+        persistentVolumeClaim:
+          claimName: immich-library
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-server
+  namespace: apps
+spec:
+  ports:
+  - port: 2283
+  selector:
+    app: immich-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-ml
+  namespace: apps
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: immich-ml
+  template:
+    metadata:
+      labels:
+        app: immich-ml
+      annotations:
+        # ML cache holds downloaded CLIP/face models (~3GB) — re-downloadable,
+        # exclude from Velero to keep backup sizes manageable.
+        backup.velero.io/backup-volumes-excludes: cache
+    spec:
+      containers:
+      - name: immich-ml
+        image: ghcr.io/immich-app/immich-machine-learning:v1.109.2
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+        ports:
+        - containerPort: 3003
+        env:
+        - name: IMMICH_HOST
+          value: "0.0.0.0"
+        - name: IMMICH_PORT
+          value: "3003"
+        - name: MPLCONFIGDIR
+          value: /tmp/matplotlib
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 4000m
+            memory: 4Gi
+        volumeMounts:
+        - name: cache
+          mountPath: /cache
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: cache
+        persistentVolumeClaim:
+          claimName: immich-ml-cache
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-ml
+  namespace: apps
+spec:
+  ports:
+  - port: 3003
+  selector:
+    app: immich-ml
