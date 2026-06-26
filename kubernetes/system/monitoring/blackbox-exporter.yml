@@ -1,0 +1,96 @@
+# Standalone prometheus-blackbox-exporter deployment.
+# The kube-prometheus-stack Helm chart (61.3.2) has the subchart in its
+# dependency list but does not render it into the ArgoCD-managed release —
+# most likely because ArgoCD strips sub-chart archives during Helm rendering
+# from the upstream Prometheus Community repo. Deploy standalone here so
+# the scrape configs in application.yml (job_name: blackbox-http and
+# blackbox-authelia-health) can reach the expected service DNS name.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blackbox-exporter-config
+  namespace: monitoring
+data:
+  blackbox.yml: |
+    modules:
+      http_2xx:
+        prober: http
+        timeout: 5s
+        http:
+          valid_status_codes: []
+          method: GET
+          follow_redirects: true
+          preferred_ip_protocol: ip4
+      http_2xx_skip_tls:
+        prober: http
+        timeout: 5s
+        http:
+          valid_status_codes: []
+          follow_redirects: true
+          tls_config:
+            insecure_skip_verify: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-blackbox-exporter
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-blackbox-exporter
+  template:
+    metadata:
+      labels:
+        app: prometheus-blackbox-exporter
+    spec:
+      containers:
+      - name: blackbox-exporter
+        image: prom/blackbox-exporter:v0.25.0
+        args:
+          - --config.file=/config/blackbox.yml
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+        ports:
+        - name: http
+          containerPort: 9115
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+      volumes:
+      - name: config
+        configMap:
+          name: blackbox-exporter-config
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-blackbox-exporter
+  namespace: monitoring
+spec:
+  ports:
+  - name: http
+    port: 9115
+    targetPort: http
+  selector:
+    app: prometheus-blackbox-exporter
