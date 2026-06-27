@@ -20,3 +20,13 @@ projects:
       when_modified:
         - "*.tf"
         - "*.tfvars"
+
+  - name: cloudflare
+    dir: terraform/stacks/cloudflare
+    terraform_version: 1.10.5
+    workspace: default
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"

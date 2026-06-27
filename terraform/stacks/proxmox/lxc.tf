@@ -1,7 +1,7 @@
 locals {
   target_node = "pve-mgmt-01"
   storage     = "local-zfs"
-  template    = "usb-templates:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+  template    = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
 }
 
 # --- Management Stack ---
