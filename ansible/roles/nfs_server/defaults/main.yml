@@ -50,5 +50,5 @@ nfs_server_shares:
 nfs_server_extra_exports:
   - path: /archive-garage-data
     description: Garage S3 data (migrated off rpool, archive pool)
-  - path: /archive-immich-library
-    description: Immich photo library (archive pool, 2TB HDD — large cold data)
+  - path: /usb-immich-library
+    description: Immich photo library (SanDisk 3.2Gen1 USB stick, pct mp3 on LXC 220)
