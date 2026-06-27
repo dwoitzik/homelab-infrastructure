@@ -159,15 +159,44 @@ spec:
                 value: "1"
         alertmanager:
           alertmanagerSpec:
-            # Config is managed via alertmanager-config.yml (a Secret in this
-            # directory) rather than inline here. Inline config is rejected by
-            # the operator when discord_configs.api_url_file is used -- the
-            # operator's Go struct does not declare that field even in v0.92.0.
-            # configSecret bypasses operator validation; Alertmanager itself
-            # supports api_url_file natively.
-            configSecret: alertmanager-discord-config
             secrets:
               - alertmanager-discord-webhook
+          config:
+            global:
+              resolve_timeout: 5m
+            inhibit_rules:
+              - source_matchers:
+                  - severity = critical
+                target_matchers:
+                  - severity = warning
+                equal:
+                  - alertname
+                  - namespace
+            route:
+              group_by: [alertname, namespace]
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 24h
+              receiver: "null"
+              routes:
+                - receiver: "null"
+                  matchers:
+                    - alertname =~ "InfoInhibitor|Watchdog|TestAlert"
+                - receiver: "null"
+                  matchers:
+                    - alertname =~ "KubeProxyDown|KubeSchedulerDown|KubeControllerManagerDown"
+                - receiver: monitoring/alertmanager-config/discord
+                  matchers:
+                    - alertname =~ "ProxmoxHostHighTemp|RpiHighTemp"
+                  group_wait: 30s
+                  repeat_interval: 2h
+                - receiver: monitoring/alertmanager-config/discord
+                  matchers:
+                    - severity = critical
+                  group_wait: 30s
+                  repeat_interval: 2h
+            receivers:
+              - name: "null"
         prometheus:
           prometheusSpec:
             tolerations:
