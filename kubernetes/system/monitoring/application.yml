@@ -7,13 +7,18 @@ spec:
   project: default
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
-    targetRevision: 61.3.2
+    targetRevision: 87.2.1
     chart: kube-prometheus-stack
     helm:
       values: |
         prometheusOperator:
           crds:
             enabled: false
+        # Automates CRD upgrades via an in-cluster Job (available since chart 68.4.0).
+        # Eliminates the need for manual kubectl apply on future operator upgrades.
+        crds:
+          upgradeJob:
+            enabled: true
 
         # k3s bundles kube-proxy/scheduler/controller-manager into the single
         # k3s server binary -- they're never exposed as separately-scrapable
