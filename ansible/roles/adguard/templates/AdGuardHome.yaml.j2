@@ -218,6 +218,12 @@ filtering:
     - domain: headscale.woitzik.dev
       answer: "10.0.20.200"
       enabled: true
+    # photos.woitzik.dev is exposed via Cloudflare tunnel — internal clients
+    # must resolve to the public Cloudflare proxy, not the Traefik VIP.
+    # This specific rewrite overrides the *.woitzik.dev wildcard.
+    - domain: photos.woitzik.dev
+      answer: "1f2e0f78-214b-4f59-881d-37e22625ae6e.cfargotunnel.com"
+      enabled: true
   safe_fs_patterns:
     - /opt/adguardhome/work/data/userfilters/*
   safebrowsing_cache_size: 1048576
