@@ -159,62 +159,15 @@ spec:
                 value: "1"
         alertmanager:
           alertmanagerSpec:
+            # Config is managed via alertmanager-config.yml (a Secret in this
+            # directory) rather than inline here. Inline config is rejected by
+            # the operator when discord_configs.api_url_file is used -- the
+            # operator's Go struct does not declare that field even in v0.92.0.
+            # configSecret bypasses operator validation; Alertmanager itself
+            # supports api_url_file natively.
+            configSecret: alertmanager-discord-config
             secrets:
               - alertmanager-discord-webhook
-          config:
-            global:
-              resolve_timeout: 5m
-            inhibit_rules:
-              - source_matchers:
-                  - severity = critical
-                target_matchers:
-                  - severity = warning
-                equal:
-                  - alertname
-                  - namespace
-            route:
-              group_by: [alertname, namespace]
-              group_wait: 30s
-              group_interval: 5m
-              repeat_interval: 24h
-              # Default: silence everything (only explicit critical routes fire)
-              receiver: "null"
-              routes:
-                # Always silence these
-                - receiver: "null"
-                  matchers:
-                    - alertname =~ "InfoInhibitor|Watchdog|TestAlert"
-                # k3s false positives — components are embedded, never expose metrics
-                - receiver: "null"
-                  matchers:
-                    - alertname =~ "KubeProxyDown|KubeSchedulerDown|KubeControllerManagerDown"
-                # Hardware temperature alerts go to Discord regardless of severity
-                - receiver: discord
-                  matchers:
-                    - alertname =~ "ProxmoxHostHighTemp|RpiHighTemp"
-                  group_wait: 30s
-                  repeat_interval: 2h
-                # Only critical alerts go to Discord, with 2h repeat to avoid spam
-                - receiver: discord
-                  matchers:
-                    - severity = critical
-                  group_wait: 30s
-                  repeat_interval: 2h
-            receivers:
-              - name: "null"
-              - name: discord
-                discord_configs:
-                  - api_url_file: /etc/alertmanager/secrets/alertmanager-discord-webhook/url
-                    title: |-
-                      [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
-                    message: |-
-                      {{ range .Alerts -}}
-                      **Alert:** {{ .Annotations.summary }}{{ if .Annotations.description }}
-                      **Description:** {{ .Annotations.description }}{{ end }}
-                      **Severity:** `{{ .Labels.severity }}`{{ if .Labels.namespace }}
-                      **Namespace:** `{{ .Labels.namespace }}`{{ end }}{{ if .Labels.pod }}
-                      **Pod:** `{{ .Labels.pod }}`{{ end }}
-                      {{ end }}
         prometheus:
           prometheusSpec:
             tolerations:
