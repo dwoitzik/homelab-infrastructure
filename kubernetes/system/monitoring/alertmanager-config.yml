@@ -1,65 +1,31 @@
-# Alertmanager configuration passed directly via configSecret, bypassing
-# prometheus-operator's inline config validator. The validator rejects
-# api_url_file (Alertmanager 0.27+ field) in the discord receiver even
-# though Alertmanager itself supports it. Using configSecret causes the
-# operator to pass the raw YAML straight through to Alertmanager.
+# AlertmanagerConfig receiver for Discord notifications.
+# prometheus-operator rejects api_url_file in the inline alertmanager.config
+# Go struct (discord.plain) — even in v0.92.0. AlertmanagerConfig CRDs use
+# a different code path (apiURL.secretKeyRef) that reads the webhook URL
+# directly from the Kubernetes Secret at runtime.
 #
-# The discord webhook URL is not stored here -- it is read at runtime
-# from the alertmanager-discord-webhook secret, mounted by the operator
-# at /etc/alertmanager/secrets/alertmanager-discord-webhook/url.
-apiVersion: v1
-kind: Secret
+# Referenced from the main Alertmanager routing config as:
+#   monitoring/alertmanager-config/discord
+# (namespace / AlertmanagerConfig name / receiver name)
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
 metadata:
-  name: alertmanager-discord-config
+  name: alertmanager-config
   namespace: monitoring
-type: Opaque
-stringData:
-  alertmanager.yaml: |
-    global:
-      resolve_timeout: 5m
-    inhibit_rules:
-      - source_matchers:
-          - severity = critical
-        target_matchers:
-          - severity = warning
-        equal:
-          - alertname
-          - namespace
-    route:
-      group_by: [alertname, namespace]
-      group_wait: 30s
-      group_interval: 5m
-      repeat_interval: 24h
-      receiver: "null"
-      routes:
-        - receiver: "null"
-          matchers:
-            - alertname =~ "InfoInhibitor|Watchdog|TestAlert"
-        - receiver: "null"
-          matchers:
-            - alertname =~ "KubeProxyDown|KubeSchedulerDown|KubeControllerManagerDown"
-        - receiver: discord
-          matchers:
-            - alertname =~ "ProxmoxHostHighTemp|RpiHighTemp"
-          group_wait: 30s
-          repeat_interval: 2h
-        - receiver: discord
-          matchers:
-            - severity = critical
-          group_wait: 30s
-          repeat_interval: 2h
-    receivers:
-      - name: "null"
-      - name: discord
-        discord_configs:
-          - api_url_file: /etc/alertmanager/secrets/alertmanager-discord-webhook/url
-            title: |-
-              [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
-            message: |-
-              {{ range .Alerts -}}
-              **Alert:** {{ .Annotations.summary }}{{ if .Annotations.description }}
-              **Description:** {{ .Annotations.description }}{{ end }}
-              **Severity:** `{{ .Labels.severity }}`{{ if .Labels.namespace }}
-              **Namespace:** `{{ .Labels.namespace }}`{{ end }}{{ if .Labels.pod }}
-              **Pod:** `{{ .Labels.pod }}`{{ end }}
-              {{ end }}
+spec:
+  receivers:
+    - name: discord
+      discordConfigs:
+        - apiURL:
+            name: alertmanager-discord-webhook
+            key: url
+          title: |-
+            [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
+          message: |-
+            {{ range .Alerts -}}
+            **Alert:** {{ .Annotations.summary }}{{ if .Annotations.description }}
+            **Description:** {{ .Annotations.description }}{{ end }}
+            **Severity:** `{{ .Labels.severity }}`{{ if .Labels.namespace }}
+            **Namespace:** `{{ .Labels.namespace }}`{{ end }}{{ if .Labels.pod }}
+            **Pod:** `{{ .Labels.pod }}`{{ end }}
+            {{ end }}
