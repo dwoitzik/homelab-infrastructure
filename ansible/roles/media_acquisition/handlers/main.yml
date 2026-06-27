@@ -1,4 +1,15 @@
 ---
+- name: Start sabnzbd
+  community.docker.docker_container:
+    name: sabnzbd
+    state: started
+
+- name: Restart jellyseerr
+  community.docker.docker_container:
+    name: jellyseerr
+    state: started
+    restart: true
+
 - name: Restart bazarr
   community.docker.docker_container:
     name: bazarr
