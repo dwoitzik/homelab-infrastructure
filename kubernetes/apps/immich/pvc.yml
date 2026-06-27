@@ -1,11 +1,12 @@
-# Immich photo library → archive pool (2TB USB HDD on mini).
-# Large sequential reads/writes are safe on this HDD; databases and
-# random-write workloads must NOT go here (see CLAUDE.local.md storage rules).
+# Immich photo library → SanDisk 3.2Gen1 USB stick (460 GB, ~149 MB/s read, ~73 MB/s write).
+# Write-once/read-many workload (originals + thumbnails written at upload, read thereafter)
+# is a good fit for USB flash. Databases and random-write workloads stay on SSD (immich-db).
 #
-# Storage setup (imperative, same pattern as Garage REL-019):
+# Storage setup (imperative):
 #   On Proxmox host:
-#     zfs create archive/immich-library
-#     pct set 220 -mp2 /mnt/pbs-storage/immich-library,mp=/archive-immich-library
+#     # USB stick is in /etc/fstab at /mnt/pve/usb-immich (UUID=2bf6bef6-...)
+#     mkdir -p /mnt/pve/usb-immich/immich-library
+#     pct set 220 -mp3 /mnt/pve/usb-immich/immich-library,mp=/usb-immich-library
 #   Then run Ansible to reload NFS exports:
 #     ansible-playbook ansible/site.yml --limit nfs_nodes
 #   Vault secret (seed once):
@@ -13,16 +14,16 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: immich-library-archive
+  name: immich-library-usb
 spec:
   capacity:
-    storage: 500Gi
+    storage: 400Gi
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   nfs:
     server: 10.0.20.100
-    path: /archive-immich-library
+    path: /usb-immich-library
   mountOptions:
     - nfsvers=4.1
     - hard
@@ -38,10 +39,10 @@ spec:
   accessModes:
     - ReadWriteOnce
   storageClassName: ""
-  volumeName: immich-library-archive
+  volumeName: immich-library-usb
   resources:
     requests:
-      storage: 500Gi
+      storage: 400Gi
 ---
 # Immich PostgreSQL data — SSD-backed NFS (metadata + pgvecto.rs face vectors).
 apiVersion: v1

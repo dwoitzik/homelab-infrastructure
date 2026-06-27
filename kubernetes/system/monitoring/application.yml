@@ -7,13 +7,13 @@ spec:
   project: default
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
-    targetRevision: 61.3.2
+    targetRevision: 87.2.1
     chart: kube-prometheus-stack
     helm:
       values: |
         prometheusOperator:
           crds:
-            enabled: false
+            enabled: true
 
         # k3s bundles kube-proxy/scheduler/controller-manager into the single
         # k3s server binary -- they're never exposed as separately-scrapable
@@ -31,28 +31,13 @@ spec:
         kubeProxy:
           enabled: false
 
+        # prometheus-blackbox-exporter subchart is not rendered from the
+        # kube-prometheus-stack Helm release in ArgoCD (subchart not bundled
+        # in upstream tarball). Deployed standalone via monitoring-manifests
+        # ApplicationSet (kubernetes/system/monitoring/blackbox-exporter.yml)
+        # at the same DNS name: prometheus-blackbox-exporter.monitoring.svc.
         prometheus-blackbox-exporter:
-          enabled: true
-          serviceMonitor:
-            enabled: true
-          config:
-            modules:
-              http_2xx:
-                prober: http
-                timeout: 5s
-                http:
-                  valid_status_codes: []
-                  method: GET
-                  follow_redirects: true
-                  preferred_ip_protocol: ip4
-              http_2xx_skip_tls:
-                prober: http
-                timeout: 5s
-                http:
-                  valid_status_codes: []
-                  follow_redirects: true
-                  tls_config:
-                    insecure_skip_verify: true
+          enabled: false
 
         grafana:
           assertNoLeakedSecrets: false
@@ -192,44 +177,26 @@ spec:
               group_wait: 30s
               group_interval: 5m
               repeat_interval: 24h
-              # Default: silence everything (only explicit critical routes fire)
               receiver: "null"
               routes:
-                # Always silence these
                 - receiver: "null"
                   matchers:
                     - alertname =~ "InfoInhibitor|Watchdog|TestAlert"
-                # k3s false positives — components are embedded, never expose metrics
                 - receiver: "null"
                   matchers:
                     - alertname =~ "KubeProxyDown|KubeSchedulerDown|KubeControllerManagerDown"
-                # Hardware temperature alerts go to Discord regardless of severity
-                - receiver: discord
+                - receiver: monitoring/alertmanager-config/discord
                   matchers:
                     - alertname =~ "ProxmoxHostHighTemp|RpiHighTemp"
                   group_wait: 30s
                   repeat_interval: 2h
-                # Only critical alerts go to Discord, with 2h repeat to avoid spam
-                - receiver: discord
+                - receiver: monitoring/alertmanager-config/discord
                   matchers:
                     - severity = critical
                   group_wait: 30s
                   repeat_interval: 2h
             receivers:
               - name: "null"
-              - name: discord
-                discord_configs:
-                  - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord-webhook/url
-                    title: |-
-                      [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
-                    message: |-
-                      {{ range .Alerts -}}
-                      **Alert:** {{ .Annotations.summary }}{{ if .Annotations.description }}
-                      **Description:** {{ .Annotations.description }}{{ end }}
-                      **Severity:** `{{ .Labels.severity }}`{{ if .Labels.namespace }}
-                      **Namespace:** `{{ .Labels.namespace }}`{{ end }}{{ if .Labels.pod }}
-                      **Pod:** `{{ .Labels.pod }}`{{ end }}
-                      {{ end }}
         prometheus:
           prometheusSpec:
             tolerations:
@@ -307,7 +274,7 @@ spec:
                 scrape_interval: 60s
                 metrics_path: /probe
                 params:
-                  module: [http_2xx]
+                  module: [http_auth_ok]
                 static_configs:
                   - targets:
                       - https://auth.woitzik.dev

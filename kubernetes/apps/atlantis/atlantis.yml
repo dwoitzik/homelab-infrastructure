@@ -133,6 +133,11 @@ spec:
             secretKeyRef:
               name: atlantis-secrets
               key: proxmox-api-token-secret
+        - name: TF_VAR_cloudflare_api_token
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-secrets
+              key: cloudflare-api-token
         resources:
           requests:
             cpu: 100m

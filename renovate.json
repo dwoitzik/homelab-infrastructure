@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "kubernetes": {
+    "fileMatch": ["kubernetes/.+\\.yml$"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["kubernetes"],
+      "matchPackageNames": ["ghcr.io/immich-app/**", "valkey/valkey", "redis"],
+      "groupName": "immich stack",
+      "automerge": false
+    },
+    {
+      "matchManagers": ["kubernetes"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["major-update"]
+    }
+  ]
+}

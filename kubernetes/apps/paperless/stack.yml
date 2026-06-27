@@ -16,7 +16,7 @@ spec:
     spec:
       initContainers:
       - name: wait-for-vault-secret
-        image: busybox:1.36
+        image: busybox:1.38
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
