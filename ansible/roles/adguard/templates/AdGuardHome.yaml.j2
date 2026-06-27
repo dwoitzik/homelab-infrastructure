@@ -44,10 +44,6 @@ dns:
   refuse_any: true
   upstream_dns:
     - 127.0.0.1:5335
-    # photos.woitzik.dev is proxied by Cloudflare — query CF's public DNS so
-    # clients get the Cloudflare anycast IPs, not the raw cfargotunnel.com
-    # IPv6 that the CNAME rewrite would resolve to.
-    - "[/photos.woitzik.dev/]1.1.1.1"
   upstream_dns_file: ""
   bootstrap_dns:
     - 9.9.9.10
@@ -221,6 +217,16 @@ filtering:
       enabled: true
     - domain: headscale.woitzik.dev
       answer: "10.0.20.200"
+      enabled: true
+    # photos.woitzik.dev is served via Cloudflare tunnel (proxied).
+    # The wildcard above would return 10.0.20.200 (Traefik); these
+    # specific rewrites override it with Cloudflare's anycast proxy IPs
+    # so internal clients reach the tunnel without going through Traefik.
+    - domain: photos.woitzik.dev
+      answer: "172.67.137.91"
+      enabled: true
+    - domain: photos.woitzik.dev
+      answer: "104.21.38.184"
       enabled: true
   safe_fs_patterns:
     - /opt/adguardhome/work/data/userfilters/*
