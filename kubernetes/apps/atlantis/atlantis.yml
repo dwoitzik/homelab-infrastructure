@@ -60,7 +60,7 @@ spec:
                 - vm-srv-k3s-12
       containers:
       - name: atlantis
-        image: ghcr.io/runatlantis/atlantis:v0.33.0
+        image: ghcr.io/runatlantis/atlantis:v0.44.1
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
