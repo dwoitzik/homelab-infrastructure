@@ -17,7 +17,7 @@ spec:
   # contended fast SSD. See AUDIT.md REL-019.
   schedule: "0 3 * * *"
   template:
-    ttl: 720h0m0s
+    ttl: 168h0m0s
     includedNamespaces:
       - "*"
     excludedNamespaces:
