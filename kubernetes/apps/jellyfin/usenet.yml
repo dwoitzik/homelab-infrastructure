@@ -1,118 +1,31 @@
+# Media acquisition stack — external services pointing to ct-srv-media-acq-01 (LXC 202, 10.0.20.253)
+# Migrated from k8s Deployments to dedicated Docker Compose LXC (WRK-006 complete).
+# All six apps (Jellyseerr, SABnzbd, Sonarr, Radarr, Bazarr, NZBHydra2) run on the LXC.
+# IngressRoutes remain unchanged; k8s cluster-local DNS (*.apps.svc.cluster.local) resolves
+# to these External services, so Homepage widgets and Authelia middleware need no updates.
 ---
-# WRK-007: this media library PV/PVC used to be defined in jellyfin.yml and shared
-# by reference (claimName: media) from this file's Sonarr/Radarr/Bazarr/SABnzbd
-# Deployments -- a coupling that wasn't obvious until removing it from jellyfin.yml
-# during the Jellyfin LXC cutover put the original "media" PVC into Terminating
-# (still Bound and working, but doomed once its finalizer clears) while these four
-# Deployments were still actively using it. Recreated here under new names, as the
-# actual owner, since this is the stack that still needs it until WRK-006's LXC
-# migration completes.
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: media-nfs-v2
-spec:
-  capacity:
-    storage: 1Ti
-  accessModes:
-    - ReadWriteMany
-  nfs:
-    server: 10.0.10.10
-    path: /mnt/media
-  mountOptions:
-    - nfsvers=4.2
-    - noatime
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: media-v2
-  namespace: apps
-spec:
-  accessModes:
-    - ReadWriteMany
-  storageClassName: ""
-  resources:
-    requests:
-      storage: 1Ti
-  volumeName: media-nfs-v2
----
-# Jellyseerr - Request management (Jellyfin + Sonarr + Radarr)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: jellyseerr
-  namespace: apps
-  annotations:
-    keel.sh/policy: force
-    keel.sh/trigger: poll
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: jellyseerr
-  template:
-    metadata:
-      labels:
-        app: jellyseerr
-    spec:
-      containers:
-        - name: jellyseerr
-          image: fallenbagel/jellyseerr:2.7.3
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            seccompProfile:
-              type: RuntimeDefault
-          env:
-            - name: TZ
-              value: "Europe/Berlin"
-            - name: LOG_LEVEL
-              value: "info"
-          ports:
-            - containerPort: 5055
-          volumeMounts:
-            - name: config
-              mountPath: /app/config
-            - name: tmp
-              mountPath: /tmp
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-      volumes:
-        - name: config
-          persistentVolumeClaim:
-            claimName: jellyseerr-config
-        - name: tmp
-          emptyDir: {}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: jellyseerr-config
-  namespace: apps
-spec:
-  accessModes: [ReadWriteOnce]
-  storageClassName: nfs-client
-  resources:
-    requests:
-      storage: 2Gi
----
+# Jellyseerr
 apiVersion: v1
 kind: Service
 metadata:
   name: jellyseerr
   namespace: apps
 spec:
-  selector:
-    app: jellyseerr
+  clusterIP: None
   ports:
-    - port: 5055
-      targetPort: 5055
+  - port: 5055
+    targetPort: 5055
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: jellyseerr
+  namespace: apps
+subsets:
+- addresses:
+  - ip: 10.0.20.253
+  ports:
+  - port: 5055
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -128,512 +41,28 @@ spec:
     services: [{name: jellyseerr, port: 5055}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# SABnzbd - Usenet downloader (routes all traffic through Mullvad WireGuard)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: sabnzbd
-  namespace: apps
-  annotations:
-    keel.sh/policy: force
-    keel.sh/trigger: poll
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: sabnzbd
-  template:
-    metadata:
-      labels:
-        app: sabnzbd
-    spec:
-      # Init container sets up WireGuard tunnel; kernel interface persists for main container
-      # SEC-012: not given readOnlyRootFilesystem -- it runs `apk add` at
-      # startup to install wireguard-tools/iptables, which fundamentally
-      # needs a writable root to unpack packages. This whole VPN sidecar
-      # pattern is slated for removal once the media-acq LXC cutover lands
-      # (see WRK-006/ROADMAP.md), not worth a custom pre-baked image for.
-      initContainers:
-        - name: mullvad-setup
-          image: alpine:3
-          command:
-            - sh
-            - -c
-            - |
-              set -e
-              apk add --no-cache wireguard-tools iproute2 iptables ip6tables
-
-              # Bring up VPN tunnel
-              wg-quick up /etc/wireguard/wg0.conf
-
-              # Save gateway before we kill the default route
-              GW=$(ip route | awk '/default/{print $3; exit}')
-
-              # KILL SWITCH: block all non-VPN external traffic via iptables
-              # Allow loopback and established connections
-              iptables -A OUTPUT -o lo -j ACCEPT
-              iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-              # Allow traffic on VPN tunnel
-              iptables -A OUTPUT -o wg0 -j ACCEPT
-              # Allow cluster-internal CIDRs via eth0 (k3s pod + service + homelab)
-              iptables -A OUTPUT -o eth0 -d 10.0.0.0/8 -j ACCEPT
-              iptables -A OUTPUT -o eth0 -d 172.16.0.0/12 -j ACCEPT
-              iptables -A OUTPUT -o eth0 -d 192.168.0.0/16 -j ACCEPT
-              # Allow WireGuard handshake to Mullvad endpoint via eth0
-              iptables -A OUTPUT -o eth0 -p udp --dport 51820 -j ACCEPT
-              # DROP everything else (kill switch — no VPN = no traffic)
-              iptables -A OUTPUT -o eth0 -j DROP
-
-              # IPv6 kill switch (Mullvad is IPv4-only on most servers)
-              ip6tables -A OUTPUT -o lo -j ACCEPT
-              ip6tables -A OUTPUT -o wg0 -j ACCEPT
-              ip6tables -A OUTPUT -j DROP
-
-              # Ensure cluster routes go via eth0 (not through wg0)
-              ip route add 10.42.0.0/16 via $GW dev eth0 2>/dev/null || true
-              ip route add 10.43.0.0/16 via $GW dev eth0 2>/dev/null || true
-
-              echo "=== Kill switch active — external traffic only via Mullvad ==="
-              wg show
-              iptables -L OUTPUT --line-numbers -n
-          securityContext:
-            allowPrivilegeEscalation: false
-            seccompProfile:
-              type: RuntimeDefault
-            capabilities:
-              add: [NET_ADMIN, SYS_MODULE]
-          resources:
-            requests:
-              cpu: 25m
-              memory: 32Mi
-            limits:
-              cpu: 250m
-              memory: 128Mi
-          volumeMounts:
-            - name: mullvad-config
-              mountPath: /etc/wireguard/wg0.conf
-              subPath: wg0.conf
-      containers:
-        - name: sabnzbd
-          image: lscr.io/linuxserver/sabnzbd:5.0.4-ls259
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            seccompProfile:
-              type: RuntimeDefault
-          env:
-            - name: PUID
-              value: "1000"
-            - name: PGID
-              value: "1000"
-            - name: TZ
-              value: "Europe/Berlin"
-          ports:
-            - containerPort: 8080
-          volumeMounts:
-            - name: config
-              mountPath: /config
-            - name: media
-              mountPath: /media
-            - name: tmp
-              mountPath: /tmp
-            - name: run
-              mountPath: /run
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 1000m
-              memory: 1Gi
-      volumes:
-        - name: config
-          persistentVolumeClaim:
-            claimName: sabnzbd-config
-        - name: media
-          persistentVolumeClaim:
-            claimName: media-v2
-        - name: tmp
-          emptyDir: {}
-        - name: run
-          emptyDir: {}
-        - name: mullvad-config
-          secret:
-            secretName: mullvad-wg-config
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: sabnzbd-config
-  namespace: apps
-spec:
-  accessModes: [ReadWriteOnce]
-  storageClassName: nfs-client
-  resources:
-    requests:
-      storage: 2Gi
----
+# SABnzbd
 apiVersion: v1
 kind: Service
 metadata:
   name: sabnzbd
   namespace: apps
 spec:
-  selector:
-    app: sabnzbd
+  clusterIP: None
   ports:
-    - port: 8080
-      targetPort: 8080
----
-# Sonarr - TV show management
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: sonarr
-  namespace: apps
-  annotations:
-    keel.sh/policy: force
-    keel.sh/trigger: poll
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: sonarr
-  template:
-    metadata:
-      labels:
-        app: sonarr
-    spec:
-      containers:
-        - name: sonarr
-          image: lscr.io/linuxserver/sonarr:4.0.17.2952-ls314
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            seccompProfile:
-              type: RuntimeDefault
-          env:
-            - name: PUID
-              value: "1000"
-            - name: PGID
-              value: "1000"
-            - name: TZ
-              value: "Europe/Berlin"
-          ports:
-            - containerPort: 8989
-          volumeMounts:
-            - name: config
-              mountPath: /config
-            - name: media
-              mountPath: /media
-            - name: tmp
-              mountPath: /tmp
-            # s6-overlay v3's init tries to rm -rf /run/s6 on startup --
-            # confirmed live, fails with "Read-only file system" otherwise
-            # (same pattern as home-assistant/paperless in this pass).
-            - name: run
-              mountPath: /run
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-      volumes:
-        - name: config
-          persistentVolumeClaim:
-            claimName: sonarr-config
-        - name: media
-          persistentVolumeClaim:
-            claimName: media-v2
-        - name: tmp
-          emptyDir: {}
-        - name: run
-          emptyDir: {}
+  - port: 8080
+    targetPort: 8080
 ---
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: Endpoints
 metadata:
-  name: sonarr-config
+  name: sabnzbd
   namespace: apps
-spec:
-  accessModes: [ReadWriteOnce]
-  storageClassName: nfs-client
-  resources:
-    requests:
-      storage: 2Gi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: sonarr
-  namespace: apps
-spec:
-  selector:
-    app: sonarr
+subsets:
+- addresses:
+  - ip: 10.0.20.253
   ports:
-    - port: 8989
-      targetPort: 8989
----
-# Radarr - Movie management
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: radarr
-  namespace: apps
-  annotations:
-    keel.sh/policy: force
-    keel.sh/trigger: poll
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: radarr
-  template:
-    metadata:
-      labels:
-        app: radarr
-    spec:
-      containers:
-        - name: radarr
-          image: lscr.io/linuxserver/radarr:6.2.1.10461-ls307
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            seccompProfile:
-              type: RuntimeDefault
-          env:
-            - name: PUID
-              value: "1000"
-            - name: PGID
-              value: "1000"
-            - name: TZ
-              value: "Europe/Berlin"
-          ports:
-            - containerPort: 7878
-          volumeMounts:
-            - name: config
-              mountPath: /config
-            - name: media
-              mountPath: /media
-            - name: tmp
-              mountPath: /tmp
-            - name: run
-              mountPath: /run
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-      volumes:
-        - name: config
-          persistentVolumeClaim:
-            claimName: radarr-config
-        - name: media
-          persistentVolumeClaim:
-            claimName: media-v2
-        - name: tmp
-          emptyDir: {}
-        - name: run
-          emptyDir: {}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: radarr-config
-  namespace: apps
-spec:
-  accessModes: [ReadWriteOnce]
-  storageClassName: nfs-client
-  resources:
-    requests:
-      storage: 2Gi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: radarr
-  namespace: apps
-spec:
-  selector:
-    app: radarr
-  ports:
-    - port: 7878
-      targetPort: 7878
----
-# Bazarr - Subtitle management
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: bazarr
-  namespace: apps
-  annotations:
-    keel.sh/policy: force
-    keel.sh/trigger: poll
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: bazarr
-  template:
-    metadata:
-      labels:
-        app: bazarr
-    spec:
-      containers:
-        - name: bazarr
-          image: lscr.io/linuxserver/bazarr:v1.5.6-ls351
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            seccompProfile:
-              type: RuntimeDefault
-          env:
-            - name: PUID
-              value: "1000"
-            - name: PGID
-              value: "1000"
-            - name: TZ
-              value: "Europe/Berlin"
-          ports:
-            - containerPort: 6767
-          volumeMounts:
-            - name: config
-              mountPath: /config
-            - name: media
-              mountPath: /media
-            - name: tmp
-              mountPath: /tmp
-            - name: run
-              mountPath: /run
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 250m
-              memory: 256Mi
-      volumes:
-        - name: config
-          persistentVolumeClaim:
-            claimName: bazarr-config
-        - name: media
-          persistentVolumeClaim:
-            claimName: media-v2
-        - name: tmp
-          emptyDir: {}
-        - name: run
-          emptyDir: {}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: bazarr-config
-  namespace: apps
-spec:
-  accessModes: [ReadWriteOnce]
-  storageClassName: nfs-client
-  resources:
-    requests:
-      storage: 2Gi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: bazarr
-  namespace: apps
-spec:
-  selector:
-    app: bazarr
-  ports:
-    - port: 6767
-      targetPort: 6767
----
-# NZBHydra2 - Usenet indexer proxy (aggregates NZBIndexer, DrunkenSlug, etc.)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nzbhydra2
-  namespace: apps
-  annotations:
-    keel.sh/policy: force
-    keel.sh/trigger: poll
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: nzbhydra2
-  template:
-    metadata:
-      labels:
-        app: nzbhydra2
-    spec:
-      containers:
-        - name: nzbhydra2
-          image: lscr.io/linuxserver/nzbhydra2:v8.8.4-ls93
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            seccompProfile:
-              type: RuntimeDefault
-          env:
-            - name: PUID
-              value: "1000"
-            - name: PGID
-              value: "1000"
-            - name: TZ
-              value: "Europe/Berlin"
-          ports:
-            - containerPort: 5076
-          volumeMounts:
-            - name: config
-              mountPath: /config
-            - name: tmp
-              mountPath: /tmp
-            - name: run
-              mountPath: /run
-          resources:
-            requests:
-              cpu: 100m
-              memory: 512Mi
-            limits:
-              cpu: 1000m
-              memory: 1Gi
-      volumes:
-        - name: config
-          persistentVolumeClaim:
-            claimName: nzbhydra2-config
-        - name: tmp
-          emptyDir: {}
-        - name: run
-          emptyDir: {}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: nzbhydra2-config
-  namespace: apps
-spec:
-  accessModes: [ReadWriteOnce]
-  storageClassName: nfs-client
-  resources:
-    requests:
-      storage: 2Gi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: nzbhydra2
-  namespace: apps
-spec:
-  selector:
-    app: nzbhydra2
-  ports:
-    - port: 5076
-      targetPort: 5076
+  - port: 8080
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -648,6 +77,140 @@ spec:
     middlewares: [{name: authelia, namespace: apps}]
     services: [{name: sabnzbd, port: 8080}]
   tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Sonarr
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonarr
+  namespace: apps
+spec:
+  clusterIP: None
+  ports:
+  - port: 8989
+    targetPort: 8989
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: sonarr
+  namespace: apps
+subsets:
+- addresses:
+  - ip: 10.0.20.253
+  ports:
+  - port: 8989
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: sonarr-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`sonarr.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia, namespace: apps}]
+    services: [{name: sonarr, port: 8989}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Radarr
+apiVersion: v1
+kind: Service
+metadata:
+  name: radarr
+  namespace: apps
+spec:
+  clusterIP: None
+  ports:
+  - port: 7878
+    targetPort: 7878
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: radarr
+  namespace: apps
+subsets:
+- addresses:
+  - ip: 10.0.20.253
+  ports:
+  - port: 7878
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: radarr-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`radarr.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia, namespace: apps}]
+    services: [{name: radarr, port: 7878}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Bazarr
+apiVersion: v1
+kind: Service
+metadata:
+  name: bazarr
+  namespace: apps
+spec:
+  clusterIP: None
+  ports:
+  - port: 6767
+    targetPort: 6767
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: bazarr
+  namespace: apps
+subsets:
+- addresses:
+  - ip: 10.0.20.253
+  ports:
+  - port: 6767
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: bazarr-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`bazarr.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia, namespace: apps}]
+    services: [{name: bazarr, port: 6767}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# NZBHydra2
+apiVersion: v1
+kind: Service
+metadata:
+  name: nzbhydra2
+  namespace: apps
+spec:
+  clusterIP: None
+  ports:
+  - port: 5076
+    targetPort: 5076
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: nzbhydra2
+  namespace: apps
+subsets:
+- addresses:
+  - ip: 10.0.20.253
+  ports:
+  - port: 5076
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
