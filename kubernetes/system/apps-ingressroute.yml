@@ -88,7 +88,6 @@ spec:
   routes:
   - match: Host(`photos.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
     services: [{name: immich-server, port: 2283}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
