@@ -1,0 +1,31 @@
+# AlertmanagerConfig receiver for Discord notifications.
+# prometheus-operator rejects api_url_file in the inline alertmanager.config
+# Go struct (discord.plain) — even in v0.92.0. AlertmanagerConfig CRDs use
+# a different code path (apiURL.secretKeyRef) that reads the webhook URL
+# directly from the Kubernetes Secret at runtime.
+#
+# Referenced from the main Alertmanager routing config as:
+#   monitoring/alertmanager-config/discord
+# (namespace / AlertmanagerConfig name / receiver name)
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+spec:
+  receivers:
+    - name: discord
+      discordConfigs:
+        - apiURL:
+            name: alertmanager-discord-webhook
+            key: url
+          title: |-
+            [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
+          message: |-
+            {{ range .Alerts -}}
+            **Alert:** {{ .Annotations.summary }}{{ if .Annotations.description }}
+            **Description:** {{ .Annotations.description }}{{ end }}
+            **Severity:** `{{ .Labels.severity }}`{{ if .Labels.namespace }}
+            **Namespace:** `{{ .Labels.namespace }}`{{ end }}{{ if .Labels.pod }}
+            **Pod:** `{{ .Labels.pod }}`{{ end }}
+            {{ end }}

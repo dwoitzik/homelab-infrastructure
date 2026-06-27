@@ -218,6 +218,16 @@ filtering:
     - domain: headscale.woitzik.dev
       answer: "10.0.20.200"
       enabled: true
+    # photos.woitzik.dev is served via Cloudflare tunnel (proxied).
+    # The wildcard above would return 10.0.20.200 (Traefik); these
+    # specific rewrites override it with Cloudflare's anycast proxy IPs
+    # so internal clients reach the tunnel without going through Traefik.
+    - domain: photos.woitzik.dev
+      answer: "172.67.137.91"
+      enabled: true
+    - domain: photos.woitzik.dev
+      answer: "104.21.38.184"
+      enabled: true
   safe_fs_patterns:
     - /opt/adguardhome/work/data/userfilters/*
   safebrowsing_cache_size: 1048576
