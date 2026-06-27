@@ -1,5 +1,3 @@
-# PostgreSQL 16 with pgvecto.rs for Immich face-recognition / CLIP vectors.
-# shared_preload_libraries is passed as a flag so no custom postgresql.conf is needed.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -20,8 +18,7 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: tensorchord/pgvecto-rs:pg16-v0.2.1
-        args: ["-c", "shared_preload_libraries=vectors.so", "-c", "search_path=\"$user\",public,vectors"]
+        image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
         ports:
         - containerPort: 5432
         env:
@@ -34,6 +31,8 @@ spec:
             secretKeyRef:
               name: immich-secrets
               key: db-password
+        - name: POSTGRES_INITDB_ARGS
+          value: "--data-checksums"
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
         resources:
@@ -82,8 +81,8 @@ spec:
         app: immich-redis
     spec:
       containers:
-      - name: redis
-        image: redis:7.4-alpine
+      - name: valkey
+        image: valkey/valkey:9-alpine
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -144,7 +143,7 @@ spec:
     spec:
       containers:
       - name: immich-server
-        image: ghcr.io/immich-app/immich-server:v1.109.2
+        image: ghcr.io/immich-app/immich-server:v2.7.5
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -153,7 +152,7 @@ spec:
           capabilities:
             drop: ["ALL"]
         ports:
-        - containerPort: 3001
+        - containerPort: 2283
         env:
         - name: TZ
           value: Europe/Berlin
@@ -208,7 +207,7 @@ metadata:
 spec:
   ports:
   - port: 2283
-    targetPort: 3001
+    targetPort: 2283
   selector:
     app: immich-server
 ---
@@ -235,7 +234,7 @@ spec:
     spec:
       containers:
       - name: immich-ml
-        image: ghcr.io/immich-app/immich-machine-learning:v1.109.2
+        image: ghcr.io/immich-app/immich-machine-learning:v2.7.5
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
