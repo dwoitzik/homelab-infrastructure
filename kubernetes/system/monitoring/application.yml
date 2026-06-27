@@ -13,11 +13,6 @@ spec:
       values: |
         prometheusOperator:
           crds:
-            enabled: false
-        # Automates CRD upgrades via an in-cluster Job (available since chart 68.4.0).
-        # Eliminates the need for manual kubectl apply on future operator upgrades.
-        crds:
-          upgradeJob:
             enabled: true
 
         # k3s bundles kube-proxy/scheduler/controller-manager into the single
