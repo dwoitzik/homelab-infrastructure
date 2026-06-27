@@ -19,7 +19,7 @@ spec:
     targetRevision: main
     path: kubernetes/system/monitoring
     directory:
-      include: '{control-plane-alerts,slo-rules,hardware-temp-alerts,storage-capacity-alerts,pve-exporter,alertmanager-discord,external-secret,ingressroute,network-policies,loki-dashboard,slo-dashboard}.yml'
+      include: '{alertmanager-config,blackbox-exporter,control-plane-alerts,slo-rules,hardware-temp-alerts,storage-capacity-alerts,pve-exporter,alertmanager-discord,external-secret,ingressroute,network-policies,loki-dashboard,slo-dashboard}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
