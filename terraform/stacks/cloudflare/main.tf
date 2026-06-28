@@ -1,5 +1,6 @@
 # =============================================================================
 # Cloudflare Tunnel configuration for woitzik.dev public services.
+# Last updated: 2026-06-28 (provider v5 migration + chunked_encoding upload fix)
 #
 # The cloudflared daemon runs in K3s (apps/cloudflared) and holds 4 persistent
 # connections to Cloudflare's edge (fra/dus PoPs). This stack configures which
@@ -28,6 +29,10 @@ locals {
   # Each entry maps a public hostname → internal K3s service.
   # cloudflared resolves these from within the apps namespace.
   tunnel_ingress = [
+    {
+      hostname = "atlantis.woitzik.dev"
+      service  = "http://atlantis.apps.svc.cluster.local:4141"
+    },
     {
       hostname = "photos.woitzik.dev"
       service  = "http://immich-server.apps.svc.cluster.local:2283"
@@ -81,4 +86,13 @@ resource "cloudflare_dns_record" "tunnel_photos" {
   content = local.tunnel_cname
   proxied = true
   comment = "Immich photo library — routed via Cloudflare tunnel"
+}
+
+resource "cloudflare_dns_record" "tunnel_atlantis" {
+  zone_id = var.zone_id
+  name    = "atlantis"
+  type    = "CNAME"
+  content = local.tunnel_cname
+  proxied = true
+  comment = "Atlantis GitOps runner — GitHub webhook endpoint (/events) + UI"
 }
