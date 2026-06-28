@@ -1,5 +1,6 @@
 # =============================================================================
 # Cloudflare Tunnel configuration for woitzik.dev public services.
+# Last updated: 2026-06-28 (provider v5 migration + chunked_encoding upload fix)
 #
 # The cloudflared daemon runs in K3s (apps/cloudflared) and holds 4 persistent
 # connections to Cloudflare's edge (fra/dus PoPs). This stack configures which
