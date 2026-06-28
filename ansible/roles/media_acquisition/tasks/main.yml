@@ -57,7 +57,7 @@
 
 - name: Wait for Sonarr to be ready
   ansible.builtin.shell:
-    cmd: docker exec sonarr curl -sf -o /dev/null -w '%{http_code}' http://localhost:8989/api/v3/system/status
+    cmd: docker exec sonarr curl -s -o /dev/null -w '%{http_code}' http://localhost:8989/api/v3/system/status
   register: media_acquisition_sonarr_health
   until: media_acquisition_sonarr_health.stdout in ['200', '401']
   retries: 20
@@ -218,7 +218,7 @@
 
 - name: Wait for Radarr to be ready
   ansible.builtin.shell:
-    cmd: docker exec radarr curl -sf -o /dev/null -w '%{http_code}' http://localhost:7878/api/v3/system/status
+    cmd: docker exec radarr curl -s -o /dev/null -w '%{http_code}' http://localhost:7878/api/v3/system/status
   register: media_acquisition_radarr_health
   until: media_acquisition_radarr_health.stdout in ['200', '401']
   retries: 20
