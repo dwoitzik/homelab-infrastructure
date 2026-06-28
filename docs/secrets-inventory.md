@@ -27,7 +27,8 @@ Decrypt with: `ansible-vault view ansible/group_vars/all/vault.yml` (needs `ansi
 | `vault_crowdsec_api_key` | CrowdSec bouncer (dmz_proxies) |
 | `atlantis_gh_token`, `atlantis_gh_webhook_secret` | Atlantis GitHub App |
 | `atlantis_tf_mikrotik_*` | Atlantis → MikroTik Terraform provider creds |
-| `cloudflare_tunnel_token` | cloudflared |
+| `cloudflare_tunnel_token` | cloudflared (Ansible role) |
+| `cloudflare_api_token` | Cloudflare Terraform provider (tunnel config + DNS record management); injected into Atlantis as `TF_VAR_cloudflare_api_token` via `atlantis-secrets` k8s Secret in `apps` namespace |
 | `minio_root_user/password` | legacy — superseded by Garage, check before removing |
 | `proxmox_api_token_*` | Atlantis → Proxmox provider |
 | `pbs_rclone_gdrive_token` | PBS → Google Drive offsite backup (rclone) |
@@ -73,6 +74,7 @@ attention. These are the ones worth knowing about:
 | `mullvad-wg-config` | `apps` | **Obsolete** — SABnzbd moved to LXC (ct-srv-media-acq-01), no VPN; delete when old k8s stack is torn down |
 | `renovate-token` | `apps` | GitHub PAT — expires periodically, watch for `401` in renovate job logs |
 | `cloudflare-api-token-secret` | `cert-manager` | DNS-01 challenge token for the wildcard cert |
+| `atlantis-secrets` | `apps` | Multi-key Secret used by Atlantis for Terraform variable injection. Contains: `cloudflare-api-token` (Cloudflare provider for the `cloudflare` TF stack), plus existing Atlantis env vars. Populated via ExternalSecret from Vault or manual apply — see `kubernetes/apps/atlantis/atlantis.yml` for the full env mapping. |
 | `wildcard-woitzik-dev-tls` | replicated to every namespace with an IngressRoute | Single source: cert-manager Certificate in `kube-system`, copied via `cert-manager` namespace-sync or manual `kubectl get/apply` if a new namespace needs it |
 
 ## Plaintext leak remediation status
