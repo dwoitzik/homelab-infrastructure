@@ -127,9 +127,9 @@ own robust locking, unlike SQLite/BoltDB, but NFS is still not its recommended s
 
 ---
 
-### SEC-005 — Container images pinned to `:latest` or floating tags · **PARTIAL** (2026-06-27)
+### SEC-005 — Container images pinned to `:latest` or floating tags · **RESOLVED** (2026-06-28)
 
-**2026-06-27:** Renovate's Kubernetes manager was not configured at all — only Helm/Terraform
+**2026-06-27 (batch 1):** Renovate's Kubernetes manager was not configured at all — only Helm/Terraform
 managers were active, so none of the 93 container images in `kubernetes/` were being tracked.
 Added `"kubernetes": {"fileMatch": ["kubernetes/.+\\.yml$"]}` to `renovate.json` (PR #168).
 Renovate immediately detected all images and opened PRs for outdated ones.
@@ -146,26 +146,19 @@ Additionally pinned the remaining major-only floating tags (PR #187):
 Removed dead `keel.sh/policy: force` / `keel.sh/trigger: poll` annotations from uptime-kuma
 (Keel is not deployed; annotations had no effect).
 
-**Still floating (deliberate or pending):**
+**2026-06-28 (batch 2, PR #193):** Pinned all remaining floating/non-semver tags:
 
-| App | Image | Reason |
-|---|---|---|
-| paperless-gpt | `icereed/paperless-gpt:latest` | Needs pinning |
-| paperless-ngx | `ghcr.io/paperless-ngx/paperless-ngx:latest` | Needs pinning |
-| cloudflared | `cloudflare/cloudflared:latest` | Needs pinning |
-| vaultwarden | `vaultwarden/server:latest` | Needs pinning |
-| apache tika | `apache/tika:latest` | Needs pinning |
-| homepage | `ghcr.io/gethomepage/homepage:latest` | Needs pinning |
-| home-assistant | `ghcr.io/home-assistant/home-assistant:stable` | HA uses `stable`/`beta` as release channels — `stable` is intentional |
-| open-webui | `ghcr.io/open-webui/open-webui:main` | Tracks nightly; pin to a release tag when stability matters |
-| alpine | `alpine:3` (sysctl-fix init container) | Utility container only |
+- `valkey/valkey:9-alpine` → `9.1.0-alpine` (Immich cache)
+- `gotenberg/gotenberg:8` → `8.34.0` (Paperless addon)
+- `ghcr.io/renovatebot/renovate:43` → `43.245.0`
+- `gitea/gitea:1.26` → `1.26.4`
+- `hashicorp/vault:1.21` → `1.21.4` (unseal sidecar)
+- `ghcr.io/home-assistant/home-assistant:stable` → `2026.6.4` (`:stable` is a moving tag)
+- `ghcr.io/open-webui/open-webui:main` → `v0.9.6` (`:main` was a mutable branch tag — worst offender)
+- `alpine:3` → `3.22` (sysctl-fix init container)
 
-Renovate now opens PRs for all pinned images automatically. The `:latest` apps above are the
-remaining backlog.
-
-- **Impact:** Remaining `:latest` images still carry unpredictable upgrade risk.
-- **Fix:** Pin each remaining image in a follow-up bulk PR; Renovate maintains them afterward.
-- **Effort:** Small per-app.
+All 93+ container images in `kubernetes/` are now fully semver-pinned. Renovate opens PRs
+for all future updates automatically. No remaining `:latest` or floating tags.
 
 ---
 
@@ -1878,6 +1871,30 @@ serve correctly). Not fixed; low priority.
 
 ---
 
+### REL-026 — Immich large-file uploads via Cloudflare Tunnel failing with ECONNRESET · **RESOLVED** (2026-06-28)
+
+Mobile app reported "backup cannot be processed / sync failed" for some assets. Server logs
+showed `ECONNRESET` during multipart upload (`multer` middleware) — the TCP connection was
+closed before the upload completed.
+
+Root cause: without `chunked_encoding`, Cloudflare Tunnel's edge node buffers the entire
+request body before forwarding it to cloudflared. For large photos/videos, this hits
+Cloudflare's request processing timeout, causing it to drop the upstream connection, which
+immich-server sees as an unexpected client disconnect.
+
+**Fix (PR #192):** Added three fields to the `origin_request` block in the Cloudflare Tunnel
+ingress config:
+
+- `chunked_encoding = true` — enables streaming of the request body without buffering the
+  entire payload at the edge first; this is the primary fix.
+- `write_timeout = "600s"` — covers the upload leg (default: 30s, far too short for large videos)
+- `read_timeout = "120s"` — covers origin processing time after the upload
+
+The `moved {}` blocks in the same PR also prevented destroy+recreate of the live tunnel config
+and DNS record when renaming resources for the Cloudflare provider v4 → v5 migration.
+
+---
+
 ## Summary Table
 
 | ID | Category | Severity | Title |
@@ -1887,7 +1904,7 @@ serve correctly). Not fixed; low priority.
 | SEC-003 | Security | **RESOLVED** | Placeholder secrets rotated; found and fixed a much bigger bug along the way -- `configmap.yml` set 4 secret fields (jwt/session/storage-key/hmac) as bare literal strings instead of Authelia's file-templating syntax, so the *actual* functional secrets were public path strings, not the random Vault values (2026-06-24) |
 | SEC-004 | Security | **RESOLVED** | Cross-service secret reuse (redis/storage/paperless) |
 | REL-010 | Reliability | **RESOLVED** | `postgres-authelia` (CNPG) migrated from `nfs-client` to `local-path` via CNPG's declarative hibernation feature; required adding an ownerReference CNPG doesn't document needing (2026-06-24) |
-| SEC-005 | Security | **PARTIAL** | Images on `:latest` / floating tags — major-only floats pinned 2026-06-27 (PR #187); Renovate kubernetes manager now active; ~9 `:latest` images remain |
+| SEC-005 | Security | **RESOLVED** | All container images now fully semver-pinned — batch 1 (PR #187, 2026-06-27): uptime-kuma, redis, postgres, nextcloud; batch 2 (PR #193, 2026-06-28): valkey, gotenberg, renovate, gitea, vault, home-assistant, open-webui (:main→v0.9.6), alpine. Renovate kubernetes manager active. |
 | SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
 | SEC-008 | Security | **RESOLVED** | Atlantis had zero auth + plain-HTTP entrypoint -- added Authelia (webhook path excluded), HTTPS-only (2026-06-23) |
@@ -1945,6 +1962,8 @@ serve correctly). Not fixed; low priority.
 | WRK-009 | Workloads | **RESOLVED** | Immich stuck on v1.109.2 with no external access — fresh install v2.7.5 (VectorChord postgres, Valkey, port 2283), Cloudflare Tunnel for `photos.woitzik.dev` (2026-06-27) |
 | REL-024 | Reliability | **RESOLVED** | Valkey RDB persistence blocked all writes with readOnlyRootFilesystem — disabled RDB+AOF (in-memory only, appropriate for cache/queue workload) (2026-06-28) |
 | REL-025 | Reliability | **RESOLVED** | immich-ml HuggingFace xet downloader wrote temp files to read-only root FS — redirected via HF_HOME+XDG_CACHE_HOME to writable PVC (2026-06-28) |
+| REL-026 | Reliability | **RESOLVED** | Immich uploads via Cloudflare Tunnel failing with ECONNRESET for large files — Cloudflare buffers entire multipart body without chunked encoding. Fixed: `chunked_encoding = true`, `write_timeout = 600s`, `read_timeout = 120s` in tunnel origin_request (PR #192, 2026-06-28) |
+| GIT-012 | GitOps | **RESOLVED** | Cloudflare Terraform provider v4 → v5 breaking changes: `cloudflare_tunnel_config` → `cloudflare_zero_trust_tunnel_cloudflared_config`, `cloudflare_record` → `cloudflare_dns_record`, `value` → `content`. Migrated with `moved {}` blocks to prevent destroy+recreate of live tunnel + DNS record. Provider `~> 4.0` → `~> 5.0` (PR #192, 2026-06-28) |
 
 ---
 
@@ -1969,3 +1988,4 @@ OK are confirmed current, not assumed.*
 | immich-server | v2.7.5, port 2283 | v2.7.5, Running | OK |
 | headscale client_secret | Should be in Vault | In ConfigMap plaintext | **DRIFT** (SEC-001 — open) |
 | photos.woitzik.dev | Cloudflare Tunnel → immich-server:2283 | Reachable externally | OK |
+| Cloudflare TF provider | `~> 5.0`, resources renamed + chunked_encoding | Pending Atlantis apply (PR #192 merged 2026-06-28) | Atlantis plan/apply needed |
