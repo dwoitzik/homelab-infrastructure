@@ -54,6 +54,13 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
           connect_timeout  = "10s"
           tcp_keep_alive   = "30s"
           http_host_header = ingress_rule.value.hostname
+          # Immich uploads large photo/video files — chunked encoding prevents
+          # Cloudflare from buffering the entire body before forwarding, which
+          # causes ECONNRESET on large uploads. write_timeout covers the upload
+          # leg; read_timeout covers the origin's processing response.
+          chunked_encoding = true
+          write_timeout    = "600s"
+          read_timeout     = "120s"
         }
       }
     }
