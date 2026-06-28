@@ -52,7 +52,7 @@ spec:
       serviceAccountName: keel
       containers:
         - name: keel
-          image: keelhq/keel:0.19.1
+          image: keelhq/keel:0.20.0
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
