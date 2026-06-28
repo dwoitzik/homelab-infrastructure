@@ -10,6 +10,17 @@
 # Zone:       woitzik.dev (1f15ed0f3a8b497302ba339dcab3c060)
 # =============================================================================
 
+# Provider v4 → v5 renames: moved blocks prevent destroy+recreate of live resources.
+moved {
+  from = cloudflare_tunnel_config.homelab
+  to   = cloudflare_zero_trust_tunnel_cloudflared_config.homelab
+}
+
+moved {
+  from = cloudflare_record.tunnel_photos
+  to   = cloudflare_dns_record.tunnel_photos
+}
+
 locals {
   tunnel_cname = "${var.tunnel_id}.cfargotunnel.com"
 
@@ -28,7 +39,7 @@ locals {
 # Tunnel ingress configuration
 # Defines which hostnames cloudflared routes and where traffic lands internally.
 # -----------------------------------------------------------------------------
-resource "cloudflare_tunnel_config" "homelab" {
+resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
   account_id = var.account_id
   tunnel_id  = var.tunnel_id
 
@@ -56,11 +67,11 @@ resource "cloudflare_tunnel_config" "homelab" {
 # -----------------------------------------------------------------------------
 # DNS records — CNAME → tunnel (proxied through Cloudflare CDN/DDoS layer)
 # -----------------------------------------------------------------------------
-resource "cloudflare_record" "tunnel_photos" {
+resource "cloudflare_dns_record" "tunnel_photos" {
   zone_id = var.zone_id
   name    = "photos"
   type    = "CNAME"
-  value   = local.tunnel_cname
+  content = local.tunnel_cname
   proxied = true
   comment = "Immich photo library — routed via Cloudflare tunnel"
 }

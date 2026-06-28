@@ -180,7 +180,7 @@ spec:
     spec:
       containers:
       - name: gotenberg
-        image: gotenberg/gotenberg:8
+        image: gotenberg/gotenberg:8.34.0
         command: ["gotenberg", "--chromium-allow-list=file:///tmp/.*"]
         securityContext:
           allowPrivilegeEscalation: false
