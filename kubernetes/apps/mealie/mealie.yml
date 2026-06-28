@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
         - name: mealie
-          image: ghcr.io/mealie-recipes/mealie:v2.8.0
+          image: ghcr.io/mealie-recipes/mealie:v3.20.1
           # SEC-012: image entrypoint runs as root and needs CAP_CHOWN to
           # chown /app/data and su-exec into uid 911 -- confirmed live,
           # dropping all capabilities crash-loops it ("operation not
