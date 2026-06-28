@@ -75,6 +75,25 @@
       ansible.builtin.set_fact:
         k3s_server_config: "{{ k3s_server_config | combine(server_config_yaml | from_yaml) }}"
 
+# etcd WAL on tmpfs — must be created before k3s starts.
+# /run is a kernel-managed tmpfs; any subdir is automatically RAM-backed.
+# systemd-tmpfiles recreates it on every boot so k3s always finds it.
+- name: Install systemd-tmpfiles rule for etcd WAL directory
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/k3s-etcd-wal.conf
+    mode: "0644"
+    content: |
+      # etcd WAL on tmpfs (REL-012b) — see ansible/k3s-cluster/inventory.yml for rationale.
+      d /run/k3s-etcd-wal 0700 root root -
+
+- name: Create etcd WAL tmpfs directory immediately (first run / after manual removal)
+  ansible.builtin.file:
+    path: /run/k3s-etcd-wal
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+
 # If airgapped, all K3s artifacts are already on the node.
 # We should be downloading and installing the newer version only if we are in one of the following cases :
 #   - we couldn't get k3s installed version in the first task of this role
