@@ -7,7 +7,7 @@
   "packageRules": [
     {
       "matchManagers": ["kubernetes"],
-      "matchPackageNames": ["ghcr.io/immich-app/**", "valkey/valkey", "redis"],
+      "matchPackageNames": ["ghcr.io/immich-app/**", "valkey/valkey"],
       "groupName": "immich stack",
       "automerge": false
     },
