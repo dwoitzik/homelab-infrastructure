@@ -6,6 +6,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   node_name = local.target_node
   tags      = ["k3s", "master", "kubernetes"]
   started   = true
+  on_boot   = true
 
   # Staggered boot (2026-06-20): all 3 k3s VMs starting simultaneously caused a
   # resource storm (load avg 147 within 4 min of boot) that made the Proxmox host
@@ -93,6 +94,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   node_name = local.target_node
   tags      = ["k3s", "worker", "kubernetes"]
   started   = true
+  on_boot   = true
 
   startup {
     order    = 3
@@ -165,6 +167,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   node_name = local.target_node
   tags      = ["k3s", "worker", "kubernetes"]
   started   = true
+  on_boot   = true
 
   startup {
     order    = 4
