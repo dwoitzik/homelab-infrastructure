@@ -58,6 +58,7 @@ services:
     volumes:
       - {{ media_acquisition_base_dir }}/sabnzbd/config:/config
       - /media:/media
+      - /downloads/incomplete:/downloads/incomplete
     ports:
       - "8080:8080"
     restart: unless-stopped
