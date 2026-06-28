@@ -27,6 +27,11 @@ services:
     networks:
       media-acq-net:
         ipv4_address: 172.28.1.10
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9150 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
   nzbhydra2:
@@ -75,6 +80,7 @@ services:
     volumes:
       - {{ media_acquisition_base_dir }}/sonarr/config:/config
       - /media:/media
+      - /downloads/incomplete:/downloads/incomplete
     ports:
       - "8989:8989"
     restart: unless-stopped
@@ -91,6 +97,7 @@ services:
     volumes:
       - {{ media_acquisition_base_dir }}/radarr/config:/config
       - /media:/media
+      - /downloads/incomplete:/downloads/incomplete
     ports:
       - "7878:7878"
     restart: unless-stopped
@@ -107,6 +114,7 @@ services:
     volumes:
       - {{ media_acquisition_base_dir }}/bazarr/config:/config
       - /media:/media
+      - /downloads/incomplete:/downloads/incomplete
     ports:
       - "6767:6767"
     restart: unless-stopped
