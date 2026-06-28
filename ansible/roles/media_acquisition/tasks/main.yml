@@ -187,6 +187,33 @@
     status_code: 201
   when: media_acquisition_sonarr_indexers.json | selectattr('name', 'equalto', 'NZBHydra2') | list | length == 0
 
+- name: Get Sonarr existing release profiles
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/releaseprofile"
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+  register: media_acquisition_sonarr_release_profiles
+
+- name: Add Block Bonus Disc release profile to Sonarr
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/releaseprofile"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: Block Bonus Disc
+      enabled: true
+      required: []
+      ignored:
+        - BONUS.DISC
+        - BONUS DISC
+      indexerId: 0
+      tags: []
+    status_code: 201
+  when: media_acquisition_sonarr_release_profiles.json | selectattr('name', 'equalto', 'Block Bonus Disc') | list | length == 0
+
 # ── Radarr quality profile + download client + indexer ────────────
 
 - name: Wait for Radarr to be ready
@@ -309,6 +336,33 @@
         - {name: additionalParameters, value: ""}
     status_code: 201
   when: media_acquisition_radarr_indexers.json | selectattr('name', 'equalto', 'NZBHydra2') | list | length == 0
+
+- name: Get Radarr existing release profiles
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/releaseprofile"
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+  register: media_acquisition_radarr_release_profiles
+
+- name: Add Block Bonus Disc release profile to Radarr
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/releaseprofile"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: Block Bonus Disc
+      enabled: true
+      required: []
+      ignored:
+        - BONUS.DISC
+        - BONUS DISC
+      indexerId: 0
+      tags: []
+    status_code: 201
+  when: media_acquisition_radarr_release_profiles.json | selectattr('name', 'equalto', 'Block Bonus Disc') | list | length == 0
 
 # ── SABnzbd: Eweka server + download categories ───────────────────
 # SABnzbd writes its config on first start. We wait for the ini to exist,
@@ -517,3 +571,33 @@
     - {key: languages, value: "['de', 'en']"}
     - {key: single_language, value: "False"}
   notify: Restart bazarr
+
+# ── Sonarr / Radarr: scheduled missing-content searches ──────────
+# SeasonSearch returns 0 results when only blocked releases (e.g. BONUS DISC)
+# exist in the index — it does NOT fall back to per-episode searches.
+# MissingEpisodeSearch / MissingMoviesSearch query per-episode/per-movie and
+# reliably surface individual releases, so we schedule them daily to
+# automatically pick up any backlog gaps without manual intervention.
+# The API key is read at runtime from config.xml so nothing is hardcoded.
+
+- name: Schedule daily Sonarr MissingEpisodeSearch
+  ansible.builtin.cron:
+    name: sonarr-missing-episode-search
+    hour: "3"
+    minute: "0"
+    job: >-
+      APIKEY=$(grep -oP '(?<=<ApiKey>)[^<]+' {{ media_acquisition_base_dir }}/sonarr/config/config.xml 2>/dev/null) &&
+      curl -sf -X POST "http://localhost:8989/api/v3/command"
+      -H "X-Api-Key: $APIKEY" -H "Content-Type: application/json"
+      -d '{"name":"MissingEpisodeSearch"}' -o /dev/null
+
+- name: Schedule daily Radarr MissingMoviesSearch
+  ansible.builtin.cron:
+    name: radarr-missing-movies-search
+    hour: "3"
+    minute: "30"
+    job: >-
+      APIKEY=$(grep -oP '(?<=<ApiKey>)[^<]+' {{ media_acquisition_base_dir }}/radarr/config/config.xml 2>/dev/null) &&
+      curl -sf -X POST "http://localhost:7878/api/v3/command"
+      -H "X-Api-Key: $APIKEY" -H "Content-Type: application/json"
+      -d '{"name":"MissingMoviesSearch"}' -o /dev/null
