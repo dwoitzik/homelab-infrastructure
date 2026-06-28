@@ -81,6 +81,15 @@
 # maximum (default is 100). Only affects intra-VM scheduling; host-level
 # contention from other LXCs/VMs is addressed by Docker blkio_config weights
 # on the media-acq stack (the biggest IO offender — SABnzbd/unrar).
+
+# Cleanup: remove leftover tmpfiles.d rule from REL-012b attempt (PR #203)
+# which moved etcd WAL to tmpfs via --etcd-arg=wal-dir. That approach breaks
+# k3s's internal temp-etcd reconciliation and was reverted.
+- name: Remove stale etcd WAL tmpfiles.d rule (REL-012b cleanup)
+  ansible.builtin.file:
+    path: /etc/tmpfiles.d/k3s-etcd-wal.conf
+    state: absent
+
 - name: Create k3s.service.d directory
   ansible.builtin.file:
     path: /etc/systemd/system/k3s.service.d
