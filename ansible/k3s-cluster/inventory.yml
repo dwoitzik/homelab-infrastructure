@@ -12,16 +12,27 @@ k3s_cluster:
     ansible_user: dw
     k3s_version: v1.31.12+k3s1
     api_endpoint: "10.0.20.11"
-    # REL-012: etcd heartbeat/election timeouts increased 5× (100ms→500ms,
-    # 1000ms→5000ms) to tolerate brief NVMe I/O stalls without triggering
-    # leader re-election. Default values assume sub-100ms disk latency; on
-    # a shared single-NVMe host under concurrent load (Velero backups, Immich
-    # ML indexing, Ollama inference) latencies spike to 2-14s, causing
-    # "apply request took too long" → raft timeout → k3s restart (REL-012).
-    # 5s election timeout absorbs most burst events while keeping failover
-    # detection fast enough for any eventual real hardware failure.
+    # REL-012 / REL-012b: etcd tuned to survive NVMe I/O stalls on a shared
+    # single-disk host. Two complementary fixes:
+    #
+    # 1. heartbeat/election timeouts 5x (100ms->500ms, 1000ms->5000ms): gives
+    #    etcd headroom to absorb burst I/O stalls without triggering leader
+    #    re-election. Stalls up to ~5s are absorbed; real failure detection
+    #    still fast enough for a homelab.
+    #
+    # 2. wal-dir on tmpfs (/run/k3s-etcd-wal): etcd's write-ahead log lives
+    #    entirely in RAM. WAL writes are the hot path for every k8s API call.
+    #    With wal-dir on disk, any workload that saturates the NVMe (SABnzbd
+    #    unrar, Immich ML, Jellyfin transcode, Velero backup) stalls WAL writes
+    #    -> etcd read-index timeout -> k3s API server crash. On tmpfs, WAL
+    #    writes are nanosecond-fast regardless of disk pressure from any source,
+    #    including new VMs/LXCs added in future.
+    #    Trade-off: on host power loss, WAL since last etcd snap is lost (etcd
+    #    restores from on-disk snap; k8s state loss is typically <5 min).
+    #    For a homelab, acceptable. etcd snap dir stays on disk.
     extra_server_args: >-
       --disable servicelb
       --disable traefik
       --etcd-arg=heartbeat-interval=500
       --etcd-arg=election-timeout=5000
+      --etcd-arg=wal-dir=/run/k3s-etcd-wal

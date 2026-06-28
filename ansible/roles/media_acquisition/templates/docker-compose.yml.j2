@@ -66,6 +66,10 @@ services:
       - /downloads/incomplete:/downloads/incomplete
     ports:
       - "8080:8080"
+    # Lowest IO weight so unrar/download writes never saturate the NVMe
+    # and starve other processes (etcd WAL, PostgreSQL, etc.).
+    blkio_config:
+      weight: 100
     restart: unless-stopped
 
   sonarr:
@@ -83,6 +87,8 @@ services:
       - /downloads/incomplete:/downloads/incomplete
     ports:
       - "8989:8989"
+    blkio_config:
+      weight: 100
     restart: unless-stopped
 
   radarr:
@@ -100,6 +106,8 @@ services:
       - /downloads/incomplete:/downloads/incomplete
     ports:
       - "7878:7878"
+    blkio_config:
+      weight: 100
     restart: unless-stopped
 
   bazarr:
