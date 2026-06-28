@@ -399,6 +399,14 @@ resource "proxmox_virtual_environment_container" "ct_srv_jellyfin_01" {
     path   = "/media"
   }
 
+  # NVMe-backed Jellyfin cache (transcodes + image extraction). ZFS dataset
+  # rpool/jellyfin-cache (20 G quota). Added via pct set 203 -mp1. Owner must
+  # be host uid 100000 (= LXC root via Proxmox default subuid mapping).
+  mount_point {
+    volume = "/rpool/jellyfin-cache"
+    path   = "/jellyfin-cache"
+  }
+
   # /dev/dri/renderD128 passthrough (VAAPI hardware transcode) -- same story,
   # added manually (pct set 203 -dev0 ...) once the container existed.
   device_passthrough {

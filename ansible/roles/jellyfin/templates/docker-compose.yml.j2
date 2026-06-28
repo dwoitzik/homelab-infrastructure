@@ -15,6 +15,7 @@ services:
       - "992" # render group gid inside the LXC (matches device_passthrough in lxc.tf)
     volumes:
       - {{ jellyfin_base_dir }}/config:/config
+      - /jellyfin-cache:/cache
       - /media:/media:ro
     ports:
       - "8096:8096"
