@@ -548,28 +548,24 @@
   changed_when: "'ok' in media_acquisition_jellyseerr_result.stdout"
   notify: Restart jellyseerr
 
-# ── Bazarr: subtitle language configuration ───────────────────────
-# Bazarr stores config in config/config.ini on disk.
-# Set German as primary subtitle language with English fallback.
-# The ini file exists only after Bazarr's first start.
+# ── Bazarr: single_language guard ─────────────────────────────────
+# Bazarr v1+ stores config in config/config/config.yaml (nested path).
+# Language profiles (German/English) are configured per-series in the
+# SQLite DB — they are not a global flat-config key. Only single_language
+# is meaningful here: ensure it is false so both DE and EN subtitles can
+# be downloaded per release.
 
 - name: Wait for Bazarr to initialize its config file
   ansible.builtin.wait_for:
-    path: "{{ media_acquisition_base_dir }}/bazarr/config/config.ini"
+    path: "{{ media_acquisition_base_dir }}/bazarr/config/config/config.yaml"
     state: present
     timeout: 60
 
-- name: Configure Bazarr subtitle languages (German primary, English fallback)
-  community.general.ini_file:
-    path: "{{ media_acquisition_base_dir }}/bazarr/config/config.ini"
-    section: general
-    option: "{{ item.key }}"
-    value: "{{ item.value }}"
-    mode: '0640'
-    create: false
-  loop:
-    - {key: languages, value: "['de', 'en']"}
-    - {key: single_language, value: "False"}
+- name: Ensure Bazarr single_language is disabled
+  ansible.builtin.replace:
+    path: "{{ media_acquisition_base_dir }}/bazarr/config/config/config.yaml"
+    regexp: '^  single_language: true'
+    replace: '  single_language: false'
   notify: Restart bazarr
 
 # ── Sonarr / Radarr: scheduled missing-content searches ──────────
