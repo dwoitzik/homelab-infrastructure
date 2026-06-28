@@ -45,7 +45,7 @@ spec:
           readOnly: true
       containers:
       - name: postgres
-        image: postgres:16
+        image: postgres:16.14
         # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
         # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
         # the postgres user -- confirmed live, dropping all capabilities
@@ -124,7 +124,7 @@ spec:
     spec:
       containers:
       - name: redis
-        image: redis:7
+        image: redis:7.4.9
         # SEC-012: this instance has no command override, so it runs the
         # image's default entrypoint, which needs CAP_SETUID to setpriv-drop
         # from root to the redis user -- confirmed live ("setpriv: setresuid
