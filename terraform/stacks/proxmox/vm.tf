@@ -74,6 +74,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
 }
 
 resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
+  # memory capped at 8 GB (was 16 GB) — pure agent node, no etcd, no
+  # Longhorn replicas scheduled here. Host has 64 GB max (DDR4 ceiling).
   vm_id     = 212
   name      = "vm-srv-k3s-12"
   node_name = local.target_node
@@ -104,8 +106,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   }
 
   memory {
-    dedicated = 16384
-    floating  = 8192
+    dedicated = 8192
+    floating  = 4096
   }
 
   disk {
@@ -141,6 +143,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
 }
 
 resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
+  # memory capped at 8 GB (was 16 GB) — pure agent node, same rationale as k3s-12.
   vm_id     = 213
   name      = "vm-srv-k3s-13"
   node_name = local.target_node
@@ -171,8 +174,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   }
 
   memory {
-    dedicated = 16384
-    floating  = 8192
+    dedicated = 8192
+    floating  = 4096
   }
 
   disk {

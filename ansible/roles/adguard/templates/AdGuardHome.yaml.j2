@@ -218,16 +218,12 @@ filtering:
     - domain: headscale.woitzik.dev
       answer: "10.0.20.200"
       enabled: true
-    # photos.woitzik.dev is served via Cloudflare tunnel (proxied).
-    # The wildcard above would return 10.0.20.200 (Traefik); these
-    # specific rewrites override it with Cloudflare's anycast proxy IPs
-    # so internal clients reach the tunnel without going through Traefik.
-    - domain: photos.woitzik.dev
-      answer: "172.67.137.91"
-      enabled: true
-    - domain: photos.woitzik.dev
-      answer: "104.21.38.184"
-      enabled: true
+    # photos.woitzik.dev intentionally uses the wildcard (10.0.20.200 / Traefik)
+    # so internal clients bypass Cloudflare entirely and hit Traefik directly.
+    # This avoids Cloudflare's 100 MB per-request body limit on the free plan,
+    # which blocks large video/RAW file uploads (REL-026b).
+    # External clients still reach Immich via the Cloudflare tunnel; the 100 MB
+    # limit only affects external uploads > 100 MB (cellular, away from home).
   safe_fs_patterns:
     - /opt/adguardhome/work/data/userfilters/*
   safebrowsing_cache_size: 1048576

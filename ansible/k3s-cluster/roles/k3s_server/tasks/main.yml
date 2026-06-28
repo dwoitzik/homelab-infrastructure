@@ -75,24 +75,34 @@
       ansible.builtin.set_fact:
         k3s_server_config: "{{ k3s_server_config | combine(server_config_yaml | from_yaml) }}"
 
-# etcd WAL on tmpfs — must be created before k3s starts.
-# /run is a kernel-managed tmpfs; any subdir is automatically RAM-backed.
-# systemd-tmpfiles recreates it on every boot so k3s always finds it.
-- name: Install systemd-tmpfiles rule for etcd WAL directory
+# REL-012: give k3s (etcd) the highest IO weight within this VM so WAL writes
+# are never starved by other cgroup siblings (Longhorn data IO, ML pods, etc.)
+# competing for the same virtio block device. IOWeight=1000 is the cgroup v2
+# maximum (default is 100). Only affects intra-VM scheduling; host-level
+# contention from other LXCs/VMs is addressed by Docker blkio_config weights
+# on the media-acq stack (the biggest IO offender — SABnzbd/unrar).
+
+# Cleanup: remove leftover tmpfiles.d rule from REL-012b attempt (PR #203)
+# which moved etcd WAL to tmpfs via --etcd-arg=wal-dir. That approach breaks
+# k3s's internal temp-etcd reconciliation and was reverted.
+- name: Remove stale etcd WAL tmpfiles.d rule (REL-012b cleanup)
+  ansible.builtin.file:
+    path: /etc/tmpfiles.d/k3s-etcd-wal.conf
+    state: absent
+
+- name: Create k3s.service.d directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/k3s.service.d
+    state: directory
+    mode: "0755"
+
+- name: Install k3s IOWeight systemd drop-in (REL-012)
   ansible.builtin.copy:
-    dest: /etc/tmpfiles.d/k3s-etcd-wal.conf
+    dest: /etc/systemd/system/k3s.service.d/20-io-priority.conf
     mode: "0644"
     content: |
-      # etcd WAL on tmpfs (REL-012b) — see ansible/k3s-cluster/inventory.yml for rationale.
-      d /run/k3s-etcd-wal 0700 root root -
-
-- name: Create etcd WAL tmpfs directory immediately (first run / after manual removal)
-  ansible.builtin.file:
-    path: /run/k3s-etcd-wal
-    state: directory
-    mode: "0700"
-    owner: root
-    group: root
+      [Service]
+      IOWeight=1000
 
 # If airgapped, all K3s artifacts are already on the node.
 # We should be downloading and installing the newer version only if we are in one of the following cases :

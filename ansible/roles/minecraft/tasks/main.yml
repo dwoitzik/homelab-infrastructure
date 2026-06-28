@@ -20,7 +20,8 @@
           environment:
             EULA: "TRUE"
             TYPE: "PAPER"
-            MEMORY: "6G"
+            INIT_MEMORY: "2G"
+            MAX_MEMORY: "4G"
             VERSION: "LATEST"
             TZ: "Europe/Berlin"
           ports:
@@ -38,7 +39,8 @@
             TYPE: "FABRIC"
             VERSION: "1.21.1"
             MODRINTH_PROJECTS: "cobblemon,fabric-api"
-            MEMORY: "6G"
+            INIT_MEMORY: "2G"
+            MAX_MEMORY: "4G"
             TZ: "Europe/Berlin"
           ports:
             - "25566:25565"
