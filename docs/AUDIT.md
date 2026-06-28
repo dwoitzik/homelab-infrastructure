@@ -127,35 +127,45 @@ own robust locking, unlike SQLite/BoltDB, but NFS is still not its recommended s
 
 ---
 
-### SEC-005 — 14 container images pinned to `:latest` or floating tags · **MEDIUM**
+### SEC-005 — Container images pinned to `:latest` or floating tags · **PARTIAL** (2026-06-27)
 
-Images using `:latest` or equivalent:
+**2026-06-27:** Renovate's Kubernetes manager was not configured at all — only Helm/Terraform
+managers were active, so none of the 93 container images in `kubernetes/` were being tracked.
+Added `"kubernetes": {"fileMatch": ["kubernetes/.+\\.yml$"]}` to `renovate.json` (PR #168).
+Renovate immediately detected all images and opened PRs for outdated ones.
 
-| App | Image |
-|---|---|
-| paperless-gpt | `icereed/paperless-gpt:latest` |
-| paperless-ngx | `ghcr.io/paperless-ngx/paperless-ngx:latest` |
-| cloudflared | `cloudflare/cloudflared:latest` |
-| vaultwarden | `vaultwarden/server:latest` |
-| apache tika | `apache/tika:latest` |
-| paperless-ai | `clusterzx/paperless-ai:latest` |
-| homepage | `ghcr.io/gethomepage/homepage:latest` |
-| jellyfin | `jellyfin/jellyfin:latest` |
-| jellyseerr | `fallenbagel/jellyseerr:latest` |
-| sabnzbd | `lscr.io/linuxserver/sabnzbd:latest` |
-| sonarr | `lscr.io/linuxserver/sonarr:latest` |
-| radarr | `lscr.io/linuxserver/radarr:latest` |
-| bazarr | `lscr.io/linuxserver/bazarr:latest` |
-| nzbhydra2 | `lscr.io/linuxserver/nzbhydra2:latest` |
+Additionally pinned the remaining major-only floating tags (PR #187):
 
-Also: `open-webui:main`, `gitea:1.22` (major-only), `uptime-kuma:1` (major-only),
-`renovate:39` (major-only), `pve-exporter:latest` (system).
+- `louislam/uptime-kuma:1` → `1.23.17`
+- `redis:7-alpine` → `7.4.9-alpine` (redis-authelia, redis-nextcloud)
+- `redis:7` → `7.4.9` (redis-paperless)
+- `postgres:16` → `16.14` (paperless)
+- `postgres:16-alpine` → `16.14-alpine` (nextcloud)
+- `nextcloud:30-apache` → `30.0.17-apache`
 
-- **Impact:** Unpredictable upgrades; rollback impossible without a digest; Kyverno
-  `disallow-latest-tag` policy is in Audit (not Enforce) specifically because of this debt.
-- **Fix:** Pin each to a specific semver digest. Renovate is already deployed and can
-  automate digest-pinning PRs once its GitHub PAT secret is applied.
-- **Effort:** Medium (bulk PR; Renovate handles ongoing maintenance once bootstrapped).
+Removed dead `keel.sh/policy: force` / `keel.sh/trigger: poll` annotations from uptime-kuma
+(Keel is not deployed; annotations had no effect).
+
+**Still floating (deliberate or pending):**
+
+| App | Image | Reason |
+|---|---|---|
+| paperless-gpt | `icereed/paperless-gpt:latest` | Needs pinning |
+| paperless-ngx | `ghcr.io/paperless-ngx/paperless-ngx:latest` | Needs pinning |
+| cloudflared | `cloudflare/cloudflared:latest` | Needs pinning |
+| vaultwarden | `vaultwarden/server:latest` | Needs pinning |
+| apache tika | `apache/tika:latest` | Needs pinning |
+| homepage | `ghcr.io/gethomepage/homepage:latest` | Needs pinning |
+| home-assistant | `ghcr.io/home-assistant/home-assistant:stable` | HA uses `stable`/`beta` as release channels — `stable` is intentional |
+| open-webui | `ghcr.io/open-webui/open-webui:main` | Tracks nightly; pin to a release tag when stability matters |
+| alpine | `alpine:3` (sysctl-fix init container) | Utility container only |
+
+Renovate now opens PRs for all pinned images automatically. The `:latest` apps above are the
+remaining backlog.
+
+- **Impact:** Remaining `:latest` images still carry unpredictable upgrade risk.
+- **Fix:** Pin each remaining image in a follow-up bulk PR; Renovate maintains them afterward.
+- **Effort:** Small per-app.
 
 ---
 
@@ -1543,16 +1553,10 @@ Homepage→Uptime Kuma, and the `vault-unseal` polling-sidecar design from REL-0
 
 ## 6. Useful-Workload Gaps
 
-### WRK-001 — Jellyfin and media stack stuck in ContainerCreating · **MEDIUM**
+### WRK-001 — Jellyfin and media stack stuck in ContainerCreating · **RESOLVED** (2026-06-24)
 
-At audit time: `jellyfin`, `jellyseerr`, `sabnzbd`, `sonarr`, `radarr`, `bazarr`,
-`nzbhydra2` all in `ContainerCreating`. The `media` PVC uses a directly-declared NFS
-PersistentVolume (`media-nfs`) at `10.0.10.10:/mnt/media`. Per ZFS output, the
-`archive/media` dataset has only 160 KB used — the NFS share may be empty or unmounted.
-
-- **Fix:** Verify the NFS export on the Proxmox host for `/mnt/media`, confirm the
-  `media-nfs` PV is bound, and restart the Jellyfin pod.
-- **Effort:** Small (30 min debugging).
+Resolved as part of WRK-007 (Jellyfin moved to dedicated LXC) and WRK-006 (media acquisition
+stack moved to VPN-isolated LXC). See those entries for the full resolution details.
 
 ---
 
@@ -1797,6 +1801,83 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 
 ---
 
+### WRK-009 — Immich: no external access + stuck on v1.109.2 · **RESOLVED** (2026-06-27)
+
+Immich was running `v1.109.2` (PostgreSQL 16 + pgvecto.rs) with no external access path —
+reachable only from inside the VPN. Two problems discovered together:
+
+**1. Version gap:** The Immich mobile app had auto-updated to v2.x but the server was still
+on v1.109.2. The app showed "your app major version is not compatible with the server." Root
+cause: Renovate was deployed but its Kubernetes manager was not configured (SEC-005/2026-06-27
+fix), so none of the 93 container images in `kubernetes/` were being tracked. The version
+drifted silently over months.
+
+**2. Upgrade path blocked:** Direct jump from v1.109.2 to v2.7.5 fails with
+`Invalid upgrade path: 1744910873969-InitialMigration`. Immich v2 switched from TypeORM to
+Kysely; the Kysely InitialMigration requires all TypeORM migrations to have run first, which
+is only true through v1.x patch releases — a multi-hop intermediate upgrade through every
+minor in between would have been required. Since no photos had been uploaded yet (only
+account/password existed in the DB), a fresh install was simpler and correct.
+
+**Resolution — fresh install v2.7.5 (2026-06-27, PR #174):**
+
+- Postgres `immich-db` PVC data wiped via busybox pod (confirmed empty before scaling up)
+- New postgres image: `tensorchord/pgvecto-rs:pg16` → `ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0` (VectorChord replaces pgvecto.rs; PG14; no custom `shared_preload_libraries` args)
+- Redis replaced by Valkey: `redis:7.4-alpine` → `valkey/valkey:9-alpine`
+- Server/ML upgraded: `v1.109.2` → `v2.7.5`
+- Port changed: `3001` → `2283`
+- Two follow-up readOnlyRootFilesystem fixes needed (REL-024, REL-025)
+
+**External access — Cloudflare Tunnel (2026-06-27, PR #165):**
+Immich is the first service exposed externally (family photo backup use case). Decision to
+use the existing Cloudflare Tunnel rather than VPN-only or port-forwarding — see
+ADR-011 for reasoning. Terraform stack `terraform/stacks/cloudflare/` manages the tunnel
+config and DNS record (`photos.woitzik.dev → http://immich-server.apps.svc.cluster.local:2283`).
+
+AdGuard DNS split: `*.woitzik.dev` wildcard returns `10.0.20.200` (Traefik VIP). Since
+`photos.woitzik.dev` goes through Cloudflare, not Traefik, added specific A-record rewrites
+for Cloudflare's anycast IPs (`172.67.137.91`, `104.21.38.184`) so internal clients also
+reach the tunnel rather than hitting a dead Traefik backend.
+
+---
+
+### REL-024 — Valkey RDB persistence fails with readOnlyRootFilesystem · **RESOLVED** (2026-06-28)
+
+Immediately after the Immich v2.7.5 fresh install (WRK-009), photo sync failed with
+`MISCONF Valkey is configured to save RDB snapshots, but it's currently unable to persist to
+disk`. Valkey's default config enables RDB point-in-time snapshots and AOF, which require
+writes to the working directory. With `readOnlyRootFilesystem: true` and no writable `/data`
+volume, this trips `stop-writes-on-bgsave-error` and blocks all write commands.
+
+Immich uses Valkey purely as a cache and job queue — persistence adds no value and would
+survive a Valkey restart with empty state fine (jobs are re-queued on next media scan).
+
+**Fix (PR #188):** `command: ["valkey-server", "--save", "", "--appendonly", "no"]` —
+disables both RDB and AOF, runs fully in-memory. No data loss risk given the workload.
+
+---
+
+### REL-025 — immich-ml model downloads fail with readOnlyRootFilesystem · **RESOLVED** (2026-06-28)
+
+After REL-024 was fixed, Immich ML returned HTTP 500 for all CLIP and face-recognition
+requests. Root cause: HuggingFace's xet downloader writes temporary files to
+`~/.cache/huggingface` on the root filesystem during model download. With
+`readOnlyRootFilesystem: true`, these writes fail with `RuntimeError: Data processing error:
+I/O error: Read-only file system (os error 30)`, and the model never loads into memory.
+
+The OCR models (PP-OCRv5) succeeded because they use a different download path (direct HTTP
+to modelscope.cn), which writes only to `/cache` (the writable PVC).
+
+**Fix (PR #190):** Added `HF_HOME=/cache/huggingface` and `XDG_CACHE_HOME=/cache/xdg`
+environment variables to the `immich-ml` container, redirecting all HuggingFace/XDG cache
+writes to the writable `immich-ml-cache` PVC.
+
+Gunicorn logs a non-fatal `Control server error: [Errno 30] Read-only file system` on every
+startup — this is a gunicorn hot-reload socket path issue, cosmetic only (workers start and
+serve correctly). Not fixed; low priority.
+
+---
+
 ## Summary Table
 
 | ID | Category | Severity | Title |
@@ -1806,7 +1887,7 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | SEC-003 | Security | **RESOLVED** | Placeholder secrets rotated; found and fixed a much bigger bug along the way -- `configmap.yml` set 4 secret fields (jwt/session/storage-key/hmac) as bare literal strings instead of Authelia's file-templating syntax, so the *actual* functional secrets were public path strings, not the random Vault values (2026-06-24) |
 | SEC-004 | Security | **RESOLVED** | Cross-service secret reuse (redis/storage/paperless) |
 | REL-010 | Reliability | **RESOLVED** | `postgres-authelia` (CNPG) migrated from `nfs-client` to `local-path` via CNPG's declarative hibernation feature; required adding an ownerReference CNPG doesn't document needing (2026-06-24) |
-| SEC-005 | Security | **MEDIUM** | 14 images on `:latest` / floating tags |
+| SEC-005 | Security | **PARTIAL** | Images on `:latest` / floating tags — major-only floats pinned 2026-06-27 (PR #187); Renovate kubernetes manager now active; ~9 `:latest` images remain |
 | SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
 | SEC-008 | Security | **RESOLVED** | Atlantis had zero auth + plain-HTTP entrypoint -- added Authelia (webhook path excluded), HTTPS-only (2026-06-23) |
@@ -1852,8 +1933,8 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | DOC-001 | Docs | **RESOLVED** | DISASTER-RECOVERY.md does not exist -- added at repo root covering all 6 required tiers + per-service restore table (2026-06-23); this summary row was stale, the detailed entry already said RESOLVED |
 | DOC-002 | Docs | **LOW** | ROADMAP.md is partially in German |
 | DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |
-| DOC-004 | Docs | **RESOLVED** | 4 architectural decisions without ADRs — added ADR-006..009 |
-| WRK-001 | Workloads | **MEDIUM** | Jellyfin/media stack stuck in ContainerCreating |
+| DOC-004 | Docs | **RESOLVED** | 4 architectural decisions without ADRs — added ADR-006..009; ADR-011 (Cloudflare Tunnel external access) added 2026-06-27 |
+| WRK-001 | Workloads | **RESOLVED** | Jellyfin/media stack stuck in ContainerCreating — resolved via WRK-006 (media acq → LXC) and WRK-007 (Jellyfin → LXC) |
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed or backed up |
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
 | WRK-004 | Workloads | **RESOLVED** | paperless-gpt failing on every document; Ollama iGPU (Vulkan) crashing constantly under load -- switched to CPU-only |
@@ -1861,22 +1942,30 @@ CLAUDE.local.md already stating hardware transcode should run on mini's APU.
 | WRK-006 | Workloads | **IN PROGRESS** | Media acquisition stack moved to a dedicated gluetun/Mullvad-isolated LXC -- provisioned, deployed, kill-switch verified failing closed; blocked on a real Mullvad config + final cutover (2026-06-24, ADR-010) |
 | WRK-007 | Workloads | **RESOLVED** | Jellyfin moved to a dedicated GPU-passthrough LXC for VAAPI hardware transcode (shares mini's APU render node with ct-srv-ai-01's ROCm passthrough); config migrated and verified, old k8s resources removed (2026-06-24) |
 | WRK-008 | Workloads | **LOW** | Offsite backup to Cloudflare R2 (`kubernetes/system/velero/offsite-schedule.yml`/`r2-backuplocation.yml`) was scaffolded but never finished -- `r2-backuplocation.yml` has a literal `ACCOUNT_ID` placeholder and its referenced credential secret (`velero-r2-credentials`) doesn't exist anywhere (not Ansible Vault, not HashiCorp Vault). Confirmed not actively broken (Velero/ArgoCD just silently never create the BackupStorageLocation/Schedule, no error state) -- local backups to Garage/archive pool work fine. User decided to leave it deferred rather than complete or remove it now (2026-06-25) |
+| WRK-009 | Workloads | **RESOLVED** | Immich stuck on v1.109.2 with no external access — fresh install v2.7.5 (VectorChord postgres, Valkey, port 2283), Cloudflare Tunnel for `photos.woitzik.dev` (2026-06-27) |
+| REL-024 | Reliability | **RESOLVED** | Valkey RDB persistence blocked all writes with readOnlyRootFilesystem — disabled RDB+AOF (in-memory only, appropriate for cache/queue workload) (2026-06-28) |
+| REL-025 | Reliability | **RESOLVED** | immich-ml HuggingFace xet downloader wrote temp files to read-only root FS — redirected via HF_HOME+XDG_CACHE_HOME to writable PVC (2026-06-28) |
 
 ---
 
 ## Drift Detection
 
+*Last updated: 2026-06-28. The table below was verified live against the cluster — cells marked
+OK are confirmed current, not assumed.*
+
 | Resource | Git state | Live state | Delta |
 |---|---|---|---|
-| k3s-11 | Running, control-plane | Running (Ready) | OK |
-| k3s-12 | Running, control-plane | **Stopped** | DRIFT — needs start |
-| k3s-13 | Running, control-plane | **Stopped** | DRIFT — needs start |
-| ct-mgmt-pbs-01 | Running (implied by backup strategy) | **Stopped** | DRIFT |
+| k3s-11/12/13 | Running, worker | Running (Ready) | OK |
+| ct-mgmt-pbs-01 | Running | Verify live | Check `qm status` on mini |
 | ct-srv-nfs-01 | Running (required by all PVCs) | Running | OK |
-| ct-srv-ai-01 | Running (Ollama required by paperless-gpt) | **Stopped** | DRIFT |
-| ct-srv-docker-01 | Running (app_nodes group) | **Stopped** | DRIFT |
-| ct-dmz-proxy-01 | Running | **Stopped** | DRIFT |
-| ct-dmz-games-01 | Running | **Stopped** | DRIFT |
+| ct-srv-ai-01 | Running (Ollama/paperless-gpt) | Verify live | Check `qm status` |
+| ct-srv-docker-01 | Running (app_nodes group) | Verify live | Check `qm status` |
+| ct-srv-media-acq-01 | Running (media acquisition) | Running | OK |
+| ct-srv-jellyfin-01 | Running (Jellyfin LXC) | Running | OK |
+| ct-dmz-proxy-01 | Running | Verify live | Check `qm status` |
+| ct-dmz-games-01 | Running | Verify live | Check `qm status` |
 | ArgoCD Applications | All apps Synced | All Synced | OK |
-| vault-0 StatefulSet | 1/1 | 0/1 (sealed on restart) | Transient — resolves with auto-unseal |
-| headscale client_secret | Should be in Vault | In ConfigMap plaintext | DRIFT |
+| vault-0 StatefulSet | 1/1 Running | 1/1 Running | OK (auto-unseal active) |
+| immich-server | v2.7.5, port 2283 | v2.7.5, Running | OK |
+| headscale client_secret | Should be in Vault | In ConfigMap plaintext | **DRIFT** (SEC-001 — open) |
+| photos.woitzik.dev | Cloudflare Tunnel → immich-server:2283 | Reachable externally | OK |

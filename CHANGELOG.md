@@ -4,6 +4,37 @@ All notable changes to this infrastructure are documented here.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-28
+
+### Added
+
+- **Immich v2.7.5** — fresh install replacing v1.109.2 (PR #174):
+  - PostgreSQL switched from `tensorchord/pgvecto-rs:pg16` to `ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0` (VectorChord, PG14, no custom args)
+  - Redis replaced by `valkey/valkey:9-alpine`; RDB+AOF disabled (`--save "" --appendonly no`) to run in-memory with `readOnlyRootFilesystem: true` (PR #188)
+  - Server and ML both on v2.7.5; server port changed 3001 → 2283
+  - `HF_HOME=/cache/huggingface` and `XDG_CACHE_HOME=/cache/xdg` added to immich-ml to redirect HuggingFace xet downloads to writable PVC (PR #190)
+- **Cloudflare Tunnel for Immich** — `photos.woitzik.dev` now externally accessible for family photo backup (PR #165):
+  - New Terraform stack `terraform/stacks/cloudflare/` with Cloudflare provider v4, `cloudflare_tunnel_config` and DNS CNAME record
+  - Cloudflare API token stored in Ansible Vault, injected into Atlantis via `atlantis-secrets` k8s Secret
+  - AdGuard split-DNS: `photos.woitzik.dev` overrides the `*.woitzik.dev → 10.0.20.200` wildcard with Cloudflare anycast A records (`172.67.137.91`, `104.21.38.184`)
+  - ADR-011 documents the external access decision
+- **Renovate Kubernetes manager** — container images in `kubernetes/` now tracked and PRs opened for updates (PR #168). Previously only Helm/Terraform were active; 93 images were invisible to Renovate
+- **Pinned floating image tags** — bulk PR #187 converts major-only floats to semver:
+  - `louislam/uptime-kuma:1` → `1.23.17`
+  - `redis:7-alpine` → `7.4.9-alpine`; `redis:7` → `7.4.9`
+  - `postgres:16` → `16.14`; `postgres:16-alpine` → `16.14-alpine`
+  - `nextcloud:30-apache` → `30.0.17-apache`
+- `renovate.json` — new file at repo root configuring Kubernetes image tracking with grouping rules for major updates
+
+### Fixed
+
+- Removed dead `keel.sh/policy: force` / `keel.sh/trigger: poll` annotations from uptime-kuma (Keel is not deployed; annotations conflicted with ArgoCD selfHeal in theory)
+- Valkey startup race: `stop-writes-on-bgsave-error` was triggering immediately on Immich startup because Valkey tries to write RDB snapshots with no writable data directory
+
+### Security
+
+- Cloudflare Tunnel token (`cfut_5NVF…`) stored in Ansible Vault (`cloudflare_api_token`), not in Git (PR #165)
+
 ## [0.6.0] — 2026-06-21
 
 ### Added
