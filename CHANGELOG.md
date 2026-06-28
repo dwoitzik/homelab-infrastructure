@@ -4,6 +4,30 @@ All notable changes to this infrastructure are documented here.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-06-28
+
+### Added
+
+- **Cloudflare TF provider v5** (PR #192): migrated `terraform/stacks/cloudflare/` from `~> 4.0`
+  to `~> 5.0` with `moved {}` blocks to rename existing state resources without destroying/recreating
+  the live tunnel or DNS record:
+  - `cloudflare_tunnel_config` → `cloudflare_zero_trust_tunnel_cloudflared_config`
+  - `cloudflare_record` → `cloudflare_dns_record` (`value` field renamed to `content`)
+- **Immich upload fix** (PR #192): added `chunked_encoding = true`, `write_timeout = 600s`,
+  `read_timeout = 120s` to Cloudflare Tunnel origin config — fixes ECONNRESET for large photo/video
+  uploads that previously failed mid-transfer (REL-026)
+
+### Fixed
+
+- **Pinned all remaining floating image tags** (PR #193): `valkey/valkey:9-alpine` → `9.1.0-alpine`,
+  `gotenberg/gotenberg:8` → `8.34.0`, `ghcr.io/renovatebot/renovate:43` → `43.245.0`,
+  `gitea/gitea:1.26` → `1.26.4`, `hashicorp/vault:1.21` → `1.21.4`,
+  `ghcr.io/home-assistant/home-assistant:stable` → `2026.6.4`,
+  `ghcr.io/open-webui/open-webui:main` → `v0.9.6`, `alpine:3` → `3.22`. Closes SEC-005.
+- Closed Renovate's auto-PR #167 (Cloudflare v5) as superseded by the manual migration (#192)
+
+---
+
 ## [0.7.0] — 2026-06-28
 
 ### Added
