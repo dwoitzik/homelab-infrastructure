@@ -41,11 +41,19 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
     floating  = 8192
   }
 
+  # REL-012c: cache=writeback so guest fdatasync (etcd WAL) flushes to host RAM
+  # instead of blocking until the NVMe confirms. Default cache=none (O_DIRECT)
+  # caused 69-second+ fdatasync stalls on the AirDisk SSD → etcd lease timeout
+  # → k3s crash loop. iothread=1 moves disk IO off the QEMU main thread.
+  # Applied manually via `qm set 211 ...`; disk is in ignore_changes so
+  # Atlantis will not re-apply this block after initial VM creation.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
     size         = 120
     file_format  = "raw"
+    cache        = "writeback"
+    iothread     = true
   }
 
   network_device {
@@ -110,11 +118,16 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
     floating  = 4096
   }
 
+  # REL-012c: cache=writeback + iothread=1 (see k3s-11 comment). Workers don't
+  # run etcd but consistency prevents issues if node roles ever change.
+  # Applied manually via `qm set 212 ...`; disk in ignore_changes.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
     size         = 120
     file_format  = "raw"
+    cache        = "writeback"
+    iothread     = true
   }
 
   network_device {
@@ -178,11 +191,15 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
     floating  = 4096
   }
 
+  # REL-012c: cache=writeback + iothread=1 (see k3s-11 comment).
+  # Applied manually via `qm set 213 ...`; disk in ignore_changes.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
     size         = 120
     file_format  = "raw"
+    cache        = "writeback"
+    iothread     = true
   }
 
   network_device {
