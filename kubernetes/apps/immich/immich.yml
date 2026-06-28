@@ -252,6 +252,10 @@ spec:
           value: "3003"
         - name: MPLCONFIGDIR
           value: /tmp/matplotlib
+        - name: HF_HOME
+          value: /cache/huggingface
+        - name: XDG_CACHE_HOME
+          value: /cache/xdg
         resources:
           requests:
             cpu: 500m
