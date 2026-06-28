@@ -82,7 +82,7 @@ spec:
     spec:
       containers:
       - name: valkey
-        image: valkey/valkey:9-alpine
+        image: valkey/valkey:9.1.0-alpine
         command: ["valkey-server", "--save", "", "--appendonly", "no"]
         securityContext:
           allowPrivilegeEscalation: false

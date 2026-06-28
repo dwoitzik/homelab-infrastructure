@@ -18,7 +18,7 @@ spec:
       hostPID: true
       containers:
         - name: sysctl
-          image: alpine:3
+          image: alpine:3.22
           command:
             - sh
             - -c
