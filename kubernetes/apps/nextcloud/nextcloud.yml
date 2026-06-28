@@ -40,7 +40,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: postgres:16-alpine
+          image: postgres:16.14-alpine
           # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
           # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
           # the postgres user -- confirmed live (same failure as
@@ -115,7 +115,7 @@ spec:
     spec:
       containers:
         - name: redis
-          image: redis:7-alpine
+          image: redis:7.4.9-alpine
           # SEC-012: this instance has no command override, so it runs the
           # image's default entrypoint, which needs CAP_SETUID to setpriv-drop
           # from root to the redis user -- confirmed live ("setpriv: setresuid
@@ -177,7 +177,7 @@ spec:
         effect: NoSchedule
       containers:
         - name: nextcloud
-          image: nextcloud:30-apache
+          image: nextcloud:30.0.17-apache
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -239,7 +239,7 @@ spec:
               memory: 1Gi
       initContainers:
         - name: copy-php-conf
-          image: nextcloud:30-apache
+          image: nextcloud:30.0.17-apache
           command: ["sh", "-c", "cp -a /usr/local/etc/php/conf.d/. /writable-conf/"]
           volumeMounts:
             - name: php-conf
@@ -295,7 +295,7 @@ spec:
                   topologyKey: kubernetes.io/hostname
           containers:
             - name: nextcloud-cron
-              image: nextcloud:30-apache
+              image: nextcloud:30.0.17-apache
               command: [php, -f, /var/www/html/cron.php]
               securityContext:
                 allowPrivilegeEscalation: false
