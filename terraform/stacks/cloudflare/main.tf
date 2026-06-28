@@ -1,6 +1,5 @@
 # =============================================================================
 # Cloudflare Tunnel configuration for woitzik.dev public services.
-# Last updated: 2026-06-28 (provider v5 migration + chunked_encoding upload fix)
 #
 # The cloudflared daemon runs in K3s (apps/cloudflared) and holds 4 persistent
 # connections to Cloudflare's edge (fra/dus PoPs). This stack configures which
@@ -11,7 +10,7 @@
 # Zone:       woitzik.dev (1f15ed0f3a8b497302ba339dcab3c060)
 # =============================================================================
 
-# Provider v4 → v5 renames: moved blocks prevent destroy+recreate of live resources.
+# Provider v4 -> v5 renames: moved blocks prevent destroy+recreate of live resources.
 moved {
   from = cloudflare_tunnel_config.homelab
   to   = cloudflare_zero_trust_tunnel_cloudflared_config.homelab
@@ -24,60 +23,61 @@ moved {
 
 locals {
   tunnel_cname = "${var.tunnel_id}.cfargotunnel.com"
-
-  # Public hostnames exposed through the Cloudflare tunnel.
-  # Each entry maps a public hostname → internal K3s service.
-  # cloudflared resolves these from within the apps namespace.
-  tunnel_ingress = [
-    {
-      hostname = "atlantis.woitzik.dev"
-      service  = "http://atlantis.apps.svc.cluster.local:4141"
-    },
-    {
-      hostname = "photos.woitzik.dev"
-      service  = "http://immich-server.apps.svc.cluster.local:2283"
-    },
-  ]
 }
 
 # -----------------------------------------------------------------------------
 # Tunnel ingress configuration
-# Defines which hostnames cloudflared routes and where traffic lands internally.
+# v5 schema: config is an object attribute (config = {}) not a block (config {}).
+# ingress is a list attribute -- not dynamic ingress_rule blocks.
+# Timeouts are integers (seconds). disable_chunked_encoding replaces chunked_encoding
+# (inverted bool: false = chunked encoding ENABLED, which is what we want).
 # -----------------------------------------------------------------------------
 resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
   account_id = var.account_id
   tunnel_id  = var.tunnel_id
 
-  config {
-    dynamic "ingress_rule" {
-      for_each = local.tunnel_ingress
-      content {
-        hostname = ingress_rule.value.hostname
-        service  = ingress_rule.value.service
-        origin_request {
-          no_tls_verify    = false
-          connect_timeout  = "10s"
-          tcp_keep_alive   = "30s"
-          http_host_header = ingress_rule.value.hostname
-          # Immich uploads large photo/video files — chunked encoding prevents
-          # Cloudflare from buffering the entire body before forwarding, which
-          # causes ECONNRESET on large uploads. write_timeout covers the upload
-          # leg; read_timeout covers the origin's processing response.
-          chunked_encoding = true
-          write_timeout    = "600s"
-          read_timeout     = "120s"
+  config = {
+    ingress = [
+      {
+        hostname = "atlantis.woitzik.dev"
+        service  = "http://atlantis.apps.svc.cluster.local:4141"
+        origin_request = {
+          no_tls_verify            = false
+          connect_timeout          = 10
+          tcp_keep_alive           = 30
+          http_host_header         = "atlantis.woitzik.dev"
+          disable_chunked_encoding = false
         }
-      }
-    }
-    # Catch-all: return 404 for any unmatched hostname
-    ingress_rule {
-      service = "http_status:404"
-    }
+      },
+      {
+        hostname = "photos.woitzik.dev"
+        service  = "http://immich-server.apps.svc.cluster.local:2283"
+        origin_request = {
+          no_tls_verify    = false
+          connect_timeout  = 10
+          tcp_keep_alive   = 30
+          http_host_header = "photos.woitzik.dev"
+          # disable_chunked_encoding = false keeps chunked encoding ON, preventing
+          # Cloudflare from buffering the full upload body before forwarding --
+          # the root cause of ECONNRESET on large Immich uploads (REL-026).
+          disable_chunked_encoding = false
+        }
+      },
+      # Catch-all: return 404 for any unmatched hostname
+      { service = "http_status:404" }
+    ]
   }
 }
 
 # -----------------------------------------------------------------------------
-# DNS records — CNAME → tunnel (proxied through Cloudflare CDN/DDoS layer)
+# DNS records -- CNAME -> tunnel (proxied through Cloudflare CDN/DDoS layer)
+#
+# NOTE: cloudflare_api_token in the Atlantis pod currently only has
+# "Cloudflare Tunnel:Edit" scope. Zone:DNS:Edit is needed to create/update
+# these records. Until the token is updated, apply with:
+#   terraform apply -target=cloudflare_zero_trust_tunnel_cloudflared_config.homelab
+#
+# ttl = 1 means "Auto" for proxied records (required field in provider v5).
 # -----------------------------------------------------------------------------
 resource "cloudflare_dns_record" "tunnel_photos" {
   zone_id = var.zone_id
@@ -85,7 +85,8 @@ resource "cloudflare_dns_record" "tunnel_photos" {
   type    = "CNAME"
   content = local.tunnel_cname
   proxied = true
-  comment = "Immich photo library — routed via Cloudflare tunnel"
+  ttl     = 1
+  comment = "Immich photo library -- routed via Cloudflare tunnel"
 }
 
 resource "cloudflare_dns_record" "tunnel_atlantis" {
@@ -94,5 +95,6 @@ resource "cloudflare_dns_record" "tunnel_atlantis" {
   type    = "CNAME"
   content = local.tunnel_cname
   proxied = true
-  comment = "Atlantis GitOps runner — GitHub webhook endpoint (/events) + UI"
+  ttl     = 1
+  comment = "Atlantis GitOps runner -- GitHub webhook endpoint (/events) + UI"
 }
