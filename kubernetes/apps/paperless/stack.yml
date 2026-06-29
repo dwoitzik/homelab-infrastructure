@@ -45,7 +45,7 @@ spec:
           readOnly: true
       containers:
       - name: postgres
-        image: postgres:16.14
+        image: postgres:18.4
         # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
         # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
         # the postgres user -- confirmed live, dropping all capabilities
