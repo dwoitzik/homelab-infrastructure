@@ -42,14 +42,14 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
     floating  = 8192
   }
 
-  # REL-012c: cache=writeback so guest fdatasync (etcd WAL) returns quickly.
-  # Default cache=none (O_DIRECT) caused 69–86s+ fdatasync stalls on the
-  # AirDisk SSD under ARC pressure → etcd lease timeout → k3s crash loop.
-  # cache=writeback: guest fsync flushes QEMU page cache to ZFS; ZFS returns
-  # immediately (sync=disabled on rpool). With zfs_dirty_data_max=256MB and
-  # zfs_txg_timeout=5s, ZFS commits to SSD SLC cache within seconds.
-  # Safer than cache=unsafe (which bypasses guest page cache entirely and
-  # caused ext4 directory corruption when VMs were force-stopped).
+  # REL-012c: cache=none + aio=native (O_DIRECT, no QEMU page cache).
+  # With cache=writeback, large sequential writes (container image pulls) accumulate
+  # in the QEMU page cache; when etcd later calls fdatasync on the WAL, QEMU must
+  # flush ALL dirty pages to ZFS at once → 8–127s stalls → etcd lease timeout →
+  # k3s crash loop. cache=none eliminates this: every VM write goes directly to
+  # ZFS ARC in small increments, so fdatasync sees only etcd's own dirty data.
+  # ZFS tuning (/etc/modprobe.d/zfs.conf): zfs_dirty_data_max=256MB,
+  # zfs_txg_timeout=5s, zfs_arc_max=16GB bounds each txg commit to SLC capacity.
   # Applied manually via `qm set 211 ...`; disk is in ignore_changes so
   # Atlantis will not re-apply this block after initial VM creation.
   disk {
@@ -57,7 +57,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
     interface    = "scsi0"
     size         = 120
     file_format  = "raw"
-    cache        = "writeback"
+    cache        = "none"
+    aio          = "native"
   }
 
   network_device {
@@ -123,14 +124,15 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
     floating  = 4096
   }
 
-  # REL-012c: cache=writeback (see k3s-11 comment).
+  # REL-012c: cache=none + aio=native (see k3s-11 comment).
   # Applied manually via `qm set 212 ...`; disk in ignore_changes.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
     size         = 120
     file_format  = "raw"
-    cache        = "writeback"
+    cache        = "none"
+    aio          = "native"
   }
 
   network_device {
@@ -195,14 +197,15 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
     floating  = 4096
   }
 
-  # REL-012c: cache=writeback (see k3s-11 comment).
+  # REL-012c: cache=none + aio=native (see k3s-11 comment).
   # Applied manually via `qm set 213 ...`; disk in ignore_changes.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
     size         = 120
     file_format  = "raw"
-    cache        = "writeback"
+    cache        = "none"
+    aio          = "native"
   }
 
   network_device {
