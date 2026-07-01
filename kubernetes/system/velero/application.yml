@@ -40,6 +40,11 @@ spec:
         backupsEnabled: true
         snapshotsEnabled: true
         deployNodeAgent: true
+        # Reduce kopia maintenance frequency from 1h (default) to 24h per repo.
+        # With 11 BackupRepositories, hourly maintenance = 11 concurrent kopia jobs/hour
+        # hammering rpool NVMe, which competes with etcd and caused cluster IO pressure.
+        extraArgs:
+          - --default-repo-maintenance-frequency=24h
   destination:
     server: https://kubernetes.default.svc
     namespace: velero
