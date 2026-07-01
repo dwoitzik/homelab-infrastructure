@@ -21,3 +21,9 @@ variable "tunnel_id" {
   description = "Cloudflare Tunnel ID (from cloudflared token)"
   default     = "1f2e0f78-214b-4f59-881d-37e22625ae6e"
 }
+
+variable "mc_playit_hostname" {
+  type        = string
+  description = "playit.gg tunnel hostname for mc.woitzik.dev CNAME (e.g. abc123.mc.ply.gg). Leave empty to skip record creation."
+  default     = ""
+}
