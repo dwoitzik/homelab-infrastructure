@@ -8,6 +8,18 @@
 # - Cobblemon (25566): internal-only going forward, no external access.
 # Matching forward-chain rules (fwd_wan_minecraft, fwd_wan_cobblemon) also
 # removed from firewall_extra.tf.
+# removed blocks tell Terraform to destroy these resources that no longer exist
+# in config. Workaround for TF "Resource has no configuration" bug (#34992)
+# that fires when removing routeros resources without explicit removed blocks.
+removed {
+  from = routeros_ip_firewall_nat.dstnat_minecraft
+  lifecycle { destroy = true }
+}
+removed {
+  from = routeros_ip_firewall_nat.dstnat_cobblemon
+  lifecycle { destroy = true }
+}
+
 ###############################################################################
 # Outbound NAT (GIT-009) — these two srcnat rules existed live but were never
 # declared in Terraform at all; basic internet access for the whole homelab
