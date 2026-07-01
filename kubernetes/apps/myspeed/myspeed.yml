@@ -16,9 +16,7 @@ metadata:
   name: myspeed
   namespace: apps
 spec:
-  # GHCR package ghcr.io/gnmyt/myspeed is private (403 on anon pull).
-  # Set replicas: 1 after adding a GHCR imagePullSecret or finding a public mirror.
-  replicas: 0
+  replicas: 1
   strategy:
     type: Recreate
   selector:
@@ -31,7 +29,7 @@ spec:
     spec:
       containers:
       - name: myspeed
-        image: ghcr.io/gnmyt/myspeed:latest
+        image: germannewsmaker/myspeed:1.0.9
         securityContext:
           allowPrivilegeEscalation: false
           seccompProfile:
