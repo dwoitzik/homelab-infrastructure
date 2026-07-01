@@ -1,5 +1,6 @@
 # =============================================================================
 # Cloudflare Tunnel configuration for woitzik.dev public services.
+# Last applied: 2026-07-01 (media tunnel + mc CNAME via playit.gg)
 #
 # The cloudflared daemon runs in K3s (apps/cloudflared) and holds 4 persistent
 # connections to Cloudflare's edge (fra/dus PoPs). This stack configures which

@@ -1,5 +1,6 @@
 ###############################################################################
 # Inbound Port Forwards (WAN -> internal services)
+# Last applied: 2026-07-01 (MC port forwards removed, playit.gg replaces WAN exposure)
 #
 # Minecraft (25565) and Cobblemon (25566) port forwards removed 2026-07-01:
 # - Main Minecraft (25565): now routed via playit.gg tunnel (mc.woitzik.dev
