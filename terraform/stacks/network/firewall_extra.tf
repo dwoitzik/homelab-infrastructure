@@ -1,3 +1,14 @@
+# removed blocks for MC firewall rules deleted 2026-07-01 (PR #216).
+# Explicit removed blocks required to avoid TF "Resource has no configuration" bug.
+removed {
+  from = routeros_ip_firewall_filter.fwd_wan_minecraft
+  lifecycle { destroy = true }
+}
+removed {
+  from = routeros_ip_firewall_filter.fwd_wan_cobblemon
+  lifecycle { destroy = true }
+}
+
 # ===============================================
 # Rules that existed live on the router but were never added to Terraform.
 # Found during the 2026-06-21 firewall audit (see CHANGELOG/OPERATIONS.md).

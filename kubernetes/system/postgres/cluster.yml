@@ -72,6 +72,9 @@ spec:
         secretAccessKey:
           name: cnpg-garage-backup
           key: secret-access-key
+        region:
+          name: cnpg-backup-config
+          key: region
       wal:
         compression: gzip
       data:
