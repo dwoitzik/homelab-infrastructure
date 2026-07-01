@@ -121,20 +121,6 @@ resource "routeros_ip_firewall_filter" "fwd_monitoring_dmz_scrape" {
   }
 }
 
-resource "routeros_ip_firewall_filter" "fwd_wan_minecraft" {
-  action       = "accept"
-  chain        = "forward"
-  protocol     = "tcp"
-  in_interface = "ether1"
-  dst_address  = "10.0.30.2"
-  dst_port     = "25565"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "13: WAN - Allow Internet traffic to DMZ Minecraft Server"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
-}
 
 resource "routeros_ip_firewall_filter" "fwd_mgmt_internet" {
   action        = "accept"
@@ -149,20 +135,6 @@ resource "routeros_ip_firewall_filter" "fwd_mgmt_internet" {
   }
 }
 
-resource "routeros_ip_firewall_filter" "fwd_wan_cobblemon" {
-  action       = "accept"
-  chain        = "forward"
-  protocol     = "tcp"
-  in_interface = "ether1"
-  dst_address  = "10.0.30.2"
-  dst_port     = "25566"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "12: WAN -> Cobblemon Minecraft (ct-dmz-proxy-01:25566)"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
-}
 
 resource "routeros_ip_firewall_filter" "fwd_vpn_full_tunnel" {
   action        = "accept"

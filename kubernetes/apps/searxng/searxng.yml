@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: searxng-config
+  namespace: apps
+data:
+  settings.yml: |
+    use_default_settings: true
+    general:
+      instance_name: "Homelab Search"
+      debug: false
+    server:
+      # Replace with a random 32+ char secret; update here or manage via ExternalSecret
+      secret_key: "REPLACE_WITH_RANDOM_SECRET_MIN_32_CHARS_LONG_XYZ"
+      bind_address: "0.0.0.0:8080"
+      limiter: false
+      image_proxy: true
+    ui:
+      default_locale: "de"
+      default_theme: simple
+      center_alignment: true
+    search:
+      safe_search: 0
+      autocomplete: "google"
+      default_lang: "de-DE"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: searxng
+  namespace: apps
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: searxng
+  template:
+    metadata:
+      labels:
+        app: searxng
+    spec:
+      containers:
+      - name: searxng
+        image: searxng/searxng:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+            add: ["SETGID", "SETUID", "CHOWN"]
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: config
+          mountPath: /etc/searxng/settings.yml
+          subPath: settings.yml
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+      volumes:
+      - name: config
+        configMap:
+          name: searxng-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: searxng
+  namespace: apps
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: searxng
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: searxng-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`search.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: searxng, port: 8080}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
