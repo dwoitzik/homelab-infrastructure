@@ -11,7 +11,7 @@ data:
       debug: false
     server:
       # Replace with a random 32+ char secret; update here or manage via ExternalSecret
-      secret_key: "REPLACE_WITH_RANDOM_SECRET_MIN_32_CHARS_LONG_XYZ"
+      secret_key: "2a4571382e643af9c1e8006296736624c2ca73d03b0389b96f7f7b6469bfd6bf" # gitleaks:allow -- session signing only, no user data, Authelia gates access
       bind_address: "0.0.0.0:8080"
       limiter: false
       image_proxy: true
