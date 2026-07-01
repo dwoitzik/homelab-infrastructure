@@ -289,7 +289,8 @@ spec:
     services: [{name: home-assistant, port: 8123}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# Jellyfin (Media Server — Authelia guards web UI; mobile apps must use Headscale VPN)
+# Jellyfin (Media Server — Authelia gates internal path; external path via Cloudflare
+# tunnel goes directly to Jellyfin login, consistent with Immich pattern)
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
