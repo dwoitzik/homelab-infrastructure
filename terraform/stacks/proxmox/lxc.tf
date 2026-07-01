@@ -299,6 +299,16 @@ resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
     path   = "/media"
   }
 
+  # SABnzbd incomplete-downloads on the HDD (archive pool), NOT rpool.
+  # rpool/incomplete-downloads was causing fdatasync stalls in etcd when
+  # SABnzbd wrote large NZB downloads at high speed (ZFS dirty data
+  # shared with VM zvols → txg commit delay → etcd lease timeout → k3s crash).
+  # Moved to archive/media 2026-07-01 (REL-020).
+  mount_point {
+    volume = "/mnt/media/incomplete-downloads"
+    path   = "/downloads/incomplete"
+  }
+
   # /dev/net/tun passthrough -- required for gluetun (Mullvad WireGuard)
   # inside this unprivileged container; without it Docker can't bind-mount
   # the device into the gluetun container at all ("error gathering device
