@@ -47,6 +47,8 @@ spec:
               value: "false"
             - name: TS_HOSTNAME
               value: "homelab-router"
+            - name: TS_KUBE_SECRET
+              value: ""
             - name: TS_EXTRA_ARGS
               value: "--login-server=https://headscale.woitzik.dev"
           securityContext:
