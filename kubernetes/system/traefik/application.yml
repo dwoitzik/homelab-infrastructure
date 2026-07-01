@@ -19,6 +19,9 @@ spec:
           - "--api.insecure=true"
           - "--entrypoints.websecure.forwardedHeaders.trustedIPs=10.42.0.0/16,10.0.0.0/8"
           - "--entrypoints.websecure.proxyProtocol.trustedIPs=10.42.0.0/16,10.0.0.0/8"
+          # Traefik v3 default readTimeout is 60s; large Immich uploads over
+          # NFS-backed USB storage exceed that → 502. Set to 0 (unlimited).
+          - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=0"
         ports:
           web:
             redirectTo:
@@ -27,13 +30,6 @@ spec:
             tls:
               enabled: true
               secretName: traefik-tls-secret
-            transport:
-              respondingTimeouts:
-                # readTimeout=0 disables the 60s default (Traefik v3 changed it from
-                # unlimited to 60s). Large Immich uploads over NFS-backed USB storage
-                # routinely exceed 60s → 502 bad gateway. Disable the limit here;
-                # Immich's own server enforces upload limits at the app layer.
-                readTimeout: "0"
         logs:
           general:
             level: INFO
