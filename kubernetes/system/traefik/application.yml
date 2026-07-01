@@ -27,6 +27,13 @@ spec:
             tls:
               enabled: true
               secretName: traefik-tls-secret
+            transport:
+              respondingTimeouts:
+                # readTimeout=0 disables the 60s default (Traefik v3 changed it from
+                # unlimited to 60s). Large Immich uploads over NFS-backed USB storage
+                # routinely exceed 60s → 502 bad gateway. Disable the limit here;
+                # Immich's own server enforces upload limits at the app layer.
+                readTimeout: "0"
         logs:
           general:
             level: INFO
