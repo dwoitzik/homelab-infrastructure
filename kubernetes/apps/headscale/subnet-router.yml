@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tailscale-router-state
+  namespace: apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tailscale-subnet-router
+  namespace: apps
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: tailscale-subnet-router
+  template:
+    metadata:
+      labels:
+        app: tailscale-subnet-router
+    spec:
+      containers:
+        - name: tailscale
+          image: tailscale/tailscale:stable
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: tailscale-subnet-router
+                  key: TS_AUTHKEY
+            - name: TS_ROUTES
+              value: "10.0.0.0/16"
+            - name: TS_STATE_DIR
+              value: /var/lib/tailscale
+            - name: TS_USERSPACE
+              value: "false"
+            - name: TS_ACCEPT_DNS
+              value: "false"
+            - name: TS_HOSTNAME
+              value: "homelab-router"
+            - name: TS_EXTRA_ARGS
+              value: "--login-server=https://headscale.woitzik.dev"
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+          volumeMounts:
+            - name: state
+              mountPath: /var/lib/tailscale
+            - name: dev-tun
+              mountPath: /dev/net/tun
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: tailscale-router-state
+        - name: dev-tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice
