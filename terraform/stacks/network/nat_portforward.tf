@@ -1,55 +1,12 @@
 ###############################################################################
 # Inbound Port Forwards (WAN -> internal services)
 #
-# Requires a matching port-forward on the Fritzbox (upstream of ether1) to
-# 192.168.178.10 (this router's WAN-side IP) for each port below — MikroTik
-# only sees the Fritzbox's LAN, not the real internet-facing public IP.
-###############################################################################
-
-# REL-017: this rule never existed -- found while investigating why
-# mc-server-2 (the original Minecraft server, port 25565) had been
-# unreachable from the internet all night, confirmed via the live router's
-# REST API (GET /rest/ip/firewall/nat) only ever showing the Cobblemon rule
-# below, nothing for 25565. The matching forward-chain ALLOW rule
-# (fwd_wan_minecraft in firewall_extra.tf) exists and always has, but an
-# ALLOW rule is useless without a NAT rule to actually rewrite the
-# destination from the public IP to the internal proxy in the first place --
-# confirmed live: NPM and the backend (ct-dmz-games-01) were both already
-# listening and reachable internally the entire time, only the public path
-# was ever broken.
-resource "routeros_ip_firewall_nat" "dstnat_minecraft" {
-  chain        = "dstnat"
-  action       = "dst-nat"
-  protocol     = "tcp"
-  dst_port     = "25565"
-  in_interface = "ether1"
-  to_addresses = "10.0.30.2"
-  to_ports     = "25565"
-  comment      = "DNAT: Minecraft -> ct-dmz-proxy-01 (NPM stream)"
-}
-
-# Cobblemon Minecraft server (Fabric) — routed through ct-dmz-proxy-01 (NPM
-# stream + CrowdSec), same pattern as the Minecraft server above on 25565.
-# NPM then forwards 25566 -> ct-dmz-games-01:25566 internally.
-resource "routeros_ip_firewall_nat" "dstnat_cobblemon" {
-  chain        = "dstnat"
-  action       = "dst-nat"
-  protocol     = "tcp"
-  dst_port     = "25566"
-  in_interface = "ether1"
-  to_addresses = "10.0.30.2"
-  to_ports     = "25566"
-  comment      = "DNAT: Cobblemon Minecraft -> ct-dmz-proxy-01 (NPM stream)"
-}
-
-# NOTE: the matching forward-chain accept rule for this port already exists
-# as routeros_ip_firewall_filter.fwd_wan_cobblemon in firewall_extra.tf
-# (imported from the live router, id *B5). A duplicate "fwd_12_wan_to_cobblemon"
-# resource with identical attributes used to live here too — same comment,
-# same match criteria — which would have claimed the same live object under a
-# second Terraform address. Removed 2026-06-23 while rebuilding network state
-# (GIT-007); only the NAT rule belongs in this file.
-
+# Minecraft (25565) and Cobblemon (25566) port forwards removed 2026-07-01:
+# - Main Minecraft (25565): now routed via playit.gg tunnel (mc.woitzik.dev
+#   CNAME in cloudflare stack). FritzBox WAN ports closed.
+# - Cobblemon (25566): internal-only going forward, no external access.
+# Matching forward-chain rules (fwd_wan_minecraft, fwd_wan_cobblemon) also
+# removed from firewall_extra.tf.
 ###############################################################################
 # Outbound NAT (GIT-009) — these two srcnat rules existed live but were never
 # declared in Terraform at all; basic internet access for the whole homelab
