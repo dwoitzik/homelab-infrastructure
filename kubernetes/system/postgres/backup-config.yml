@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cnpg-backup-config
+  namespace: database
+type: Opaque
+stringData:
+  region: homelab
