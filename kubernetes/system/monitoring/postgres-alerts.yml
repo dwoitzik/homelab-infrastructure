@@ -1,0 +1,50 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-postgres-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: postgres.wal
+      rules:
+        # WAL archiving backlog warning: >50 files ready means archiving is falling behind.
+        # Normal steady-state is 0-5. We hit 2501 files (40 GB) over 7 days before detection
+        # because there was no alert (root cause: NetworkPolicy block + wrong S3 region).
+        # 50 files ≈ 800 MB; anything sustained here warrants investigation.
+        - alert: PostgresWALArchivingBacklogHigh
+          expr: |
+            cnpg_collector_pg_wal_archive_status{value="ready"} > 50
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG WAL archive backlog > 50 files on {{ $labels.pod }}"
+            description: >
+              {{ $labels.pod }} has {{ $value | humanize }} WAL files waiting to be archived
+              for 10+ minutes. Each file is 16 MB so {{ $value | humanize }} files ≈
+              {{ $value | humanize }}×16 MB. Normal steady-state is 0-5 files. A sustained
+              backlog means archiving is blocked (NetworkPolicy? S3 endpoint down? region
+              mismatch?). Check pod logs: kubectl -n database logs {{ $labels.pod }} | grep -i
+              'archive\|wal\|s3\|error'. This previously grew to 2501 files (40 GB) over 7 days
+              with no alert, causing cluster-wide IO pressure and etcd timeouts (REL-021).
+
+        - alert: PostgresWALArchivingBacklogCritical
+          expr: |
+            cnpg_collector_pg_wal_archive_status{value="ready"} > 500
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CNPG WAL archive backlog > 500 files (8 GB) on {{ $labels.pod }} -- IO pressure risk"
+            description: >
+              {{ $labels.pod }} has {{ $value | humanize }} unarchived WAL files (≈ {{ $value |
+              humanize }}×16 MB). At this level the pg_wal directory on the local-path PVC is
+              consuming significant SSD space and competing with etcd for IO bandwidth.
+              The cluster suffered IO pressure + API server instability when this reached 2501
+              files (40 GB) on node 13 (REL-021). Immediate action required: check archiving
+              connectivity to Garage S3, NetworkPolicies in apps namespace, and S3 region
+              configuration.
