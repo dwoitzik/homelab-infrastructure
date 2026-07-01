@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myspeed-data
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myspeed
+  namespace: apps
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: myspeed
+  template:
+    metadata:
+      labels:
+        app: myspeed
+    spec:
+      containers:
+      - name: myspeed
+        image: ghcr.io/gnmyt/myspeed:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+        ports:
+        - containerPort: 5216
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: myspeed-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: myspeed
+  namespace: apps
+spec:
+  ports:
+  - port: 5216
+    targetPort: 5216
+  selector:
+    app: myspeed
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: myspeed-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`speed.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: myspeed, port: 5216}]
+  tls: {secretName: wildcard-woitzik-dev-tls}

@@ -84,6 +84,10 @@ data:
             icon: open-webui.png
             href: https://ai.woitzik.dev
             description: Local LLM · gemma2:27b
+        - SearXNG:
+            icon: searxng.png
+            href: https://search.woitzik.dev
+            description: Private Search Engine
         - Nextcloud:
             icon: nextcloud.png
             href: https://nextcloud.woitzik.dev
@@ -177,6 +181,13 @@ data:
               type: uptimekuma
               url: http://uptime-kuma.monitoring.svc.cluster.local:3001
               slug: status
+        - MySpeed:
+            icon: myspeed.png
+            href: https://speed.woitzik.dev
+            description: Internet Speed Tracker
+            widget:
+              type: myspeed
+              url: http://myspeed.apps.svc.cluster.local:5216
         - Loki:
             icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/loki.svg
             href: https://monitoring.woitzik.dev/explore?schemaVersion=1&panes=%7B%22logs%22:%7B%22datasource%22:%22loki%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bjob%3D~%22.%2B%22%7D%22%7D%5D%7D%7D
@@ -201,8 +212,10 @@ data:
           cpu: true
           memory: true
     - search:
-        provider: google
+        provider: custom
+        url: https://search.woitzik.dev/search?q=
         target: _blank
+        focus: true
     - datetime:
         text_size: xl
         locale: de-DE
@@ -222,13 +235,13 @@ data:
       columns: 3
     Apps:
       style: grid
-      columns: 4
+      columns: 5
     Media:
       style: grid
       columns: 6
     Monitoring:
       style: grid
-      columns: 3
+      columns: 4
   settings.yaml: |
     title: David's Homelab
     theme: dark
