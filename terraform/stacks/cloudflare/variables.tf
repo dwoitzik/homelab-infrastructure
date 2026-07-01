@@ -24,6 +24,6 @@ variable "tunnel_id" {
 
 variable "mc_playit_hostname" {
   type        = string
-  description = "playit.gg tunnel hostname for mc.woitzik.dev CNAME (e.g. abc123.mc.ply.gg). Leave empty to skip record creation."
-  default     = ""
+  description = "playit.gg tunnel hostname for mc.woitzik.dev CNAME."
+  default     = "doing-sigma.gl.joinmc.link"
 }
