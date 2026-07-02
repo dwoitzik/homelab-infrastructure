@@ -1895,6 +1895,45 @@ and DNS record when renaming resources for the Cloudflare provider v4 → v5 mig
 
 ---
 
+### REL-032 — Media acquisition stack: no autoheal, recurring silent queue jams · **RESOLVED** (2026-07-02)
+
+Two distinct "usenet does nothing" recurrences in 24h (2026-07-01 permission bug, 2026-07-02
+Sonarr import jam) both required manual intervention to notice and fix — no automated
+recovery existed for either failure class. Root cause of the second: Sonarr's `DetectSample`
+step (used during import to distinguish sample/trailer files from real episodes) choked on a
+release group's malformed subtitle track, and separately, a whole-season raw Blu-ray `.iso`
+disc image was grabbed that can never be imported (no demuxable video stream at the container
+level) — both jammed the queue behind them indefinitely with no self-recovery. Found in the
+same pass: two stuck `_UNPACK_` folders (Game of Thrones S03/S08, ~40GB) sitting since
+2026-06-28, never imported, salvaged by moving files directly into the library and triggering
+a Sonarr rescan instead of re-downloading.
+
+**Fixes:**
+
+1. Docker healthchecks added to all 6 media-acq containers (`sonarr`/`radarr`/`bazarr`/
+   `sabnzbd`/`nzbhydra2`/`jellyseerr`) plus a `willfarrell/autoheal` sidecar that force-restarts
+   any container Docker marks unhealthy — covers "process alive but hung/unresponsive," the
+   class `restart: unless-stopped` alone doesn't catch.
+2. New Sonarr/Radarr Custom Format "Block Raw Disc/ISO Releases" (regex on `BD25/50/66/100`,
+   `COMPLETE.BLURAY`, `BDMV`, `.ISO`, and season-disc naming like `S06.D04`), scored -10000 in
+   every quality profile — rejects this release class at grab time instead of downloading
+   50+GB of something that can never be imported. Applied via idempotent Ansible tasks
+   (`ansible/roles/media_acquisition/tasks/main.yml`), not just live API calls.
+3. New queue watchdog (`ansible/roles/media_acquisition/templates/queue-watchdog.sh.j2`), cron
+   every 10 minutes: auto-clears (blocklist + remove) any Sonarr/Radarr queue item stuck in a
+   `warning` state for >30 minutes, and posts a Discord notification only when it actually
+   clears something (state-change style, no spam on clean runs). Covers the exact failure
+   class that caused both this incident and the original REL-020 near-miss — a jammed import
+   silently blocks everything behind it while RSS sync keeps running underneath, so nothing
+   *looks* broken until someone checks the queue specifically.
+
+Deliberately does **not** attempt to auto-recover SABnzbd itself for connectivity failures
+(DNS/ISP outages) — SABnzbd's own retry logic already handles that correctly on its own (see
+the 2026-07-02 ISP outage in the 2026-07-01/02 sweep memory), the *arr-side import queue is
+where jams actually stick.
+
+---
+
 ## Summary Table
 
 | ID | Category | Severity | Title |
@@ -1964,6 +2003,7 @@ and DNS record when renaming resources for the Cloudflare provider v4 → v5 mig
 | REL-025 | Reliability | **RESOLVED** | immich-ml HuggingFace xet downloader wrote temp files to read-only root FS — redirected via HF_HOME+XDG_CACHE_HOME to writable PVC (2026-06-28) |
 | REL-026 | Reliability | **RESOLVED** | Immich uploads via Cloudflare Tunnel failing with ECONNRESET for large files — Cloudflare buffers entire multipart body without chunked encoding. Fixed: `chunked_encoding = true`, `write_timeout = 600s`, `read_timeout = 120s` in tunnel origin_request (PR #192, 2026-06-28) |
 | GIT-012 | GitOps | **RESOLVED** | Cloudflare Terraform provider v4 → v5 breaking changes: `cloudflare_tunnel_config` → `cloudflare_zero_trust_tunnel_cloudflared_config`, `cloudflare_record` → `cloudflare_dns_record`, `value` → `content`. Migrated with `moved {}` blocks to prevent destroy+recreate of live tunnel + DNS record. Provider `~> 4.0` → `~> 5.0` (PR #192, 2026-06-28) |
+| REL-032 | Reliability | **RESOLVED** | Media acquisition stack had no autoheal — two "usenet does nothing" recurrences in 24h needed manual fixes. Added docker healthchecks + `autoheal` sidecar (restarts hung-but-alive containers), a "Block Raw Disc/ISO Releases" Custom Format (-10000 score, rejects un-importable raw disc rips at grab time), and a 10-min cron queue watchdog that auto-blocklists Sonarr/Radarr items stuck >30min in a warning state, with Discord notification only on actual action (2026-07-02) |
 
 ---
 
