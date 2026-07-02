@@ -41,8 +41,13 @@ spec:
                 secretKeyRef:
                   name: tailscale-subnet-router
                   key: TS_AUTHKEY
+            # REL-033: was 10.0.0.0/16 -- advertised every VLAN (MGMT/DMZ/IOT/ADMIN
+            # included) to any approved tailnet device, bypassing the MikroTik's
+            # zero-trust VLAN segmentation entirely for VPN clients. Actual use case
+            # is internal services (Jellyfin etc, all behind the Traefik VIP on SRV),
+            # so scope to just that VLAN.
             - name: TS_ROUTES
-              value: "10.0.0.0/16"
+              value: "10.0.20.0/24"
             - name: TS_STATE_DIR
               value: /var/lib/tailscale
             - name: TS_USERSPACE
