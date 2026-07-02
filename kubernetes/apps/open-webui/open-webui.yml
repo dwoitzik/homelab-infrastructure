@@ -64,6 +64,10 @@ spec:
         volumeMounts:
         - name: static
           mountPath: /static-init
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: open-webui
         image: ghcr.io/open-webui/open-webui:v0.9.6

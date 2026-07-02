@@ -28,6 +28,10 @@ spec:
       labels:
         app: headscale
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
         - name: headscale
           image: ghcr.io/juanfont/headscale:0.29.1

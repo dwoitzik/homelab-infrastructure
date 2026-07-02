@@ -58,6 +58,10 @@ spec:
                 values:
                 - vm-srv-k3s-11
                 - vm-srv-k3s-12
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: atlantis
         image: ghcr.io/runatlantis/atlantis:v0.46.0
