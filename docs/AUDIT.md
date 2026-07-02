@@ -1895,6 +1895,45 @@ and DNS record when renaming resources for the Cloudflare provider v4 → v5 mig
 
 ---
 
+### REL-027 — Vault unseal-helper CLI major bump: 1.21.4 → 2.0.3 · **PLANNED** (2026-07-02)
+
+Renovate PR #204 only bumps `kubernetes/system/vault/unseal.yml`'s CLI image — the actual
+Vault server version comes from the Helm chart default and is untouched. Risk is functional
+(the automated unseal script from REL-007 could silently break on the next restart if CLI
+2.0 changed flags/output), not a data-format risk. Full runbook:
+`docs/runbooks/pending-major-upgrades.md`.
+
+---
+
+### REL-028 — Postgres for Nextcloud + Paperless major bump: 16.14 → 18.4 · **PLANNED** (2026-07-02)
+
+Renovate PR #214 bumps two independent bare `StatefulSet` Postgres instances
+(`postgres-nextcloud`, `postgres-paperless`) — not the Authelia CNPG cluster, which has no
+pinned tag and is untouched. A bare image swap will crash-loop both (PG18 refuses to start
+against a PG16 data directory); needs pg_dump/restore into a fresh PVC per app. Full runbook:
+`docs/runbooks/pending-major-upgrades.md`.
+
+---
+
+### REL-029 — Nextcloud app major bump: 30.0.17 → 34.0.1 · **PLANNED** (2026-07-02)
+
+Renovate PR #212. Nextcloud's updater refuses to skip major versions — needs four sequential
+`occ upgrade` passes (30→31→32→33→34), each with its own DB migration and app-compatibility
+check. Depends on REL-028's nextcloud half landing first. Full runbook:
+`docs/runbooks/pending-major-upgrades.md`.
+
+---
+
+### REL-030 — Immich Postgres (VectorChord) major bump: 14 → 16 · **PLANNED** (2026-07-02)
+
+Renovate PR #202. Same on-disk-format incompatibility class as REL-028, on the largest PVC
+in the cluster (entire photo library metadata + face/CLIP embeddings). VectorChord extension
+version itself unchanged (`0.4.3` on both tags). Needs `pg_dumpall`/restore into a fresh PVC,
+with explicit post-restore verification that the VectorChord extension actually loaded before
+resuming Immich. Full runbook: `docs/runbooks/pending-major-upgrades.md`.
+
+---
+
 ### REL-032 — Media acquisition stack: no autoheal, recurring silent queue jams · **RESOLVED** (2026-07-02)
 
 Two distinct "usenet does nothing" recurrences in 24h (2026-07-01 permission bug, 2026-07-02
@@ -2003,6 +2042,10 @@ where jams actually stick.
 | REL-025 | Reliability | **RESOLVED** | immich-ml HuggingFace xet downloader wrote temp files to read-only root FS — redirected via HF_HOME+XDG_CACHE_HOME to writable PVC (2026-06-28) |
 | REL-026 | Reliability | **RESOLVED** | Immich uploads via Cloudflare Tunnel failing with ECONNRESET for large files — Cloudflare buffers entire multipart body without chunked encoding. Fixed: `chunked_encoding = true`, `write_timeout = 600s`, `read_timeout = 120s` in tunnel origin_request (PR #192, 2026-06-28) |
 | GIT-012 | GitOps | **RESOLVED** | Cloudflare Terraform provider v4 → v5 breaking changes: `cloudflare_tunnel_config` → `cloudflare_zero_trust_tunnel_cloudflared_config`, `cloudflare_record` → `cloudflare_dns_record`, `value` → `content`. Migrated with `moved {}` blocks to prevent destroy+recreate of live tunnel + DNS record. Provider `~> 4.0` → `~> 5.0` (PR #192, 2026-06-28) |
+| REL-027 | Reliability | **PLANNED** | Vault unseal-helper CLI (not the server) major bump 1.21.4→2.0.3 (Renovate #204) — functional risk to the REL-007 automated-unseal script, not a data risk; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
+| REL-028 | Reliability | **PLANNED** | Postgres for Nextcloud + Paperless major bump 16.14→18.4 (Renovate #214, two independent bare StatefulSets, not the Authelia CNPG cluster) — needs pg_dump/restore into fresh PVCs per app, not a bare image swap; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
+| REL-029 | Reliability | **PLANNED** | Nextcloud app major bump 30.0.17→34.0.1 (Renovate #212) — needs 4 sequential `occ upgrade` passes (30→31→32→33→34), depends on REL-028's nextcloud half; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
+| REL-030 | Reliability | **PLANNED** | Immich Postgres (VectorChord) major bump 14→16 (Renovate #202) — largest PVC in cluster, needs `pg_dumpall`/restore into fresh PVC + explicit VectorChord-extension-loaded verification before resuming Immich; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
 | REL-032 | Reliability | **RESOLVED** | Media acquisition stack had no autoheal — two "usenet does nothing" recurrences in 24h needed manual fixes. Added docker healthchecks + `autoheal` sidecar (restarts hung-but-alive containers), a "Block Raw Disc/ISO Releases" Custom Format (-10000 score, rejects un-importable raw disc rips at grab time), and a 10-min cron queue watchdog that auto-blocklists Sonarr/Radarr items stuck >30min in a warning state, with Discord notification only on actual action (2026-07-02) |
 
 ---
