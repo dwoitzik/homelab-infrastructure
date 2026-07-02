@@ -42,6 +42,10 @@ spec:
         app: searxng
     spec:
       enableServiceLinks: false
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: searxng
         image: searxng/searxng:2026.7.1-c5d8d05f0
