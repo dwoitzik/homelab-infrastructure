@@ -84,6 +84,10 @@ spec:
       labels:
         app: garage
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
         - name: garage
           image: dxflrs/garage:v2.3.0
