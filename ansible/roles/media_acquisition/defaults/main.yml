@@ -16,3 +16,10 @@ media_acquisition_eweka_ssl: "1"
 media_acquisition_eweka_connections: "20"
 media_acquisition_eweka_username: "{{ vault_eweka_username }}"
 media_acquisition_eweka_password: "{{ vault_eweka_password }}"
+
+# Queue watchdog (REL-032): auto-clears Sonarr/Radarr queue items stuck in a
+# "warning" state (import jams -- bad archive, raw disc/ISO, ffprobe choking
+# on a malformed subtitle track) so one bad release doesn't silently block
+# every grab behind it. Runs via cron, see tasks/main.yml.
+media_acquisition_watchdog_stuck_threshold_min: 30
+media_acquisition_discord_webhook_url: "{{ vault_media_acquisition_discord_webhook_url }}"

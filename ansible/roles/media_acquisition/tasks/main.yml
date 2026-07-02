@@ -597,3 +597,151 @@
       curl -sf -X POST "http://localhost:7878/api/v3/command"
       -H "X-Api-Key: $APIKEY" -H "Content-Type: application/json"
       -d '{"name":"MissingMoviesSearch"}' -o /dev/null
+
+# ── Block raw Blu-ray disc/ISO releases (REL-032) ─────────────────
+# "Block Bonus Disc" (above) only catches BONUS.DISC-labeled releases.
+# It missed a whole-season raw disc rip (e.g. "S06.D04...Blu-ray...ISO")
+# that Sonarr grabbed and then could never import: ffprobe cannot get a
+# runtime from a raw .iso disc image (no demuxable video stream at the
+# container level), so the file sat retrying import forever, jamming the
+# queue behind it. This Custom Format + a large negative score makes
+# Sonarr/Radarr reject these releases at grab time instead of downloading
+# 50+GB of something that can never be imported.
+
+- name: Get existing Sonarr custom formats
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/customformat"
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+  register: media_acquisition_sonarr_custom_formats
+
+- name: Add Block Raw Disc/ISO Releases custom format to Sonarr
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/customformat"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: Block Raw Disc/ISO Releases
+      includeCustomFormatWhenRenaming: false
+      specifications:
+        - name: Disc/ISO indicators
+          implementation: ReleaseTitleSpecification
+          implementationName: Release Title
+          negate: false
+          required: false
+          fields:
+            - {name: value, value: '(?i)(\bBD25\b|\bBD50\b|\bBD66\b|\bBD100\b|COMPLETE\.BLURAY|\bBDMV\b|\.ISO\b|\bS\d{2}\.D\d{2}\b)'}
+    status_code: 201
+  when: media_acquisition_sonarr_custom_formats.json | selectattr('name', 'equalto', 'Block Raw Disc/ISO Releases') | list | length == 0
+
+- name: Reject Block Raw Disc/ISO Releases format in every Sonarr quality profile
+  ansible.builtin.shell:
+    cmd: |
+      python3 -c "
+      import json, urllib.request
+
+      api_key = '{{ media_acquisition_sonarr_api_key }}'
+      base = 'http://localhost:8989/api/v3'
+
+      def req(method, path, body=None):
+          data = json.dumps(body).encode() if body is not None else None
+          r = urllib.request.Request(base + path, data=data, method=method,
+              headers={'X-Api-Key': api_key, 'Content-Type': 'application/json'})
+          with urllib.request.urlopen(r) as resp:
+              return json.loads(resp.read() or b'null')
+
+      formats = req('GET', '/customformat')
+      fmt_id = next(f['id'] for f in formats if f['name'] == 'Block Raw Disc/ISO Releases')
+      changed = False
+      for profile in req('GET', '/qualityprofile'):
+          items = profile.get('formatItems', [])
+          for item in items:
+              if item['format'] == fmt_id and item['score'] != -10000:
+                  item['score'] = -10000
+                  req('PUT', f\"/qualityprofile/{profile['id']}\", profile)
+                  changed = True
+      print('CHANGED' if changed else 'OK')
+      "
+  register: media_acquisition_sonarr_disc_format_score
+  changed_when: "'CHANGED' in media_acquisition_sonarr_disc_format_score.stdout"
+
+- name: Get existing Radarr custom formats
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/customformat"
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+  register: media_acquisition_radarr_custom_formats
+
+- name: Add Block Raw Disc/ISO Releases custom format to Radarr
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/customformat"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: Block Raw Disc/ISO Releases
+      includeCustomFormatWhenRenaming: false
+      specifications:
+        - name: Disc/ISO indicators
+          implementation: ReleaseTitleSpecification
+          implementationName: Release Title
+          negate: false
+          required: false
+          fields:
+            - {name: value, value: '(?i)(\bBD25\b|\bBD50\b|\bBD66\b|\bBD100\b|COMPLETE\.BLURAY|\bBDMV\b|\.ISO\b|\bD\d{2}\b)'}
+    status_code: 201
+  when: media_acquisition_radarr_custom_formats.json | selectattr('name', 'equalto', 'Block Raw Disc/ISO Releases') | list | length == 0
+
+- name: Reject Block Raw Disc/ISO Releases format in every Radarr quality profile
+  ansible.builtin.shell:
+    cmd: |
+      python3 -c "
+      import json, urllib.request
+
+      api_key = '{{ media_acquisition_radarr_api_key }}'
+      base = 'http://localhost:7878/api/v3'
+
+      def req(method, path, body=None):
+          data = json.dumps(body).encode() if body is not None else None
+          r = urllib.request.Request(base + path, data=data, method=method,
+              headers={'X-Api-Key': api_key, 'Content-Type': 'application/json'})
+          with urllib.request.urlopen(r) as resp:
+              return json.loads(resp.read() or b'null')
+
+      formats = req('GET', '/customformat')
+      fmt_id = next(f['id'] for f in formats if f['name'] == 'Block Raw Disc/ISO Releases')
+      changed = False
+      for profile in req('GET', '/qualityprofile'):
+          items = profile.get('formatItems', [])
+          for item in items:
+              if item['format'] == fmt_id and item['score'] != -10000:
+                  item['score'] = -10000
+                  req('PUT', f\"/qualityprofile/{profile['id']}\", profile)
+                  changed = True
+      print('CHANGED' if changed else 'OK')
+      "
+  register: media_acquisition_radarr_disc_format_score
+  changed_when: "'CHANGED' in media_acquisition_radarr_disc_format_score.stdout"
+
+# ── Queue watchdog (REL-032): auto-clear stuck import jams ────────
+# See templates/queue-watchdog.sh.j2 for the failure class this covers.
+# Runs every 10 minutes; only ever acts on items stuck >30min in a
+# "warning" state, and only notifies Discord when it actually clears
+# something.
+
+- name: Deploy queue watchdog script
+  ansible.builtin.template:
+    src: queue-watchdog.sh.j2
+    dest: /usr/local/bin/media-acq-queue-watchdog.sh
+    mode: '0755'
+
+- name: Schedule queue watchdog every 10 minutes
+  ansible.builtin.cron:
+    name: media-acq-queue-watchdog
+    minute: "*/10"
+    job: /usr/local/bin/media-acq-queue-watchdog.sh >> /var/log/media-acq-queue-watchdog.log 2>&1
