@@ -13,19 +13,10 @@ spec:
     services: [{name: vault, port: 8200}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# ArgoCD
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: argo-main
-  namespace: argocd
-spec:
-  entryPoints: [websecure]
-  routes:
-  - match: Host(`argo.woitzik.dev`)
-    kind: Rule
-    services: [{name: argocd-server, port: 80}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
+# REL-033: ArgoCD IngressRoute moved to kubernetes/system/argocd/ingressroute.yml
+# (co-located with the app it fronts, now Authelia-gated there) -- this was a
+# byte-identical duplicate (same name+namespace, so no Traefik routing conflict,
+# but two Applications fighting to own one object is its own footgun).
 ---
 # Router (MikroTik at 10.0.10.1:80) — headless Service + Endpoints
 # Note: ExternalName with raw IPs doesn't work reliably in k8s/Traefik
@@ -105,7 +96,7 @@ spec:
     services: [{name: loki, port: 3100}]
   - match: Host(`loki.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: loki-to-grafana-redirect}]
+    middlewares: [{name: loki-to-grafana-redirect}, {name: authelia, namespace: apps}]
     services: [{name: loki, port: 3100}]
 ---
 # Traefik Dashboard (api@internal — Authelia-protected)

@@ -23,6 +23,16 @@ data:
       safe_search: 0
       autocomplete: "google"
       default_lang: "de-DE"
+    # REL-033: default engine set (use_default_settings: true, ~70 engines) fans
+    # every query out and waits up to the default 3s/engine before finalizing --
+    # one slow/unreachable engine drags out the whole response. Capping
+    # request_timeout bounds worst-case page latency regardless of which
+    # engines are slow that day.
+    outgoing:
+      request_timeout: 2.0
+      max_request_timeout: 4.0
+      pool_connections: 100
+      pool_maxsize: 20
 ---
 apiVersion: apps/v1
 kind: Deployment
