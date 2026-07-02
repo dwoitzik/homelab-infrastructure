@@ -49,6 +49,14 @@ services:
       - "5076:5076"
     depends_on:
       - tor
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5076/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - autoheal=true
     restart: unless-stopped
 
   sabnzbd:
@@ -70,6 +78,14 @@ services:
     # and starve other processes (etcd WAL, PostgreSQL, etc.).
     blkio_config:
       weight: 100
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - autoheal=true
     restart: unless-stopped
 
   sonarr:
@@ -89,6 +105,14 @@ services:
       - "8989:8989"
     blkio_config:
       weight: 100
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8989/ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - autoheal=true
     restart: unless-stopped
 
   radarr:
@@ -108,6 +132,14 @@ services:
       - "7878:7878"
     blkio_config:
       weight: 100
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - autoheal=true
     restart: unless-stopped
 
   bazarr:
@@ -125,6 +157,14 @@ services:
       - /downloads/incomplete:/downloads/incomplete
     ports:
       - "6767:6767"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6767/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - autoheal=true
     restart: unless-stopped
 
   jellyseerr:
@@ -139,4 +179,29 @@ services:
       - {{ media_acquisition_base_dir }}/jellyseerr/config:/app/config
     ports:
       - "5055:5055"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5055/api/v1/status"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - autoheal=true
+    restart: unless-stopped
+
+  autoheal:
+    # Watches every sibling container's Docker healthcheck status (via the
+    # autoheal=true label above) and force-restarts any that go "unhealthy" --
+    # covers the class of failure a plain `restart: unless-stopped` misses:
+    # a process that's still running but internally hung/unresponsive
+    # (as opposed to a clean crash/exit, which unless-stopped already
+    # handles fine on its own).
+    image: willfarrell/autoheal:latest
+    container_name: autoheal
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+      - AUTOHEAL_INTERVAL=30
+      - AUTOHEAL_START_PERIOD=60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped

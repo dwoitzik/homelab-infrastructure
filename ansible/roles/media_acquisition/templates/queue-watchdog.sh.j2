@@ -1,0 +1,76 @@
+#!/bin/bash
+# Auto-clears stuck Sonarr/Radarr queue items so a bad release (corrupt
+# archive, raw disc/ISO, ffprobe choking on a malformed subtitle track, an
+# import that never completes) doesn't sit there silently blocking every
+# grab behind it -- this is the actual recurring cause of "usenet does
+# nothing" (see docs/AUDIT.md REL-020 and the 2026-07-01/02 incidents),
+# not sabnzbd itself. sabnzbd's own retry logic already handles transient
+# network/DNS failures on its own; this script only handles the *arr-side
+# import-queue-jam class of failure, which nothing else recovers from
+# automatically.
+#
+# Only acts on items stuck in a warning state for longer than the
+# threshold (new grabs legitimately sit in "warning" briefly during normal
+# import) and only notifies Discord when it actually clears something --
+# no notification on a clean run, to avoid spam.
+set -uo pipefail
+
+WEBHOOK_URL="{{ media_acquisition_discord_webhook_url }}"
+STUCK_THRESHOLD_MIN={{ media_acquisition_watchdog_stuck_threshold_min }}
+SONARR_KEY=$(grep -oP '(?<=<ApiKey>)[^<]+' {{ media_acquisition_base_dir }}/sonarr/config/config.xml 2>/dev/null)
+RADARR_KEY=$(grep -oP '(?<=<ApiKey>)[^<]+' {{ media_acquisition_base_dir }}/radarr/config/config.xml 2>/dev/null)
+
+notify() {
+  local message="$1"
+  curl -s -X POST -H "Content-Type: application/json" \
+    -d "{\"content\": \"${message}\"}" \
+    "${WEBHOOK_URL}" > /dev/null 2>&1 || true
+}
+
+clear_stuck_queue() {
+  local app_name="$1" port="$2" api_key="$3"
+  [ -z "$api_key" ] && return 0
+
+  curl -s "http://localhost:${port}/api/v3/queue?pageSize=200&apikey=${api_key}" | python3 -c "
+import json, sys, subprocess
+from datetime import datetime, timezone
+
+threshold_min = ${STUCK_THRESHOLD_MIN}
+data = json.load(sys.stdin)
+now = datetime.now(timezone.utc)
+cleared = []
+
+for r in data.get('records', []):
+    if r.get('trackedDownloadStatus') != 'warning':
+        continue
+    added = r.get('added')
+    if not added:
+        continue
+    added_dt = datetime.fromisoformat(added.replace('Z', '+00:00'))
+    age_min = (now - added_dt).total_seconds() / 60
+    if age_min < threshold_min:
+        continue
+    rid = r['id']
+    title = r.get('title', 'unknown')
+    resp = subprocess.run(
+        ['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', '-X', 'DELETE',
+         f'http://localhost:${port}/api/v3/queue/{rid}?removeFromClient=true&blocklist=true&apikey=${api_key}'],
+        capture_output=True, text=True,
+    )
+    if resp.stdout.strip() in ('200', '404'):
+        cleared.append(f'{title} (stuck {int(age_min)}min)')
+
+if cleared:
+    print('\n'.join(cleared))
+" 2>/dev/null
+}
+
+sonarr_cleared=$(clear_stuck_queue "Sonarr" 8989 "$SONARR_KEY")
+radarr_cleared=$(clear_stuck_queue "Radarr" 7878 "$RADARR_KEY")
+
+if [ -n "$sonarr_cleared" ] || [ -n "$radarr_cleared" ]; then
+  message="🟡 **media-acq watchdog**: auto-cleared stuck queue item(s) (blocklisted, will not be re-grabbed from the same release)."
+  [ -n "$sonarr_cleared" ] && message="${message}\n**Sonarr:**\n${sonarr_cleared}"
+  [ -n "$radarr_cleared" ] && message="${message}\n**Radarr:**\n${radarr_cleared}"
+  notify "$message"
+fi
