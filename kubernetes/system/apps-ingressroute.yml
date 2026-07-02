@@ -169,6 +169,7 @@ spec:
   - match: Host(`pve.woitzik.dev`)
     kind: Rule
     middlewares:
+      - name: authelia
       - name: websockets
     services:
       - name: external-pve
@@ -189,6 +190,7 @@ spec:
   - match: Host(`backup.woitzik.dev`)
     kind: Rule
     middlewares:
+      - name: authelia
       - name: websockets
     services:
       - name: external-pbs
