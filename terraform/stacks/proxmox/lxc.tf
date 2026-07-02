@@ -650,7 +650,17 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   }
 
   cpu {
-    cores = 4
+    # REL-031: cut from 4 -> 2 to reduce host CPU overcommit (36 vCPU declared
+    # across VMs+LXCs vs 16 physical threads on `mini`, 2.25x). This LXC was
+    # the single biggest non-k3s consumer (two Minecraft JVMs). Proxmox `cores`
+    # is a cgroup CFS quota, not an exclusive reservation, so this doesn't
+    # remove capacity Minecraft can burst into when the host is idle -- it
+    # just lowers the ceiling both JVMs can hit simultaneously under load,
+    # which is exactly the scenario that was contending with etcd fdatasync
+    # (see docs/AUDIT.md REL-012). If this reintroduces Cobblemon lag under
+    # normal two-player load, revert to 4 -- the earlier RAM bump (6G/JVM,
+    # WRK-002-adjacent) stays either way, this only touches the CPU ceiling.
+    cores = 2
   }
 
   memory {

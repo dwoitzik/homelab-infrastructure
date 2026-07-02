@@ -1895,6 +1895,20 @@ and DNS record when renaming resources for the Cloudflare provider v4 → v5 mig
 
 ---
 
+### REL-031 — Host CPU overcommit: 36 vCPU declared vs 16 physical threads on `mini` · **PARTIAL** (2026-07-02)
+
+REL-012's recurrence (2026-07-01 evening) traced to host overcommit — 2.25x on an 8C/16T
+host, worsened by two concurrent Minecraft JVMs plus a 4K HDR Remux hardware transcode
+pushing load average to 40-45. `ct-dmz-games-01` (Minecraft, VMID 302) was the single
+biggest non-k3s consumer. Cut its `cpu.cores` 4 → 2 in `terraform/stacks/proxmox/lxc.tf`
+(cgroup CFS quota, not an exclusive reservation — doesn't remove burst capacity when the
+host is idle, only lowers the ceiling both JVMs can hit simultaneously). Brings the total
+to 34 vCPU declared (2.125x) — a partial reduction, not a fix of the overcommit itself.
+Pending Atlantis apply. If Minecraft lag reappears under normal two-player load, revert to
+4 — the RAM bump from the earlier Cobblemon fix is untouched either way.
+
+---
+
 ## Summary Table
 
 | ID | Category | Severity | Title |
@@ -1964,6 +1978,7 @@ and DNS record when renaming resources for the Cloudflare provider v4 → v5 mig
 | REL-025 | Reliability | **RESOLVED** | immich-ml HuggingFace xet downloader wrote temp files to read-only root FS — redirected via HF_HOME+XDG_CACHE_HOME to writable PVC (2026-06-28) |
 | REL-026 | Reliability | **RESOLVED** | Immich uploads via Cloudflare Tunnel failing with ECONNRESET for large files — Cloudflare buffers entire multipart body without chunked encoding. Fixed: `chunked_encoding = true`, `write_timeout = 600s`, `read_timeout = 120s` in tunnel origin_request (PR #192, 2026-06-28) |
 | GIT-012 | GitOps | **RESOLVED** | Cloudflare Terraform provider v4 → v5 breaking changes: `cloudflare_tunnel_config` → `cloudflare_zero_trust_tunnel_cloudflared_config`, `cloudflare_record` → `cloudflare_dns_record`, `value` → `content`. Migrated with `moved {}` blocks to prevent destroy+recreate of live tunnel + DNS record. Provider `~> 4.0` → `~> 5.0` (PR #192, 2026-06-28) |
+| REL-031 | Reliability | **PARTIAL** | Host CPU overcommit 36 vCPU declared vs 16 physical threads on `mini` (2.25x) — root contributor to REL-012's 2026-07-01 recurrence. Cut `ct-dmz-games-01` (Minecraft) `cpu.cores` 4→2, bringing total to 34 vCPU (2.125x) — partial relief, not a structural fix; pending Atlantis apply (2026-07-02) |
 
 ---
 
