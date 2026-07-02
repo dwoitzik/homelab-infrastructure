@@ -13,6 +13,10 @@ spec:
       labels:
         app: paperless-gpt
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: paperless-gpt
         image: icereed/paperless-gpt:v0.25.1
@@ -71,6 +75,13 @@ spec:
           value: German
         - name: LOG_LEVEL
           value: info
+        # REL-027: qwen2.5:7b-instruct occasionally ignored the title_prompt's
+        # 60-char limit and generated a full multi-thousand-token document
+        # instead of a title (task ran >2h on ai_nodes LXC, swapped it to a
+        # crawl, dragged the whole mini host into overcommit). TOKEN_LIMIT
+        # hard-caps generation length regardless of what the model decides to do.
+        - name: TOKEN_LIMIT
+          value: "1000"
         volumeMounts:
         # SEC-012: at startup the app creates any *missing* default prompt
         # files (tag_prompt.tmpl etc.) directly under /app/prompts -- a

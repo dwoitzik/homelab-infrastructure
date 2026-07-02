@@ -57,6 +57,10 @@ spec:
         - name: secrets
           mountPath: /secrets
           readOnly: true
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: authelia
         image: ghcr.io/authelia/authelia:4.39.20

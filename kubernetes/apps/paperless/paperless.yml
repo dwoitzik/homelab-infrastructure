@@ -13,6 +13,10 @@ spec:
       labels:
         app: paperless
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: paperless
         image: paperlessngx/paperless-ngx:2.20.15

@@ -16,6 +16,10 @@ spec:
       annotations:
         backup.velero.io/backup-volumes: db
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: postgres
         image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
@@ -80,6 +84,10 @@ spec:
       labels:
         app: immich-redis
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: valkey
         image: valkey/valkey:9.1.0-alpine
@@ -142,6 +150,10 @@ spec:
         # worth backing up as a filesystem blob (re-upload source from phone).
         backup.velero.io/backup-volumes-excludes: library
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: immich-server
         image: ghcr.io/immich-app/immich-server:v2.7.5
@@ -233,6 +245,10 @@ spec:
         # exclude from Velero to keep backup sizes manageable.
         backup.velero.io/backup-volumes-excludes: cache
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: immich-ml
         image: ghcr.io/immich-app/immich-machine-learning:v2.7.5

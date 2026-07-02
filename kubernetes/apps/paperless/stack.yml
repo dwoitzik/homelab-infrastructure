@@ -43,6 +43,10 @@ spec:
         - name: paperless-secrets
           mountPath: /secrets
           readOnly: true
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: postgres
         image: postgres:16.14
@@ -122,6 +126,10 @@ spec:
       labels:
         app: redis-paperless
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: redis
         image: redis:7.4.9
@@ -178,6 +186,10 @@ spec:
       labels:
         app: paperless-addons
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
       - name: gotenberg
         image: gotenberg/gotenberg:8.34.0

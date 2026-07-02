@@ -28,6 +28,10 @@ spec:
       labels:
         app: tailscale-subnet-router
     spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
       containers:
         - name: tailscale
           image: tailscale/tailscale:stable
