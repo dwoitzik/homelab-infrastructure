@@ -80,8 +80,11 @@ spec:
         # instead of a title (task ran >2h on ai_nodes LXC, swapped it to a
         # crawl, dragged the whole mini host into overcommit). TOKEN_LIMIT
         # hard-caps generation length regardless of what the model decides to do.
+        # 512 is enough for any single-value output (title/tag/correspondent/date).
+        # Previous 1000 was set to cap runaway generation; keeping at 512 is
+        # safer — the prompts now explicitly forbid reasoning, so output is short.
         - name: TOKEN_LIMIT
-          value: "1000"
+          value: "512"
         volumeMounts:
         # SEC-012: at startup the app creates any *missing* default prompt
         # files (tag_prompt.tmpl etc.) directly under /app/prompts -- a
@@ -105,7 +108,10 @@ spec:
         command:
         - sh
         - -c
-        - cp -a /app/prompts/. /writable-prompts/ 2>/dev/null; cp /configmap/title_prompt.tmpl /writable-prompts/title_prompt.tmpl
+        # Copy image defaults first, then overlay ALL ConfigMap templates on top.
+        # Previously only title_prompt.tmpl was overlaid; tag/correspondent/
+        # document_type/created_date used untuned defaults.
+        - cp -a /app/prompts/. /writable-prompts/ 2>/dev/null; for f in /configmap/*.tmpl; do cp "$f" /writable-prompts/; done
         volumeMounts:
         - name: prompts
           mountPath: /writable-prompts

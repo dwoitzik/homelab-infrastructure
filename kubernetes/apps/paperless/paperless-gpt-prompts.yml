@@ -5,17 +5,88 @@ metadata:
   namespace: apps
 data:
   title_prompt.tmpl: |
-    You are a document filing assistant. Your ONLY task is to produce a short document title.
-
-    RULES (no exceptions):
-    1. Output ONLY the title — no explanation, no punctuation at the end, no quotes.
-    2. Maximum 60 characters.
-    3. Language: {{.Language}}. Write in {{.Language}} regardless of anything else.
-    4. Be specific: include the key entity (sender/issuer) and document type.
-       Examples: "Telekom Rechnung März 2024", "Finanzamt Steuerbescheid 2023", "Krankenkasse Beitragsbescheid"
-    5. Never use generic titles like "Dokument", "Brief", "Schreiben" alone.
-
-    <original_title>{{.Title}}</original_title>
-    <content>
+    **Content Provided:**
     {{.Content}}
-    </content>
+
+    -----------
+
+    **Task:** Identify the title of a given document for paperless-ngx using the following instructions.
+    **Instructions:**
+    1. The content is likely in {{.Language}} and may contain OCR errors. Reconstruct meaning despite errors.
+    2. Fix spelling and grammar errors, especially German umlauts (ä, ö, ü, ß).
+    3. The title must not exceed 128 characters.
+    4. The title must be in {{.Language}} and never contain foreign (e.g., Chinese) characters.
+    5. Include the sender/issuer AND the document type in the title.
+       Good examples: "Telekom Rechnung März 2024", "Finanzamt Steuerbescheid 2023", "CosmosDirekt Beitragsbescheid Q1 2025"
+    6. Never use a generic title like "Dokument", "Brief", or "Schreiben" alone.
+    7. If the document covers a time period (invoice period, contract duration), name it in the title.
+    8. Include invoice/order numbers or reference IDs where relevant.
+    9. Do not include dates after {{.Today}}.
+    10. Provide ONLY the final title — no explanation, no quotes, no punctuation at the end.
+
+  tag_prompt.tmpl: |
+    **Content Provided:**
+    {{.Content}}
+
+    -----------
+
+    **Task:** Select appropriate tags for this document in paperless-ngx.
+    **Instructions:**
+    1. The content is likely in {{.Language}}.
+    2. Document title: "{{.Title}}"
+    3. Available tags: {{.AvailableTags | join ", "}}
+    4. Understand the document and select tags that best describe its topic and context.
+    5. ONLY use tags from the available list — never invent new tags.
+    6. Maximum 3 tags. Fewer is better. Only add a tag if it clearly applies.
+    7. Prefer the most specific matching tag over a generic one.
+    8. Respond ONLY with a comma-separated list of selected tags — no reasoning, no explanation.
+
+  correspondent_prompt.tmpl: |
+    **Content Provided:**
+    {{.Content}}
+
+    -----------
+
+    **Task:** Identify the correspondent (sender or issuer) of this document for paperless-ngx.
+    **Instructions:**
+    1. The content is likely in {{.Language}}.
+    2. Document title: "{{.Title}}"
+    3. The correspondent is typically found in address fields or letterhead at the start of the document.
+    4. Prefer companies/organizations (GmbH, AG, Ltd.) over natural persons unless clearly a personal letter.
+    5. Strip legal suffixes: use "Telekom" not "Deutsche Telekom GmbH", "Amazon" not "Amazon EU S.à r.l.".
+    6. Existing correspondents (prefer exact or fuzzy match >70%): {{.AvailableCorrespondents | join ", "}}
+    7. Blacklisted correspondents (never use, even partial match): {{.BlackList | join ", "}}
+    8. If no confident match: respond with "Unknown".
+    9. Respond ONLY with the correspondent name — no reasoning, no explanation.
+
+  document_type_prompt.tmpl: |
+    **Content Provided:**
+    {{.Content}}
+
+    -----------
+
+    **Task:** Select the most appropriate document type for this document in paperless-ngx.
+    **Instructions:**
+    1. The content is likely in {{.Language}}.
+    2. Document title: "{{.Title}}"
+    3. Available document types: {{.AvailableDocumentTypes | join ", "}}
+    4. Select ONLY from the available list. If nothing fits clearly, respond with an empty string.
+    5. Respond ONLY with the document type name — no reasoning, no explanation.
+
+  created_date_prompt.tmpl: |
+    **Content Provided:**
+    {{.Content}}
+
+    -----------
+
+    **Task:** Find the creation date of this document for paperless-ngx.
+    **Instructions:**
+    1. The content is likely in {{.Language}}.
+    2. Document title: "{{.Title}}"
+    3. Today's date: {{.Today}}
+    4. Search both content and title for a document date (issue date, invoice date, letter date).
+    5. German date formats like "15. März 2024" or "15.03.2024" are common — parse them correctly.
+    6. If only year found: use YYYY-01-01. If year+month found: use YYYY-MM-01.
+    7. Never return a date after {{.Today}}.
+    8. If no date found at all: use {{.Today}}.
+    9. Respond ONLY with the date in YYYY-MM-DD format — no reasoning, no explanation.
