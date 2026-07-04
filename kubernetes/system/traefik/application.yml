@@ -12,7 +12,16 @@ spec:
     helm:
       values: |
         additionalArguments:
+          # REL-037: default is false, so every IngressRoute outside apps ns
+          # referencing {name: authelia, namespace: apps} was silently failing
+          # ("middleware apps/authelia is not in the IngressRoute namespace X")
+          # -- confirmed live for argo-main, grafana-main, loki-main,
+          # vault-main, status-final. Traefik fails closed on a broken
+          # middleware ref (404, not open passthrough), so this was an outage,
+          # not an exposure -- but it meant argo/grafana/vault/loki were all
+          # unreachable, and the Authelia gating never actually took effect.
           - "--providers.kubernetescrd"
+          - "--providers.kubernetescrd.allowCrossNamespace=true"
           - "--providers.kubernetesingress"
           - "--serverstransport.insecureskipverify=true"
           - "--api.dashboard=true"
