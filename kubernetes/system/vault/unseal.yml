@@ -17,7 +17,7 @@ spec:
       restartPolicy: Always
       containers:
         - name: unseal
-          image: hashicorp/vault:1.21.4
+          image: hashicorp/vault:2.0.3
           # SEC-012: hashicorp/vault's default image user is root -- confirmed
           # live, runAsNonRoot alone fails admission ("container has
           # runAsNonRoot and image will run as root").
