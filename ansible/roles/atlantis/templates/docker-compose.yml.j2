@@ -1,0 +1,38 @@
+---
+# Atlantis GitOps runner -- ADR-012: moved off k3s onto its own LXC so it can
+# no longer shut down its own node mid-apply (see terraform/stacks/proxmox/lxc.tf
+# ct_srv_atlantis_01 comment for the full incident).
+services:
+  atlantis:
+    image: "{{ atlantis_image }}"
+    container_name: atlantis
+    restart: unless-stopped
+    ports:
+      - "4141:4141"
+    volumes:
+      - "{{ atlantis_base_dir }}/data:/home/atlantis"
+      - "{{ atlantis_base_dir }}/repos.yaml:/etc/atlantis/repos.yaml:ro"
+    environment:
+      ATLANTIS_ATLANTIS_URL: "{{ atlantis_url }}"
+      ATLANTIS_PORT: "4141"
+      ATLANTIS_REPO_ALLOWLIST: "{{ atlantis_repo_allowlist }}"
+      ATLANTIS_ALLOW_TF_VERSION_DOWNLOAD: "false"
+      ATLANTIS_TERRAFORM_VERSION: "{{ atlantis_terraform_version }}"
+      ATLANTIS_REPO_CONFIG: /etc/atlantis/repos.yaml
+      ATLANTIS_GH_USER: "{{ atlantis_gh_user }}"
+      ATLANTIS_GH_TOKEN: "{{ atlantis_gh_token }}"
+      ATLANTIS_GH_WEBHOOK_SECRET: "{{ atlantis_gh_webhook_secret }}"
+      TF_VAR_mikrotik_url: "{{ atlantis_mikrotik_url }}"
+      TF_VAR_mikrotik_user: "{{ atlantis_mikrotik_user }}"
+      TF_VAR_mikrotik_password: "{{ atlantis_mikrotik_password }}"
+      TF_VAR_mikrotik_insecure: "true"
+      AWS_ACCESS_KEY_ID: "{{ atlantis_aws_access_key_id }}"
+      AWS_SECRET_ACCESS_KEY: "{{ atlantis_aws_secret_access_key }}"
+      AWS_ENDPOINT_URL_S3: "{{ atlantis_aws_endpoint_url_s3 }}"
+      AWS_REGION: "{{ atlantis_aws_region }}"
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_STS_REGIONAL_ENDPOINTS: regional
+      TF_VAR_proxmox_api_url: "{{ atlantis_proxmox_api_url }}"
+      TF_VAR_proxmox_api_token_id: "{{ atlantis_proxmox_api_token_id }}"
+      TF_VAR_proxmox_api_token_secret: "{{ atlantis_proxmox_api_token_secret }}"
+      TF_VAR_cloudflare_api_token: "{{ atlantis_cloudflare_api_token }}"

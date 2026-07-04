@@ -1,0 +1,13 @@
+repos:
+  - id: {{ atlantis_repo_allowlist }}
+    allowed_overrides: [workflow]
+    allow_custom_workflows: false
+workflows:
+  default:
+    plan:
+      steps:
+        - init
+        - plan
+    apply:
+      steps:
+        - apply

@@ -1,0 +1,29 @@
+---
+atlantis_base_dir: /opt/atlantis
+atlantis_image: ghcr.io/runatlantis/atlantis:v0.46.0
+atlantis_url: https://atlantis.woitzik.dev
+atlantis_repo_allowlist: github.com/dwoitzik/homelab-infrastructure
+atlantis_terraform_version: "1.10.5"
+
+atlantis_gh_user: dwoitzik
+atlantis_gh_token: "{{ vault_atlantis_gh_token }}"
+atlantis_gh_webhook_secret: "{{ vault_atlantis_gh_webhook_secret }}"
+
+atlantis_mikrotik_url: https://10.0.10.1
+atlantis_mikrotik_user: terraform
+atlantis_mikrotik_password: "{{ vault_atlantis_mikrotik_password }}"
+
+# Reached via https://s3.woitzik.dev -- AdGuard (10.0.20.5) resolves this to
+# Traefik's internal LB IP (10.0.20.200) for LAN clients (split-horizon DNS),
+# routing to garage:3900 same as every other internal client. This LXC no
+# longer has the garage.apps.svc.cluster.local k8s-internal name available.
+atlantis_aws_access_key_id: "{{ vault_atlantis_aws_access_key_id }}"
+atlantis_aws_secret_access_key: "{{ vault_atlantis_aws_secret_access_key }}"
+atlantis_aws_endpoint_url_s3: https://s3.woitzik.dev
+atlantis_aws_region: homelab
+
+atlantis_proxmox_api_url: https://10.0.10.10:8006/api2/json
+atlantis_proxmox_api_token_id: terraform@pve!atlantis
+atlantis_proxmox_api_token_secret: "{{ vault_atlantis_proxmox_api_token_secret }}"
+
+atlantis_cloudflare_api_token: "{{ vault_atlantis_cloudflare_api_token }}"
