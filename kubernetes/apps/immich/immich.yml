@@ -22,7 +22,7 @@ spec:
             value: "1"
       containers:
       - name: postgres
-        image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+        image: ghcr.io/immich-app/postgres:16-vectorchord0.4.3-pgvectors0.2.0
         ports:
         - containerPort: 5432
         env:
@@ -54,7 +54,7 @@ spec:
       volumes:
       - name: db
         persistentVolumeClaim:
-          claimName: immich-db
+          claimName: immich-db-pg16
       - name: tmp
         emptyDir: {}
 ---

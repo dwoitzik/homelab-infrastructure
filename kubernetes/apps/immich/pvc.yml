@@ -57,6 +57,24 @@ spec:
     requests:
       storage: 20Gi
 ---
+# REL-030: Postgres 14->16 major bump needs dump/restore, not a bare image
+# swap -- PG16 refuses to start against a PG14 data directory. Fresh PVC so
+# the new instance can never accidentally touch the old on-disk format. Old
+# immich-db PVC above kept declared (unused) so ArgoCD prune doesn't delete
+# it -- rollback path until this is verified good (largest/most critical PVC
+# in the cluster, extra caution warranted).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-db-pg16
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 20Gi
+---
 # ML model cache — downloaded once (~3GB), re-downloadable, SSD-backed NFS.
 apiVersion: v1
 kind: PersistentVolumeClaim
