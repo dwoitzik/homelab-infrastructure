@@ -5,7 +5,10 @@ metadata:
   namespace: apps
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: local-path
+  # nfs-client, not local-path -- local-path pins the PV to whichever node
+  # created it (via nodeAffinity), so the pod can only ever be (re)scheduled
+  # back onto that one node. Matches every other app's PVC in this repo.
+  storageClassName: nfs-client
   resources:
     requests:
       storage: 1Gi
@@ -44,7 +47,12 @@ spec:
         - containerPort: 5216
         volumeMounts:
         - name: data
-          mountPath: /app/data
+          # MySpeed's actual DB lives at /myspeed/data/storage.db (confirmed
+          # live via exec) -- the PVC was mounted at /app/data, a path the
+          # app never wrote to at all. So nothing was ever actually
+          # persisted: every restart/reschedule/redeploy showed the
+          # first-run setup wizard again, silently, since day one.
+          mountPath: /myspeed/data
         resources:
           requests:
             cpu: 50m
