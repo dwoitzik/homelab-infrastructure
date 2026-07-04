@@ -47,3 +47,27 @@
     executable: /bin/bash
   changed_when: false
   failed_when: false
+
+# REL-012c/REL-037: bring the previously-manual /etc/modprobe.d/zfs.conf
+# under Ansible so it survives a fresh host build, and add
+# zfs_vdev_async_write_max_active to actually prioritize etcd's synchronous
+# WAL fdatasync over bulk async writes from every other VM/CT sharing this
+# host's single SSD (see defaults/main.yml comment for the full incident).
+- name: Persist ZFS module tuning (survives reboot)
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/zfs.conf
+    content: >-
+      options zfs
+      zfs_arc_max={{ pve_power_zfs_arc_max_bytes }}
+      zfs_prefetch_disable={{ pve_power_zfs_prefetch_disable }}
+      zfs_dirty_data_max={{ pve_power_zfs_dirty_data_max_bytes }}
+      zfs_txg_timeout={{ pve_power_zfs_txg_timeout }}
+      zfs_vdev_async_write_max_active={{ pve_power_zfs_vdev_async_write_max_active }}
+    mode: '0644'
+
+- name: Apply zfs_vdev_async_write_max_active immediately (no reboot needed)
+  # sysfs isn't a real filesystem -- ansible.builtin.copy's atomic
+  # write-then-rename fails with EXDEV/EACCES against it, needs a direct echo.
+  ansible.builtin.shell:
+    cmd: echo {{ pve_power_zfs_vdev_async_write_max_active }} > /sys/module/zfs/parameters/zfs_vdev_async_write_max_active
+  changed_when: false
