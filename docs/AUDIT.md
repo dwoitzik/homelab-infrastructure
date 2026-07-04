@@ -1935,12 +1935,30 @@ verified-good day per the runbook.
 
 ---
 
-### REL-029 — Nextcloud app major bump: 30.0.17 → 34.0.1 · **PLANNED** (2026-07-02)
+### REL-029 — Nextcloud app major bump: 30.0.17 → 34.0.1 · **RESOLVED** (2026-07-05)
 
-Renovate PR #212. Nextcloud's updater refuses to skip major versions — needs four sequential
-`occ upgrade` passes (30→31→32→33→34), each with its own DB migration and app-compatibility
-check. Depends on REL-028's nextcloud half landing first. Full runbook:
-`docs/runbooks/pending-major-upgrades.md`.
+Renovate PR #212 (closed, executed manually instead). Ran all four sequential `occ upgrade`
+passes (30→31→32→33→34, PRs #259-260-261-262-264-265) — Nextcloud's updater refuses to skip
+major versions. Two things found only by actually running the chain (not in the original
+runbook):
+
+- **The official image's entrypoint needs `su`'s CAP_SETGID** to rsync app files as `www-data`
+  during a major-version transition — `capabilities: drop: ["ALL"]` broke this
+  ("su: cannot set groups: Operation not permitted"), causing `occ upgrade` to fail with
+  "the files of the app 'files' were not correctly replaced". Temporarily removed the
+  capability drop for the duration of the migration, re-hardened (PR #265) once all 4 steps
+  verified good.
+- **`occ upgrade` must be run *after* the container entrypoint's own background file-sync
+  finishes**, not just after the pod reports `Ready`/`Running` — running it too early hits a
+  half-synced filesystem (`Failed opening required '.../symfony/polyfill-php82/bootstrap.php'`).
+  Wait for `Initializing finished` in the pod logs first.
+
+Verified: `occ status` (34.0.1.2, `needsDbUpgrade: false`), `occ user:list` (user intact),
+`https://nextcloud.woitzik.dev` reachable. `occ app:list` showed 6 disabled apps
+(`admin_audit`, `encryption`, `files_external`, `suspicious_login`,
+`twofactor_nextcloud_notification`, `user_ldap`) — all opt-in/advanced features not used in
+this single-user homelab install, not re-enabled per the runbook's "don't auto-re-enable
+blindly" guidance.
 
 ---
 
@@ -2064,7 +2082,7 @@ where jams actually stick.
 | GIT-012 | GitOps | **RESOLVED** | Cloudflare Terraform provider v4 → v5 breaking changes: `cloudflare_tunnel_config` → `cloudflare_zero_trust_tunnel_cloudflared_config`, `cloudflare_record` → `cloudflare_dns_record`, `value` → `content`. Migrated with `moved {}` blocks to prevent destroy+recreate of live tunnel + DNS record. Provider `~> 4.0` → `~> 5.0` (PR #192, 2026-06-28) |
 | REL-027 | Reliability | **PLANNED** | Vault unseal-helper CLI (not the server) major bump 1.21.4→2.0.3 (Renovate #204) — functional risk to the REL-007 automated-unseal script, not a data risk; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
 | REL-028 | Reliability | **RESOLVED** | Postgres for Nextcloud + Paperless major bump 16.14→18.4 (PR #255, #257) — executed via pg_dump/restore into fresh PVCs, not a bare image swap. Found live: PG18 requires a single `/var/lib/postgresql` mount (not the old data+subPath convention), and Nextcloud's `config.php` used a different DB role (`oc_dw`) than `POSTGRES_USER` -- both fixed, both apps verified reachable (2026-07-04) |
-| REL-029 | Reliability | **PLANNED** | Nextcloud app major bump 30.0.17→34.0.1 (Renovate #212) — needs 4 sequential `occ upgrade` passes (30→31→32→33→34), depends on REL-028's nextcloud half; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
+| REL-029 | Reliability | **RESOLVED** | Nextcloud app major bump 30.0.17→34.0.1 — ran all 4 sequential `occ upgrade` passes (30→31→32→33→34). Found live: image entrypoint needs CAP_SETGID (`su`) during the upgrade to rsync app files, temporarily un-hardened then re-hardened after; `occ upgrade` must wait for the entrypoint's own background file-sync to finish first. Verified reachable + user data intact (2026-07-05) |
 | REL-030 | Reliability | **PLANNED** | Immich Postgres (VectorChord) major bump 14→16 (Renovate #202) — largest PVC in cluster, needs `pg_dumpall`/restore into fresh PVC + explicit VectorChord-extension-loaded verification before resuming Immich; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
 | REL-032 | Reliability | **RESOLVED** | Media acquisition stack had no autoheal — two "usenet does nothing" recurrences in 24h needed manual fixes. Added docker healthchecks + `autoheal` sidecar (restarts hung-but-alive containers), a "Block Raw Disc/ISO Releases" Custom Format (-10000 score, rejects un-importable raw disc rips at grab time), and a 10-min cron queue watchdog that auto-blocklists Sonarr/Radarr items stuck >30min in a warning state, with Discord notification only on actual action (2026-07-02) |
 | REL-031 | Reliability | **RESOLVED** | `ct_dmz_games_01` (Minecraft) cpu.cores 4→2 — first cut into the host overcommit ratio; folded into REL-035 below (2026-07-04) |
