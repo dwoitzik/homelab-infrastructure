@@ -49,7 +49,7 @@ spec:
             value: "1"
       containers:
       - name: postgres
-        image: postgres:16.14
+        image: postgres:18.4
         # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
         # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
         # the postgres user -- confirmed live, dropping all capabilities
@@ -80,9 +80,13 @@ spec:
             cpu: 1000m
             memory: 1Gi
         volumeMounts:
+        # REL-028: postgres 18's image refuses to start against the old
+        # 16.x-style mount (/var/lib/postgresql/data + subPath) -- 18+
+        # requires a single mount at /var/lib/postgresql (docker-library/
+        # postgres#1259). No subPath since this is a fresh PVC
+        # (paperless-db-data-pg18), nothing else on it yet.
         - name: data
-          mountPath: /var/lib/postgresql/data
-          subPath: data
+          mountPath: /var/lib/postgresql
         - name: run
           mountPath: /var/run/postgresql
         - name: tmp
@@ -90,7 +94,7 @@ spec:
       volumes:
       - name: data
         persistentVolumeClaim:
-          claimName: paperless-db-data
+          claimName: paperless-db-data-pg18
       - name: paperless-secrets
         secret:
           secretName: paperless-secrets
