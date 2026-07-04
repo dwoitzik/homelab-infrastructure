@@ -212,13 +212,18 @@ spec:
       containers:
         - name: nextcloud
           image: nextcloud:31-apache
+          # REL-029: capabilities temporarily NOT dropped -- the official
+          # image's entrypoint uses `su` internally to rsync app files as
+          # www-data during a major-version upgrade ("su: cannot set groups:
+          # Operation not permitted" with CAP_SETGID dropped, causing occ
+          # upgrade to fail with "files of the app 'files' were not correctly
+          # replaced"). Revert to `capabilities: drop: ["ALL"]` once all 4
+          # steps of the 30->34 upgrade chain are done and verified.
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
-            capabilities:
-              drop: ["ALL"]
           ports:
             - containerPort: 80
           env:
