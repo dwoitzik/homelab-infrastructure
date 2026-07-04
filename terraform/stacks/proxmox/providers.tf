@@ -11,7 +11,7 @@ terraform {
     key    = "proxmox/terraform.tfstate"
     region = "homelab"
     endpoints = {
-      s3 = "http://garage.apps.svc.cluster.local:3900"
+      s3 = "https://s3.woitzik.dev"
     }
     skip_credentials_validation = true
     skip_metadata_api_check     = true
