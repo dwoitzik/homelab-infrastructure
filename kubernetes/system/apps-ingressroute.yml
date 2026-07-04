@@ -291,8 +291,10 @@ spec:
     services: [{name: home-assistant, port: 8123}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# Jellyfin (Media Server — Authelia gates internal path; external path via Cloudflare
-# tunnel goes directly to Jellyfin login, consistent with Immich pattern)
+# Jellyfin — no Authelia; Jellyfin's own auth handles access control.
+# Cloudflare tunnel also bypasses Authelia (direct to Jellyfin login), so this
+# makes the internal path consistent. App clients (Android/iOS) cannot handle
+# Authelia's SSO redirect flow.
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -303,7 +305,6 @@ spec:
   routes:
   - match: Host(`media.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
     services: [{name: jellyfin, port: 8096}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 # SABnzbd, Sonarr, Radarr, Bazarr — IngressRoutes consolidated into
