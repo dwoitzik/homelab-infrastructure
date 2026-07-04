@@ -1,0 +1,26 @@
+---
+- name: Ensure base directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0750'
+  loop:
+    - "{{ atlantis_base_dir }}"
+    - "{{ atlantis_base_dir }}/data"
+
+- name: Deploy Atlantis repo config
+  ansible.builtin.template:
+    src: repos.yaml.j2
+    dest: "{{ atlantis_base_dir }}/repos.yaml"
+    mode: '0640'
+
+- name: Deploy Atlantis docker-compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ atlantis_base_dir }}/docker-compose.yml"
+    mode: '0640'
+
+- name: Ensure Atlantis stack is running
+  community.docker.docker_compose_v2:
+    project_src: "{{ atlantis_base_dir }}"
+    state: present

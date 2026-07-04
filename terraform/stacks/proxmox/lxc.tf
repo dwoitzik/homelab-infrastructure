@@ -439,6 +439,90 @@ resource "proxmox_virtual_environment_container" "ct_srv_jellyfin_01" {
   }
 }
 
+# --- GitOps Runner ---
+# ADR-012: Atlantis moved out of the k3s cluster into its own LXC.
+# It previously ran as a k8s Deployment scheduled on vm-srv-k3s-11/12 --
+# whenever a Terraform plan modified one of those VMs' attributes that
+# bpg/proxmox implements via a real qmshutdown+qmstart cycle (not a live
+# update -- e.g. cpu.units, serial_device), and Atlantis happened to be
+# scheduled on the VM being rebooted, Atlantis shut down its own node
+# mid-apply. Confirmed live twice on 2026-07-04 (Proxmox task log showed
+# `qmshutdown 211 terraform@pve` at the exact moment the apply was
+# interrupted; the k8s node hosting the atlantis pod was the same VM). A
+# dedicated LXC fully decouples Atlantis's own availability from the
+# infrastructure it modifies -- it can now reboot any/all 3 k3s VMs without
+# taking itself down.
+resource "proxmox_virtual_environment_container" "ct_srv_atlantis_01" {
+  vm_id                 = 204
+  node_name             = local.target_node
+  tags                  = ["gitops", "atlantis", "server"]
+  started               = true
+  unprivileged          = true
+  environment_variables = {}
+
+  startup {
+    order    = 5
+    up_delay = 10
+  }
+
+  initialization {
+    hostname = "ct-srv-atlantis-01"
+    ip_config {
+      ipv4 {
+        address = "10.0.20.250/24"
+        gateway = "10.0.20.1"
+      }
+    }
+    # AdGuard resolves *.woitzik.dev to Traefik's internal LB IP
+    # (10.0.20.200) for LAN clients -- needed so this LXC can reach Garage
+    # (Terraform S3 backend) via https://s3.woitzik.dev instead of a
+    # k8s-internal DNS name it no longer has access to.
+    dns {
+      servers = ["10.0.20.5"]
+    }
+  }
+
+  cpu {
+    cores = 2
+  }
+
+  memory {
+    dedicated = 2048
+    swap      = 1024
+  }
+
+  features {
+    nesting = true
+  }
+
+  disk {
+    datastore_id = local.storage
+    size         = 15
+  }
+
+  network_interface {
+    name     = "eth0"
+    bridge   = "vmbr0"
+    vlan_id  = 20
+    firewall = true
+  }
+
+  operating_system {
+    template_file_id = local.template
+    type             = "debian"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      description,
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+      network_interface[0].mac_address,
+      features,
+    ]
+  }
+}
+
 # --- DMZ Stack ---
 
 # REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
