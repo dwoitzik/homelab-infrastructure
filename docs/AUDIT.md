@@ -1962,13 +1962,23 @@ blindly" guidance.
 
 ---
 
-### REL-030 — Immich Postgres (VectorChord) major bump: 14 → 16 · **PLANNED** (2026-07-02)
+### REL-030 — Immich Postgres (VectorChord) major bump: 14 → 16 · **RESOLVED** (2026-07-05)
 
-Renovate PR #202. Same on-disk-format incompatibility class as REL-028, on the largest PVC
-in the cluster (entire photo library metadata + face/CLIP embeddings). VectorChord extension
-version itself unchanged (`0.4.3` on both tags). Needs `pg_dumpall`/restore into a fresh PVC,
-with explicit post-restore verification that the VectorChord extension actually loaded before
-resuming Immich. Full runbook: `docs/runbooks/pending-major-upgrades.md`.
+Renovate PR #202 (closed, executed manually instead, PR #267). Same on-disk-format
+incompatibility class as REL-028, on the largest PVC in the cluster (entire photo library
+metadata + face/CLIP embeddings). VectorChord extension version itself unchanged (`0.4.3` on
+both tags) -- only the Postgres major changed.
+
+`pg_dumpall` (415748 lines, 180MB) into a fresh `immich-db-pg16` PVC; old `immich-db` kept
+declared (unused) as rollback path. Verified post-restore: `vchord 0.4.3` and `vector 0.8.1`
+extensions both loaded (`\dx`), `asset` table 11502 rows, `asset_face` 5456 rows matching
+pre-migration counts. One transient error seen in `immich-server`'s first log lines
+("infer_arbiter_indexes" on an `ON CONFLICT` upsert) turned out to be from ArgoCD self-heal
+restarting the pod *before* the restore had finished (same race as REL-029) -- a plain pod
+restart after the restore completed showed a fully clean startup. `https://photos.woitzik.dev`
+and `/api/server/ping` both confirmed working post-migration.
+
+All 4 originally-deferred Renovate major-version PRs (REL-027/028/029/030) are now done.
 
 ---
 
@@ -2083,7 +2093,7 @@ where jams actually stick.
 | REL-027 | Reliability | **PLANNED** | Vault unseal-helper CLI (not the server) major bump 1.21.4→2.0.3 (Renovate #204) — functional risk to the REL-007 automated-unseal script, not a data risk; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
 | REL-028 | Reliability | **RESOLVED** | Postgres for Nextcloud + Paperless major bump 16.14→18.4 (PR #255, #257) — executed via pg_dump/restore into fresh PVCs, not a bare image swap. Found live: PG18 requires a single `/var/lib/postgresql` mount (not the old data+subPath convention), and Nextcloud's `config.php` used a different DB role (`oc_dw`) than `POSTGRES_USER` -- both fixed, both apps verified reachable (2026-07-04) |
 | REL-029 | Reliability | **RESOLVED** | Nextcloud app major bump 30.0.17→34.0.1 — ran all 4 sequential `occ upgrade` passes (30→31→32→33→34). Found live: image entrypoint needs CAP_SETGID (`su`) during the upgrade to rsync app files, temporarily un-hardened then re-hardened after; `occ upgrade` must wait for the entrypoint's own background file-sync to finish first. Verified reachable + user data intact (2026-07-05) |
-| REL-030 | Reliability | **PLANNED** | Immich Postgres (VectorChord) major bump 14→16 (Renovate #202) — largest PVC in cluster, needs `pg_dumpall`/restore into fresh PVC + explicit VectorChord-extension-loaded verification before resuming Immich; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
+| REL-030 | Reliability | **RESOLVED** | Immich Postgres (VectorChord) major bump 14→16 (PR #267) — largest PVC in cluster, executed via `pg_dumpall`/restore into fresh PVC. Verified: vchord/vector extensions loaded, asset/asset_face row counts match pre-migration, photos.woitzik.dev + API ping working. All 4 deferred Renovate majors (REL-027/028/029/030) now done (2026-07-05) |
 | REL-032 | Reliability | **RESOLVED** | Media acquisition stack had no autoheal — two "usenet does nothing" recurrences in 24h needed manual fixes. Added docker healthchecks + `autoheal` sidecar (restarts hung-but-alive containers), a "Block Raw Disc/ISO Releases" Custom Format (-10000 score, rejects un-importable raw disc rips at grab time), and a 10-min cron queue watchdog that auto-blocklists Sonarr/Radarr items stuck >30min in a warning state, with Discord notification only on actual action (2026-07-02) |
 | REL-031 | Reliability | **RESOLVED** | `ct_dmz_games_01` (Minecraft) cpu.cores 4→2 — first cut into the host overcommit ratio; folded into REL-035 below (2026-07-04) |
 | REL-035 | Reliability | **PARTIAL** | Host `mini` (8C/16T, 62GB) runs ~34 vCPU / ~91GB allocated across all VMs/CTs — a chronic ~2.1x CPU / ~1.5x memory overcommit that has caused repeated, recurring incidents (REL-012c etcd fdatasync stalls, the REL-016 Ollama host-freeze, and a 2026-07-04 cascade where a single test pod pushed host load 1.49→18.9 and briefly crash-looped k3s). Each prior incident was patched individually without addressing the shared root cause. Fixed this pass: (1) all 3 k3s VMs get `cpu.units = 2048` (2x the Proxmox default) so etcd/kubelet win CPU scheduling contention against every LXC on the host instead of competing on equal footing; (2) `ct_srv_ai_01` (Ollama, REL-016) now sets `cpu.limit = 6` directly in Terraform — the previous fix relied on a manual `pct set 201 -cpulimit 6` that was documented as done but confirmed **not actually present** on the live host on 2026-07-04 (bpg/proxmox 0.100.0 had no `limit` attribute; 0.111.0 does), meaning that container had had zero effective CPU ceiling since whenever it was last recreated; (3) `ct_dmz_games_01` (REL-031) memory reservation cut 16GB→8GB (observed peak usage ~4.7GB) to claw back the largest unused-but-allocated chunk after ai-01's 32GB. **Still open:** total allocation is still >16 threads / >62GB even after this pass (hardware is fixed, single-host by design per CLAUDE.local.md) — the units/limit weighting makes contention *survivable* for etcd, it doesn't remove contention. No CI/lint gate yet stops total allocation from creeping back up via future Renovate/feature additions; a documented per-host allocation ceiling + pre-commit check is the logical next step if this recurs again (2026-07-04) |
