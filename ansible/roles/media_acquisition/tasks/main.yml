@@ -668,6 +668,95 @@
   register: media_acquisition_sonarr_disc_format_score
   changed_when: "'CHANGED' in media_acquisition_sonarr_disc_format_score.stdout"
 
+# ── Block 3D/SBS and Hindi/Multi-audio junk releases ──────────────
+# 3D SBS = double-image on normal screens.
+# Hindi-Multi = regional non-English repacks (Jio, PunisheR, etc.).
+# minFormatScore:-9998 + CF score:-9999 = hard reject at grab time.
+
+- name: Add 3D-SBS custom format to Sonarr
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/customformat"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: 3D-SBS
+      includeCustomFormatWhenRenaming: false
+      specifications:
+        - name: 3D/SBS indicators
+          implementation: ReleaseTitleSpecification
+          implementationName: Release Title
+          negate: false
+          required: false
+          fields:
+            - {name: value, value: '\b(3D|SBS|HOU|AI3D|VR360|3D\.SBS|Half\.SBS)\b'}
+    status_code: 201
+  when: media_acquisition_sonarr_custom_formats.json | selectattr('name', 'equalto', '3D-SBS') | list | length == 0
+
+- name: Add Hindi-Multi custom format to Sonarr
+  ansible.builtin.uri:
+    url: "http://localhost:8989/api/v3/customformat"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: Hindi-Multi
+      includeCustomFormatWhenRenaming: false
+      specifications:
+        - name: Hindi/Multi indicators
+          implementation: ReleaseTitleSpecification
+          implementationName: Release Title
+          negate: false
+          required: false
+          fields:
+            - {name: value, value: '(?i)(Jio|Hindi\.DDP|DDP2\.0\.Hindi|PunisheR|Org\.Jio|ITA[-.]ENG\.MULTI|ITA\.ENG\.MULTI|MULTI\.WEBRip|ENG\.MULTI)'}
+    status_code: 201
+  when: media_acquisition_sonarr_custom_formats.json | selectattr('name', 'equalto', 'Hindi-Multi') | list | length == 0
+
+- name: Enforce 3D-SBS/Hindi-Multi block scores and minFormatScore in every Sonarr quality profile
+  ansible.builtin.shell:
+    cmd: |
+      python3 -c "
+      import json, urllib.request
+
+      api_key = '{{ media_acquisition_sonarr_api_key }}'
+      base = 'http://localhost:8989/api/v3'
+
+      def req(method, path, body=None):
+          data = json.dumps(body).encode() if body is not None else None
+          r = urllib.request.Request(base + path, data=data, method=method,
+              headers={'X-Api-Key': api_key, 'Content-Type': 'application/json'})
+          with urllib.request.urlopen(r) as resp:
+              return json.loads(resp.read() or b'null')
+
+      block_names = {'3D-SBS', 'Hindi-Multi'}
+      block_score = -9999
+      min_format_score = -9998
+
+      formats = req('GET', '/customformat')
+      block_ids = {f['id'] for f in formats if f['name'] in block_names}
+      changed = False
+      for profile in req('GET', '/qualityprofile'):
+          dirty = False
+          for item in profile.get('formatItems', []):
+              if item['format'] in block_ids and item['score'] != block_score:
+                  item['score'] = block_score
+                  dirty = True
+          if profile.get('minFormatScore', 0) != min_format_score:
+              profile['minFormatScore'] = min_format_score
+              dirty = True
+          if dirty:
+              req('PUT', f\"/qualityprofile/{profile['id']}\", profile)
+              changed = True
+      print('CHANGED' if changed else 'OK')
+      "
+  register: media_acquisition_sonarr_block_format_scores
+  changed_when: "'CHANGED' in media_acquisition_sonarr_block_format_scores.stdout"
+
 - name: Get existing Radarr custom formats
   ansible.builtin.uri:
     url: "http://localhost:7878/api/v3/customformat"
@@ -727,6 +816,90 @@
       "
   register: media_acquisition_radarr_disc_format_score
   changed_when: "'CHANGED' in media_acquisition_radarr_disc_format_score.stdout"
+
+- name: Add 3D-SBS custom format to Radarr
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/customformat"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: 3D-SBS
+      includeCustomFormatWhenRenaming: false
+      specifications:
+        - name: 3D/SBS indicators
+          implementation: ReleaseTitleSpecification
+          implementationName: Release Title
+          negate: false
+          required: false
+          fields:
+            - {name: value, value: '\b(3D|SBS|HOU|AI3D|VR360|3D\.SBS|Half\.SBS)\b'}
+    status_code: 201
+  when: media_acquisition_radarr_custom_formats.json | selectattr('name', 'equalto', '3D-SBS') | list | length == 0
+
+- name: Add Hindi-Multi custom format to Radarr
+  ansible.builtin.uri:
+    url: "http://localhost:7878/api/v3/customformat"
+    method: POST
+    headers:
+      X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      name: Hindi-Multi
+      includeCustomFormatWhenRenaming: false
+      specifications:
+        - name: Hindi/Multi indicators
+          implementation: ReleaseTitleSpecification
+          implementationName: Release Title
+          negate: false
+          required: false
+          fields:
+            - {name: value, value: '(?i)(Jio|Hindi\.DDP|DDP2\.0\.Hindi|PunisheR|Org\.Jio|ITA[-.]ENG\.MULTI|ITA\.ENG\.MULTI|MULTI\.WEBRip|ENG\.MULTI)'}
+    status_code: 201
+  when: media_acquisition_radarr_custom_formats.json | selectattr('name', 'equalto', 'Hindi-Multi') | list | length == 0
+
+- name: Enforce 3D-SBS/Hindi-Multi block scores and minFormatScore in every Radarr quality profile
+  ansible.builtin.shell:
+    cmd: |
+      python3 -c "
+      import json, urllib.request
+
+      api_key = '{{ media_acquisition_radarr_api_key }}'
+      base = 'http://localhost:7878/api/v3'
+
+      def req(method, path, body=None):
+          data = json.dumps(body).encode() if body is not None else None
+          r = urllib.request.Request(base + path, data=data, method=method,
+              headers={'X-Api-Key': api_key, 'Content-Type': 'application/json'})
+          with urllib.request.urlopen(r) as resp:
+              return json.loads(resp.read() or b'null')
+
+      block_names = {'3D-SBS', 'Hindi-Multi'}
+      block_score = -9999
+      min_format_score = -9998
+
+      formats = req('GET', '/customformat')
+      block_ids = {f['id'] for f in formats if f['name'] in block_names}
+      changed = False
+      for profile in req('GET', '/qualityprofile'):
+          dirty = False
+          for item in profile.get('formatItems', []):
+              if item['format'] in block_ids and item['score'] != block_score:
+                  item['score'] = block_score
+                  dirty = True
+          if profile.get('minFormatScore', 0) != min_format_score:
+              profile['minFormatScore'] = min_format_score
+              dirty = True
+          if dirty:
+              req('PUT', f\"/qualityprofile/{profile['id']}\", profile)
+              changed = True
+      print('CHANGED' if changed else 'OK')
+      "
+  register: media_acquisition_radarr_block_format_scores
+  changed_when: "'CHANGED' in media_acquisition_radarr_block_format_scores.stdout"
 
 # ── Queue watchdog (REL-032): auto-clear stuck import jams ────────
 # See templates/queue-watchdog.sh.j2 for the failure class this covers.
