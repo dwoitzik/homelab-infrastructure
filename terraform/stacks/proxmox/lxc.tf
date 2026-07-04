@@ -161,15 +161,16 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   # ceiling here, took 17+ minutes, and froze the entire host (every other
   # LXC/VM on mini, confirmed unreachable at the SSH-banner level, needed a
   # manual power-cycle). Proxmox doesn't isolate CPU between LXCs by default.
-  # This `cores` reduction is the durable, Terraform-tracked half of the fix;
-  # bpg/proxmox 0.100.0's container resource has no `limit` attribute at all
-  # (confirmed via the provider's own schema: cpu{} only exposes
-  # architecture/cores/units) -- Proxmox's actual cpulimit (a fractional
-  # ceiling, not just a core count) is applied manually via
-  # `pct set 201 -cpulimit 6` and is NOT representable here. If this
-  # container is ever recreated, that manual step needs to be redone.
+  # REL-035: `limit` used to require a manual `pct set 201 -cpulimit 6` step
+  # (bpg/proxmox 0.100.0's container resource had no `limit` attribute) --
+  # confirmed live 2026-07-04 that cpulimit was NOT actually set on the host
+  # despite that step being documented as done, i.e. this container had zero
+  # effective CPU ceiling. Provider is now 0.111.0 and exposes `limit`
+  # directly, so the cap is real and Terraform-tracked going forward instead
+  # of depending on a manual step nobody re-runs after a recreate.
   cpu {
     cores = 6
+    limit = 6
   }
 
   memory {
@@ -649,12 +650,22 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
     }
   }
 
+  # REL-031: cut 4->2 of the host's 16 logical threads -- part of the same
+  # host-overcommit remediation as REL-035 below (was ~2.25x total vCPU
+  # overcommit across all VMs/CTs). Cgroup CFS quota, not an exclusive
+  # reservation -- doesn't guarantee 2 cores are always free, just caps this
+  # container's ceiling so it can't monopolize more than 2 of 16 threads.
   cpu {
-    cores = 4
+    cores = 2
   }
 
+  # REL-035: dedicated memory was 16384 (16GB) but actual observed usage
+  # (2026-07-04, running Minecraft server) never exceeded ~4.7GB -- this was
+  # the single largest unused memory reservation on the host after ai-01,
+  # contributing to a ~91GB allocated vs 62GB physical overcommit ratio.
+  # 8192 keeps ~70% headroom over observed peak.
   memory {
-    dedicated = 16384
+    dedicated = 8192
     swap      = 2048
   }
 
