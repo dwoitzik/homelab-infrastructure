@@ -57,26 +57,6 @@ spec:
     services: [{name: open-webui, port: 8080}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
-# Atlantis
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: atlantis-final
-  namespace: apps
-spec:
-  entryPoints: [websecure]
-  routes:
-  - match: Host(`atlantis.woitzik.dev`) && PathPrefix(`/events`)
-    kind: Rule
-    priority: 10
-    services: [{name: atlantis, port: 4141}]
-  - match: Host(`atlantis.woitzik.dev`)
-    kind: Rule
-    priority: 1
-    middlewares: [{name: authelia}]
-    services: [{name: atlantis, port: 4141}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
----
 # Immich
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
