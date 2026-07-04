@@ -1,0 +1,37 @@
+# REL-035: kubernetes/system/argocd/ was tracked in git but owned by NO ArgoCD
+# Application -- system-manifests' directory.include only matches
+# {apps-ingressroute,other-ingressroute,pod-disruption-budgets}.yml at the top
+# level of kubernetes/system/, never recursing into subdirectories. Discovered
+# because the Authelia fix committed to argo-main/ingressroute.yml never took
+# live effect via GitOps; a fully untracked duplicate (argo-final, no auth)
+# was the only live route until it was found and manually removed.
+#
+# Only ingressroute.yml and external-secret.yml are included here -- both
+# simple, already-verified-matching-live objects. argocd-cm.yml,
+# argocd-cmd-params-cm.yml, argocd-rbac-cm.yml, and apps-applicationset.yaml
+# (ArgoCD's own bootstrap/RBAC config and the ApplicationSet that generates
+# every other Application) are deliberately left out of automated sync until
+# each has been individually diffed against live state -- selfHeal+prune on
+# those objects has cluster-wide blast radius if git and live have drifted.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-manifests
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dwoitzik/homelab-infrastructure.git
+    targetRevision: main
+    path: kubernetes/system/argocd
+    directory:
+      include: '{ingressroute,external-secret}.yml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
