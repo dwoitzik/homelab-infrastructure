@@ -550,3 +550,6 @@ import {
   id = "*2"
 }
 # Trigger fresh atlantis plan (GIT-009 apply pending)
+# IAC-002 2026-07-04: re-triggering -- this stack was never actually applied
+# via Atlantis (it was k3s-hosted and blocked on cluster health; now moved to
+# its own LXC, ADR-012). Checking what's actually pending before any apply.
