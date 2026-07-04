@@ -212,18 +212,20 @@ spec:
       containers:
         - name: nextcloud
           image: nextcloud:34.0.1-apache
-          # REL-029: the 30->34 upgrade chain is complete and verified (see
-          # docs/AUDIT.md). capabilities were temporarily NOT dropped during
-          # the migration -- the image's entrypoint needs `su`'s CAP_SETGID to
-          # rsync app files during a major-version transition -- now
-          # re-hardened since no upgrade is in progress.
+          # REL-029 regression (2026-07-05): re-hardening to `drop: ["ALL"]"`
+          # after the upgrade chain broke the container permanently, not just
+          # during upgrades -- Apache's main process needs CAP_SETGID itself
+          # to spawn worker processes as www-data (uid/gid 33), confirmed live
+          # ("setgid: unable to set group id to Group 33" on every new worker,
+          # HTTP requests timing out). Same class of issue as the SEC-012
+          # comments on postgres/redis containers elsewhere in this repo --
+          # this image's entrypoint is never actually capability-drop-safe,
+          # not just during major-version upgrades. Do not re-add this drop.
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
-            capabilities:
-              drop: ["ALL"]
           ports:
             - containerPort: 80
           env:
