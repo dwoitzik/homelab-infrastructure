@@ -137,17 +137,26 @@ spec:
       containers:
       - name: redis
         image: redis:8.8.0
-        # SEC-012: this instance has no command override, so it runs the
+        # REL-031-redis (2026-07-05): same latent bug found live on
+        # redis-nextcloud -- no PVC at all, but default redis persistence
+        # settings still try to write RDB snapshots, which fail against the
+        # read-only rootfs and eventually trip `stop-writes-on-bgsave-error`,
+        # blocking ALL writes (including whatever this instance is used for)
+        # once enough changes accumulate. Fixed proactively here the same way
+        # (persistence off, invoke redis-server directly instead of the
         # image's default entrypoint, which needs CAP_SETUID to setpriv-drop
-        # from root to the redis user -- confirmed live ("setpriv: setresuid
-        # failed: Operation not permitted"). redis-authelia (system/redis)
-        # tolerates the same capability drop fine because it overrides
-        # command: with redis-server directly, skipping that entrypoint.
+        # from root to the redis user).
+        command: ["redis-server", "--save", "", "--appendonly", "no"]
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
           seccompProfile:
             type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
         ports:
         - containerPort: 6379
         volumeMounts:
