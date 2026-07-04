@@ -1,8 +1,14 @@
 ---
+# Atlantis image runs as uid=100(atlantis) gid=1000(atlantis), not root --
+# bind-mounted files/dirs must be readable (and /data writable) by that uid,
+# confirmed live 2026-07-04 (container crash-looped on "permission denied"
+# reading repos.yaml until ownership was set here).
 - name: Ensure base directories exist
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
+    owner: "100"
+    group: "1000"
     mode: '0750'
   loop:
     - "{{ atlantis_base_dir }}"
@@ -12,6 +18,8 @@
   ansible.builtin.template:
     src: repos.yaml.j2
     dest: "{{ atlantis_base_dir }}/repos.yaml"
+    owner: "100"
+    group: "1000"
     mode: '0640'
 
 - name: Deploy Atlantis docker-compose configuration
