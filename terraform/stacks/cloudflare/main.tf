@@ -41,7 +41,13 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
     ingress = [
       {
         hostname = "atlantis.woitzik.dev"
-        service  = "http://atlantis.apps.svc.cluster.local:4141"
+        # ADR-012: Atlantis moved off the k3s cluster onto its own LXC
+        # (ct-srv-atlantis-01, 10.0.20.250) -- it used to run as a k8s pod
+        # scheduled on one of the very VMs it applies Terraform changes to,
+        # and would occasionally shut down its own node mid-apply. Plain IP
+        # instead of a .svc.cluster.local name since it's no longer a
+        # cluster-internal Service.
+        service = "http://10.0.20.250:4141"
         origin_request = {
           no_tls_verify            = false
           connect_timeout          = 10

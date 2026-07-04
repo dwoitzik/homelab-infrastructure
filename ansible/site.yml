@@ -74,6 +74,14 @@
   roles:
     - nfs_server
 
+- name: Provision Atlantis (GitOps runner, ADR-012)
+  hosts: atlantis_nodes
+  become: true
+  roles:
+    - docker
+    - node_exporter_native
+    - atlantis
+
 - name: Proxmox Host — Power Management
   hosts: pve_hosts
   become: true
