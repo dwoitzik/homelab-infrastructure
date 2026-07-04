@@ -38,8 +38,6 @@ nfs_server_shares:
     description: Headscale data
   - name: gitea
     description: Gitea data
-  - name: atlantis
-    description: Atlantis workspace
   - name: loki
     description: Loki storage
 
