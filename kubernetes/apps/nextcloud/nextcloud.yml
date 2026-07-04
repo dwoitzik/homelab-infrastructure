@@ -146,17 +146,29 @@ spec:
       containers:
         - name: redis
           image: redis:8.8.0-alpine
-          # SEC-012: this instance has no command override, so it runs the
-          # image's default entrypoint, which needs CAP_SETUID to setpriv-drop
-          # from root to the redis user -- confirmed live ("setpriv: setresuid
-          # failed: Operation not permitted"). redis-authelia (system/redis)
-          # tolerates the same capability drop fine because it overrides
-          # command: with redis-server directly, skipping that entrypoint.
+          # REL-031-redis (2026-07-05): this container has no PVC at all, but
+          # was still running with redis's default persistence settings --
+          # confirmed live it kept trying (and failing) to write RDB
+          # snapshots to the read-only rootfs ("Failed opening the temp RDB
+          # file ... Read-only file system"), which after enough writes hits
+          # Redis's own `stop-writes-on-bgsave-error` safeguard and starts
+          # REFUSING writes entirely, including PHP session writes -- this is
+          # what actually took Nextcloud down (looked like a capabilities
+          # issue at first, was a red herring; the real cause was this).
+          # Fixed the same way as immich-redis/valkey: invoke redis-server
+          # directly with persistence off instead of the image's default
+          # entrypoint (which needs CAP_SETUID to setpriv-drop from root).
+          command: ["redis-server", "--save", "", "--appendonly", "no"]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 1000
             seccompProfile:
               type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 6379
           volumeMounts:
