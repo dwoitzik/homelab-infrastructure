@@ -136,7 +136,7 @@ spec:
             value: "1"
       containers:
       - name: redis
-        image: redis:7.4.9
+        image: redis:8.8.0
         # SEC-012: this instance has no command override, so it runs the
         # image's default entrypoint, which needs CAP_SETUID to setpriv-drop
         # from root to the redis user -- confirmed live ("setpriv: setresuid
