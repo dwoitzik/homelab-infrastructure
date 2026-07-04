@@ -85,9 +85,14 @@ spec:
           ports:
             - containerPort: 5432
           volumeMounts:
+            # REL-028: postgres 18's image refuses to start against the old
+            # 16.x-style mount (/var/lib/postgresql/data + subPath) -- 18+
+            # requires a single mount at /var/lib/postgresql, data goes into
+            # an auto-versioned subdirectory it manages itself
+            # (docker-library/postgres#1259). No subPath since this is a
+            # fresh PVC (nextcloud-db-data-pg18), nothing else on it yet.
             - name: data
-              mountPath: /var/lib/postgresql/data
-              subPath: data
+              mountPath: /var/lib/postgresql
             - name: run
               mountPath: /var/run/postgresql
             - name: tmp
