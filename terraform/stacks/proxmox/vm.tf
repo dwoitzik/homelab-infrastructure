@@ -32,9 +32,19 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
     enabled = true
   }
 
+  # REL-035: units=2048 (default is 1024) gives these VMs 2x scheduling
+  # priority relative to every LXC on this host when physical CPU is
+  # contended. Total allocated vCPU across all VMs/CTs is ~2x the host's 16
+  # threads (documented, unavoidable without new hardware -- see
+  # docs/AUDIT.md REL-035), so contention *will* happen; without a priority
+  # weight, etcd's fdatasync calls compete on equal footing with e.g. a
+  # Minecraft server or an Ollama inference run and lose, causing the
+  # repeated REL-012c-style crash loops. This VM runs etcd -- it must win
+  # that contention every time.
   cpu {
     cores = 4
     type  = "host"
+    units = 2048
   }
 
   memory {
@@ -114,9 +124,14 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
     enabled = true
   }
 
+  # REL-035: see vm-srv-k3s-11 comment -- same priority weighting so this
+  # worker's kubelet/containerd don't starve either (etcd runs on k3s-11
+  # only, but a starved worker still causes node-not-ready flaps and pod
+  # evictions that cascade back onto the control plane).
   cpu {
     cores = 4
     type  = "host"
+    units = 2048
   }
 
   memory {
@@ -187,9 +202,11 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
     enabled = true
   }
 
+  # REL-035: see vm-srv-k3s-11 comment.
   cpu {
     cores = 4
     type  = "host"
+    units = 2048
   }
 
   memory {
