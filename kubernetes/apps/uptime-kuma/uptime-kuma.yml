@@ -77,16 +77,11 @@ spec:
       targetPort: 3001
   selector:
     app: uptime-kuma
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: status-main
-  namespace: monitoring
-spec:
-  entryPoints: [websecure]
-  routes:
-  - match: Host(`status.woitzik.dev`)
-    kind: Rule
-    services: [{name: uptime-kuma, port: 3001}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
+# REL-036: status-main IngressRoute removed -- duplicate of status-final in
+# kubernetes/system/apps-ingressroute.yml (same Host, same namespace). That
+# copy has authelia; this one had no middlewares at all, and with
+# UPTIME_KUMA_DISABLE_AUTH=1 the app itself has no login either. Traefik was
+# serving THIS route live (confirmed: hitting status.woitzik.dev returned a
+# 302 straight to /dashboard, no Authelia challenge) -- the dashboard was
+# fully unauthenticated. Same REL-018 duplicate-IngressRoute bug class as the
+# argo-final incident. Keeping only the authelia-gated copy.
