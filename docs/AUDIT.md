@@ -1905,13 +1905,33 @@ Vault server version comes from the Helm chart default and is untouched. Risk is
 
 ---
 
-### REL-028 — Postgres for Nextcloud + Paperless major bump: 16.14 → 18.4 · **PLANNED** (2026-07-02)
+### REL-028 — Postgres for Nextcloud + Paperless major bump: 16.14 → 18.4 · **RESOLVED** (2026-07-04)
 
-Renovate PR #214 bumps two independent bare `StatefulSet` Postgres instances
+Renovate PR #214 bumped two independent bare `StatefulSet` Postgres instances
 (`postgres-nextcloud`, `postgres-paperless`) — not the Authelia CNPG cluster, which has no
-pinned tag and is untouched. A bare image swap will crash-loop both (PG18 refuses to start
-against a PG16 data directory); needs pg_dump/restore into a fresh PVC per app. Full runbook:
-`docs/runbooks/pending-major-upgrades.md`.
+pinned tag and is untouched. Executed both via dump/restore into a fresh PVC (PR #255
+nextcloud, PR #257 paperless) rather than the unsafe bare image swap Renovate proposed.
+
+Two things found only by actually running it (not in the original runbook):
+
+- **PG18 requires a single `/var/lib/postgresql` mount**, not the old 16.x
+  `/var/lib/postgresql/data` + `subPath` convention — the image's entrypoint refuses to start
+  otherwise ("PostgreSQL data in /var/lib/postgresql/data (unused mount/volume)",
+  docker-library/postgres#1259). Hit this on nextcloud first, fixed proactively on paperless.
+- **Nextcloud's `config.php` used a different DB role name (`oc_dw`) than `POSTGRES_USER`
+  (`nextcloud`)** — the fresh PG18 instance only had the `nextcloud` role from the env var.
+  `pg_dump`'s `ALTER OWNER`/`GRANT` statements referencing `oc_dw` failed (230 harmless errors,
+  data itself restored fine since `CREATE TABLE`/`COPY` ran as the connecting role), but
+  Nextcloud itself couldn't authenticate until `oc_dw` was created manually with the same
+  password from `config.php` and granted full privileges. Paperless didn't have this mismatch
+  (`PAPERLESS_DBUSER` = `POSTGRES_USER` = `paperless`).
+
+Verified: `occ status`/`occ user:list` on nextcloud, `django_migrations`/`documents_document`
+row counts + a fresh paperless pod's celery logs on paperless, both apps reachable
+(`https://nextcloud.woitzik.dev`, `https://docs.woitzik.dev`). pg_dump + a Velero on-demand
+backup taken for each before touching anything; old PVCs (`nextcloud-db-data`,
+`paperless-db-data`) kept declared (unused) as a rollback path, to be deleted after a
+verified-good day per the runbook.
 
 ---
 
@@ -2043,7 +2063,7 @@ where jams actually stick.
 | REL-026 | Reliability | **RESOLVED** | Immich uploads via Cloudflare Tunnel failing with ECONNRESET for large files — Cloudflare buffers entire multipart body without chunked encoding. Fixed: `chunked_encoding = true`, `write_timeout = 600s`, `read_timeout = 120s` in tunnel origin_request (PR #192, 2026-06-28) |
 | GIT-012 | GitOps | **RESOLVED** | Cloudflare Terraform provider v4 → v5 breaking changes: `cloudflare_tunnel_config` → `cloudflare_zero_trust_tunnel_cloudflared_config`, `cloudflare_record` → `cloudflare_dns_record`, `value` → `content`. Migrated with `moved {}` blocks to prevent destroy+recreate of live tunnel + DNS record. Provider `~> 4.0` → `~> 5.0` (PR #192, 2026-06-28) |
 | REL-027 | Reliability | **PLANNED** | Vault unseal-helper CLI (not the server) major bump 1.21.4→2.0.3 (Renovate #204) — functional risk to the REL-007 automated-unseal script, not a data risk; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
-| REL-028 | Reliability | **PLANNED** | Postgres for Nextcloud + Paperless major bump 16.14→18.4 (Renovate #214, two independent bare StatefulSets, not the Authelia CNPG cluster) — needs pg_dump/restore into fresh PVCs per app, not a bare image swap; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
+| REL-028 | Reliability | **RESOLVED** | Postgres for Nextcloud + Paperless major bump 16.14→18.4 (PR #255, #257) — executed via pg_dump/restore into fresh PVCs, not a bare image swap. Found live: PG18 requires a single `/var/lib/postgresql` mount (not the old data+subPath convention), and Nextcloud's `config.php` used a different DB role (`oc_dw`) than `POSTGRES_USER` -- both fixed, both apps verified reachable (2026-07-04) |
 | REL-029 | Reliability | **PLANNED** | Nextcloud app major bump 30.0.17→34.0.1 (Renovate #212) — needs 4 sequential `occ upgrade` passes (30→31→32→33→34), depends on REL-028's nextcloud half; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
 | REL-030 | Reliability | **PLANNED** | Immich Postgres (VectorChord) major bump 14→16 (Renovate #202) — largest PVC in cluster, needs `pg_dumpall`/restore into fresh PVC + explicit VectorChord-extension-loaded verification before resuming Immich; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
 | REL-032 | Reliability | **RESOLVED** | Media acquisition stack had no autoheal — two "usenet does nothing" recurrences in 24h needed manual fixes. Added docker healthchecks + `autoheal` sidecar (restarts hung-but-alive containers), a "Block Raw Disc/ISO Releases" Custom Format (-10000 score, rejects un-importable raw disc rips at grab time), and a 10-min cron queue watchdog that auto-blocklists Sonarr/Radarr items stuck >30min in a warning state, with Discord notification only on actual action (2026-07-02) |
