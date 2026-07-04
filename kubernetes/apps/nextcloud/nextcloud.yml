@@ -22,6 +22,23 @@ spec:
     requests:
       storage: 5Gi
 ---
+# REL-028: Postgres 16->18 major bump needs dump/restore, not a bare image
+# swap -- PG18 refuses to start against a PG16 data directory. Fresh PVC so
+# the new instance can never accidentally touch the old on-disk format. Old
+# nextcloud-db-data PVC above kept declared (unused) so ArgoCD prune doesn't
+# delete it -- rollback path until this is verified good.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nextcloud-db-data-pg18
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 5Gi
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -44,7 +61,7 @@ spec:
             value: "1"
       containers:
         - name: postgres
-          image: postgres:16.14-alpine
+          image: postgres:18.4-alpine
           # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
           # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
           # the postgres user -- confirmed live (same failure as
@@ -85,7 +102,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: nextcloud-db-data
+            claimName: nextcloud-db-data-pg18
         - name: run
           emptyDir: {}
         - name: tmp
