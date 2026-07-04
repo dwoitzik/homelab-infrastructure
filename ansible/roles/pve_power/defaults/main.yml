@@ -2,3 +2,21 @@
 pve_power_cpu_governor: schedutil
 pve_power_energy_perf_pref: balance_power
 pve_power_amd_pstate: active
+
+# REL-012c/REL-037: ZFS module tuning. arc_max/prefetch_disable/dirty_data_max/
+# txg_timeout were applied manually (never in git) after the original
+# REL-012c etcd fdatasync incident. zfs_vdev_async_write_max_active=3 is new
+# (2026-07-04) -- default is 10, equal to zfs_vdev_sync_write_max_active (also
+# 10), meaning bulk async writes from any LXC/VM on this host could compete
+# for the single shared SSD's queue on completely equal footing with etcd's
+# own synchronous WAL fdatasync. Capping async well below sync's ceiling
+# gives etcd's sync writes priority in the ZIO scheduler's issue order,
+# directly targeting "leader is overloaded likely from slow disk" (the
+# recurring REL-012c crash signature) instead of just tolerating it better
+# (REL-035's cpu.units was CPU scheduling only, doesn't touch disk I/O
+# contention at all).
+pve_power_zfs_arc_max_bytes: 17179869184
+pve_power_zfs_prefetch_disable: 1
+pve_power_zfs_dirty_data_max_bytes: 268435456
+pve_power_zfs_txg_timeout: 5
+pve_power_zfs_vdev_async_write_max_active: 3
