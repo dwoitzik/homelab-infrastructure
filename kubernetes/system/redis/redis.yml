@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: redis
-        image: redis:7.4.9-alpine
+        image: redis:8.8.0-alpine
         command: ["redis-server", "--requirepass", "$(REDIS_PASSWORD)", "--appendonly", "yes"]
         # SEC-012: redis:7-alpine has no non-root default user -- confirmed
         # live elsewhere (redis-paperless/redis-nextcloud), runAsNonRoot
