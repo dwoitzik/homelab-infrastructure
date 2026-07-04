@@ -211,7 +211,7 @@ spec:
             value: "1"
       containers:
         - name: nextcloud
-          image: nextcloud:33-apache
+          image: nextcloud:34.0.1-apache
           # REL-029: capabilities temporarily NOT dropped -- the official
           # image's entrypoint uses `su` internally to rsync app files as
           # www-data during a major-version upgrade ("su: cannot set groups:
@@ -278,7 +278,7 @@ spec:
               memory: 1Gi
       initContainers:
         - name: copy-php-conf
-          image: nextcloud:33-apache
+          image: nextcloud:34.0.1-apache
           command: ["sh", "-c", "cp -a /usr/local/etc/php/conf.d/. /writable-conf/"]
           volumeMounts:
             - name: php-conf
@@ -334,7 +334,7 @@ spec:
                   topologyKey: kubernetes.io/hostname
           containers:
             - name: nextcloud-cron
-              image: nextcloud:33-apache
+              image: nextcloud:34.0.1-apache
               command: [php, -f, /var/www/html/cron.php]
               securityContext:
                 allowPrivilegeEscalation: false
