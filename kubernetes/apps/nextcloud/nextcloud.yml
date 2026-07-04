@@ -211,7 +211,7 @@ spec:
             value: "1"
       containers:
         - name: nextcloud
-          image: nextcloud:30.0.17-apache
+          image: nextcloud:31-apache
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -273,7 +273,7 @@ spec:
               memory: 1Gi
       initContainers:
         - name: copy-php-conf
-          image: nextcloud:30.0.17-apache
+          image: nextcloud:31-apache
           command: ["sh", "-c", "cp -a /usr/local/etc/php/conf.d/. /writable-conf/"]
           volumeMounts:
             - name: php-conf
@@ -329,7 +329,7 @@ spec:
                   topologyKey: kubernetes.io/hostname
           containers:
             - name: nextcloud-cron
-              image: nextcloud:30.0.17-apache
+              image: nextcloud:31-apache
               command: [php, -f, /var/www/html/cron.php]
               securityContext:
                 allowPrivilegeEscalation: false
