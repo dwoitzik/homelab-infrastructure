@@ -650,8 +650,13 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
     }
   }
 
+  # REL-031: cut 4->2 of the host's 16 logical threads -- part of the same
+  # host-overcommit remediation as REL-035 below (was ~2.25x total vCPU
+  # overcommit across all VMs/CTs). Cgroup CFS quota, not an exclusive
+  # reservation -- doesn't guarantee 2 cores are always free, just caps this
+  # container's ceiling so it can't monopolize more than 2 of 16 threads.
   cpu {
-    cores = 4
+    cores = 2
   }
 
   # REL-035: dedicated memory was 16384 (16GB) but actual observed usage
