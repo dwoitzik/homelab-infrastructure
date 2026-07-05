@@ -7,6 +7,15 @@
 # kubernetes/apps/* gets this automatically via the homelab-apps ApplicationSet;
 # kubernetes/system/* does not, so each subdirectory needs its own Application, same
 # pattern as vault-manifests/velero-manifests.
+#
+# REL-042 (2026-07-05): `application.yml` (defines the kube-prometheus-stack
+# Application itself) and this file were BOTH missing from the include glob
+# below -- meaning neither was ever re-synced by ArgoCD after their initial
+# manual bootstrap. A real fix merged to application.yml on 2026-06-27
+# (removing a broken `configSecret` reference that silently killed Discord
+# alerting) sat in git for 8+ days having zero effect live, because nothing
+# was watching that file. Adding both here so any future edit to either one
+# actually gets applied automatically going forward.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -19,7 +28,7 @@ spec:
     targetRevision: main
     path: kubernetes/system/monitoring
     directory:
-      include: '{alertmanager-config,blackbox-exporter,control-plane-alerts,slo-rules,hardware-temp-alerts,storage-capacity-alerts,postgres-alerts,pve-exporter,alertmanager-discord,external-secret,ingressroute,network-policies,loki-dashboard,slo-dashboard}.yml'
+      include: '{alertmanager-config,blackbox-exporter,control-plane-alerts,slo-rules,hardware-temp-alerts,storage-capacity-alerts,postgres-alerts,pve-exporter,alertmanager-discord,external-secret,ingressroute,network-policies,loki-dashboard,slo-dashboard,application,manifests-application}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

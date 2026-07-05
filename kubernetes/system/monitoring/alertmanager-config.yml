@@ -1,19 +1,56 @@
-# AlertmanagerConfig receiver for Discord notifications.
+# REL-042: AlertmanagerConfig receiver for Discord notifications.
 # prometheus-operator rejects api_url_file in the inline alertmanager.config
 # Go struct (discord.plain) — even in v0.92.0. AlertmanagerConfig CRDs use
 # a different code path (apiURL.secretKeyRef) that reads the webhook URL
 # directly from the Kubernetes Secret at runtime.
 #
-# Referenced from the main Alertmanager routing config as:
-#   monitoring/alertmanager-config/discord
-# (namespace / AlertmanagerConfig name / receiver name)
+# The route/matchers live HERE, not in the main config (application.yml), and
+# on purpose: prometheus-operator does NOT support referencing a receiver
+# defined in one AlertmanagerConfig from the main/global route (confirmed via
+# upstream operator maintainers -- "AlertmanagerConfigs are meant to be
+# self-contained... the only way to accomplish it today is to configure such
+# routes into the main Alertmanager configuration", which is the opposite
+# direction of what we need). A prior attempt at
+# `monitoring/alertmanager-config/discord` cross-reference syntax in the main
+# route silently broke Discord alerting entirely for 8+ days (operator logs:
+# "undefined receiver ... used in route", config fell back to a bare null
+# route). Fixed by making this AlertmanagerConfig fully self-contained with
+# its own route, and setting `alertmanagerConfigMatcherStrategy:
+# OnNamespaceExceptForAlertmanagerNamespace` on the Alertmanager CR (same
+# namespace as this object) so the operator doesn't auto-inject a
+# `namespace=monitoring` matcher that would otherwise silently drop every
+# alert from every other namespace (which is most of them).
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:
   name: alertmanager-config
   namespace: monitoring
 spec:
+  # Top-level route must default to a no-op receiver ("null") -- since
+  # alertmanagerConfigMatcherStrategy exempts this object from the
+  # auto-injected namespace matcher, an unrestricted top-level receiver here
+  # would catch and Discord-notify EVERY alert cluster-wide, not just the two
+  # cases below. The two real routes are children with their own matchers.
+  route:
+    receiver: "null"
+    groupBy: [alertname, namespace]
+    routes:
+      - receiver: discord
+        groupWait: 30s
+        repeatInterval: 2h
+        matchers:
+          - matchType: "=~"
+            name: alertname
+            value: "ProxmoxHostHighTemp|RpiHighTemp"
+      - receiver: discord
+        groupWait: 30s
+        repeatInterval: 2h
+        matchers:
+          - matchType: "="
+            name: severity
+            value: critical
   receivers:
+    - name: "null"
     - name: discord
       discordConfigs:
         - apiURL:

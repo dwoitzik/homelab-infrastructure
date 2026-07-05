@@ -161,6 +161,17 @@ spec:
           alertmanagerSpec:
             secrets:
               - alertmanager-discord-webhook
+            # REL-042: AlertmanagerConfig objects can't be referenced as
+            # receivers from this main route (confirmed with upstream --
+            # they're meant to be self-contained); the discord routing lives
+            # entirely in alertmanager-config.yml's own route instead. This
+            # exempts that object (same namespace as Alertmanager) from the
+            # default per-namespace matcher the operator would otherwise
+            # inject, which would silently scope it to namespace=monitoring
+            # only -- see the comment in alertmanager-config.yml for the full
+            # story of the 8-day silent breakage this caused.
+            alertmanagerConfigMatcherStrategy:
+              type: OnNamespaceExceptForAlertmanagerNamespace
           config:
             global:
               resolve_timeout: 5m
@@ -185,16 +196,6 @@ spec:
                 - receiver: "null"
                   matchers:
                     - alertname =~ "KubeProxyDown|KubeSchedulerDown|KubeControllerManagerDown"
-                - receiver: monitoring/alertmanager-config/discord
-                  matchers:
-                    - alertname =~ "ProxmoxHostHighTemp|RpiHighTemp"
-                  group_wait: 30s
-                  repeat_interval: 2h
-                - receiver: monitoring/alertmanager-config/discord
-                  matchers:
-                    - severity = critical
-                  group_wait: 30s
-                  repeat_interval: 2h
             receivers:
               - name: "null"
         prometheus:
