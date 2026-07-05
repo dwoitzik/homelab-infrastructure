@@ -1,20 +1,10 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: paperless-db-data
-  namespace: apps
-spec:
-  accessModes: [ "ReadWriteOnce" ]
-  storageClassName: nfs-client
-  resources:
-    requests:
-      storage: 2Gi
----
 # REL-028: Postgres 16->18 major bump needs dump/restore, not a bare image
 # swap -- PG18 refuses to start against a PG16 data directory. Fresh PVC so
 # the new instance can never accidentally touch the old on-disk format. Old
-# paperless-db-data PVC above kept declared (unused) so ArgoCD prune doesn't
-# delete it -- rollback path until this is verified good.
+# paperless-db-data PVC (pre-migration, 2Gi) removed 2026-07-05 after a full
+# day+ verified good on pg18 (survived a real Nextcloud-stack outage/fix in
+# between) -- if a rollback is ever needed again, restore from the daily
+# Velero backup instead of relying on the old live PVC.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
