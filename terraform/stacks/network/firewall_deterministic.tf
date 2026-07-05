@@ -25,6 +25,21 @@ resource "routeros_ip_firewall_mangle" "mss_clamp" {
   comment       = "TCP MSS clamping for MTU efficiency"
 }
 
+# GIT-008 step 1/2: byte-identical live duplicate of mss_clamp above (router
+# id *5, this repo already tracks *1). Bringing it under Terraform first so
+# the actual deletion goes through a real, auditable `terraform apply` in a
+# follow-up change instead of a manual RouterOS edit (CLAUDE.local.md: never
+# make manual RouterOS changes). See imports.tf for the matching import block.
+resource "routeros_ip_firewall_mangle" "mss_clamp_duplicate" {
+  chain         = "forward"
+  action        = "change-mss"
+  new_mss       = "clamp-to-pmtu"
+  out_interface = "ether1"
+  protocol      = "tcp"
+  tcp_flags     = "syn"
+  comment       = "TCP MSS clamping for MTU efficiency"
+}
+
 # ===============================================
 # INPUT CHAIN (Traffic TO the Router)
 # ===============================================
