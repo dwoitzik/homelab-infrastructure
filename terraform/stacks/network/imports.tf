@@ -95,18 +95,8 @@ import {
 }
 
 import {
-  to = routeros_ip_firewall_filter.fwd_wan_minecraft
-  id = "*59"
-}
-
-import {
   to = routeros_ip_firewall_filter.fwd_mgmt_internet
   id = "*5E"
-}
-
-import {
-  to = routeros_ip_firewall_filter.fwd_wan_cobblemon
-  id = "*B5"
 }
 
 import {
@@ -342,10 +332,6 @@ import {
 import {
   to = routeros_ip_firewall_mangle.mss_clamp
   id = "*1"
-}
-import {
-  to = routeros_ip_firewall_nat.dstnat_cobblemon
-  id = "*9"
 }
 import {
   to = routeros_ip_firewall_nat.srcnat_masquerade_wan
