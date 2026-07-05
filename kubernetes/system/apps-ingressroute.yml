@@ -180,6 +180,62 @@ spec:
         passHostHeader: true
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
+# SEC-008 regression fix (2026-07-05): ADR-012 moved Atlantis off k3s onto its
+# own LXC (ct-srv-atlantis-01, 10.0.20.250) and, in the process, deleted this
+# IngressRoute entirely (it used to carry the Authelia gate) and repointed the
+# Cloudflare Tunnel straight at the LXC's IP, bypassing Traefik/Authelia
+# completely. Atlantis has no built-in auth of its own (no basic-auth env var
+# configured) -- confirmed live: atlantis.woitzik.dev served its full UI
+# (PR history, plan/apply state, lock controls) to an unauthenticated public
+# request. Re-adding the same external-host + Authelia pattern already used
+# for pve-final/pbs-final above. The Cloudflare Tunnel ingress (terraform/
+# stacks/cloudflare/main.tf) must also be repointed to Traefik, not the LXC
+# directly, for this to actually take effect -- see that file's matching fix.
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-atlantis
+  namespace: apps
+spec:
+  ports:
+    - port: 4141
+      targetPort: 4141
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: external-atlantis
+  namespace: apps
+subsets:
+  - addresses:
+      - ip: 10.0.20.250
+    ports:
+      - port: 4141
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: atlantis-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  # GitHub webhook path -- no Authelia (its own HMAC secret is the auth;
+  # forcing it through Authelia's forward-auth redirect would break delivery
+  # entirely, per the original SEC-008 fix this replicates).
+  - match: Host(`atlantis.woitzik.dev`) && PathPrefix(`/events`)
+    kind: Rule
+    priority: 10
+    services: [{name: external-atlantis, port: 4141}]
+  - match: Host(`atlantis.woitzik.dev`)
+    kind: Rule
+    priority: 1
+    middlewares:
+      - name: authelia
+      - name: websockets
+    services: [{name: external-atlantis, port: 4141}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
 # Uptime Kuma
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
