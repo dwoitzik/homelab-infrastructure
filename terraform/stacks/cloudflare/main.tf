@@ -51,7 +51,13 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
         # middleware on atlantis-final (apps-ingressroute.yml) actually
         # applies -- unlike photos/media below, Atlantis has no native login
         # to fall back on, so it can't use the direct-to-service pattern.
-        service = "http://traefik.kube-system.svc.cluster.local:80"
+        # port 80 (Traefik's plain-HTTP entrypoint) redirects to https
+        # globally -- the tunnel doesn't follow redirects like a browser, it
+        # just relays them, causing an infinite loop back through Cloudflare.
+        # Hit Traefik's websecure (443) entrypoint directly instead; its
+        # *.woitzik.dev cert is valid for this hostname so no_tls_verify
+        # stays false.
+        service = "https://traefik.kube-system.svc.cluster.local:443"
         origin_request = {
           no_tls_verify            = false
           connect_timeout          = 10
