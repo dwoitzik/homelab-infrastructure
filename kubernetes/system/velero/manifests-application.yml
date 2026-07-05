@@ -10,7 +10,14 @@ spec:
     targetRevision: main
     path: kubernetes/system/velero
     directory:
-      include: '{secrets,schedule,offsite-schedule,r2-backuplocation}.yml'
+      # WRK-008: offsite-schedule.yml/r2-backuplocation.yml are deliberately
+      # excluded -- scaffolded but incomplete (literal ACCOUNT_ID placeholder,
+      # credential secret doesn't exist anywhere), user decided to leave
+      # deferred rather than complete or remove (2026-06-25). Don't add them
+      # here until real R2 credentials exist -- confirmed live that including
+      # them creates an Unavailable BackupStorageLocation and a Schedule that
+      # would fail daily at 4am.
+      include: '{secrets,schedule}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: velero

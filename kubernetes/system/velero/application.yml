@@ -27,6 +27,19 @@ spec:
               provider: aws
               config:
                 region: homelab
+          # REL-044: originally placed at the top level as `extraArgs` and
+          # misspelled `--default-repo-maintenance-frequency` -- Helm silently
+          # ignores unknown top-level keys, and the flag (even if it had been
+          # read) doesn't exist under that name, so this never actually took
+          # effect despite being merged 11 days earlier. Confirmed via the
+          # chart's own deployment.yaml template
+          # ({{ .Values.configuration.extraArgs }}) and the real flag name
+          # (velero/velero#8156, #8543): `--default-repo-maintain-frequency`.
+          # Reduce kopia maintenance frequency from 1h (default) to 24h --
+          # with 11 BackupRepositories, hourly maintenance = 11 concurrent
+          # kopia jobs/hour hammering rpool NVMe, competing with etcd.
+          extraArgs:
+            - --default-repo-maintain-frequency=24h
         initContainers:
           - name: velero-plugin-for-aws
             image: velero/velero-plugin-for-aws:v1.14.2
@@ -40,11 +53,6 @@ spec:
         backupsEnabled: true
         snapshotsEnabled: true
         deployNodeAgent: true
-        # Reduce kopia maintenance frequency from 1h (default) to 24h per repo.
-        # With 11 BackupRepositories, hourly maintenance = 11 concurrent kopia jobs/hour
-        # hammering rpool NVMe, which competes with etcd and caused cluster IO pressure.
-        extraArgs:
-          - --default-repo-maintenance-frequency=24h
   destination:
     server: https://kubernetes.default.svc
     namespace: velero
