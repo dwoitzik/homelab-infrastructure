@@ -41,13 +41,17 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
     ingress = [
       {
         hostname = "atlantis.woitzik.dev"
-        # ADR-012: Atlantis moved off the k3s cluster onto its own LXC
-        # (ct-srv-atlantis-01, 10.0.20.250) -- it used to run as a k8s pod
-        # scheduled on one of the very VMs it applies Terraform changes to,
-        # and would occasionally shut down its own node mid-apply. Plain IP
-        # instead of a .svc.cluster.local name since it's no longer a
-        # cluster-internal Service.
-        service = "http://10.0.20.250:4141"
+        # SEC-008 regression fix (2026-07-05): ADR-012 moved Atlantis off k3s
+        # onto its own LXC (ct-srv-atlantis-01, 10.0.20.250) and this ingress
+        # entry was repointed straight at the LXC's IP -- bypassing Traefik
+        # and, with it, the Authelia gate SEC-008 originally added. Atlantis
+        # has no auth of its own; confirmed live this served its full UI
+        # (PR history, plan/apply state, lock controls) to an unauthenticated
+        # public request. Routed back through Traefik so the Authelia
+        # middleware on atlantis-final (apps-ingressroute.yml) actually
+        # applies -- unlike photos/media below, Atlantis has no native login
+        # to fall back on, so it can't use the direct-to-service pattern.
+        service = "http://traefik.kube-system.svc.cluster.local:80"
         origin_request = {
           no_tls_verify            = false
           connect_timeout          = 10
