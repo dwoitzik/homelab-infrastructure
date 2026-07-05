@@ -112,11 +112,6 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
 # -----------------------------------------------------------------------------
 # DNS records -- CNAME -> tunnel (proxied through Cloudflare CDN/DDoS layer)
 #
-# NOTE: cloudflare_api_token in the Atlantis pod currently only has
-# "Cloudflare Tunnel:Edit" scope. Zone:DNS:Edit is needed to create/update
-# these records. Until the token is updated, apply with:
-#   terraform apply -target=cloudflare_zero_trust_tunnel_cloudflared_config.homelab
-#
 # ttl = 1 means "Auto" for proxied records (required field in provider v5).
 # -----------------------------------------------------------------------------
 resource "cloudflare_dns_record" "tunnel_photos" {
