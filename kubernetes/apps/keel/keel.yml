@@ -12,6 +12,14 @@ rules:
   - apiGroups: ["apps", "extensions"]
     resources: ["deployments", "statefulsets"]
     verbs: ["get", "list", "watch", "update", "patch"]
+  # REL-043: keel also watches DaemonSets internally (unconditionally, not
+  # gated by whether any DS actually carries a keel.sh/policy annotation) --
+  # missing this spammed "cannot list resource daemonsets" every ~45s.
+  # Read-only: none of this repo's DaemonSets (node-exporter, promtail,
+  # metallb-speaker) are meant to be Keel-auto-updated, so no update/patch.
+  - apiGroups: ["apps", "extensions"]
+    resources: ["daemonsets"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["pods", "namespaces"]
     verbs: ["get", "list", "watch"]
