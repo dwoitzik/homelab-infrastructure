@@ -41,19 +41,34 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
     ingress = [
       {
         hostname = "atlantis.woitzik.dev"
-        # ADR-012: Atlantis moved off the k3s cluster onto its own LXC
-        # (ct-srv-atlantis-01, 10.0.20.250) -- it used to run as a k8s pod
-        # scheduled on one of the very VMs it applies Terraform changes to,
-        # and would occasionally shut down its own node mid-apply. Plain IP
-        # instead of a .svc.cluster.local name since it's no longer a
-        # cluster-internal Service.
-        service = "http://10.0.20.250:4141"
+        # SEC-008 regression fix (2026-07-05): ADR-012 moved Atlantis off k3s
+        # onto its own LXC (ct-srv-atlantis-01, 10.0.20.250) and this ingress
+        # entry was repointed straight at the LXC's IP -- bypassing Traefik
+        # and, with it, the Authelia gate SEC-008 originally added. Atlantis
+        # has no auth of its own; confirmed live this served its full UI
+        # (PR history, plan/apply state, lock controls) to an unauthenticated
+        # public request. Routed back through Traefik so the Authelia
+        # middleware on atlantis-final (apps-ingressroute.yml) actually
+        # applies -- unlike photos/media below, Atlantis has no native login
+        # to fall back on, so it can't use the direct-to-service pattern.
+        # port 80 (Traefik's plain-HTTP entrypoint) redirects to https
+        # globally -- the tunnel doesn't follow redirects like a browser, it
+        # just relays them, causing an infinite loop back through Cloudflare.
+        # Hit Traefik's websecure (443) entrypoint directly instead; its
+        # *.woitzik.dev cert is valid for this hostname so no_tls_verify
+        # stays false.
+        service = "https://traefik.kube-system.svc.cluster.local:443"
         origin_request = {
-          no_tls_verify            = false
-          connect_timeout          = 10
-          tcp_keep_alive           = 30
-          keep_alive_connections   = 10
-          http_host_header         = "atlantis.woitzik.dev"
+          no_tls_verify          = false
+          connect_timeout        = 10
+          tcp_keep_alive         = 30
+          keep_alive_connections = 10
+          http_host_header       = "atlantis.woitzik.dev"
+          # Without this, cloudflared expects the origin's TLS cert to match
+          # the service hostname (traefik.kube-system.svc.cluster.local) and
+          # fails verification against Traefik's *.woitzik.dev cert -- a 502
+          # confirmed live before adding this.
+          origin_server_name       = "atlantis.woitzik.dev"
           disable_chunked_encoding = false
         }
       },
@@ -96,11 +111,6 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
 
 # -----------------------------------------------------------------------------
 # DNS records -- CNAME -> tunnel (proxied through Cloudflare CDN/DDoS layer)
-#
-# NOTE: cloudflare_api_token in the Atlantis pod currently only has
-# "Cloudflare Tunnel:Edit" scope. Zone:DNS:Edit is needed to create/update
-# these records. Until the token is updated, apply with:
-#   terraform apply -target=cloudflare_zero_trust_tunnel_cloudflared_config.homelab
 #
 # ttl = 1 means "Auto" for proxied records (required field in provider v5).
 # -----------------------------------------------------------------------------
