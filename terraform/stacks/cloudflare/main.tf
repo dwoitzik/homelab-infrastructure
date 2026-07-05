@@ -59,11 +59,16 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
         # stays false.
         service = "https://traefik.kube-system.svc.cluster.local:443"
         origin_request = {
-          no_tls_verify            = false
-          connect_timeout          = 10
-          tcp_keep_alive           = 30
-          keep_alive_connections   = 10
-          http_host_header         = "atlantis.woitzik.dev"
+          no_tls_verify          = false
+          connect_timeout        = 10
+          tcp_keep_alive         = 30
+          keep_alive_connections = 10
+          http_host_header       = "atlantis.woitzik.dev"
+          # Without this, cloudflared expects the origin's TLS cert to match
+          # the service hostname (traefik.kube-system.svc.cluster.local) and
+          # fails verification against Traefik's *.woitzik.dev cert -- a 502
+          # confirmed live before adding this.
+          origin_server_name       = "atlantis.woitzik.dev"
           disable_chunked_encoding = false
         }
       },
