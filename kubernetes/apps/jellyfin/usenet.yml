@@ -37,7 +37,14 @@ spec:
   routes:
   - match: Host(`requests.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia, namespace: apps}]
+    # UX-001: no Authelia middleware here, deliberately -- Jellyseerr 2.7.3 has
+    # no OIDC/SSO client support (confirmed via container code search), so
+    # stacking Authelia forward-auth in front of it just produced two
+    # unrelated login prompts (Authelia, then Jellyseerr's own per-user
+    # account) with no real defense-in-depth benefit, since Jellyseerr's own
+    # auth can't consume the Authelia session either way. Matches the existing
+    # jellyfin.yml precedent (media.woitzik.dev): same user base, same trust
+    # boundary, gate via the app's native per-user login alone.
     services: [{name: jellyseerr, port: 5055}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
