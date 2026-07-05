@@ -335,18 +335,13 @@ import {
 }
 
 # --- Mangle / NAT ---
-# NOTE: mss_clamp has a live duplicate (*1 and *5, byte-identical config, both
-# carrying real traffic) — almost certainly created by a prior apply attempt
-# against the same missing state. Importing the lower id here; *5 is imported
-# separately below (GIT-008 step 1/2) so its removal in a follow-up change is
-# a real Terraform destroy, not a manual RouterOS edit.
+# GIT-008: mss_clamp had a live duplicate (*1 and *5, byte-identical config).
+# *5 was imported as mss_clamp_duplicate (PR #279) then removed via a real
+# terraform destroy (firewall_deterministic.tf) -- the import block for it is
+# gone now that the resource itself no longer exists in config.
 import {
   to = routeros_ip_firewall_mangle.mss_clamp
   id = "*1"
-}
-import {
-  to = routeros_ip_firewall_mangle.mss_clamp_duplicate
-  id = "*5"
 }
 import {
   to = routeros_ip_firewall_nat.dstnat_cobblemon
