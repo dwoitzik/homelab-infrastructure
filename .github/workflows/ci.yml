@@ -160,12 +160,28 @@ jobs:
           tar xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
           chmod +x /usr/local/bin/kubeconform
 
+      # Without this, kubeconform re-fetches every schema from
+      # raw.githubusercontent.com on every single run -- hit that CDN's rate
+      # limit (429) repeatedly during a busy PR session, failing CI for
+      # commits that touched zero Kubernetes manifests. Cache persists the
+      # downloaded schemas across runs so a stable k8s version only needs to
+      # fetch each schema once.
+      - name: Cache kubeconform schemas
+        uses: actions/cache@v4
+        with:
+          path: /tmp/kubeconform-cache
+          key: kubeconform-schemas-1.31.0-${{ hashFiles('kubernetes/**/*.yml', 'kubernetes/**/*.yaml') }}
+          restore-keys: |
+            kubeconform-schemas-1.31.0-
+
       - name: Validate k8s manifests
         run: |
+          mkdir -p /tmp/kubeconform-cache
           find kubernetes/ -name "*.yaml" -o -name "*.yml" \
             | grep -v users_database \
             | xargs kubeconform \
                 -kubernetes-version 1.31.0 \
+                -cache /tmp/kubeconform-cache \
                 -ignore-missing-schemas \
                 -summary \
                 -exit-on-error
