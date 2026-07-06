@@ -40,6 +40,10 @@
     name: proxmox-backup-server
     state: present
 
+# REL-051: the restart used to run unconditionally on every Ansible pass against
+# mgmt_nodes, not just the one-time bootstrap it was written for -- a real backup job
+# could get killed mid-run by an unrelated playbook run. Moved to a handler so it only
+# fires when this task actually changes something.
 - name: Add bind mount to PBS container configuration on PVE host
   ansible.builtin.lineinfile:
     path: "/etc/pve/lxc/110.conf"
@@ -48,13 +52,10 @@
   delegate_to: 10.0.10.10
   vars:
     ansible_user: root
+  notify: Force restart PBS Container
 
-- name: Force restart PBS Container
-  ansible.builtin.shell: pct stop 110 && sleep 3 && pct start 110
-  delegate_to: 10.0.10.10
-  vars:
-    ansible_user: root
-  changed_when: true
+- name: Flush handlers so the container is restarted before subsequent tasks run
+  ansible.builtin.meta: flush_handlers
 
 - name: Wait for PBS container to wake up
   ansible.builtin.wait_for_connection:
