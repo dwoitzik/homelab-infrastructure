@@ -2640,6 +2640,81 @@ Reran the same broken-proxy test against the new `-schema-location` setup: `Erro
 
 ---
 
+### REL-035b — Memory-overcommit regression guard: RAM/ARC, not vCPU/thread · **PARTIAL** (2026-07-06)
+
+Follow-up to REL-035. That pass fixed CPU-scheduling contention (`cpu.units`) but left
+"no CI/lint gate stops total allocation from creeping back up" as an explicitly open
+gap. Built that gate now, but scoped correctly: **the host freeze that started this
+whole investigation (REL-016) was a ZFS I/O stall-wait under RAM pressure, not CPU
+starvation** — vCPU/thread overcommit on this host is fine (already survivable per
+REL-035's `cpu.units` fix) and gating on it would guard against the wrong failure mode.
+The guard gates on RAM headroom instead.
+
+**Measured live on `mini` first (read-only, nothing changed):**
+
+- Physical RAM: 64 GB nominal, 62 GiB usable (`free -h`)
+- `zfs_arc_max`: already capped at exactly 4 GiB (`/sys/module/zfs/parameters/zfs_arc_max`
+  = 4294967296 bytes) — this was already done, tighter than the 8 GB cap this pass
+  considered proposing; nothing to change here
+- KSM: `ksmtuned` service enabled and running, but `/sys/kernel/mm/ksm/run` currently
+  reads `0` (inactive) — the daemon exists but hasn't triggered page-merging, likely
+  because the host hasn't crossed its memory-pressure threshold recently
+- **Summed `dedicated` memory across every VM/CT in `terraform/stacks/proxmox/{lxc,vm}.tf`:
+  85.0 GB** (57.0 GB across 9 LXCs + 28.0 GB across 3 VMs) — against 64 GB of physical
+  RAM. This is worse than the "~91GB" figure REL-035 cited (that included aspects of the
+  old CPU/thread framing this pass replaced; the pure-memory figure re-measured here is
+  85 GB, still a severe ~1.3x overcommit against a 64 GB host).
+
+**Built:** `scripts/check-host-memory-overcommit.py`, wired into pre-commit (fires when
+`terraform/stacks/proxmox/{lxc,vm}.tf` change, plus a full-repo re-check on every push)
+and a new CI job (`host-memory-overcommit-guard`). Ceiling is 50 GB — `64 GB total - 14
+GB reserved` (4 GB ZFS ARC + 6 GB host/hypervisor overhead + 4 GB safety margin),
+expressed as named constants with the breakdown in a comment, not a magic number. The
+failure message explicitly names REL-016 and states this exists to prevent a repeat of
+that exact host-freeze.
+
+- **Current state is red by design, not a bug:** 85.0 GB measured vs. the 50 GB ceiling
+  is a 35.0 GB overage. Per instruction, **no VM/CT was auto-shrunk** — that's a decision
+  for the account owner, not something to silently apply. Options, in order of
+  disruption:
+  1. **Cap `zfs_arc_max` further or tune ballooning more aggressively** — doesn't reduce
+     Terraform's `dedicated` ceiling at all (this guard measures the worst-case ceiling,
+     not live usage), so this alone would not turn the guard green. Proposed (not
+     applied — needs a planned reboot of `mini` the account owner schedules): a
+     `/etc/modprobe.d/zfs.conf` entry is what the existing `zfs_arc_max=4294967296`
+     already achieves; there's no further headroom to gain here without changing the
+     ceiling math itself, since ARC is already at the tightest cap this pass was asked
+     to consider (4 GB, below the 8 GB proposed).
+  2. **Trim specific over-provisioned guests.** Largest single allocations, by how much
+     each exceeds its plausible working set:
+     - `ct_srv_ai_01` (Ollama): `dedicated = 32768` (32 GB) — the single largest
+       allocation in the fleet by a wide margin. REL-016's own incident notes only ever
+       observed spikes from loading large LLM models (the `gemma2:27b` incident spiked
+       ~13 GB); whether 32 GB dedicated is real headroom for larger models the account
+       owner intends to run, or inherited from an earlier sizing guess, is a usage
+       question only they can answer.
+     - `ct_dmz_games_01` (Minecraft): `dedicated = 8192` (8 GB) — REL-035 already noted
+       "observed peak usage ~4.7GB" here after cutting it from 16→8 GB; a further cut
+       to ~6 GB would claw back ~2 GB with apparent headroom to spare, smallest-blast-
+       radius trim available.
+     - `vm-srv-k3s-11` (12 GB) / `-12`/`-13` (8 GB each): the k3s control-plane/workers
+       already run with `floating` (ballooning floor) well below `dedicated` (8/4/4 GB),
+       meaning the *ceiling* this guard measures is already generous headroom above
+       the *floor* they can be squeezed to under host pressure — trimming `dedicated`
+       here directly reduces how much burst capacity etcd/kubelet get before ballooning
+       kicks in, the most operationally risky trim on this list.
+  3. **Revisit the ceiling itself** — 50 GB was this task's own proposed number
+     (64 GB total − 14 GB reserved); if the account owner judges the reserve breakdown
+     too conservative (e.g., accepting more host/hypervisor-overhead risk), the ceiling
+     constant is a single named value in the script to change, with the same
+     REL-016-referencing rationale required to stay attached to it.
+  - **The guard goes in regardless of the current red state** — getting it green is a
+    separate decision for the account owner, not blocked on by this PR.
+- **Effort:** Small for the guard itself (done); the decision on how to get under the
+  ceiling is the account owner's, not a technical task.
+
+---
+
 ### REL-032 — Media acquisition stack: no autoheal, recurring silent queue jams · **RESOLVED** (2026-07-02)
 
 Two distinct "usenet does nothing" recurrences in 24h (2026-07-01 permission bug, 2026-07-02
@@ -2762,6 +2837,7 @@ where jams actually stick.
 | REL-032 | Reliability | **RESOLVED** | Media acquisition stack had no autoheal — two "usenet does nothing" recurrences in 24h needed manual fixes. Added docker healthchecks + `autoheal` sidecar (restarts hung-but-alive containers), a "Block Raw Disc/ISO Releases" Custom Format (-10000 score, rejects un-importable raw disc rips at grab time), and a 10-min cron queue watchdog that auto-blocklists Sonarr/Radarr items stuck >30min in a warning state, with Discord notification only on actual action (2026-07-02) |
 | REL-031 | Reliability | **RESOLVED** | `ct_dmz_games_01` (Minecraft) cpu.cores 4→2 — first cut into the host overcommit ratio; folded into REL-035 below (2026-07-04) |
 | REL-035 | Reliability | **PARTIAL** | Host `mini` (8C/16T, 62GB) runs ~34 vCPU / ~91GB allocated across all VMs/CTs — a chronic ~2.1x CPU / ~1.5x memory overcommit that has caused repeated, recurring incidents (REL-012c etcd fdatasync stalls, the REL-016 Ollama host-freeze, and a 2026-07-04 cascade where a single test pod pushed host load 1.49→18.9 and briefly crash-looped k3s). Each prior incident was patched individually without addressing the shared root cause. Fixed this pass: (1) all 3 k3s VMs get `cpu.units = 2048` (2x the Proxmox default) so etcd/kubelet win CPU scheduling contention against every LXC on the host instead of competing on equal footing; (2) `ct_srv_ai_01` (Ollama, REL-016) now sets `cpu.limit = 6` directly in Terraform — the previous fix relied on a manual `pct set 201 -cpulimit 6` that was documented as done but confirmed **not actually present** on the live host on 2026-07-04 (bpg/proxmox 0.100.0 had no `limit` attribute; 0.111.0 does), meaning that container had had zero effective CPU ceiling since whenever it was last recreated; (3) `ct_dmz_games_01` (REL-031) memory reservation cut 16GB→8GB (observed peak usage ~4.7GB) to claw back the largest unused-but-allocated chunk after ai-01's 32GB. **Still open:** total allocation is still >16 threads / >62GB even after this pass (hardware is fixed, single-host by design per CLAUDE.local.md) — the units/limit weighting makes contention *survivable* for etcd, it doesn't remove contention. No CI/lint gate yet stops total allocation from creeping back up via future Renovate/feature additions; a documented per-host allocation ceiling + pre-commit check is the logical next step if this recurs again (2026-07-04) |
+| REL-035b | Reliability | **PARTIAL** | REL-035's own "no CI gate" gap, closed correctly: REL-016's actual failure mode was ZFS I/O stall under RAM pressure, not CPU starvation, so the new guard (`scripts/check-host-memory-overcommit.py`, wired into pre-commit + CI) gates on summed VM/CT `dedicated` memory vs. a 50GB ceiling (64GB - 14GB reserved for ARC/host/margin), not vCPU/threads. Measured live: ARC already capped at 4GB (tighter than proposed), current allocation is 85.0GB -- 35GB over the ceiling. Guard intentionally ships red; no VM was auto-shrunk, 3 options (ARC/ballooning, trim specific guests, revisit ceiling) documented for the account owner to choose (2026-07-06) |
 | REL-036 | Reliability | **RESOLVED** | Atlantis ran as a k8s Deployment scheduled on vm-srv-k3s-11/12 -- the same VMs it applies Terraform changes to. Twice on 2026-07-04, a plan that changed one of those VMs' config (bpg/proxmox implements `cpu.units`/`serial_device` changes as a real `qmshutdown`+`qmstart`, not a live update) shut down the very node Atlantis was running on mid-apply, confirmed via the Proxmox task log (`qmshutdown 211 terraform@pve` at the exact interrupt timestamp) and k8s events (`SandboxChanged` on the atlantis pod same second). Fixed via ADR-012: moved Atlantis to its own dedicated LXC (`ct-srv-atlantis-01`, 10.0.20.250), fully decoupling its availability from the infrastructure it manages. Cutover verified live (new instance received a GitHub webhook and completed a real `terraform apply` post-migration). k8s-side resources (Deployment/Service/ConfigMap/PVC, the REL-034 `allow-atlantis-ingress` NetworkPolicy exception, the vestigial Traefik IngressRoute) removed in the same change. |
 | REL-037 | Reliability | **RESOLVED** | REL-035 (`cpu.units`) only addressed CPU scheduling contention -- the recurring REL-012c "leader is overloaded likely from slow disk" etcd crash signature is disk I/O contention on `mini`'s single shared SSD. `zfs_vdev_async_write_max_active` defaulted to 10, equal to `zfs_vdev_sync_write_max_active` (also 10), so any LXC/VM's bulk async writes competed for ZFS's per-vdev queue on equal footing with etcd's own synchronous WAL fdatasync. Capped async to 3, well below sync's ceiling, applied live + brought the previously-manual `/etc/modprobe.d/zfs.conf` under `ansible/roles/pve_power/` (2026-07-04). Investigated and ruled out per-container disk I/O throttling (`mbps_rd`/`mbps_wr`) as an alternative -- not possible on Proxmox 9.2 for LXCs at all, confirmed via `pct set` rejection + `man pct.conf` (QEMU VM-disk-only feature). |
 | REL-038 | Reliability | **RESOLVED** | All 3 Terraform stacks' S3 backend hardcoded `http://garage.apps.svc.cluster.local:3900` -- a k8s-internal Service DNS name. After ADR-012 moved Atlantis onto its own LXC, `terraform init` failed outright (DNS lookup failure) for every stack -- silently broken since the migration, not caught immediately because applies run right after cutover happened to land on the old k8s instance before the tunnel fully switched over. Repointed to `https://s3.woitzik.dev` (same as Atlantis's own `AWS_ENDPOINT_URL_S3` env var; AdGuard split-horizon DNS resolves it to Traefik's internal LB for LAN clients) (2026-07-04). |

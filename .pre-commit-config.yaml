@@ -42,6 +42,29 @@ repos:
         args: ["--recursive"]
         stages: [pre-commit, pre-push]
 
+      - id: host-memory-overcommit-guard
+        name: Host memory overcommit guard (REL-035)
+        description: >-
+          Sums dedicated memory across every VM/CT on the single physical
+          host (mini) and fails if it exceeds the safe ceiling -- a
+          regression guard against the REL-016 ZFS-IO host-freeze. See
+          scripts/check-host-memory-overcommit.py for the full rationale.
+          Runs whenever the Proxmox VM/LXC definitions change.
+        entry: python3 scripts/check-host-memory-overcommit.py
+        language: system
+        files: ^terraform/stacks/proxmox/(lxc|vm)\.tf$
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
+
+      - id: host-memory-overcommit-guard-full-repo
+        name: Host memory overcommit guard (REL-035, pre-push re-check)
+        description: Re-checks total host memory allocation before every push, not just on changed files.
+        entry: python3 scripts/check-host-memory-overcommit.py
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]
+
       - id: tflint-full-repo
         name: TFLint (all stacks, pre-push only)
         description: Re-checks every Terraform stack before push, not just changed files.

@@ -74,6 +74,15 @@ jobs:
       - name: TFLint
         run: tflint
 
+  host-memory-overcommit-guard:
+    name: Host memory overcommit guard (REL-035)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check total guest memory allocation on mini
+        run: python3 scripts/check-host-memory-overcommit.py
+
   terraform-cloudflare:
     name: Terraform / cloudflare
     runs-on: ubuntu-latest
