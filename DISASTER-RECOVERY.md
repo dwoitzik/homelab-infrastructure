@@ -66,14 +66,33 @@ If the router needs to be rebuilt from scratch:
 
    ```bash
    # In the Proxmox web UI: Datacenter > pbs-storage > <vmid> > Backups > Restore
-   # or via CLI on the PBS host (ct-mgmt-pbs-01, 10.0.10.110):
-   proxmox-backup-client restore <vmid> <snapshot> --repository <repo>
+   # or via CLI on the Proxmox host itself (pve-mgmt-01, 10.0.10.10):
+   pct restore <new-or-same-vmid> local-pbs:backup/ct/<vmid>/<snapshot> --storage local-zfs
    ```
 
-   If the local 2TB USB HDD (`/mnt/pbs-storage`) is also gone, restore the PBS datastore
-   itself first from the Google Drive offsite copy (`rclone sync gdrive:Backup-Homelab/PBS
-   /mnt/pbs-storage` — see `docs/backup-strategy.md` Stage 3), then proceed as above. This
-   requires the PBS encryption key, kept outside this repo (see `docs/secrets-inventory.md`).
+   **Verified live 2026-07-06** (real test, not a dry run): restored `ct-srv-atlantis-01`'s
+   (vmid 204) most recent PBS snapshot to a scratch vmid (999) alongside the still-running
+   original, booted it, and confirmed it came up clean (`systemctl is-system-running` →
+   `running`) with its Docker stack auto-starting from the restored compose file and real
+   data intact. Test container destroyed immediately after. **Gotcha found doing this**:
+   a PBS restore recreates the container with the *exact same* static IP and MAC address
+   as the original — starting it while the original is still running causes an IP/MAC
+   conflict on the live network. If restoring alongside a still-live original (as opposed
+   to a genuine full-loss recovery where the original is gone), change the restored
+   copy's `net0` to `link_down=1` (or a different IP/MAC) before starting it, e.g.:
+   `pct set <new-vmid> -net0 name=eth0,bridge=vmbr0,tag=<vlan>,link_down=1`.
+
+   If the local 2TB USB HDD (`/mnt/pbs-storage`) is also gone, there is currently
+   **no working offsite fallback for this** — the Google Drive sync (`docs/backup-strategy.md`
+   Stage 3) is deliberately disabled (insufficient Drive storage, see `REL-051` in
+   `docs/AUDIT.md`) and even when it briefly ran, it never got far enough for a real
+   PBS datastore worth restoring from (Google's API throttling on PBS's many-small-file
+   format made the initial sync impractical). **This means total loss of both `mini`'s
+   ZFS pool and the USB HDD simultaneously is currently unrecoverable at the VM/LXC
+   layer** — only k3s workloads (Velero → Garage S3, itself also in-cluster, see
+   `GIT-001`/`REL-003`) would have any path back, and only if Garage's own data
+   survived. This is the single biggest real gap in this recovery plan as written;
+   revisit once REL-051's offsite question is resolved.
 5. Backup job coverage uses `all: 1` (every VM/CT, including all 3 k3s VMs and the NFS LXC)
    — confirm the restored job still does after rebuild; this was missing coverage
    historically (see resolved `REL-002` in `docs/AUDIT.md`).
