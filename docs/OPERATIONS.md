@@ -55,36 +55,39 @@ again: `docker logs adguardhome | grep "i/o timeout"`, then check `private_netwo
 | paperless-gpt fails every document with "model not found" | Ollama model pull never finished — check `ollama list` on the AI node (`ct-srv-ai-01`, 10.0.20.251) before assuming a config bug | — |
 | `ollama pull` on the AI LXC keeps restarting/stalling mid-download | Plain `&` over SSH gets SIGHUP'd when the session ends. Use `setsid nohup ollama pull <model> > /tmp/ollama-pull.log 2>&1 < /dev/null & disown` instead. | — |
 | k3s API unreachable on `10.0.20.11` after HA migration | kubeconfig should point at the VIP `10.0.20.10`, not a specific node | `docs/k3s-architecture.md` |
-| Proxmox host becomes totally unresponsive (ping works, SSH/everything else doesn't; no kernel panic in the logs) | Long-running investigation across 2026-06-20 to 2026-06-22. Ruled out: thermal paste (repasted, temps fine), CPU C-states (`max_cstate=1` made things worse, reverted), boot-time resource storm alone (staggered `startup` order helped but freezes continued). Two real contributing factors found: (1) BMAX ships an undersized PSU for this chip's TDP — dropped BIOS TDP 54W→25W. (2) A known unfixed OpenZFS 2.4.1 deadlock under ARC memory pressure + concurrent I/O (`openzfs/zfs#18426`) matches every symptom exactly — upgraded to ZFS 2.4.2, capped ARC to 4GB and dirty-data to 1GB, dropped txg_timeout to 5s, forced PCIe ASPM to `performance` (power-saving link states are a plausible NVMe-stall trigger given the marginal PSU). Also found and fixed a real contributing trigger: `paperless-gpt` was configured for `gemma2:27b` (15GB, and not even vision-capable) instead of the documented `qwen2.5:7b` — loading it spiked host memory by ~13GB in 10 seconds, into real swap usage. `onboot` is now `0` for every VM/LXC — a host reboot starts nothing automatically; start things back up deliberately. Open question: whether running 3-node etcd HA on a single physical disk is worth the 3x fsync write amplification it causes versus reverting to single-node etcd. If it happens again: `dmesg -T`, `journalctl -k -b -1`, check for `dmu_tx_wait`/`txg_sync` in D-state (`ps aux \| grep D`), `zpool status -x`. | — |
+| Proxmox host becomes totally unresponsive (ping works, SSH/everything else doesn't; no kernel panic in the logs) | Long-running investigation across 2026-06-20 to 2026-06-22. Ruled out: thermal paste (repasted, temps fine), CPU C-states (`max_cstate=1` made things worse, reverted), boot-time resource storm alone (staggered `startup` order helped but freezes continued). Two real contributing factors found: (1) BMAX ships an undersized PSU for this chip's TDP — dropped BIOS TDP 54W→25W. (2) A known unfixed OpenZFS 2.4.1 deadlock under ARC memory pressure + concurrent I/O (`openzfs/zfs#18426`) matches every symptom exactly — upgraded to ZFS 2.4.2, capped ARC to 4GB and dirty-data to 1GB, dropped txg_timeout to 5s, forced PCIe ASPM to `performance` (power-saving link states are a plausible NVMe-stall trigger given the marginal PSU). Also found and fixed a real contributing trigger: `paperless-gpt` was configured for `gemma2:27b` (15GB, and not even vision-capable) instead of the documented `qwen2.5:7b` — loading it spiked host memory by ~13GB in 10 seconds, into real swap usage. `onboot` was `0` for every VM/LXC at the time of this incident (deliberate, for isolated debugging) but has since been **re-enabled (`onboot=1`) everywhere** (REL-001/REL-002/REL-016, re-verified live 2026-07-06 via `pvesh`) once that debugging need passed — a host reboot now auto-starts everything again. Open question: whether running 3-node etcd HA on a single physical disk is worth the 3x fsync write amplification it causes versus reverting to single-node etcd (settled: reverted to single-node etcd, see `docs/k3s-architecture.md`). If it happens again: `dmesg -T`, `journalctl -k -b -1`, check for `dmu_tx_wait`/`txg_sync` in D-state (`ps aux \| grep D`), `zpool status -x`. | — |
 | Proxmox host SSH key auth fails (`Permission denied (publickey,password)`) | The host itself, not its VMs/LXCs, may be missing the key in `authorized_keys` — VM/LXC SSH goes through cloud-init/Ansible separately. Check with `ssh -o PreferredAuthentications=publickey root@10.0.10.10`. | — |
 | `kubectl apply` succeeds but the live resource reverts within seconds | ArgoCD repo-server cache staleness, hit 3x on 2026-06-20 (tempo, traefik, paperless-gpt). Force it: `kubectl patch application <name> -n argocd --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'`. If that's not enough, `kubectl rollout restart deployment argocd-repo-server -n argocd`. StatefulSets need a delete+recreate — `volumeClaimTemplates` are immutable, so a cache refresh alone won't fix it. | — |
 | Two ArgoCD Applications fight over the same resource (`SharedResourceWarning`, flickering or pruned) | Two owners claiming the same object — usually a Helm chart's own ingress toggle vs. a manually-defined IngressRoute. Pick one, disable the other's claim, recreate. | `kubernetes/system/traefik/application.yml` — `ingressRoute.dashboard.enabled: false`, the manual route in `other-ingressroute.yml` wins |
 
-## Pending — needs the cluster back up
+## Pending
 
-- **Secrets rotation**: full list in `docs/secrets-inventory.md`. Needs live Vault and
-  service access to actually rotate, not just to identify.
-- **MikroTik service hardening apply**: `terraform/stacks/network/imports.tf` is committed
-  and validates clean, but the backend (Garage S3) is k3s-hosted, and this stack only ever
-  applies via Atlantis. Comment `atlantis apply` once the cluster's back — check Atlantis
-  itself is reachable first, since it's also k3s-hosted.
-- **Velero R2 offsite backup**: configured, just waiting on Cloudflare R2 credentials.
-- Firewall rules that existed live but weren't in Terraform are now imported
-  (`firewall_extra.tf`) — same Atlantis-apply constraint as above.
-- **No remote syslog from MikroTik**: security events only live in a 1000-line in-memory
-  buffer. Wiring it to Loki needs a syslog receiver on the cluster side.
-- **No native MikroTik config backup**: the Terraform API user doesn't have permission to
-  run `/system backup`/`/export`. Recoverability depends entirely on Terraform state right
-  now. Needs either a higher-privilege API user or an admin credential in Vault.
-- **Check for a leftover Longhorn ArgoCD Application in-cluster**: `kubernetes/system/longhorn/`
-  (an Application manifest with `selfHeal: true`/`prune: true`, plus an IngressRoute) was
-  still in the repo despite Longhorn being fully migrated to NFS — removed from git
-  2026-06-21, but if it was ever applied to the cluster, the Application object itself
-  might still exist and keep reconciling Longhorn back in. Check with
-  `kubectl get application longhorn -n argocd` once the cluster's up, delete it if present.
+This whole section used to be framed as "needs the cluster back up" (written while the
+cluster was mid-rebuild in June). Re-checked 2026-07-06 — most of it was resolved weeks
+ago and never updated here:
+
+- ~~MikroTik service hardening apply, blocked on Atlantis being k3s-hosted~~ — resolved.
+  ADR-012 moved Atlantis to its own dedicated LXC, fully decoupled from cluster health.
+  The network stack (including `imports.tf`) has applied cleanly and repeatedly since
+  (GIT-008, REL-047/048, SEC-015).
+- ~~Check for a leftover Longhorn ArgoCD Application~~ — moot; Longhorn has been fully
+  gone for weeks (see README's stack overview) with no further sign of it reappearing.
+- **Secrets rotation**: full list in `docs/secrets-inventory.md`. Several items closed
+  out since this was written (SEC-002/003/004/013/014) — that doc has the current status.
+- **Velero R2 offsite backup**: still not active. Framing corrected in
+  `docs/backup-strategy.md`/`docs/AUDIT.md` (WRK-008) — this is a deliberate deferral by
+  the account owner, not just "waiting on credentials."
+- **No remote syslog from MikroTik**: still true — security events only live in a
+  1000-line in-memory buffer. Wiring it to Loki needs a syslog receiver on the cluster side.
+- **No native MikroTik config backup**: still true — the Terraform API user doesn't have
+  permission to run `/system backup`/`/export` (confirmed its live policy explicitly
+  denies `password`/`sensitive`, SEC-015). Recoverability depends entirely on Terraform
+  state right now.
 
 ## Last known-good audit
 
-2026-06-19: full pass across AdGuard, Velero, NetworkPolicies, Vault, k3s, CI. Findings
-and fixes are in the git history (`git log --oneline` around that date) and reflected in
-the docs above. If something here feels stale, `git log -1 -- <doc>` tells you how stale.
+2026-07-06: re-verified this page plus `compute-nodes.md`, `k3s-architecture.md`,
+`naming-convention.md`, `secrets-inventory.md`, `backup-strategy.md`, and README against
+live state directly (`pvesh`, `docker inspect`, `terraform` files, `ansible/site.yml`) —
+several had drifted since their last real update. If something here feels stale again,
+`git log -1 -- <doc>` tells you how stale.
