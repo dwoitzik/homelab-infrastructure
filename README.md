@@ -157,11 +157,14 @@ graph TB
 | Gitea | git.woitzik.dev | Built-in |
 | Home Assistant | ha.woitzik.dev | Built-in |
 | Headscale | headscale.woitzik.dev | Built-in |
-| Atlantis | atlantis.woitzik.dev | GitHub HMAC |
+| Atlantis | atlantis.woitzik.dev | Authelia (except `/events` webhook: GitHub HMAC) |
+| Immich | photos.woitzik.dev | Built-in |
+| Jellyfin | media.woitzik.dev | Built-in |
+| Jellyseerr | requests.woitzik.dev | Built-in |
 | AdGuard Home | dns.woitzik.dev | Authelia |
-| Proxmox VE | pve.woitzik.dev | Authelia OIDC |
-| PBS | backup.woitzik.dev | Authelia OIDC |
-| MikroTik | router.woitzik.dev | Authelia |
+| Proxmox VE | pve.woitzik.dev | Authelia |
+| PBS | backup.woitzik.dev | Authelia |
+| MikroTik (RouterOS webfig) | router.woitzik.dev | Authelia |
 | Garage S3 | s3.woitzik.dev | Key auth |
 
 ## VLAN Layout
