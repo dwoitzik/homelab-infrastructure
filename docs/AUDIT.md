@@ -359,6 +359,53 @@ Headscale, and every Authelia-gated app in `apps-ingressroute.yml`).
 
 ---
 
+### SEC-015 — Live MikroTik `terraform` API user password hardcoded in a bootstrap script · **RESOLVED** (2026-07-06)
+
+Found during a portfolio-quality pass over the repo root (prompted by "what would an
+employer/reviewer flag in this repo"). `network/scripts/bootstrap.rsc` — a one-time
+router bootstrap reference script, not something re-run regularly — had the router's
+`terraform` API user's password hardcoded in plaintext:
+`password="***REMOVED***"`. Confirmed live via a direct authenticated REST call to the router's `/rest/user`
+endpoint (returned `200`) that this was **still the real, active credential** — not a
+stale placeholder. This user's group
+(`terraform-api`) grants `read,write,api,rest,test,winbox` — full network-management
+API access to the router that runs this entire homelab's firewall/NAT/VLANs. It had
+been sitting in a public repo's git history since the file was first committed
+(2026-03), unrotated, and outside the scope of the earlier `.gitleaks-baseline.json`
+sweep (SEC-013) since this file/pattern was never flagged by gitleaks at all.
+
+- **Why I couldn't rotate it myself:** the `terraform` user's live group policy
+  correctly denies both `password` and `sensitive` (`!password,!sensitive`, confirmed
+  via `GET /rest/user/group`) — meaning this user structurally cannot change its own
+  (or anyone's) password via the API. Good security posture, but it also meant a
+  `PATCH /rest/user/*` attempt failed with `not enough permissions (9)`. No admin
+  credential exists in Vault, and this user was never brought under Terraform's own
+  management (no `routeros_user` resource exists for it) — so there was no automated
+  path to rotate it. The user rotated it directly via Winbox/SSH as `admin`.
+- **Fix:** verified the new password live (`200` on the new credential, `401` on the
+  old one), updated `ansible/group_vars/all/vault.yml` to match, redeployed the
+  Atlantis LXC (`ansible-playbook site.yml --limit atlantis_nodes`), and replaced the
+  hardcoded value in `bootstrap.rsc` with a placeholder + a comment instructing any
+  future re-run to set the password out-of-band, never commit a real value.
+- **Verified end-to-end:** this PR's own `atlantis/plan` check against
+  `terraform/stacks/network` succeeding is the real proof the new credential works —
+  a `terraform validate`/`fmt` pass alone would not catch a wrong or unrotated
+  credential.
+- **Lesson:** the gitleaks baseline sweep (SEC-013) checked *known-flagged* secrets
+  against their live values, but a secret that gitleaks' generic-api-key/generic-secret
+  rules never pattern-matched in the first place (a `.rsc` RouterOS script isn't a
+  typical scanned extension/pattern) can sit invisible to that whole class of tooling
+  indefinitely. A portfolio-quality pass that manually walks the repo root and asks
+  "would a reviewer's eyes catch this" found what an automated secret scanner missed.
+- **Not done:** bringing the `terraform` RouterOS user itself under Terraform
+  management (a `routeros_user` resource) so its credential lifecycle is
+  declarative/tracked like everything else this stack manages — worth a follow-up, not
+  attempted here given the live-router blast radius of experimenting with the very
+  credential Terraform authenticates with.
+- **Effort:** Small once the user could rotate the live credential — done.
+
+---
+
 ### SEC-009 — Home Assistant had no auth layer beyond its own login · **MEDIUM** (fixed 2026-06-23)
 
 Same Authelia-coverage audit as SEC-008. Of the apps with no Authelia middleware,
@@ -2307,6 +2354,7 @@ where jams actually stick.
 | SEC-012 | Security | **RESOLVED** | securityContext hardening across ~25 manifests, 215->171 Trivy findings; first attempt broke 9 containers (capabilities.drop/runAsNonRoot assumptions wrong for several images), caught and fixed live within ~15min across 3 follow-up PRs (2026-06-24) |
 | SEC-013 | Security | **RESOLVED** | `.gitleaks-baseline.json` silently suppressed 2 still-live secrets in a public repo -- Garage `rpc_secret`/`admin_token` (S3 backend for Terraform state/Velero/Immich) were byte-identical to their 2026-06-03 git-history values, never rotated. Rotated via Vault + forced ExternalSecret sync + Garage restart, verified healthy live (2026-07-06) |
 | SEC-014 | Security | **RESOLVED** | Authelia's `users_database.yml` (real admin password argon2 hash) was a plain committed Secret in a public repo, same class as SEC-001/SEC-003 -- migrated to Vault via ExternalSecret, then the password itself rotated (new hash generated live in-pod, never committed) with the user's explicit sign-off given the SSO blast radius (2026-07-06) |
+| SEC-015 | Security | **RESOLVED** | `network/scripts/bootstrap.rsc` had the router's `terraform` API user's real, live password hardcoded in plaintext since 2026-03 -- missed by the gitleaks baseline sweep entirely (not a pattern gitleaks matched). User rotated live via Winbox (the account structurally can't change its own password via API), Vault + Atlantis redeployed to match, hardcoded value scrubbed to a placeholder. Found via a manual portfolio-quality pass, not tooling (2026-07-06) |
 | REL-001 | Reliability | **RESOLVED** | All 3 k3s nodes run continuously (`on_boot=true`); single-server topology by deliberate design, not an HA gap -- see `docs/k3s-architecture.md` |
 | REL-002 | Reliability | **RESOLVED** | PBS running with `onboot=1`; `all: 1` backup job covers every VM/CT incl. k3s nodes + NFS LXC; verified successful 2026-06-23 03:00 run |
 | REL-003 | Reliability | **HIGH** | Velero backend (Garage) is in-cluster; circular recovery dependency |
