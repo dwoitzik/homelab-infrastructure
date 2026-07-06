@@ -1,0 +1,7 @@
+---
+- name: Force restart PBS Container
+  ansible.builtin.shell: pct stop 110 && sleep 3 && pct start 110
+  delegate_to: 10.0.10.10
+  vars:
+    ansible_user: root
+  changed_when: true
