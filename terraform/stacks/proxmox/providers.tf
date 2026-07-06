@@ -25,5 +25,8 @@ terraform {
 provider "proxmox" {
   endpoint  = var.proxmox_api_url
   api_token = "${var.proxmox_api_token_id}=${var.proxmox_api_token_secret}"
-  insecure  = true
+  # SEC-007: was `insecure = true`. Proxmox's self-signed cluster CA is now
+  # trusted by the Atlantis runtime (ansible/roles/atlantis/files/Dockerfile),
+  # so real TLS verification works instead of skipping it.
+  insecure = false
 }

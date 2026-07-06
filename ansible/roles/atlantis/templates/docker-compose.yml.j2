@@ -4,7 +4,9 @@
 # ct_srv_atlantis_01 comment for the full incident).
 services:
   atlantis:
-    image: "{{ atlantis_image }}"
+    # SEC-007: custom image built from {{ atlantis_image }} with Proxmox's
+    # CA trusted (ansible/roles/atlantis/files/Dockerfile), not the stock tag.
+    image: "atlantis-custom:{{ atlantis_image.split(':')[-1] }}"
     container_name: atlantis
     restart: unless-stopped
     ports:
