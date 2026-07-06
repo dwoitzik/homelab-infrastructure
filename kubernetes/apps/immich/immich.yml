@@ -156,7 +156,7 @@ spec:
             value: "1"
       containers:
       - name: immich-server
-        image: ghcr.io/immich-app/immich-server:v2.7.5
+        image: ghcr.io/immich-app/immich-server:v3.0.1
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -251,7 +251,7 @@ spec:
             value: "1"
       containers:
       - name: immich-ml
-        image: ghcr.io/immich-app/immich-machine-learning:v2.7.5
+        image: ghcr.io/immich-app/immich-machine-learning:v3.0.1
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
