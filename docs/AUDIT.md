@@ -1791,6 +1791,27 @@ committed compose file matched live reality**:
 
 ---
 
+### DOC-006 — Two conflicting Renovate configs at repo root, one of them dead · **RESOLVED** (2026-07-06)
+
+`renovate.json` and `renovate.json5` both existed at repo root with genuinely different
+settings (the `.json` had the `kubernetes` fileMatch and immich/major-update
+`packageRules` that SEC-005's fix actually edited and confirmed working; the `.json5`
+had `automerge` for minor/patch, `:rebaseStalePrs`, explicit ansible/terraform/kubernetes
+manager enables, and a custom `regexManager` for Helm chart tracking).
+
+- **Confirmed dead:** Renovate's config-file discovery order checks `renovate.json`
+  before `renovate.json5` in the same directory and uses only the first match — it does
+  not merge both. Since `renovate.json` exists, `renovate.json5` has never been read at
+  all. Verified this didn't leave a real functional gap: Terraform provider bumps and
+  Helm chart `targetRevision` bumps (e.g. the kube-prometheus-stack v61→v87 upgrade)
+  have both actually happened via Renovate PRs — covered by Renovate's own built-in
+  default managers, not the dead file's explicit settings or its custom regexManager.
+- **Fix:** removed `renovate.json5`. No behavior change (it was never active); a
+  reviewer no longer has to figure out which of two config files is the real one.
+- **Effort:** Small — done.
+
+---
+
 ## 6. Useful-Workload Gaps
 
 ### WRK-001 — Jellyfin and media stack stuck in ContainerCreating · **RESOLVED** (2026-06-24)
@@ -2443,6 +2464,7 @@ where jams actually stick.
 | DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |
 | DOC-004 | Docs | **RESOLVED** | 4 architectural decisions without ADRs — added ADR-006..009; ADR-011 (Cloudflare Tunnel external access) added 2026-06-27 |
 | DOC-005 | Docs | **RESOLVED** | `docker/crafty`/`docker/npmplus` described services that aren't actually running live (Crafty and npmplus fork both abandoned in favor of raw itzg/minecraft-server and plain nginx-proxy-manager) -- reconciled to match real deployed configs, also added previously fully-undocumented watchtower/promtail/node-exporter (2026-07-06) |
+| DOC-006 | Docs | **RESOLVED** | Two conflicting Renovate configs at repo root (`renovate.json` + `renovate.json5`) -- confirmed the `.json5` was never actually read (Renovate only uses the first config file it finds), removed it, no functional change (2026-07-06) |
 | WRK-001 | Workloads | **RESOLVED** | Jellyfin/media stack stuck in ContainerCreating — resolved via WRK-006 (media acq → LXC) and WRK-007 (Jellyfin → LXC) |
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed; playit.gg agent install not Ansible-ized (re-checked 2026-07-06: backup coverage is fine, nightly PBS `all:1` job already covers it, and whitelist already active on all 4 servers -- prior "no backup/no whitelist" assumptions were wrong) |
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
