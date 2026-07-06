@@ -338,6 +338,31 @@ Headscale, and every Authelia-gated app in `apps-ingressroute.yml`).
 
 ---
 
+### SEC-014 — Authelia's `users_database.yml` (real password hash) was a plain committed Secret · **PARTIAL** (2026-07-06)
+
+Same class as SEC-001/SEC-003: `kubernetes/apps/authelia/users_database_secret.yml` was
+a static `kind: Secret` with the base64-encoded `users_database.yml` file committed
+directly to this public repo — including the real argon2 hash of the admin login
+password used across the entire Authelia SSO layer (Proxmox, PBS, ArgoCD, Grafana,
+Headscale, and every Authelia-gated app in `apps-ingressroute.yml`).
+
+- **Fix (storage only):** Migrated to an ExternalSecret sourced from
+  `secret/authelia#users-database-yml` in Vault, matching the existing `authelia-secrets`
+  pattern. Same hash value as before — verified byte-identical live before committing,
+  `auth.woitzik.dev` still serving login normally, no Authelia pod restart triggered.
+  This closes the "committed in git" half of the finding.
+- **Not done (needs the user's input, not something to decide unilaterally):** the
+  password itself has been sitting as a crackable offline hash in a public repo's git
+  history for weeks — moving *where* it's stored now doesn't undo that past exposure.
+  A real fix also rotates the password value itself (generate a new one, hash it via
+  `authelia crypto hash generate argon2` against the live pod, update Vault). Deferred
+  pending the user choosing/confirming a new password, since changing it wrong locks out
+  the SSO layer protecting every service in the cluster.
+- **Effort:** Storage migration was small (done); password rotation itself is small but
+  needs explicit user sign-off given the blast radius (SSO for the whole homelab).
+
+---
+
 ### SEC-009 — Home Assistant had no auth layer beyond its own login · **MEDIUM** (fixed 2026-06-23)
 
 Same Authelia-coverage audit as SEC-008. Of the apps with no Authelia middleware,
@@ -1661,17 +1686,36 @@ stack moved to VPN-isolated LXC). See those entries for the full resolution deta
 
 ---
 
-### WRK-002 — Minecraft not GitOps-managed · **LOW**
+### WRK-002 — Minecraft/playit.gg not GitOps-managed (backup coverage re-checked, better than assumed) · **LOW** (re-checked 2026-07-06)
 
 CLAUDE.local.md lists Minecraft as a target useful workload ("fully GitOps-managed,
-backed up, and documented"). The game server runs in `ct-dmz-games-01` via
-`docker/crafty/` (Docker Compose). It is not exposed through k3s, not backed up via
-Velero, and has no runbook.
+backed up, and documented"). The game server (`ct-dmz-games-01`) is not exposed through
+k3s and has no runbook of its own beyond `DISASTER-RECOVERY.md`'s per-service table.
 
-- **Fix:** Either document the Crafty/Docker Compose setup properly with a backup strategy
-  for world data, or migrate to a k3s Deployment with NFS PVC for world persistence and
-  Velero backup coverage.
-- **Effort:** Medium.
+**Re-checked as part of the 2026-07-05 security review**, which had flagged the
+playit.gg tunnel agent (installed 2026-07-04 for IAC-002's WAN-port-forward removal) as
+having "zero IaC/backup representation" — **that claim was only half right**. The agent
+(`/etc/playit/playit.toml`, holding the tunnel's claimed identity/secret — losing it
+means re-claiming a new tunnel and a new `*.joinmc.link` hostname, breaking the
+`mc.woitzik.dev` CNAME) was installed manually via `apt` (playit's own repo), not
+Ansible — that half of the gap is real. But **it is not backup-uncovered**: confirmed
+live via `pvesh get /cluster/backup` that the PBS job (`backup-8b6a6f73-c4ce`, `all: 1`,
+only VMID 9000 excluded) includes `ct-dmz-games-01`, and confirmed actual nightly
+backups exist and succeed (`state: ok`, most recent 2026-07-06 01:07). `playit.toml`
+is part of the LXC filesystem, so it's captured every night along with everything else.
+`DISASTER-RECOVERY.md` already correctly documents "Restore via Tier 1 (PBS) only" for
+this LXC — that path fully restores playit's identity intact.
+
+- **Residual gap, real but narrower than previously stated:** only if the PBS backup
+  itself were lost (not just the LXC) would recreating from Terraform + a fresh manual
+  `apt install playit` produce a *new* tunnel identity, silently breaking the DNS CNAME
+  until someone notices and updates `var.mc_playit_hostname`. This is a secondary,
+  low-probability failure mode (PBS itself has its own retention/verification), not the
+  "no backup at all" gap originally flagged.
+- **Fix, not done:** an Ansible role to install/configure playit idempotently would
+  close the from-scratch-rebuild case, but given PBS restore already covers the much
+  more likely single-LXC-loss scenario, this is a nice-to-have, not urgent.
+- **Effort:** Small for the Ansible role; the underlying backup risk is already low.
 
 ---
 
