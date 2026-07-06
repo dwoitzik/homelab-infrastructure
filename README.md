@@ -122,9 +122,13 @@ graph TB
 │   ├── group_vars/           # Variables + Ansible Vault secrets
 │   ├── k3s-cluster/          # k3s provisioning (install, upgrade, reset)
 │   └── inventory.ini
-├── docker/                   # Docker Compose for DMZ services
-│   ├── crafty/                # Minecraft server manager (dmz_games LXC)
-│   └── npmplus/                # Nginx Proxy Manager Plus (dmz_proxies LXC)
+├── docker/                   # Docker Compose for DMZ services (reference copies of
+│   │                         # live config -- deployed by hand, not Ansible-managed)
+│   ├── minecraft/              # itzg/minecraft-server x2 (dmz_games LXC)
+│   ├── npm/                    # nginx-proxy-manager + CrowdSec (dmz_proxies LXC)
+│   ├── watchtower/              # daily auto-update for the above (dmz_proxies + dmz_games)
+│   ├── promtail/                # ships syslog/auth/docker logs to Loki (both DMZ LXCs)
+│   └── node-exporter/           # host metrics for Prometheus (both DMZ LXCs)
 ├── docs/
 │   ├── decisions/             # ADRs
 │   └── *.md                   # Architecture, naming, topology, VLAN docs
