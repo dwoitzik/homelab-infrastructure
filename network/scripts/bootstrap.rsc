@@ -7,8 +7,15 @@
 # 1. Create a dedicated group for Terraform
 /user group add name=terraform-api policy=read,write,api,rest,test,winbox,password
 
-# 2. Create the Terraform user (Update password before running!)
-/user add name=terraform group=terraform-api password="GcNVZn2%6@gARP" comment="Managed by Terraform"
+# 2. Create the Terraform user
+# SEC-015: this line previously had a real, live password hardcoded here --
+# leaked in git history for months (2026-03 - 2026-07) in a public repo, and
+# was the actual password Atlantis used to manage this router the whole
+# time, since this user was never brought under Terraform management
+# (no routeros_user resource exists for it). Rotated 2026-07-06. Generate a
+# fresh password out-of-band (`openssl rand -base64 24`) and set it directly
+# on the router via Winbox/SSH as admin -- never commit a real value here.
+/user add name=terraform group=terraform-api password="CHANGE_ME_SET_VIA_WINBOX_NOT_GIT" comment="Managed by Terraform"
 
 # 3. Network Base: Bridge & Management VLAN
 /interface bridge add name=bridge1 vlan-filtering=no comment="Core Bridge"
