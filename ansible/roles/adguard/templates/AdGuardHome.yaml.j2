@@ -209,6 +209,17 @@ filtering:
     - domain: cobblemon.woitzik.dev
       answer: "10.0.30.2"
       enabled: true
+    # mc.woitzik.dev is the same class of problem as cobblemon above: raw-TCP
+    # Minecraft, not HTTP, so the wildcard's Traefik answer has no route to it.
+    # Unlike cobblemon, the external path for this server is a playit.gg tunnel
+    # (IAC-004) with no local NPM stream proxy in front of it -- confirmed live
+    # that NPM's published 25565/25566 ports have no actual stream config behind
+    # them (leftover from the pre-playit port-forward design, never cleaned up).
+    # Point internal clients straight at the game LXC instead of through a dead
+    # proxy hop or back out through the internet via playit unnecessarily.
+    - domain: mc.woitzik.dev
+      answer: "10.0.30.3"
+      enabled: true
     - domain: www.woitzik.dev
       answer: "64.29.17.65"
       enabled: true
