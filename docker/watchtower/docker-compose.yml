@@ -1,0 +1,21 @@
+# Runs on both DMZ LXCs (ct-dmz-proxy-01, ct-dmz-games-01), /opt/watchtower/.
+# Added to git 2026-07-06 (DOC-005) -- was undocumented anywhere in this repo.
+# Deliberate difference from the kubernetes/ update strategy: these two hosts
+# run simple, stateless-ish proxy/game-server containers where an unattended
+# daily auto-update is an acceptable tradeoff, unlike the pinned-tag +
+# Renovate-PR-review pattern used for every stateful/critical k8s workload
+# (SEC-005). `renovate.json`'s kubernetes fileMatch does not cover docker/,
+# so these floating tags are intentionally outside Renovate's scope and
+# updated by Watchtower's daily poll instead.
+services:
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    mem_limit: 128m
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=86400
+      - DOCKER_API_VERSION=1.40

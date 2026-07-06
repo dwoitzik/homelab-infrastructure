@@ -1744,6 +1744,53 @@ Homepage→Uptime Kuma, and the `vault-unseal` polling-sidecar design from REL-0
 
 ---
 
+### DOC-005 — `docker/crafty/` and `docker/npmplus/` described services that don't exist live · **RESOLVED** (2026-07-06)
+
+Found during a portfolio-quality pass ("what would a reviewer flag") prompted by SEC-015.
+Compared every file under `docker/` against what's actually running on the two DMZ LXCs
+(`ct-dmz-proxy-01`, `ct-dmz-games-01`) via `docker inspect`/`docker ps` — **neither
+committed compose file matched live reality**:
+
+- `docker/crafty/docker-compose.yaml` described Crafty Controller managing the
+  Minecraft servers. Live: Crafty isn't running at all — two `itzg/minecraft-server`
+  containers run directly (`mc-server-2`, `mc-server-cobblemon`), confirmed via the
+  actual `/opt/minecraft/docker-compose.yml` on the host. Stale `.bak`/`.bak2` compose
+  files on the same host suggest Crafty was tried and abandoned at some point, and the
+  committed version was simply never updated to match.
+- `docker/npmplus/docker-compose.yml` described the `zoeyvid/npmplus` fork (with
+  built-in GeoIP/goaccess). Live: plain `jc21/nginx-proxy-manager` runs instead, paired
+  with a separately-configured CrowdSec container reading its logs — confirmed via
+  `/opt/npm/docker-compose.yml`. (The architecture diagram elsewhere in `README.md`
+  already correctly said "Nginx Proxy Manager", not "Plus" — only the `docker/`
+  directory itself was wrong.)
+- **Also found completely undocumented**: both LXCs run `watchtower` (daily
+  auto-update, `containrrr/watchtower`), `promtail` (ships logs to the same
+  `loki.woitzik.dev` used cluster-wide), and `node_exporter` (scraped by the in-cluster
+  Prometheus) — none of these had any representation in this repo at all.
+
+- **Fix:** replaced `docker/crafty/`/`docker/npmplus/` with `docker/minecraft/`,
+  `docker/npm/` matching the real, live compose files byte-for-byte, and added
+  `docker/watchtower/`, `docker/promtail/` (both host-specific `promtail.yml` variants,
+  since the `host:` label differs), and `docker/node-exporter/` for the previously
+  undocumented services. Updated `README.md`'s directory tree to match.
+- **Noted, not changed:** these two hosts use `:latest` tags + Watchtower's daily
+  auto-update instead of the pinned-tag + Renovate-PR-review pattern used everywhere in
+  `kubernetes/` (SEC-005) — `renovate.json`'s `kubernetes` fileMatch doesn't cover
+  `docker/` at all, so this was never an oversight in Renovate's config, just an
+  entirely separate, previously-undocumented update strategy for these two
+  simpler/stateless-ish DMZ services. Documented as the actual (retroactively
+  identified) rationale in `docker/watchtower/docker-compose.yml`'s comment rather than
+  changed — reconciling docs to match a real, working, low-risk pattern, not
+  second-guessing it.
+- **Lesson: "the repo has a file describing X" is not evidence X is what's actually
+  deployed** — for anything not under Ansible/ArgoCD/Terraform management (the docker/
+  directory's whole reason for existing outside those), periodically diff the
+  committed reference copy against the live host directly, the same discipline already
+  applied to Kubernetes manifests in REL-042/046.
+- **Effort:** Small — done.
+
+---
+
 ## 6. Useful-Workload Gaps
 
 ### WRK-001 — Jellyfin and media stack stuck in ContainerCreating · **RESOLVED** (2026-06-24)
@@ -2395,6 +2442,7 @@ where jams actually stick.
 | DOC-002 | Docs | **RESOLVED** | ROADMAP.md already fully English -- stale finding, translated at some point but never marked resolved (re-checked 2026-07-06) |
 | DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |
 | DOC-004 | Docs | **RESOLVED** | 4 architectural decisions without ADRs — added ADR-006..009; ADR-011 (Cloudflare Tunnel external access) added 2026-06-27 |
+| DOC-005 | Docs | **RESOLVED** | `docker/crafty`/`docker/npmplus` described services that aren't actually running live (Crafty and npmplus fork both abandoned in favor of raw itzg/minecraft-server and plain nginx-proxy-manager) -- reconciled to match real deployed configs, also added previously fully-undocumented watchtower/promtail/node-exporter (2026-07-06) |
 | WRK-001 | Workloads | **RESOLVED** | Jellyfin/media stack stuck in ContainerCreating — resolved via WRK-006 (media acq → LXC) and WRK-007 (Jellyfin → LXC) |
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed; playit.gg agent install not Ansible-ized (re-checked 2026-07-06: backup coverage is fine, nightly PBS `all:1` job already covers it, and whitelist already active on all 4 servers -- prior "no backup/no whitelist" assumptions were wrong) |
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
