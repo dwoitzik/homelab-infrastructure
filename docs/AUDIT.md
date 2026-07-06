@@ -338,31 +338,6 @@ Headscale, and every Authelia-gated app in `apps-ingressroute.yml`).
 
 ---
 
-### SEC-014 — Authelia's `users_database.yml` (real password hash) was a plain committed Secret · **PARTIAL** (2026-07-06)
-
-Same class as SEC-001/SEC-003: `kubernetes/apps/authelia/users_database_secret.yml` was
-a static `kind: Secret` with the base64-encoded `users_database.yml` file committed
-directly to this public repo — including the real argon2 hash of the admin login
-password used across the entire Authelia SSO layer (Proxmox, PBS, ArgoCD, Grafana,
-Headscale, and every Authelia-gated app in `apps-ingressroute.yml`).
-
-- **Fix (storage only):** Migrated to an ExternalSecret sourced from
-  `secret/authelia#users-database-yml` in Vault, matching the existing `authelia-secrets`
-  pattern. Same hash value as before — verified byte-identical live before committing,
-  `auth.woitzik.dev` still serving login normally, no Authelia pod restart triggered.
-  This closes the "committed in git" half of the finding.
-- **Not done (needs the user's input, not something to decide unilaterally):** the
-  password itself has been sitting as a crackable offline hash in a public repo's git
-  history for weeks — moving *where* it's stored now doesn't undo that past exposure.
-  A real fix also rotates the password value itself (generate a new one, hash it via
-  `authelia crypto hash generate argon2` against the live pod, update Vault). Deferred
-  pending the user choosing/confirming a new password, since changing it wrong locks out
-  the SSO layer protecting every service in the cluster.
-- **Effort:** Storage migration was small (done); password rotation itself is small but
-  needs explicit user sign-off given the blast radius (SSO for the whole homelab).
-
----
-
 ### SEC-009 — Home Assistant had no auth layer beyond its own login · **MEDIUM** (fixed 2026-06-23)
 
 Same Authelia-coverage audit as SEC-008. Of the apps with no Authelia middleware,
@@ -2328,7 +2303,7 @@ where jams actually stick.
 | DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |
 | DOC-004 | Docs | **RESOLVED** | 4 architectural decisions without ADRs — added ADR-006..009; ADR-011 (Cloudflare Tunnel external access) added 2026-06-27 |
 | WRK-001 | Workloads | **RESOLVED** | Jellyfin/media stack stuck in ContainerCreating — resolved via WRK-006 (media acq → LXC) and WRK-007 (Jellyfin → LXC) |
-| WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed or backed up |
+| WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed; playit.gg agent install not Ansible-ized (re-checked 2026-07-06: backup coverage is fine, nightly PBS `all:1` job already covers it, and whitelist already active on all 4 servers -- prior "no backup/no whitelist" assumptions were wrong) |
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
 | WRK-004 | Workloads | **RESOLVED** | paperless-gpt failing on every document; Ollama iGPU (Vulkan) crashing constantly under load -- switched to CPU-only |
 | WRK-005 | Workloads | **PARTIAL** | Paperless data-quality pass: missing archives (nfs-client related, fixed) + 5 "hallucinated" docs were actually scanned upside-down (fixed) + LLM_MODEL occasionally returns chatty-assistant text instead of short field values (low-frequency, not fixed) (2026-06-24) |
