@@ -1578,17 +1578,36 @@ stack moved to VPN-isolated LXC). See those entries for the full resolution deta
 
 ---
 
-### WRK-002 — Minecraft not GitOps-managed · **LOW**
+### WRK-002 — Minecraft/playit.gg not GitOps-managed (backup coverage re-checked, better than assumed) · **LOW** (re-checked 2026-07-06)
 
 CLAUDE.local.md lists Minecraft as a target useful workload ("fully GitOps-managed,
-backed up, and documented"). The game server runs in `ct-dmz-games-01` via
-`docker/crafty/` (Docker Compose). It is not exposed through k3s, not backed up via
-Velero, and has no runbook.
+backed up, and documented"). The game server (`ct-dmz-games-01`) is not exposed through
+k3s and has no runbook of its own beyond `DISASTER-RECOVERY.md`'s per-service table.
 
-- **Fix:** Either document the Crafty/Docker Compose setup properly with a backup strategy
-  for world data, or migrate to a k3s Deployment with NFS PVC for world persistence and
-  Velero backup coverage.
-- **Effort:** Medium.
+**Re-checked as part of the 2026-07-05 security review**, which had flagged the
+playit.gg tunnel agent (installed 2026-07-04 for IAC-002's WAN-port-forward removal) as
+having "zero IaC/backup representation" — **that claim was only half right**. The agent
+(`/etc/playit/playit.toml`, holding the tunnel's claimed identity/secret — losing it
+means re-claiming a new tunnel and a new `*.joinmc.link` hostname, breaking the
+`mc.woitzik.dev` CNAME) was installed manually via `apt` (playit's own repo), not
+Ansible — that half of the gap is real. But **it is not backup-uncovered**: confirmed
+live via `pvesh get /cluster/backup` that the PBS job (`backup-8b6a6f73-c4ce`, `all: 1`,
+only VMID 9000 excluded) includes `ct-dmz-games-01`, and confirmed actual nightly
+backups exist and succeed (`state: ok`, most recent 2026-07-06 01:07). `playit.toml`
+is part of the LXC filesystem, so it's captured every night along with everything else.
+`DISASTER-RECOVERY.md` already correctly documents "Restore via Tier 1 (PBS) only" for
+this LXC — that path fully restores playit's identity intact.
+
+- **Residual gap, real but narrower than previously stated:** only if the PBS backup
+  itself were lost (not just the LXC) would recreating from Terraform + a fresh manual
+  `apt install playit` produce a *new* tunnel identity, silently breaking the DNS CNAME
+  until someone notices and updates `var.mc_playit_hostname`. This is a secondary,
+  low-probability failure mode (PBS itself has its own retention/verification), not the
+  "no backup at all" gap originally flagged.
+- **Fix, not done:** an Ansible role to install/configure playit idempotently would
+  close the from-scratch-rebuild case, but given PBS restore already covers the much
+  more likely single-LXC-loss scenario, this is a nice-to-have, not urgent.
+- **Effort:** Small for the Ansible role; the underlying backup risk is already low.
 
 ---
 
