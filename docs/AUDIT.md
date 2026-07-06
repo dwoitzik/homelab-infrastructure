@@ -2444,6 +2444,47 @@ killed before finishing, matching the log exactly.
 
 ---
 
+### REL-052 — First real, live-verified PBS restore test; found the offsite gap REL-051 leaves is bigger than it looked · **RESOLVED** (2026-07-06)
+
+`DISASTER-RECOVERY.md` documented the PBS restore procedure but nothing in this repo's
+history indicates it had ever actually been executed and verified end-to-end — a written
+runbook that's never been tried is a guess, not a tested procedure.
+
+- **Test performed:** restored `ct-srv-atlantis-01`'s (vmid 204) most recent PBS snapshot
+  (2026-07-06 01:04) to a scratch vmid (999) on the same host, alongside the still-running
+  original — a genuine `pct restore` from a real backup, not a dry run. Booted it, confirmed
+  `systemctl is-system-running` → `running`, confirmed its Docker Compose stack auto-started
+  from the restored config (`unless-stopped` policy) and came up healthy with real data
+  intact (`.atlantis` state directory, `.terraform.d`). Destroyed the test container
+  immediately after. The live original was never touched and stayed healthy throughout
+  (confirmed `atlantis.woitzik.dev` still returned its normal `302` Authelia redirect).
+- **Real gotcha found doing this, not previously documented:** a PBS restore recreates
+  the container with the exact same static IP and MAC address as the original. Starting
+  the restored copy while the original is still running (as opposed to a true full-loss
+  scenario where the original is gone) causes a live IP/MAC conflict on the network.
+  Caught this *before* starting the test container by inspecting its restored config
+  first — set `net0` to `link_down=1` with a different MAC prior to `pct start`. Added
+  this as an explicit step in `DISASTER-RECOVERY.md`'s Tier 1 so a future
+  restore-while-original-still-exists test (or a real partial-loss recovery run
+  alongside other still-healthy nodes) doesn't cause a self-inflicted outage.
+- **Bigger finding, surfaced by writing up this test properly:** `DISASTER-RECOVERY.md`'s
+  Tier 1 previously said a total loss of both `mini`'s ZFS pool and the USB PBS storage
+  disk could still be recovered "first from the Google Drive offsite copy." Cross-checking
+  this against REL-051 (found the same day): that offsite copy has been deliberately
+  disabled by the account owner (insufficient Drive storage) and, even in the weeks it did
+  attempt to run, never got far enough for a usable restore given the Google Drive API
+  throttling issue REL-051 documents. **The actual current state is that a simultaneous
+  loss of both PBS storage layers has no working recovery path at all** — corrected the
+  runbook to say so plainly rather than pointing at a step that would fail.
+- **Lesson: a disaster-recovery runbook's accuracy has to be checked against the *current*
+  state of every backup it depends on, not just written once and trusted** — this doc's
+  Stage-3 reference was accurate when originally written, but silently became wrong the
+  moment the offsite sync was disabled, and nothing flagged the mismatch until this test
+  prompted a direct cross-check.
+- **Effort:** Small — done.
+
+---
+
 ### REL-032 — Media acquisition stack: no autoheal, recurring silent queue jams · **RESOLVED** (2026-07-02)
 
 Two distinct "usenet does nothing" recurrences in 24h (2026-07-01 permission bug, 2026-07-02
@@ -2581,6 +2622,7 @@ where jams actually stick.
 | REL-049 | Reliability | **PARTIAL** | Usenet stack effectively dead -- 11/12 NZBHydra2 indexers `DISABLED_USER` incl. paid NZBGeek; re-enabled, but NZBGeek's own membership is expired (external, needs renewal). Separately: Sonarr's language profile hard-filtered non-English releases before custom-format scoring ever ran, silently blocking already-correct German custom formats -- added German as an allowed language (2026-07-05) |
 | REL-050 | Reliability | **RESOLVED** | Jellyseerr requests stuck "Processing" forever despite files existing -- the only Radarr server was mismarked `is4k: true`, so non-4k completion status wrote to `status4k` instead of `status`. Fixed the flag; also tightened radarr/sonarr-scan to every 2h, availability-sync to every 3h, Radarr RSS sync 30min->15min (2026-07-05) |
 | REL-051 | Reliability | **DEFERRED (deliberate)** | PBS offsite backup to Google Drive's cron job was missing live -- confirmed with the account owner this was an intentional disable (insufficient Drive storage quota), not a bug. Stale Vault rclone token (would've clobbered the working live token) fixed anyway; cron explicitly set `state: absent` to match the real decision instead of silently drifting back to `present`. Also fixed an unrelated idempotency bug (PBS force-restart task ran on every Ansible pass, moved to a handler). Underlying Google Drive API throttling on PBS's many-small-file format (~12-week ETA for a full sync) documented for if this is ever revisited with more storage (2026-07-06) |
+| REL-052 | Reliability | **RESOLVED** | First real, live-verified PBS restore test (`ct-srv-atlantis-01` snapshot restored to a scratch vmid, booted, Docker stack came up clean, data intact, test container destroyed) -- `DISASTER-RECOVERY.md`'s restore procedure had never actually been tried before. Found and documented a real gotcha (PBS restore duplicates the original's static IP/MAC, causing a live conflict if started alongside the still-running original) and a bigger doc-accuracy gap (the runbook still pointed at the Google Drive offsite copy as a fallback for total PBS-storage loss, which REL-051 confirms doesn't actually have usable data) (2026-07-06) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
 
 ---
