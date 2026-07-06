@@ -44,7 +44,6 @@ graph TB
         ARGO["ArgoCD\nGitOps · kubernetes/apps/*"]
         APPS["Applications\nNextcloud · Paperless · Vaultwarden\nMealie · Gitea · Home Assistant\nOpen WebUI · Uptime Kuma · Garage S3"]
         MON["Monitoring\nPrometheus · Grafana · Loki"]
-        ATL["Atlantis\nTerraform GitOps"]
     end
 
     subgraph edge["RPi Edge Cluster — Keepalived VIP"]
@@ -56,6 +55,7 @@ graph TB
         PBS["PBS (LXC 110)\nProxmox Backup Server"]
         AI["AI LXC (LXC 201)\nOllama LLM inference"]
         DMZ["DMZ Proxy (LXC 301)\nNginx Proxy Manager"]
+        ATLLXC["Atlantis (LXC 204)\nTerraform GitOps -- ADR-012"]
     end
 
     NET --> MK
@@ -65,12 +65,13 @@ graph TB
     TR --> ARGO
     TR --> APPS
     TR --> MON
-    TR --> ATL
+    TR --> ATLLXC
     MK --> RPI1
     RPI1 -. "sync" .-> RPI2
     MK --> PBS
     MK --> AI
     MK --> DMZ
+    MK --> ATLLXC
 ```
 
 ## Repository Layout
@@ -78,7 +79,6 @@ graph TB
 ```text
 ├── kubernetes/
 │   ├── apps/                  # ArgoCD-managed workloads (ApplicationSet picks up any new folder)
-│   │   ├── atlantis/          # Terraform GitOps runner
 │   │   ├── authelia/          # SSO / OIDC identity provider
 │   │   ├── cloudflared/       # Cloudflare Tunnel
 │   │   ├── garage/            # S3-compatible object storage
@@ -86,49 +86,51 @@ graph TB
 │   │   ├── headscale/         # Tailscale control plane
 │   │   ├── home-assistant/    # Smart home hub
 │   │   ├── homepage/          # Dashboard
-│   │   ├── jellyfin/          # Media server
+│   │   ├── immich/            # Photo library (Cloudflare Tunnel external access)
+│   │   ├── jellyfin/          # External-service pointer to the GPU-passthrough LXC (WRK-007)
 │   │   ├── keel/              # Image auto-update
 │   │   ├── mealie/            # Recipe manager
+│   │   ├── myspeed/           # Internet speed-test history
 │   │   ├── nextcloud/         # Files · CalDAV · CardDAV
 │   │   ├── open-webui/        # Local LLM interface (Ollama)
 │   │   ├── paperless/         # Document management + paperless-gpt
 │   │   ├── renovate/          # Dependency update bot
+│   │   ├── searxng/           # Self-hosted metasearch
 │   │   ├── uptime-kuma/       # Uptime monitoring
 │   │   └── vaultwarden/       # Password manager
 │   └── system/                # Manually-applied system components
 │       ├── argocd/            # ArgoCD config (RBAC, OIDC)
-│       ├── cert-manager/      # TLS certificate automation
+│       ├── cert-manager/      # TLS certificate automation (+ cert-manager-config/, certificates/)
 │       ├── chaos-mesh/        # Scheduled pod-kill / latency-injection experiments
 │       ├── cloudnative-pg/    # CNPG operator (Authelia Postgres)
 │       ├── external-secrets/  # External Secrets Operator
 │       ├── infrastructure/    # sysctl-fix DaemonSet, Cloudflare DDNS, misc cluster glue
 │       ├── kyverno/           # Policy engine (resource limits, no-latest-tag, no-privileged)
-│       ├── metallb/           # LoadBalancer IPs
+│       ├── metallb/           # LoadBalancer IPs (+ metallb-config/)
 │       ├── monitoring/        # kube-prometheus-stack + Loki + Tempo + PVE exporter
 │       ├── nfs-provisioner/   # nfs-client StorageClass
 │       ├── postgres/          # Authelia PostgreSQL
 │       ├── redis/             # Authelia Redis
-│       ├── traefik/           # Traefik ingress
+│       ├── tempo/             # Distributed tracing backend
+│       ├── traefik/           # Traefik ingress (+ traefik-config/)
 │       ├── vault/             # HashiCorp Vault + auto-unseal sidecar
 │       ├── velero/            # Cluster backup to Garage S3 (+ Cloudflare R2 offsite)
 │       ├── apps-ingressroute.yml   # All app IngressRoutes
 │       └── other-ingressroute.yml  # System IngressRoutes (ArgoCD, Grafana)
 ├── terraform/
 │   └── stacks/
-│       ├── network/          # MikroTik — VLANs, firewall, DHCP, NAT
-│       └── proxmox/          # VMs and LXC containers
+│       ├── cloudflare/        # Tunnel config + DNS records (Terraform-managed, applied via Atlantis)
+│       ├── network/           # MikroTik — VLANs, firewall, DHCP, NAT
+│       └── proxmox/           # VMs and LXC containers, incl. ct-srv-atlantis-01 (ADR-012)
 ├── ansible/
-│   ├── roles/                # One role per service (19 roles)
+│   ├── roles/                # One role per service (22 roles) -- incl. the DMZ hosts:
+│   │                         # minecraft, nginx_proxy_manager, crowdsec_bouncer,
+│   │                         # watchtower, monitoring_agent (docker-based node_exporter
+│   │                         # + promtail for rpi_nodes/dmz_proxies/dmz_games; every
+│   │                         # other host group uses node_exporter_native instead)
 │   ├── group_vars/           # Variables + Ansible Vault secrets
 │   ├── k3s-cluster/          # k3s provisioning (install, upgrade, reset)
 │   └── inventory.ini
-├── docker/                   # Docker Compose for DMZ services (reference copies of
-│   │                         # live config -- deployed by hand, not Ansible-managed)
-│   ├── minecraft/              # itzg/minecraft-server x2 (dmz_games LXC)
-│   ├── npm/                    # nginx-proxy-manager + CrowdSec (dmz_proxies LXC)
-│   ├── watchtower/              # daily auto-update for the above (dmz_proxies + dmz_games)
-│   ├── promtail/                # ships syslog/auth/docker logs to Loki (both DMZ LXCs)
-│   └── node-exporter/           # host metrics for Prometheus (both DMZ LXCs)
 ├── docs/
 │   ├── decisions/             # ADRs
 │   └── *.md                   # Architecture, naming, topology, VLAN docs
