@@ -13,6 +13,7 @@
   loop:
     - "{{ atlantis_base_dir }}"
     - "{{ atlantis_base_dir }}/data"
+    - "{{ atlantis_base_dir }}/build"
 
 - name: Deploy Atlantis repo config
   ansible.builtin.template:
@@ -21,6 +22,31 @@
     owner: "100"
     group: "1000"
     mode: '0640'
+
+# SEC-007: custom image adds Proxmox's self-signed cluster CA to the trust
+# store so terraform/stacks/proxmox can run with insecure = false instead of
+# skipping TLS verification. Rebuilt every run (force_source) so a bump to
+# atlantis_image (Renovate) or a CA rotation is always picked up.
+- name: Copy Dockerfile and Proxmox CA cert for custom Atlantis image
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ atlantis_base_dir }}/build/{{ item }}"
+    mode: '0644'
+  loop:
+    - Dockerfile
+    - pve-root-ca.crt
+
+- name: Build custom Atlantis image with trusted Proxmox CA
+  community.docker.docker_image:
+    name: atlantis-custom
+    tag: "{{ atlantis_image.split(':')[-1] }}"
+    source: build
+    force_source: true
+    build:
+      path: "{{ atlantis_base_dir }}/build"
+      args:
+        BASE_IMAGE: "{{ atlantis_image }}"
+      pull: true
 
 - name: Deploy Atlantis docker-compose configuration
   ansible.builtin.template:
