@@ -260,6 +260,57 @@ request over the real public path, `cf-ray`/`server: cloudflare` headers confirm
 
 ---
 
+### SEC-013 — Garage `rpc_secret`/`admin_token` leaked in git history were still the live values · **RESOLVED** (2026-07-06)
+
+Found while investigating `.gitleaks-baseline.json` (flagged in the 2026-07-05 security
+review as needing a check). The baseline exists to suppress historical findings from CI,
+but "historical" only means "the file no longer contains it" — it says nothing about
+whether the *value itself* was ever rotated. Of the ~15 unique secrets baselined,
+checked each against the current live Vault/config value; two were **byte-identical to
+the value still live in production**:
+
+- Garage `rpc_secret` (`secret/garage#rpc-secret`) — used for internal cluster RPC auth.
+- Garage `admin_token` (`secret/garage#admin-token`) — full control of Garage's Admin API
+  (the S3 backend for Terraform state, Velero backups, and Immich photo storage).
+
+Both had been sitting in git history, in a **public repository**, unrotated since the
+commit that first added them (2026-06-03), fully readable by anyone with repo access —
+the baseline only stopped CI from re-flagging them, it did nothing to reduce actual
+exposure.
+
+Everything else checked in the same pass was already safe: Authelia's OIDC private key
+and `hmac_secret` differ from their leaked git-history values (rotated under SEC-003),
+the Cloudflare tunnel token differs from its leaked value (rotated under REL-048's
+predecessor work), Headscale's `client_secret` is already Vault/ExternalSecret-sourced
+(SEC-001), and the Minio/mikrodash secrets belong to files no longer present in the tree
+at all (superseded configs, no live counterpart to rotate).
+
+- **Fix:** Generated fresh random values (`openssl rand -hex 32`/`-hex 16`), wrote them to
+  `secret/garage` in Vault, force-synced the `garage-secrets` ExternalSecret
+  (`kubectl annotate externalsecret garage-secrets -n apps force-sync=... --overwrite`
+  to trigger an immediate reconcile instead of waiting out the 1h `refreshInterval`), then
+  `kubectl rollout restart deployment garage`.
+- **Verified live:** new pod came up with 0 restarts, `garage status` showed the single
+  node healthy and connected via RPC (proves the new `rpc_secret` actually works, not
+  just that the pod started), `s3.woitzik.dev` still answering. Grepped the whole repo
+  for both old values — no other file references them outside
+  `.gitleaks-baseline.json` itself (which is left as-is; it's a historical detection
+  record, not a live config, and removing entries from it doesn't add security — the
+  values are already rotated and useless to an attacker now).
+- **Lesson: a `.gitleaks-baseline.json` (or any allowlist/baseline suppressing historical
+  secret-scanner findings) needs a recurring "is this value still live" check, not just a
+  one-time "yes it's in history, baseline it and move on."** A baseline is correct for
+  genuinely-rotated-already secrets; silently baselining a still-active one just
+  documents the exposure instead of closing it.
+- **Not found live** (checked but not re-verified in exhaustive depth): the RSA private
+  key baselined from `authelia_cm.tmp`/an old `configmap.yml` commit differs from the
+  current Vault value in its trailing bytes, which is enough to conclude it isn't the
+  identical string, but a full OIDC key rotation (re-issuing tokens, updating RP-side
+  JWKS caches for Proxmox/PBS/ArgoCD/Grafana) was out of scope for this pass since the
+  live value is already different from the leaked one.
+
+---
+
 ### SEC-009 — Home Assistant had no auth layer beyond its own login · **MEDIUM** (fixed 2026-06-23)
 
 Same Authelia-coverage audit as SEC-008. Of the apps with no Authelia middleware,
@@ -2163,6 +2214,7 @@ where jams actually stick.
 | SEC-009 | Security | **RESOLVED** | Home Assistant had no auth layer beyond its own login -- added Authelia, same pattern as Jellyfin (2026-06-23) |
 | SEC-010 | Security | **PARTIAL** | 545 open Trivy code-scanning alerts, mostly ~20 manifests missing securityContext; suppressed 2 genuinely-justified findings via .trivyignore; hardening pass done in SEC-012 (2026-06-24) |
 | SEC-012 | Security | **RESOLVED** | securityContext hardening across ~25 manifests, 215->171 Trivy findings; first attempt broke 9 containers (capabilities.drop/runAsNonRoot assumptions wrong for several images), caught and fixed live within ~15min across 3 follow-up PRs (2026-06-24) |
+| SEC-013 | Security | **RESOLVED** | `.gitleaks-baseline.json` silently suppressed 2 still-live secrets in a public repo -- Garage `rpc_secret`/`admin_token` (S3 backend for Terraform state/Velero/Immich) were byte-identical to their 2026-06-03 git-history values, never rotated. Rotated via Vault + forced ExternalSecret sync + Garage restart, verified healthy live (2026-07-06) |
 | REL-001 | Reliability | **RESOLVED** | All 3 k3s nodes run continuously (`on_boot=true`); single-server topology by deliberate design, not an HA gap -- see `docs/k3s-architecture.md` |
 | REL-002 | Reliability | **RESOLVED** | PBS running with `onboot=1`; `all: 1` backup job covers every VM/CT incl. k3s nodes + NFS LXC; verified successful 2026-06-23 03:00 run |
 | REL-003 | Reliability | **HIGH** | Velero backend (Garage) is in-cluster; circular recovery dependency |
