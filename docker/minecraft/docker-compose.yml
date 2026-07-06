@@ -1,0 +1,42 @@
+# Runs on ct-dmz-games-01 (dmz_games), /opt/minecraft/docker-compose.yml.
+# Reconciled into git 2026-07-06 (DOC-005) -- this replaces docker/crafty/,
+# which described Crafty Controller managing these servers. Crafty was
+# evaluated and abandoned (see the .bak/.bak2 files still on the host) in
+# favor of running itzg/minecraft-server containers directly; the committed
+# crafty compose file never matched what's actually deployed. Not
+# Ansible-managed -- deployed/updated by hand via SSH on the LXC. See
+# WRK-002 in docs/AUDIT.md for the tracked gap.
+services:
+  minecraft-2:
+    image: itzg/minecraft-server
+    container_name: mc-server-2
+    environment:
+      EULA: "TRUE"
+      TYPE: "PAPER"
+      INIT_MEMORY: "2G"
+      MAX_MEMORY: "4G"
+      VERSION: "LATEST"
+      TZ: "Europe/Berlin"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data-3:/data
+    restart: unless-stopped
+
+  cobblemon:
+    # Cobblemon 1.7.x requires Java 21 specifically - the "latest" tag ships Java 25
+    image: itzg/minecraft-server:java21
+    container_name: mc-server-cobblemon
+    environment:
+      EULA: "TRUE"
+      TYPE: "FABRIC"
+      VERSION: "1.21.1"
+      MODRINTH_PROJECTS: "cobblemon,fabric-api"
+      INIT_MEMORY: "2G"
+      MAX_MEMORY: "4G"
+      TZ: "Europe/Berlin"
+    ports:
+      - "25566:25565"
+    volumes:
+      - ./data-cobblemon:/data
+    restart: unless-stopped

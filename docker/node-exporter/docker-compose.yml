@@ -1,0 +1,21 @@
+# Runs on both DMZ LXCs (ct-dmz-proxy-01, ct-dmz-games-01), /opt/docker/node_exporter/.
+# Added to git 2026-07-06 (DOC-005) -- scraped by the in-cluster Prometheus
+# alongside every other host's node_exporter (see kubernetes/system/monitoring/).
+services:
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    restart: unless-stopped
+    mem_limit: 128m
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      - /run/udev:/run/udev:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
