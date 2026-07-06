@@ -228,6 +228,36 @@ no password prompt.
   unaffected (still hits `/events` directly, still HMAC-verified).
 - **Effort:** Small (1h) — done.
 
+**Regression, found and fixed again 2026-07-05 (PR #288):** ADR-012's migration of
+Atlantis off k3s onto its own LXC (`ct-srv-atlantis-01`, 10.0.20.250, see REL-036)
+deleted the `atlantis-final` IngressRoute entirely — the Authelia gate went with it —
+and repointed the Cloudflare Tunnel ingress (`terraform/stacks/cloudflare/main.tf`)
+straight at the LXC's IP, bypassing Traefik (and Authelia) completely. Found during a
+user-requested security review of public-facing tunnels. Confirmed live via a public-DNS
+bypass test (`dig @1.1.1.1` for the real IP, then `curl --resolve` through the actual
+Cloudflare edge rather than the sandbox's internal split-horizon DNS): `atlantis.woitzik.dev`
+served its full UI (PR history, plan/apply state, lock controls) to a plain unauthenticated
+request over the real public path, `cf-ray`/`server: cloudflare` headers confirmed present.
+
+- **Fix:** Recreated the same external-host-behind-Traefik-+-Authelia pattern already
+  used for `pve-final`/`pbs-final` (`kubernetes/system/apps-ingressroute.yml`):
+  a selector-less Service+Endpoints (`external-atlantis` → 10.0.20.250:4141) plus an
+  `atlantis-final` IngressRoute with `/events` split out unauthenticated (webhook HMAC
+  is its own auth) and everything else behind `authelia`. Repointed the Cloudflare Tunnel's
+  `service` from the LXC's raw IP to Traefik's `websecure` (443) entrypoint with
+  `origin_server_name = "atlantis.woitzik.dev"` (needed because Traefik's cert doesn't
+  match the internal `traefik.kube-system.svc.cluster.local` service hostname cloudflared
+  otherwise expects).
+- **Lesson: any infra migration that changes how a public hostname reaches its backend
+  (new LXC, new Service, new tunnel target) needs an explicit ingress/auth re-audit** —
+  the auth gate lived on the now-deleted IngressRoute, not on Atlantis itself, so moving
+  the backend silently moved the exposure back to "fully public" with no error or warning
+  anywhere in the migration. Same broader theme as REL-042/044's "Application manifest
+  never re-synced after bootstrap" class of bug: a security control that isn't itself
+  continuously reconciled/verified live can silently stop existing.
+- **Verified fixed:** re-ran the same public-DNS-bypass curl test post-fix — correct
+  `302` redirect to `auth.woitzik.dev`.
+
 ---
 
 ### SEC-009 — Home Assistant had no auth layer beyond its own login · **MEDIUM** (fixed 2026-06-23)
@@ -2022,6 +2052,62 @@ the actual redis logs were checked).
 
 ---
 
+### REL-049 — Usenet stack effectively dead: 11 of 12 indexers disabled, German releases hard-filtered · **PARTIAL** (2026-07-05)
+
+User-reported: "usenet stack not working." Root cause in NZBHydra2: 11 of 12 configured
+indexers were `state: DISABLED_USER` (manually disabled at some prior point, not the
+auto-recovering `DISABLED_SYSTEM_TEMPORARY` state), including the paid NZBGeek indexer —
+leaving only SceneNZBs actually querying on any search.
+
+- **Fix:** Re-enabled NZBGeek (`state` flipped to `ENABLED` in
+  `/opt/media-acq/nzbhydra2/config/nzbhydra.yml`, container restarted). A live search
+  test then surfaced NZBGeek's own `error code 104 "Membership Expired"` — a genuine
+  billing issue, not a technical one; flagged to the user, needs renewal at nzbgeek.info.
+  SceneNZBs (already `ENABLED`, real `apiKey` configured) confirmed fully functional —
+  a live RSS sync test returned millions of real results.
+- **Second bug found chasing a related complaint ("I have paid SceneNZBs, German
+  releases should be in there")**: Sonarr's only language profile hard-restricted to
+  English-only. Sonarr v4 still enforces a legacy allowed-languages list that filters
+  releases out **before** custom-format scoring ever runs — so the repo's
+  already-correctly-configured `German DL`/`German Audio` custom formats could never
+  fire, no matter how well-scored a German release was, because it never reached
+  scoring at all. Fixed by adding German as an additional allowed language on that
+  profile (cutoff stays English) via `PUT /api/v3/languageprofile/1`.
+- **Not fixed (external dependency):** NZBGeek membership renewal — requires the user
+  to actually pay/renew, not something fixable from this session.
+- **Lesson:** "indexer configured with a real API key" and "indexer actually enabled"
+  are two different states worth checking independently — the same applies to
+  "custom format exists and is scored correctly" vs. "the release ever reaches
+  scoring at all" (a profile-level allow-list can silently gate everything upstream
+  of scoring).
+
+---
+
+### REL-050 — Jellyseerr requests permanently stuck "Processing" despite files existing; scan cadence tightened · **RESOLVED** (2026-07-05)
+
+User-reported: "why aren't requested items being pulled in Jellyseerr." Initially
+misdiagnosed as a scheduling issue (jobs only ran once daily) — manually triggering the
+jobs didn't change anything, which was the tell that the real cause was elsewhere.
+
+- **Root cause:** Jellyseerr's only configured Radarr server was marked `is4k: true`.
+  For a non-4k request, Jellyseerr writes completion status against the `status4k`
+  field on that mismarked server (which correctly reached `5`/Available) instead of the
+  `status` field (stuck at `3`/Processing) the UI actually renders for regular requests.
+  The download and import had both fully succeeded the whole time — this was a pure
+  status-reporting bug, not a pipeline failure.
+- **Fix:** Set `is4k: false` on the Radarr server config (`PUT /api/v1/settings/radarr/1`),
+  re-triggered `radarr-scan`, confirmed both `status` and `status4k` reached `5`.
+- **Also done, per explicit user request to reduce staleness ("mach das die scans
+  öfter sind")**: `radarr-scan`/`sonarr-scan` jobs 1x/day → every 2h, `availability-sync`
+  → every 3h; Radarr's RSS sync interval 30min → 15min (now matches Sonarr's existing
+  15min).
+- **Lesson:** a single boolean server-config flag (`is4k`) on the *only* instance of a
+  service, mismarked, silently reroutes status writes to a field the UI never reads —
+  if a Radarr/Sonarr server in Jellyseerr isn't genuinely a 4K-only instance, `is4k`
+  must be `false`.
+
+---
+
 ### REL-032 — Media acquisition stack: no autoheal, recurring silent queue jams · **RESOLVED** (2026-07-02)
 
 Two distinct "usenet does nothing" recurrences in 24h (2026-07-01 permission bug, 2026-07-02
@@ -2073,7 +2159,7 @@ where jams actually stick.
 | SEC-005 | Security | **RESOLVED** | All container images now fully semver-pinned — batch 1 (PR #187, 2026-06-27): uptime-kuma, redis, postgres, nextcloud; batch 2 (PR #193, 2026-06-28): valkey, gotenberg, renovate, gitea, vault, home-assistant, open-webui (:main→v0.9.6), alpine. Renovate kubernetes manager active. |
 | SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
 | SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
-| SEC-008 | Security | **RESOLVED** | Atlantis had zero auth + plain-HTTP entrypoint -- added Authelia (webhook path excluded), HTTPS-only (2026-06-23) |
+| SEC-008 | Security | **RESOLVED** | Atlantis had zero auth + plain-HTTP entrypoint -- added Authelia (webhook path excluded), HTTPS-only (2026-06-23). **Regressed and re-fixed 2026-07-05**: ADR-012's LXC migration deleted the IngressRoute and repointed the Cloudflare Tunnel straight at the LXC, silently re-exposing it fully public -- caught via a requested security review, recreated the pve-final/pbs-final external-host+Authelia pattern (PR #288) |
 | SEC-009 | Security | **RESOLVED** | Home Assistant had no auth layer beyond its own login -- added Authelia, same pattern as Jellyfin (2026-06-23) |
 | SEC-010 | Security | **PARTIAL** | 545 open Trivy code-scanning alerts, mostly ~20 manifests missing securityContext; suppressed 2 genuinely-justified findings via .trivyignore; hardening pass done in SEC-012 (2026-06-24) |
 | SEC-012 | Security | **RESOLVED** | securityContext hardening across ~25 manifests, 215->171 Trivy findings; first attempt broke 9 containers (capabilities.drop/runAsNonRoot assumptions wrong for several images), caught and fixed live within ~15min across 3 follow-up PRs (2026-06-24) |
@@ -2151,6 +2237,8 @@ where jams actually stick.
 | REL-046 | Reliability | **PARTIAL** | Systematic check (`kubectl diff -f` against every one of the ~21 self-bootstrapped Application manifests across `kubernetes/system/**`, prompted by finding REL-042's tracking gap) found **7 files with live/git drift**, of which 2 were real, previously-invisible bugs (REL-044 Traefik outage, REL-045 Velero maintenance-frequency), 2 were additional untracked-file gaps now manually synced (`postgres-cluster-application.yml`'s `backup-config` glob entry; `infrastructure/application.yml`, harmless), and 1 was caught and deliberately reverted before merging (`velero/manifests-application.yml`'s glob briefly included `offsite-schedule.yml`/`r2-backuplocation.yml` -- WRK-008's intentionally-incomplete R2 offsite feature, which auto-activated into a real but permanently-`Unavailable` BackupStorageLocation and a Schedule that would have failed daily at 4am; deleted both live and re-excluded from the glob to match the existing deliberate-defer decision). **Not fixed**: the other ~14 orphaned Application files (cert-manager, traefik itself, metallb, kyverno, tempo, chaos-mesh, cloudnative-pg, external-secrets, cert-manager-config, metallb-config, nfs-provisioner, vault(+manifests), argocd-manifests) currently show zero drift, but nothing stops the same class of bug recurring the next time any of them is edited -- the systemic fix (one root Application, or an extended ApplicationSet, that recursively tracks every `kind: Application` manifest under `kubernetes/system/**`) is scoped out for a dedicated future session rather than touching every Application in the cluster at once here. |
 | REL-047 | Reliability | **RESOLVED** | Root-caused a mysterious, recurring Terraform error ("Resource has no configuration... this is a bug in Terraform; please report it!") that had blocked *any* plan of the whole `terraform/stacks/network` stack for weeks, misdiagnosed in earlier sessions as an unfixable upstream Terraform bug (bug #34992 was cited but never actually located/confirmed). Real cause: `fwd_wan_minecraft`, `fwd_wan_cobblemon`, and `dstnat_cobblemon` each still had a leftover `import {}` block in `imports.tf` from before PR #216 replaced their `resource {}` blocks with `removed {}` blocks -- having both an `import` targeting a resource address and a `removed` block destroying that same address in one plan is what triggered it. `dstnat_minecraft`, which never had a leftover import block, always planned fine, which is what eventually gave this away. Deleted the 3 stale import blocks; the full network stack now plans and applies cleanly with zero workarounds (2026-07-05). |
 | REL-048 | Security | **RESOLVED** | The Cloudflare API token used by Atlantis had been completely unable to manage any DNS records since it was first issued (confirmed live: `GET /zones` returned an empty result -- zero zone-level permissions of any kind), blocking IAC-002 (Minecraft playit.gg DNS cutover) and the Jellyfin/Immich/Atlantis tunnel DNS records for over a week. Root cause was permission-scope, not a bug -- required the account owner to grant access. Rotated to a properly-scoped token (Zone: DNS Edit for woitzik.dev + Account: Cloudflare Tunnel Edit, both permission groups on one token, created via a single API call rather than the dashboard UI after two rounds of single-scope tokens failed to combine correctly through the UI) using the account's Global API Key as a one-time bootstrap credential; the two superseded single-scope tokens and the Global Key itself were deleted/rotated immediately after. Deployed to the Atlantis LXC via Ansible; unblocked and completed GIT-008, IAC-002, and the 3 previously-unappliable `cloudflare_dns_record` resources (imported, since all 3 already existed live from earlier dashboard-created records) (2026-07-05). |
+| REL-049 | Reliability | **PARTIAL** | Usenet stack effectively dead -- 11/12 NZBHydra2 indexers `DISABLED_USER` incl. paid NZBGeek; re-enabled, but NZBGeek's own membership is expired (external, needs renewal). Separately: Sonarr's language profile hard-filtered non-English releases before custom-format scoring ever ran, silently blocking already-correct German custom formats -- added German as an allowed language (2026-07-05) |
+| REL-050 | Reliability | **RESOLVED** | Jellyseerr requests stuck "Processing" forever despite files existing -- the only Radarr server was mismarked `is4k: true`, so non-4k completion status wrote to `status4k` instead of `status`. Fixed the flag; also tightened radarr/sonarr-scan to every 2h, availability-sync to every 3h, Radarr RSS sync 30min->15min (2026-07-05) |
 | IAC-002 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
 
 ---
