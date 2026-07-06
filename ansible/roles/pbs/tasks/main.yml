@@ -68,6 +68,10 @@
     state: directory
     mode: "0755"
 
+# REL-051: the account owner deliberately disabled this offsite sync themselves --
+# insufficient Google Drive storage quota for PBS's datastore, not a bug. Keep the
+# config/script deployed (harmless, useful if re-enabled later with more Drive space
+# or a different destination) but the cron job stays state: absent on purpose.
 - name: Deploy rclone config
   ansible.builtin.template:
     src: rclone.conf.j2
@@ -80,11 +84,8 @@
     dest: /usr/local/bin/pbs-to-gdrive.sh
     mode: "0750"
 
-- name: Configure rclone sync cron job
+- name: Ensure rclone sync cron job is NOT scheduled (deliberately disabled, REL-051)
   ansible.builtin.cron:
     name: "PBS to GDrive offsite backup"
-    minute: "0"
-    hour: "4"
-    job: "/usr/local/bin/pbs-to-gdrive.sh >> /dev/null 2>&1"
     user: root
-    state: present
+    state: absent
