@@ -184,16 +184,37 @@ rejected by the admission webhook.
 
 ---
 
-### SEC-007 — Proxmox provider uses insecure TLS (`insecure: true`) · **LOW**
+### SEC-007 — Proxmox provider uses insecure TLS (`insecure: true`) · **RESOLVED** (2026-07-06)
 
-`terraform/stacks/proxmox/providers.tf` sets `insecure = true` — skips TLS certificate
+`terraform/stacks/proxmox/providers.tf` set `insecure = true` — skipped TLS certificate
 verification when talking to the Proxmox API.
 
 - **Impact:** On the local management VLAN this is low risk, but it means MITM on VLAN 10
   could intercept API calls including the API token.
-- **Fix:** Add the Proxmox self-signed CA cert to the TF provider's `tls_client_config`,
-  or issue a cert-manager certificate for the Proxmox web UI from the Let's Encrypt wildcard.
-- **Effort:** Small.
+- **Fix:** Proxmox's cluster cert already carries an IP SAN for `10.0.10.10` (confirmed
+  via `openssl s_client`), so no re-issuance was needed — just trust. Built a custom
+  Atlantis Docker image (`ansible/roles/atlantis/files/Dockerfile`) layering in
+  Proxmox's self-signed cluster CA via `update-ca-certificates`, based on the existing
+  `atlantis_image` tag so Renovate bumps keep working unmodified. Flipped `insecure`
+  to `false`.
+- **Verified live:** rebuilt/redeployed the Atlantis container, confirmed the CA landed
+  in `/etc/ssl/certs`, confirmed `wget --spider https://10.0.10.10:8006` succeeds with
+  verification on. Real end-to-end proof: PR #293's `atlantis/plan: proxmox` check
+  passed — "No changes. Your infrastructure matches the configuration" — with
+  `insecure = false` live against the real Proxmox API.
+- **Effort:** Small — done.
+- **Investigated but not applied to MikroTik's identical `insecure = true`
+  (`terraform/stacks/network/providers.tf`)**: RouterOS's self-signed cert at
+  `10.0.10.1` has `Subject: CN = 10.0.10.1` but **no SAN extension at all**
+  (confirmed via `openssl s_client`). Go's TLS stack (used by the terraform-routeros
+  provider) stopped honoring bare CN matching in Go 1.15+ — trusting the CA alone
+  would not be enough, RouterOS itself would need to be issued a new self-signed cert
+  with a proper IP SAN first. That means touching the live router's own certificate
+  config on a production network device that's a documented single point of failure —
+  materially higher blast radius than the Proxmox fix for a LOW-severity finding, and
+  outside what the `routeros` Terraform provider manages declaratively (would need
+  RouterOS console/API commands directly). Left as accepted risk; revisit only with a
+  dedicated maintenance window.
 
 ---
 
@@ -1257,16 +1278,31 @@ state rebuild) rather than being rushed alongside this fix.
 
 ---
 
-### REL-008 — uptime-kuma uses local-path storage (single-node, non-NFS) · **LOW**
+### REL-008 — uptime-kuma uses local-path storage (single-node, non-NFS) · **LOW, accepted risk** (re-checked 2026-07-06)
 
 `uptime-kuma-data` PVC uses `local-path` StorageClass rather than `nfs-client`. This means
 the data is stored on the node's local disk (`/var/lib/rancher/k3s/storage`), which is the
 k3s-11 VM disk.
 
-- **Impact:** If pods reschedule to a different node (once k3s-12/13 are running again),
-  uptime-kuma loses its data. In a 3-node cluster this is a real scheduling risk.
-- **Fix:** Migrate to `nfs-client` StorageClass (consistent with all other PVCs).
-- **Effort:** Small (PVC migration, Velero backup of current data first).
+- **Re-checked, original suggested fix was wrong:** the original recommendation
+  ("migrate to `nfs-client`, consistent with all other PVCs") would actively reintroduce
+  the exact corruption risk GIT-006 spent real effort eliminating — confirmed live that
+  uptime-kuma is SQLite-backed (`/app/data/kuma.db`), and SQLite-on-NFS is the documented
+  anti-pattern this repo has spent multiple incidents removing everywhere else. `local-path`
+  is the *correct* storage class for a SQLite workload; the real gap is only reschedule
+  risk, not the storage class choice itself.
+- **Reschedule risk is smaller than stated:** confirmed live that `uptime-kuma-data` (and
+  its `tmp` volume) already gets captured every night by the existing `daily-backup`
+  Velero schedule (`kubectl get podvolumebackups.velero.io -n velero -l
+  velero.io/backup-name=<latest>` shows both, `Completed`, kopia). A reschedule to a
+  different node would still cause a live gap until someone restores from that backup —
+  not zero-risk — but it is not the unrecoverable full data loss the original wording
+  implied.
+- **Fix:** None needed structurally — `local-path` is right for this workload, and
+  Velero already covers it. Accepted as a known, backed-up, single-node-scheduling
+  tradeoff (`k3s-11` remains the sole viable node for anything stateful+local-path per
+  the deliberate single-server design in `docs/k3s-architecture.md`).
+- **Effort:** None.
 
 ---
 
@@ -1609,14 +1645,18 @@ HA topology) and `README.md`'s stack table (same stale claim).
 
 ---
 
-### DOC-002 — ROADMAP.md is partially in German · **LOW**
+### DOC-002 — ROADMAP.md is partially in German · **RESOLVED** (re-checked 2026-07-06)
 
-The ROADMAP contains a mix of German and English text ("Abgeschlossen", "offen",
+The ROADMAP contained a mix of German and English text ("Abgeschlossen", "offen",
 "benötigt"). For a public portfolio repo read by potential employers, this inconsistency
 reduces readability.
 
-- **Fix:** Translate ROADMAP.md to consistent English.
-- **Effort:** Small (1h).
+- **Re-checked:** already fully English — no German words found (`grep -niE
+  "abgeschlossen|offen|benötigt|geplant|erledigt"` returns nothing, no umlauts/ß either).
+  This must have been translated at some point (matches a commit message on this repo:
+  "Translate ROADMAP.md to English (public repository)") but the finding was never
+  marked resolved. Stale entry, closing it out.
+- **Effort:** None needed — already done.
 
 ---
 
@@ -2260,7 +2300,7 @@ where jams actually stick.
 | REL-010 | Reliability | **RESOLVED** | `postgres-authelia` (CNPG) migrated from `nfs-client` to `local-path` via CNPG's declarative hibernation feature; required adding an ownerReference CNPG doesn't document needing (2026-06-24) |
 | SEC-005 | Security | **RESOLVED** | All container images now fully semver-pinned — batch 1 (PR #187, 2026-06-27): uptime-kuma, redis, postgres, nextcloud; batch 2 (PR #193, 2026-06-28): valkey, gotenberg, renovate, gitea, vault, home-assistant, open-webui (:main→v0.9.6), alpine. Renovate kubernetes manager active. |
 | SEC-006 | Security | **RESOLVED** | Kyverno enforcement policies in Audit mode |
-| SEC-007 | Security | **LOW** | Proxmox provider uses `insecure = true` |
+| SEC-007 | Security | **RESOLVED** | Proxmox provider TLS verification enabled -- Proxmox's cert already had an IP SAN for 10.0.10.10, just needed its CA trusted (custom Atlantis image via update-ca-certificates), verified live via a real `atlantis/plan` succeeding with `insecure = false` (2026-07-06) |
 | SEC-008 | Security | **RESOLVED** | Atlantis had zero auth + plain-HTTP entrypoint -- added Authelia (webhook path excluded), HTTPS-only (2026-06-23). **Regressed and re-fixed 2026-07-05**: ADR-012's LXC migration deleted the IngressRoute and repointed the Cloudflare Tunnel straight at the LXC, silently re-exposing it fully public -- caught via a requested security review, recreated the pve-final/pbs-final external-host+Authelia pattern (PR #288) |
 | SEC-009 | Security | **RESOLVED** | Home Assistant had no auth layer beyond its own login -- added Authelia, same pattern as Jellyfin (2026-06-23) |
 | SEC-010 | Security | **PARTIAL** | 545 open Trivy code-scanning alerts, mostly ~20 manifests missing securityContext; suppressed 2 genuinely-justified findings via .trivyignore; hardening pass done in SEC-012 (2026-06-24) |
@@ -2288,7 +2328,7 @@ where jams actually stick.
 | REL-021 | Reliability/Security | **PARTIAL** | Authelia's readOnlyRootFilesystem (SEC-012) passed a live test, then crash-looped in production hours later (35+ restarts, generic fatal error, no detail) -- a live outage on home.woitzik.dev. Reverted; root cause of the intermittent failure still unknown. Also found and fixed a related but separate SEC-012 regression on homepage (EROFS creating docker.yaml) in the same response (2026-06-25) |
 | REL-022 | Reliability/Security | **RESOLVED** | Third SEC-012 readOnlyRootFilesystem regression, same class as REL-021: open-webui's static branding assets (favicons, splash, loader.js) failed to write under EROFS on every boot. Fixed with an init container that copies the existing static dir into an emptyDir before overlaying it, preserving required assets (fonts/, swagger-ui/) that a bare emptyDir would have wiped (2026-06-25) |
 | REL-023 | Reliability | **PARTIAL** | Garage logging recurring "Unable to decode entry of object" -- traced to 8 corrupted Velero/kopia backup chunks for nfs-provisioner-root and two apps PVs, likely from the REL-019 disk-full window. No live data affected, but a fresh ad-hoc backup reproduced a real, repeatable failure backing up nfs-provisioner-root specifically. Root cause of that cancellation not yet found (2026-06-25) |
-| REL-008 | Reliability | **LOW** | uptime-kuma uses local-path storage; will lose data on node reschedule |
+| REL-008 | Reliability | **LOW, accepted risk** | uptime-kuma's local-path storage is actually correct (it's SQLite-backed, NFS would reintroduce GIT-006); already covered nightly by the existing Velero daily-backup, original "migrate to NFS" fix suggestion was wrong (re-checked 2026-07-06) |
 | GIT-001 | GitOps | **HIGH** | TF state backend requires live in-cluster Garage |
 | GIT-002 | GitOps | **RESOLVED** | k3s-12/13 mistakenly retagged "master"/control-plane; reverted to "worker" (agent-only) — single-etcd design confirmed correct (2026-06-23) |
 | GIT-006 | GitOps | **RESOLVED** | Garage `garage-meta` (sqlite) was on NFS (`nfs-client`); SQLite's locking/WAL model is incompatible with NFS and the metadata DB became corrupted ("database disk image is malformed" / "locking protocol" errors), breaking Velero, Loki, and TF-state writes. Recovered via `sqlite3 .recover` + cleared derived merkle/GC tables; fixed by migrating `garage-meta` to `local-path` (2026-06-23). `garage-data` (blob storage, no locking needs) remains on NFS, which is fine. Audited every other app on `nfs-client` for the same risk and found 6 more SQLite-backed apps exposed: Headscale (migrated same day, PR #50), Vaultwarden, Gitea, Mealie, Open WebUI, paperless-ai, and Home Assistant — all migrated to `local-path` 2026-06-23, each backed up and `PRAGMA integrity_check`-verified before and after. None had corrupted yet, but Vaultwarden/Open WebUI/Home Assistant were confirmed in WAL mode (the highest-risk configuration, same as Garage). |
@@ -2304,7 +2344,7 @@ where jams actually stick.
 | IAC-002 | IaC | **RESOLVED** | MikroTik firewall hardening apply blocked on Atlantis's k3s-hosted availability -- superseded by ADR-012 (Atlantis moved to its own LXC), network stack applies cleanly now (re-checked 2026-07-06) |
 | IAC-003 | IaC | **LOW** | No automated k3s VM rebuild procedure |
 | DOC-001 | Docs | **RESOLVED** | DISASTER-RECOVERY.md does not exist -- added at repo root covering all 6 required tiers + per-service restore table (2026-06-23); this summary row was stale, the detailed entry already said RESOLVED |
-| DOC-002 | Docs | **LOW** | ROADMAP.md is partially in German |
+| DOC-002 | Docs | **RESOLVED** | ROADMAP.md already fully English -- stale finding, translated at some point but never marked resolved (re-checked 2026-07-06) |
 | DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |
 | DOC-004 | Docs | **RESOLVED** | 4 architectural decisions without ADRs — added ADR-006..009; ADR-011 (Cloudflare Tunnel external access) added 2026-06-27 |
 | WRK-001 | Workloads | **RESOLVED** | Jellyfin/media stack stuck in ContainerCreating — resolved via WRK-006 (media acq → LXC) and WRK-007 (Jellyfin → LXC) |
