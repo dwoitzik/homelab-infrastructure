@@ -2372,7 +2372,7 @@ jobs didn't change anything, which was the tell that the real cause was elsewher
 
 ---
 
-### REL-051 — PBS offsite backup to Google Drive has been near-permanently broken since inception; root cause is Google Drive API throttling on PBS's chunked storage format · **PARTIAL** (2026-07-06)
+### REL-051 — PBS offsite backup to Google Drive: cron job missing was a deliberate user decision (insufficient Drive quota), not a bug; underlying throttling issue documented anyway · **DEFERRED (deliberate)** (2026-07-06)
 
 Found via a systematic `ansible-playbook site.yml --check --diff` sweep across every
 host group looking for the same class of drift that caught the Minecraft `data-2`/
@@ -2386,10 +2386,13 @@ host group looking for the same class of drift that caught the Minecraft `data-2
    Ansible run against this host would have overwritten the live, working config with
    the stale one.
 2. **The offsite sync cron job does not exist on the live host at all** (`crontab -l`
-   returns empty) — despite `docs/backup-strategy.md` claiming "Daily at 04:00" is
+   returns empty) — `docs/backup-strategy.md` still claimed "Daily at 04:00" was
    active. `/var/log/pbs-to-gdrive.log` shows the job ran (and mostly failed) nearly
-   every day from 2026-05-04 through 2026-06-14, then stopped being invoked entirely —
-   the cron entry was removed at some point around then and never restored.
+   every day from 2026-05-04 through 2026-06-14, then stopped being invoked entirely.
+   **Confirmed with the account owner: this was intentional** — they disabled it
+   themselves around then because the destination Google Drive account doesn't have
+   enough free space for the PBS datastore. Not a bug, just a doc that was never
+   updated to say so.
 
 **Root cause of the near-daily failures, found by running a real (bounded, 60s)
 manual sync and reading rclone's own error output**: the sync isn't actually broken in
@@ -2406,27 +2409,32 @@ single day's window, so every run for 6 weeks was doomed to either time out or g
 killed before finishing, matching the log exactly.
 
 - **Fixed:** Vault's `pbs_rclone_gdrive_token` updated to match the current live
-  (self-refreshed) token, so a future Ansible run won't regress a working credential.
+  (self-refreshed) token, so a future Ansible run won't regress a working credential —
+  worth keeping current even with the cron job disabled, in case this gets revisited.
 - **Also found while reading the role:** `ansible/roles/pbs/tasks/main.yml`'s "Force
-  restart PBS Container" task (`pct stop 110 && sleep 3 && pct start 110`) has
-  `changed_when: true` unconditionally and no guard — it restarts the live PBS
+  restart PBS Container" task (`pct stop 110 && sleep 3 && pct start 110`) had
+  `changed_when: true` unconditionally and no guard — it restarted the live PBS
   container on *every* Ansible run against `mgmt_nodes`, not just the one-time bootstrap
   it was clearly written for (adding a bind-mount line to `110.conf`). A real backup
   job interrupted mid-run by an unrelated Ansible pass would be a self-inflicted
-  version of this same finding. Not fixed here — flagged for the same PR/session that
-  re-enables the cron job, since fixing it means testing an actual PBS restart cycle.
-- **Not fixed (needs a decision, not a quick technical fix):** simply re-enabling the
-  cron job would just repeat the exact 6-week failure pattern — the initial full sync
-  fundamentally cannot finish in a 24h window at the observed throttled rate. Real
-  options: (a) let an initial sync run unattended for however many weeks it takes
-  (bounded risk, but ties up the PBS host and Drive API quota for a long time with no
-  guaranteed completion), (b) bundle chunks into fewer, larger archives before
-  syncing (e.g., tar the datastore in batches) to reduce the file-count-driven API
-  throttling, (c) reconsider whether Google Drive (optimized for human file sharing,
-  not high-file-count backup datastores) is the right offsite target for this specific
-  data shape, keeping it for other less-fragmented data if useful elsewhere. Deferred
-  pending the account owner's choice — this is a real gap in the offsite leg of the
-  3-2-1 backup strategy that's existed, undetected, since the stack's original setup.
+  version of this same finding. **Fixed** — moved to a `notify`/`flush_handlers`
+  handler so it only fires when the bind-mount task actually changes something.
+- **Fix (deliberately disabled, matching the account owner's actual decision):**
+  `ansible/roles/pbs/tasks/main.yml`'s cron task now sets `state: absent` explicitly
+  (was `present`, which is what silently kept trying to reintroduce it every Ansible
+  run despite someone removing it live) — the rclone config and sync script stay
+  deployed (harmless, ready to re-enable), only the schedule itself is off. Removed
+  the live crontab entry to match.
+- **Underlying throttling problem still documented, for if this is ever revisited:**
+  even before the quota ran out, the sync mostly failed daily anyway. A manual bounded
+  test sync showed why: Google Drive's API throttles hard on PBS's chunked storage
+  format (tens of thousands of small files) — ~1.6 KiB/s observed, rclone's own ETA
+  ~12 weeks for an initial full sync of 11.65 GiB. `context deadline exceeded` errors
+  on `list directory` calls, consistent with per-file-operation API rate limiting, not
+  a network or auth problem. **If offsite backup is revisited with a Drive plan that
+  has enough space, this throttling issue would still need solving separately** —
+  bundling chunks into fewer/larger archives before syncing, or picking a destination
+  better suited to a many-small-files backup format, not just re-enabling the cron job.
 - **Lesson: "the daily job ran and sometimes reported failure" was previously
   invisible** — nothing alerts on this cron job's own success/failure (the
   `healthchecks.io` ping at the end of the script only fires on a fully successful
@@ -2572,7 +2580,7 @@ where jams actually stick.
 | REL-048 | Security | **RESOLVED** | The Cloudflare API token used by Atlantis had been completely unable to manage any DNS records since it was first issued (confirmed live: `GET /zones` returned an empty result -- zero zone-level permissions of any kind), blocking IAC-004 (Minecraft playit.gg DNS cutover) and the Jellyfin/Immich/Atlantis tunnel DNS records for over a week. Root cause was permission-scope, not a bug -- required the account owner to grant access. Rotated to a properly-scoped token (Zone: DNS Edit for woitzik.dev + Account: Cloudflare Tunnel Edit, both permission groups on one token, created via a single API call rather than the dashboard UI after two rounds of single-scope tokens failed to combine correctly through the UI) using the account's Global API Key as a one-time bootstrap credential; the two superseded single-scope tokens and the Global Key itself were deleted/rotated immediately after. Deployed to the Atlantis LXC via Ansible; unblocked and completed GIT-008, IAC-004, and the 3 previously-unappliable `cloudflare_dns_record` resources (imported, since all 3 already existed live from earlier dashboard-created records) (2026-07-05). |
 | REL-049 | Reliability | **PARTIAL** | Usenet stack effectively dead -- 11/12 NZBHydra2 indexers `DISABLED_USER` incl. paid NZBGeek; re-enabled, but NZBGeek's own membership is expired (external, needs renewal). Separately: Sonarr's language profile hard-filtered non-English releases before custom-format scoring ever ran, silently blocking already-correct German custom formats -- added German as an allowed language (2026-07-05) |
 | REL-050 | Reliability | **RESOLVED** | Jellyseerr requests stuck "Processing" forever despite files existing -- the only Radarr server was mismarked `is4k: true`, so non-4k completion status wrote to `status4k` instead of `status`. Fixed the flag; also tightened radarr/sonarr-scan to every 2h, availability-sync to every 3h, Radarr RSS sync 30min->15min (2026-07-05) |
-| REL-051 | Reliability | **PARTIAL** | PBS offsite backup to Google Drive has been near-permanently broken since May -- cron job missing live entirely, Vault's rclone token was stale (would've clobbered the working live token on a real Ansible run, fixed). Root cause of the actual sync failures: Google Drive API throttles hard on PBS's many-small-file chunk store (~1.6 KiB/s, ~12-week ETA for the initial sync) -- not a quick fix, needs the account owner to choose between a long unattended initial sync, bundling chunks before sync, or a different offsite target (2026-07-06) |
+| REL-051 | Reliability | **DEFERRED (deliberate)** | PBS offsite backup to Google Drive's cron job was missing live -- confirmed with the account owner this was an intentional disable (insufficient Drive storage quota), not a bug. Stale Vault rclone token (would've clobbered the working live token) fixed anyway; cron explicitly set `state: absent` to match the real decision instead of silently drifting back to `present`. Also fixed an unrelated idempotency bug (PBS force-restart task ran on every Ansible pass, moved to a handler). Underlying Google Drive API throttling on PBS's many-small-file format (~12-week ETA for a full sync) documented for if this is ever revisited with more storage (2026-07-06) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
 
 ---
