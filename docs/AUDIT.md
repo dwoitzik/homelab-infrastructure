@@ -2485,6 +2485,34 @@ runbook that's never been tried is a guess, not a tested procedure.
 
 ---
 
+### REL-053 — Immich major bump v2.7.5 → v3.0.1, last deferred Renovate major finally executed · **RESOLVED** (2026-07-06)
+
+The immich-server/immich-ml major bump (PR #273, `v2.7.5` → `v3.0.1`) had sat deferred
+since it was opened — flagged in earlier sessions as needing its own dedicated pass
+rather than a blind merge, matching the same caution applied to the other 2026-07
+majors (REL-027/028/029/030). Checked the actual v3.0.0 upstream release notes before
+proceeding: breaking changes are almost entirely API-endpoint changes affecting
+third-party integrations, not core web/mobile functionality, and the one genuine
+migration warning (dropping `pgvecto.rs` support) didn't apply — this repo's Postgres
+was already on VectorChord (REL-030, 2026-07-05). The PR's diff also still listed a
+postgres `14→16` bump that had *already happened* in REL-030; confirmed via
+`mergeStateStatus: CLEAN` that merging it wouldn't revert that (git's 3-way merge saw
+both sides already agreeing on `16`, a no-op).
+
+- **Fix:** took a real `pg_dumpall` backup first (guardrail #1, snapshot before any
+  change touching running state), recorded `asset`/`asset_face` row counts as a
+  before/after check (11553 / 5461), then merged PR #273 and let ArgoCD's `selfHeal`
+  roll it out.
+- **Verified live, not just "pods are Running":** confirmed both `immich-server` and
+  `immich-ml` pods came up on the new image with 0 restarts, row counts identical
+  post-migration (11553 / 5461 — no data loss), `GET /api/server/version` reports
+  `{"major":3,"minor":0,"patch":1}`, and `photos.woitzik.dev` serves its login page
+  (`200`).
+- **Effort:** Small once actually attempted — the deferral itself had outlasted the
+  actual risk, which turned out to be low for this specific major version.
+
+---
+
 ### REL-032 — Media acquisition stack: no autoheal, recurring silent queue jams · **RESOLVED** (2026-07-02)
 
 Two distinct "usenet does nothing" recurrences in 24h (2026-07-01 permission bug, 2026-07-02
@@ -2593,7 +2621,7 @@ where jams actually stick.
 | WRK-006 | Workloads | **IN PROGRESS** | Media acquisition stack moved to a dedicated gluetun/Mullvad-isolated LXC -- provisioned, deployed, kill-switch verified failing closed; blocked on a real Mullvad config + final cutover (2026-06-24, ADR-010) |
 | WRK-007 | Workloads | **RESOLVED** | Jellyfin moved to a dedicated GPU-passthrough LXC for VAAPI hardware transcode (shares mini's APU render node with ct-srv-ai-01's ROCm passthrough); config migrated and verified, old k8s resources removed (2026-06-24) |
 | WRK-008 | Workloads | **LOW** | Offsite backup to Cloudflare R2 (`kubernetes/system/velero/offsite-schedule.yml`/`r2-backuplocation.yml`) was scaffolded but never finished -- `r2-backuplocation.yml` has a literal `ACCOUNT_ID` placeholder and its referenced credential secret (`velero-r2-credentials`) doesn't exist anywhere (not Ansible Vault, not HashiCorp Vault). Confirmed not actively broken (Velero/ArgoCD just silently never create the BackupStorageLocation/Schedule, no error state) -- local backups to Garage/archive pool work fine. User decided to leave it deferred rather than complete or remove it now (2026-06-25) |
-| WRK-009 | Workloads | **RESOLVED** | Immich stuck on v1.109.2 with no external access — fresh install v2.7.5 (VectorChord postgres, Valkey, port 2283), Cloudflare Tunnel for `photos.woitzik.dev` (2026-06-27) |
+| WRK-009 | Workloads | **RESOLVED** | Immich stuck on v1.109.2 with no external access — fresh install v2.7.5 (VectorChord postgres, Valkey, port 2283), Cloudflare Tunnel for `photos.woitzik.dev` (2026-06-27). Since bumped: postgres 14->16 (REL-030, 2026-07-05), server/ML v2.7.5->v3.0.1 (REL-053, 2026-07-06) |
 | REL-024 | Reliability | **RESOLVED** | Valkey RDB persistence blocked all writes with readOnlyRootFilesystem — disabled RDB+AOF (in-memory only, appropriate for cache/queue workload) (2026-06-28) |
 | REL-025 | Reliability | **RESOLVED** | immich-ml HuggingFace xet downloader wrote temp files to read-only root FS — redirected via HF_HOME+XDG_CACHE_HOME to writable PVC (2026-06-28) |
 | REL-026 | Reliability | **RESOLVED** | Immich uploads via Cloudflare Tunnel failing with ECONNRESET for large files — Cloudflare buffers entire multipart body without chunked encoding. Fixed: `chunked_encoding = true`, `write_timeout = 600s`, `read_timeout = 120s` in tunnel origin_request (PR #192, 2026-06-28) |
@@ -2623,6 +2651,7 @@ where jams actually stick.
 | REL-050 | Reliability | **RESOLVED** | Jellyseerr requests stuck "Processing" forever despite files existing -- the only Radarr server was mismarked `is4k: true`, so non-4k completion status wrote to `status4k` instead of `status`. Fixed the flag; also tightened radarr/sonarr-scan to every 2h, availability-sync to every 3h, Radarr RSS sync 30min->15min (2026-07-05) |
 | REL-051 | Reliability | **DEFERRED (deliberate)** | PBS offsite backup to Google Drive's cron job was missing live -- confirmed with the account owner this was an intentional disable (insufficient Drive storage quota), not a bug. Stale Vault rclone token (would've clobbered the working live token) fixed anyway; cron explicitly set `state: absent` to match the real decision instead of silently drifting back to `present`. Also fixed an unrelated idempotency bug (PBS force-restart task ran on every Ansible pass, moved to a handler). Underlying Google Drive API throttling on PBS's many-small-file format (~12-week ETA for a full sync) documented for if this is ever revisited with more storage (2026-07-06) |
 | REL-052 | Reliability | **RESOLVED** | First real, live-verified PBS restore test (`ct-srv-atlantis-01` snapshot restored to a scratch vmid, booted, Docker stack came up clean, data intact, test container destroyed) -- `DISASTER-RECOVERY.md`'s restore procedure had never actually been tried before. Found and documented a real gotcha (PBS restore duplicates the original's static IP/MAC, causing a live conflict if started alongside the still-running original) and a bigger doc-accuracy gap (the runbook still pointed at the Google Drive offsite copy as a fallback for total PBS-storage loss, which REL-051 confirms doesn't actually have usable data) (2026-07-06) |
+| REL-053 | Reliability | **RESOLVED** | Immich major bump v2.7.5->v3.0.1 (PR #273, the last of the 2026-07 deferred Renovate majors) -- checked upstream breaking changes first (API-only, no DB migration needed since VectorChord already in place per REL-030), took a real pg_dumpall backup, merged, verified live: 0 restarts, identical asset/asset_face row counts (11553/5461), API reports v3.0.1, login page reachable (2026-07-06) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
 
 ---
