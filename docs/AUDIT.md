@@ -1744,50 +1744,57 @@ Homepage→Uptime Kuma, and the `vault-unseal` polling-sidecar design from REL-0
 
 ---
 
-### DOC-005 — `docker/crafty/` and `docker/npmplus/` described services that don't exist live · **RESOLVED** (2026-07-06)
+### DOC-005 — `docker/crafty/` and `docker/npmplus/` described services that don't exist live; real fix was Ansible, not new reference copies · **RESOLVED** (2026-07-06, corrected same day)
 
 Found during a portfolio-quality pass ("what would a reviewer flag") prompted by SEC-015.
-Compared every file under `docker/` against what's actually running on the two DMZ LXCs
-(`ct-dmz-proxy-01`, `ct-dmz-games-01`) via `docker inspect`/`docker ps` — **neither
-committed compose file matched live reality**:
+Compared the two files under `docker/` against what's actually running on the two DMZ
+LXCs (`ct-dmz-proxy-01`, `ct-dmz-games-01`) via `docker inspect`/`docker ps` — **neither
+committed compose file matched live reality**: `docker/crafty/docker-compose.yaml`
+described Crafty Controller managing Minecraft (live: two plain `itzg/minecraft-server`
+containers, Crafty isn't running at all); `docker/npmplus/docker-compose.yml` described
+the `zoeyvid/npmplus` fork (live: plain `jc21/nginx-proxy-manager` + a separate CrowdSec
+container).
 
-- `docker/crafty/docker-compose.yaml` described Crafty Controller managing the
-  Minecraft servers. Live: Crafty isn't running at all — two `itzg/minecraft-server`
-  containers run directly (`mc-server-2`, `mc-server-cobblemon`), confirmed via the
-  actual `/opt/minecraft/docker-compose.yml` on the host. Stale `.bak`/`.bak2` compose
-  files on the same host suggest Crafty was tried and abandoned at some point, and the
-  committed version was simply never updated to match.
-- `docker/npmplus/docker-compose.yml` described the `zoeyvid/npmplus` fork (with
-  built-in GeoIP/goaccess). Live: plain `jc21/nginx-proxy-manager` runs instead, paired
-  with a separately-configured CrowdSec container reading its logs — confirmed via
-  `/opt/npm/docker-compose.yml`. (The architecture diagram elsewhere in `README.md`
-  already correctly said "Nginx Proxy Manager", not "Plus" — only the `docker/`
-  directory itself was wrong.)
-- **Also found completely undocumented**: both LXCs run `watchtower` (daily
-  auto-update, `containrrr/watchtower`), `promtail` (ships logs to the same
-  `loki.woitzik.dev` used cluster-wide), and `node_exporter` (scraped by the in-cluster
-  Prometheus) — none of these had any representation in this repo at all.
+**First-pass fix was wrong, corrected within the same session**: initially assumed
+`docker/` was the actual (if stale) deployment mechanism and replaced the two dead files
+with fresh reference copies pulled off the live hosts (`docker/minecraft/`, `docker/npm/`,
+plus newly-added `docker/watchtower/`, `docker/promtail/`, `docker/node-exporter/` for
+three more containers found running with no repo representation at all). **This was
+based on an incomplete check** — `ansible/roles/` already has real, working,
+templated roles for every one of these: `minecraft`, `nginx_proxy_manager`,
+`crowdsec_bouncer`, `watchtower`, and `monitoring_agent` (the last one deploys the
+docker-based `node_exporter` + `promtail` pair specifically for the `nodes` group —
+`rpi_nodes`/`dmz_proxies`/`dmz_games` — as a distinct pattern from `node_exporter_native`,
+which every other host group uses instead). Confirmed via `ansible/site.yml`: these
+roles are actually applied to `dmz_proxies`/`dmz_games` on every playbook run. Adding a
+second, static, un-templated copy under `docker/` created exactly the "which one is
+real" confusion this whole pass was trying to eliminate — removed `docker/` entirely
+once this was clear; the Ansible roles are the single real source now.
 
-- **Fix:** replaced `docker/crafty/`/`docker/npmplus/` with `docker/minecraft/`,
-  `docker/npm/` matching the real, live compose files byte-for-byte, and added
-  `docker/watchtower/`, `docker/promtail/` (both host-specific `promtail.yml` variants,
-  since the `host:` label differs), and `docker/node-exporter/` for the previously
-  undocumented services. Updated `README.md`'s directory tree to match.
-- **Noted, not changed:** these two hosts use `:latest` tags + Watchtower's daily
-  auto-update instead of the pinned-tag + Renovate-PR-review pattern used everywhere in
-  `kubernetes/` (SEC-005) — `renovate.json`'s `kubernetes` fileMatch doesn't cover
-  `docker/` at all, so this was never an oversight in Renovate's config, just an
-  entirely separate, previously-undocumented update strategy for these two
-  simpler/stateless-ish DMZ services. Documented as the actual (retroactively
-  identified) rationale in `docker/watchtower/docker-compose.yml`'s comment rather than
-  changed — reconciling docs to match a real, working, low-risk pattern, not
-  second-guessing it.
-- **Lesson: "the repo has a file describing X" is not evidence X is what's actually
-  deployed** — for anything not under Ansible/ArgoCD/Terraform management (the docker/
-  directory's whole reason for existing outside those), periodically diff the
-  committed reference copy against the live host directly, the same discipline already
-  applied to Kubernetes manifests in REL-042/046.
-- **Effort:** Small — done.
+**A genuine, previously-unknown drift was found while verifying this**:
+`ansible/roles/minecraft/tasks/main.yml` hardcoded the `minecraft-2` service's volume as
+`./data-2:/data` and only pre-created `/opt/minecraft/data`/`data-cobblemon` — but the
+*live* container (`mc-server-2`) is actually mounted at `/opt/minecraft/data-3`
+(confirmed via `docker inspect`), one of four world directories on the host
+(`data`, `data-2`, `data-3`, `data-cobblemon`, plus an `alte_welten` manual-archive
+folder) — someone had manually reconfigured which world is live at some point without
+ever updating the Ansible role to match. Had the playbook been re-run against this host,
+it would have redeployed a docker-compose pointing back at the stale `data-2` world
+(831MB, last modified 2026-06-20) instead of the actually-active `data-3`
+(283MB, last modified 2026-06-28) — a real, live risk of silently reverting the running
+Minecraft world on the next routine Ansible run. Fixed the role to reference `data-3`;
+verified safe via `ansible-playbook site.yml --limit dmz_games --check --diff` showing
+the compose-file task as `ok` (no diff) against the live host, not `changed`.
+
+- **Lesson (the corrected one): before assuming something is "not IaC-managed," check
+  `ansible/roles/` and `site.yml` for a matching role FIRST** — don't default to
+  "must be manually deployed" just because a stale-looking committed file exists
+  elsewhere. And separately: **a role matching live reality today doesn't mean it still
+  will after a manual live reconfiguration** — the same "git vs. reality" drift class
+  that hit ArgoCD-managed Kubernetes manifests (REL-042/046) applies just as much to
+  Ansible-managed Docker Compose hosts.
+- **Effort:** Small — done (docker/ removed, Ansible role corrected, verified via
+  `--check --diff`, not applied destructively).
 
 ---
 
@@ -2463,7 +2470,7 @@ where jams actually stick.
 | DOC-002 | Docs | **RESOLVED** | ROADMAP.md already fully English -- stale finding, translated at some point but never marked resolved (re-checked 2026-07-06) |
 | DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |
 | DOC-004 | Docs | **RESOLVED** | 4 architectural decisions without ADRs — added ADR-006..009; ADR-011 (Cloudflare Tunnel external access) added 2026-06-27 |
-| DOC-005 | Docs | **RESOLVED** | `docker/crafty`/`docker/npmplus` described services that aren't actually running live (Crafty and npmplus fork both abandoned in favor of raw itzg/minecraft-server and plain nginx-proxy-manager) -- reconciled to match real deployed configs, also added previously fully-undocumented watchtower/promtail/node-exporter (2026-07-06) |
+| DOC-005 | Docs | **RESOLVED** | `docker/crafty`/`docker/npmplus` described services not actually running -- first-pass fix (new static reference copies) was itself wrong, corrected same-day: these are already real Ansible-managed roles (`minecraft`/`nginx_proxy_manager`/`crowdsec_bouncer`/`watchtower`/`monitoring_agent`), `docker/` removed entirely. Also found and fixed a genuine live drift: Ansible's minecraft role still referenced the stale `data-2` world while the live container actually runs on `data-3` -- would have reverted the live world on next playbook run (2026-07-06) |
 | DOC-006 | Docs | **RESOLVED** | Two conflicting Renovate configs at repo root (`renovate.json` + `renovate.json5`) -- confirmed the `.json5` was never actually read (Renovate only uses the first config file it finds), removed it, no functional change (2026-07-06) |
 | WRK-001 | Workloads | **RESOLVED** | Jellyfin/media stack stuck in ContainerCreating — resolved via WRK-006 (media acq → LXC) and WRK-007 (Jellyfin → LXC) |
 | WRK-002 | Workloads | **LOW** | Minecraft not GitOps-managed; playit.gg agent install not Ansible-ized (re-checked 2026-07-06: backup coverage is fine, nightly PBS `all:1` job already covers it, and whitelist already active on all 4 servers -- prior "no backup/no whitelist" assumptions were wrong) |
