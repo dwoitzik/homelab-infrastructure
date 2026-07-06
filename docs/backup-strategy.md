@@ -10,8 +10,8 @@ The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with
   Kopia, not just k8s manifests. `nfs-client` storage class has no CSI snapshotter, so
   this filesystem-level backup is the *only* way PVC data gets captured.)
 - **Backend:** Garage S3 (`s3.woitzik.dev`, bucket: `velero`)
-- **Schedule:** Daily at 03:00, TTL 30 days
-- **Scope:** All namespaces (`apps`, `database`, `monitoring`)
+- **Schedule:** Daily at 03:00, TTL 7 days (re-verified against `kubernetes/system/velero/schedule.yml`'s `ttl: 168h0m0s` 2026-07-06 -- this doc previously said 30 days)
+- **Scope:** All namespaces except `kube-system`/`kube-public`/`kube-node-lease` (`includedNamespaces: ["*"]` with those 3 excluded) -- not just `apps`/`database`/`monitoring` as previously stated here
 - **Recovery:** `velero restore create --from-backup <name>`
 
 > **Incident note (2026-06-19):** `defaultVolumesToFsBackup` was missing from the schedule
