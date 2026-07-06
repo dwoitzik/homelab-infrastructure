@@ -1,6 +1,6 @@
 # Backup Strategy: 3-2-1 Rule
 
-The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with 1 copy offsite. All backups are fully automated.
+The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with 1 copy offsite. All *local* backups are fully automated. **Neither offsite leg is currently active**: Stage 1b (Cloudflare R2) is scaffolded but deliberately not turned on (WRK-008), and Stage 3 (Google Drive) was deliberately disabled by the account owner due to insufficient Drive storage (REL-051). Both are documented below with their current real status, not the originally-intended one.
 
 ## Stage 1 — Kubernetes Workloads (Velero)
 
@@ -42,20 +42,25 @@ The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with
 - **Schedule:** Daily at 03:00 (block-level deduplication, only changed chunks stored)
 - **Recovery:** Restore directly from PBS in the Proxmox web UI
 
-## Stage 3 — Offsite Cloud (rclone → Google Drive) · **currently broken, see REL-051**
+## Stage 3 — Offsite Cloud (rclone → Google Drive) · **deliberately disabled, see REL-051**
 
 **What:** PBS datastore synced to Google Drive for offsite copy.
 
+- **Status as of 2026-07-06: intentionally off.** The account owner disabled the cron
+  job themselves (around 2026-06-14) because the destination Google Drive account
+  doesn't have enough free space for the PBS datastore. Config/script stay deployed
+  (harmless), the schedule itself is deliberately `state: absent` in
+  `ansible/roles/pbs/tasks/main.yml`. This is currently the **only** offsite copy in
+  this doc's 3-2-1 strategy that's active — see the note at the top of this file.
 - **Tool:** rclone
-- **Schedule:** Daily at 04:00 (`rclone sync`) — **the cron job doesn't actually exist on
-  the live host as of 2026-07-06** (removed at some point around 2026-06-14, never
-  restored). Re-verify against `docs/AUDIT.md` REL-051 before trusting this line.
+- **Schedule (when re-enabled):** Daily at 04:00 (`rclone sync`)
 - **Destination:** `gdrive:Backup-Homelab/PBS`
 - **Encryption:** Client-side encrypted by PBS before upload; unreadable without PBS encryption key
-- **Known issue:** even when the cron job ran (2026-05-04 through 2026-06-14), it
-  nearly always failed. Root cause: Google Drive's API throttles hard on PBS's
-  chunked storage format (tens of thousands of small files) — a manual test sync
-  showed ~1.6 KiB/s and a ~12-week ETA for the initial full sync. This isn't a config
+- **Known issue, separate from the quota problem — re-enabling this needs solving it
+  too:** even when the cron job ran (2026-05-04 through 2026-06-14, before the quota
+  ran out), it nearly always failed anyway. Root cause: Google Drive's API throttles
+  hard on PBS's chunked storage format (tens of thousands of small files) — a manual
+  test sync showed ~1.6 KiB/s and a ~12-week ETA for the initial full sync. This isn't a config
   bug, it's a fundamental mismatch between Drive's API and this data shape. Needs a
   decision (long unattended initial sync, pre-bundling chunks, or a different offsite
   target) before this stage can be considered actually working — see REL-051.
