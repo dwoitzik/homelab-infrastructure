@@ -2238,13 +2238,29 @@ and DNS record when renaming resources for the Cloudflare provider v4 → v5 mig
 
 ---
 
-### REL-027 — Vault unseal-helper CLI major bump: 1.21.4 → 2.0.3 · **PLANNED** (2026-07-02)
+### REL-027 — Vault unseal-helper CLI major bump: 1.21.4 → 2.0.3 · **RESOLVED** (merged 2026-07-04, verified live 2026-07-06)
 
 Renovate PR #204 only bumps `kubernetes/system/vault/unseal.yml`'s CLI image — the actual
-Vault server version comes from the Helm chart default and is untouched. Risk is functional
-(the automated unseal script from REL-007 could silently break on the next restart if CLI
-2.0 changed flags/output), not a data-format risk. Full runbook:
-`docs/runbooks/pending-major-upgrades.md`.
+Vault server version comes from the Helm chart default and is untouched. Risk was
+functional (the automated unseal script from REL-007 could silently break on a restart
+if CLI 2.0 changed flags/output), not a data-format risk.
+
+**Found already merged and running, never marked resolved:** PR #204 merged 2026-07-04
+(commit `3754f24`); this finding just sat as "PLANNED" for two days afterward with no one
+re-checking it. Re-verified properly on 2026-07-06 rather than trusting "the pod is
+Running" alone:
+
+- Took a real raft snapshot first (`vault operator raft snapshot save`, pulled out via
+  `kubectl cp`) as insurance, per the runbook's own step 2.
+- **Forced a real test of the unseal path**, not just confirmed the image tag: deleted
+  the live `vault-0` pod (`kubectl delete pod -n vault vault-0`) to force a genuine
+  re-seal-on-restart, then watched it recover. `vault-unseal`'s own pod logs show
+  `"Unseal attempt done"` timestamped right at the restart, and `vault status`
+  immediately after confirms `Sealed: false`. This is real proof the CLI 2.0.3 unseal
+  script still works correctly against the live server — not an assumption from the
+  image tag alone.
+- Full runbook: `docs/runbooks/pending-major-upgrades.md` (also corrected there —
+  it still described this as "not yet executed").
 
 ---
 
@@ -2713,7 +2729,7 @@ where jams actually stick.
 | REL-025 | Reliability | **RESOLVED** | immich-ml HuggingFace xet downloader wrote temp files to read-only root FS — redirected via HF_HOME+XDG_CACHE_HOME to writable PVC (2026-06-28) |
 | REL-026 | Reliability | **RESOLVED** | Immich uploads via Cloudflare Tunnel failing with ECONNRESET for large files — Cloudflare buffers entire multipart body without chunked encoding. Fixed: `chunked_encoding = true`, `write_timeout = 600s`, `read_timeout = 120s` in tunnel origin_request (PR #192, 2026-06-28) |
 | GIT-012 | GitOps | **RESOLVED** | Cloudflare Terraform provider v4 → v5 breaking changes: `cloudflare_tunnel_config` → `cloudflare_zero_trust_tunnel_cloudflared_config`, `cloudflare_record` → `cloudflare_dns_record`, `value` → `content`. Migrated with `moved {}` blocks to prevent destroy+recreate of live tunnel + DNS record. Provider `~> 4.0` → `~> 5.0` (PR #192, 2026-06-28) |
-| REL-027 | Reliability | **PLANNED** | Vault unseal-helper CLI (not the server) major bump 1.21.4→2.0.3 (Renovate #204) — functional risk to the REL-007 automated-unseal script, not a data risk; runbook in `docs/runbooks/pending-major-upgrades.md` (2026-07-02) |
+| REL-027 | Reliability | **RESOLVED** | Vault unseal-helper CLI major bump 1.21.4→2.0.3 (Renovate #204) -- found already merged 2026-07-04 but never marked resolved; verified live 2026-07-06 by force-restarting vault-0 and confirming the unseal script actually completes ("Unseal attempt done" in its logs) and `Sealed: false`, not just that the pod is Running |
 | REL-028 | Reliability | **RESOLVED** | Postgres for Nextcloud + Paperless major bump 16.14→18.4 (PR #255, #257) — executed via pg_dump/restore into fresh PVCs, not a bare image swap. Found live: PG18 requires a single `/var/lib/postgresql` mount (not the old data+subPath convention), and Nextcloud's `config.php` used a different DB role (`oc_dw`) than `POSTGRES_USER` -- both fixed, both apps verified reachable (2026-07-04) |
 | REL-029 | Reliability | **RESOLVED** | Nextcloud app major bump 30.0.17→34.0.1 — ran all 4 sequential `occ upgrade` passes (30→31→32→33→34). Found live: image entrypoint needs CAP_SETGID (`su`) during the upgrade to rsync app files, temporarily un-hardened then re-hardened after; `occ upgrade` must wait for the entrypoint's own background file-sync to finish first. Verified reachable + user data intact (2026-07-05) |
 | REL-030 | Reliability | **RESOLVED** | Immich Postgres (VectorChord) major bump 14→16 (PR #267) — largest PVC in cluster, executed via `pg_dumpall`/restore into fresh PVC. Verified: vchord/vector extensions loaded, asset/asset_face row counts match pre-migration, photos.woitzik.dev + API ping working. All 4 deferred Renovate majors (REL-027/028/029/030) now done (2026-07-05) |
