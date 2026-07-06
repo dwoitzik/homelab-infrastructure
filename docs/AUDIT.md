@@ -230,6 +230,31 @@ no password prompt.
 
 ---
 
+### SEC-014 — Authelia's `users_database.yml` (real password hash) was a plain committed Secret · **PARTIAL** (2026-07-06)
+
+Same class as SEC-001/SEC-003: `kubernetes/apps/authelia/users_database_secret.yml` was
+a static `kind: Secret` with the base64-encoded `users_database.yml` file committed
+directly to this public repo — including the real argon2 hash of the admin login
+password used across the entire Authelia SSO layer (Proxmox, PBS, ArgoCD, Grafana,
+Headscale, and every Authelia-gated app in `apps-ingressroute.yml`).
+
+- **Fix (storage only):** Migrated to an ExternalSecret sourced from
+  `secret/authelia#users-database-yml` in Vault, matching the existing `authelia-secrets`
+  pattern. Same hash value as before — verified byte-identical live before committing,
+  `auth.woitzik.dev` still serving login normally, no Authelia pod restart triggered.
+  This closes the "committed in git" half of the finding.
+- **Not done (needs the user's input, not something to decide unilaterally):** the
+  password itself has been sitting as a crackable offline hash in a public repo's git
+  history for weeks — moving *where* it's stored now doesn't undo that past exposure.
+  A real fix also rotates the password value itself (generate a new one, hash it via
+  `authelia crypto hash generate argon2` against the live pod, update Vault). Deferred
+  pending the user choosing/confirming a new password, since changing it wrong locks out
+  the SSO layer protecting every service in the cluster.
+- **Effort:** Storage migration was small (done); password rotation itself is small but
+  needs explicit user sign-off given the blast radius (SSO for the whole homelab).
+
+---
+
 ### SEC-009 — Home Assistant had no auth layer beyond its own login · **MEDIUM** (fixed 2026-06-23)
 
 Same Authelia-coverage audit as SEC-008. Of the apps with no Authelia middleware,
