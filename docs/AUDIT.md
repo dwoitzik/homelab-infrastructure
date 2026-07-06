@@ -311,6 +311,33 @@ at all (superseded configs, no live counterpart to rotate).
 
 ---
 
+### SEC-014 — Authelia's `users_database.yml` (real password hash) was a plain committed Secret · **RESOLVED** (2026-07-06)
+
+Same class as SEC-001/SEC-003: `kubernetes/apps/authelia/users_database_secret.yml` was
+a static `kind: Secret` with the base64-encoded `users_database.yml` file committed
+directly to this public repo — including the real argon2 hash of the admin login
+password used across the entire Authelia SSO layer (Proxmox, PBS, ArgoCD, Grafana,
+Headscale, and every Authelia-gated app in `apps-ingressroute.yml`).
+
+- **Fix (storage only):** Migrated to an ExternalSecret sourced from
+  `secret/authelia#users-database-yml` in Vault, matching the existing `authelia-secrets`
+  pattern. Same hash value as before — verified byte-identical live before committing,
+  `auth.woitzik.dev` still serving login normally, no Authelia pod restart triggered.
+  This closes the "committed in git" half of the finding.
+- **Fix (password rotation, done same day with explicit user sign-off):** the password
+  itself had been sitting as a crackable offline hash in a public repo's git history for
+  weeks — moving *where* it's stored didn't undo that past exposure on its own. Generated
+  a new random password, hashed it live via `authelia crypto hash generate argon2` inside
+  the running pod (never touched a plaintext value outside that one command), wrote the
+  new hash to `secret/authelia#users-database-yml` in Vault, force-synced the
+  ExternalSecret, and `kubectl rollout restart deployment authelia`. New password
+  communicated to the user directly (not committed anywhere).
+- **Verified live:** both Authelia replicas restarted clean, `auth.woitzik.dev` serving
+  login normally post-rollout.
+- **Effort:** Small — done.
+
+---
+
 ### SEC-009 — Home Assistant had no auth layer beyond its own login · **MEDIUM** (fixed 2026-06-23)
 
 Same Authelia-coverage audit as SEC-008. Of the apps with no Authelia middleware,
@@ -2215,6 +2242,7 @@ where jams actually stick.
 | SEC-010 | Security | **PARTIAL** | 545 open Trivy code-scanning alerts, mostly ~20 manifests missing securityContext; suppressed 2 genuinely-justified findings via .trivyignore; hardening pass done in SEC-012 (2026-06-24) |
 | SEC-012 | Security | **RESOLVED** | securityContext hardening across ~25 manifests, 215->171 Trivy findings; first attempt broke 9 containers (capabilities.drop/runAsNonRoot assumptions wrong for several images), caught and fixed live within ~15min across 3 follow-up PRs (2026-06-24) |
 | SEC-013 | Security | **RESOLVED** | `.gitleaks-baseline.json` silently suppressed 2 still-live secrets in a public repo -- Garage `rpc_secret`/`admin_token` (S3 backend for Terraform state/Velero/Immich) were byte-identical to their 2026-06-03 git-history values, never rotated. Rotated via Vault + forced ExternalSecret sync + Garage restart, verified healthy live (2026-07-06) |
+| SEC-014 | Security | **RESOLVED** | Authelia's `users_database.yml` (real admin password argon2 hash) was a plain committed Secret in a public repo, same class as SEC-001/SEC-003 -- migrated to Vault via ExternalSecret, then the password itself rotated (new hash generated live in-pod, never committed) with the user's explicit sign-off given the SSO blast radius (2026-07-06) |
 | REL-001 | Reliability | **RESOLVED** | All 3 k3s nodes run continuously (`on_boot=true`); single-server topology by deliberate design, not an HA gap -- see `docs/k3s-architecture.md` |
 | REL-002 | Reliability | **RESOLVED** | PBS running with `onboot=1`; `all: 1` backup job covers every VM/CT incl. k3s nodes + NFS LXC; verified successful 2026-06-23 03:00 run |
 | REL-003 | Reliability | **HIGH** | Velero backend (Garage) is in-cluster; circular recovery dependency |
