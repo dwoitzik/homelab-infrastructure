@@ -15,8 +15,8 @@ failure either way.
 | Node | IP | Role | vCPU | RAM |
 |---|---|---|---|---|
 | `vm-srv-k3s-11` | 10.0.20.11 | Control Plane + etcd + Worker (sole server) | 4 | 12 GB |
-| `vm-srv-k3s-12` | 10.0.20.12 | Worker (agent only, no etcd) | 4 | 16 GB |
-| `vm-srv-k3s-13` | 10.0.20.13 | Worker (agent only, no etcd) | 4 | 16 GB |
+| `vm-srv-k3s-12` | 10.0.20.12 | Worker (agent only, no etcd) | 4 | 8 GB |
+| `vm-srv-k3s-13` | 10.0.20.13 | Worker (agent only, no etcd) | 4 | 8 GB |
 
 All three have `on_boot = true` in Terraform — they auto-start on host reboot.
 
@@ -113,6 +113,8 @@ Prometheus scrapes from both in-cluster and external targets:
 | Docker LXC (10.0.20.252) | Static config | 9100 |
 | AI LXC (10.0.20.251) | Static config | 9100 |
 | PBS (10.0.10.110) | Static config | 9100 |
+| Media-acq, Jellyfin, Atlantis LXCs | Static config (`node_exporter_native`, added after this doc was first written -- WRK-006/007, ADR-012) | 9100 |
+| DMZ proxy + games LXCs (10.0.30.2-3) | Static config (`monitoring_agent` role's docker-based node_exporter, distinct from `node_exporter_native` used elsewhere) | 9100 |
 | Proxmox host (10.0.10.10) | PVE exporter in-cluster | 9221 |
 
 Grafana dashboards (auto-downloaded): 1860 (Node Exporter Full), 10347 + 19022 (Proxmox).

@@ -99,41 +99,39 @@ compromised even after it's gone from git. Rotation status below.
 | Cloudflare Tunnel token | Rotated via the Cloudflare Zero Trust dashboard. New token in Vault (`secret/cloudflared`) via ExternalSecret. |
 | Authelia OIDC issuer private key | Old key (exposed in git history) replaced with a freshly generated 4096-bit RSA key, 2026-06-22. Stored in Vault `secret/authelia` (`oidc-issuer-private-key`), mounted via the existing `authelia-secrets` ExternalSecret and referenced by file path (`issuer_private_key: '/config/secrets/oidc-issuer-private-key'`) rather than inline — same pattern already used for `hmac_secret`. Authelia restarted and confirmed healthy on the new key. |
 
-### Moved to Vault/ExternalSecrets, value not yet rotated
+### Remediated since this doc was written (re-verified 2026-07-06)
 
-These are out of git entirely now, but still using the value that was exposed — treat as a
-weaker form of "done," not closed out.
+This doc was written 2026-06-19 and mostly never updated as items got fixed — the
+sections below described almost everything as still-open weeks after AUDIT.md recorded
+it resolved. Re-checked against AUDIT.md directly rather than trusting this doc's own
+prior status:
+
+| Secret | Resolution |
+|---|---|
+| Authelia OIDC client secret shared across proxmox/pbs/argocd/grafana | SEC-002 — 4 distinct secrets generated 2026-06-23, each service's side updated independently (Vault for ArgoCD/Grafana, native realm config for Proxmox/PBS). |
+| Authelia `hmac-secret` reusing the same value as the OIDC client secret | SEC-003 — rotated 2026-06-23/24 alongside the bigger discovery that `configmap.yml` was reading several secrets as literal path strings, not actual file contents (see AUDIT.md SEC-003 for the full story). |
+| Authelia `session-secret`/`storage-key` placeholder values | SEC-003 — regenerated with real random values; `storage-key` required running `authelia storage encryption change-key` since it protects live TOTP/WebAuthn data. |
+| Authelia `redis-password`/`storage-password` reusing the Paperless Postgres password | SEC-004 — independent random values generated 2026-06-23 for each. |
+| Garage RPC secret + admin token | SEC-013 (2026-07-06) — confirmed these were still the exact values leaked in git history since 2026-06-03 (not just "moved to Vault," genuinely never rotated). Rotated via Vault + forced ExternalSecret sync + Garage restart, verified live. |
+| `kubernetes/apps/authelia/users_database_secret.yml` (Argon2id password hash) | SEC-014 (2026-07-06) — migrated to an ExternalSecret, then the password itself rotated with explicit user sign-off given the SSO blast radius. |
+
+### Still open (re-verified, genuinely not done yet)
 
 | Secret | Vault path | Notes |
 |---|---|---|
-| Garage S3 access key (Velero + CNPG WAL archiving) | `secret/garage` (`velero-access-key-id`, `velero-secret-access-key`) | Rotating requires the Garage admin CLI; invalidates both consumers simultaneously, do together. |
-| Garage RPC secret + admin token | `secret/garage` (`rpc-secret`, `admin-token`) | Same caveat — Garage admin CLI, single-node so lower risk than a multi-node rotation, but still needs care. |
-| Authelia OIDC client secret shared across **proxmox, pbs, argocd, grafana** | `secret/argocd`, `secret/grafana` (ArgoCD/Grafana sides); Proxmox/PBS sides are in their own web UI, not Vault | Most impactful remaining item — one secret authenticates four clients including hypervisor and backup-server access. Needs four distinct secrets: regenerate, update Authelia's per-client hash for each, update the two Vault-backed values, and re-enter the new value in Proxmox's and PBS's own OIDC realm config (see `SSO_SETUP.md`). |
-| Grafana admin password | `secret/grafana` (`admin-password`) | Straightforward rotation, just hasn't been prioritized over the higher-impact items above. |
+| Garage S3 access key (Velero + CNPG WAL archiving) | `secret/garage` (`velero-access-key-id`, `velero-secret-access-key`) | Distinct from the rpc-secret/admin-token pair fixed in SEC-013 — this pair hasn't been re-checked against its live value yet. Rotating requires the Garage admin CLI; invalidates both consumers simultaneously, do together. |
+| Grafana admin password | `secret/grafana` (`admin-password`) | Not yet re-verified against its git-history leaked value the way SEC-013/014 checked Garage/Authelia — worth the same "is this still the leaked value" check. |
 | Paperless Postgres password + AI API token | `secret/paperless` | Postgres password rotation needs an `ALTER USER` on the database, not just the Vault value. |
 | Discord webhook (Alertmanager + rpi-optimize alerts) | `secret/alertmanager` (`discord-webhook-url`) | Low severity (posts messages to one channel, doesn't expose other data) — rotate in Discord's webhook settings when convenient. |
+| `kubernetes/apps/headscale/config.yml` OIDC client secret | Vault via ExternalSecret (SEC-001, already migrated out of the ConfigMap) | Storage location fixed; the value itself was never confirmed rotated post-migration, unlike Garage/Authelia. |
+| `kubernetes/system/monitoring/loki.yml` Minio/S3 password | `secretKeyRef` already, exposure was history-only | Credential itself still not confirmed rotated. |
+| `kubernetes/apps/mikrodash/secrets.yml` MikroDash password | -- | Re-check whether MikroDash is actually decommissioned before deciding rotate-vs-delete — `ansible/roles/mikrodash` still exists in this repo as of 2026-07-06, contradicting the "decommissioned" note this doc previously had. |
 
-### Still fully unaddressed
-
-| File | Secret | Notes |
-|---|---|---|
-| `kubernetes/apps/headscale/config.yml` | OIDC client secret (Authelia ↔ Headscale) | Must rotate both sides together — values have to match. |
-| `kubernetes/system/monitoring/loki.yml` | Minio/S3 password | Live manifest already uses `secretKeyRef`, exposure was history-only (now purged). Credential itself still needs rotation. |
-| `kubernetes/apps/mikrodash/secrets.yml` | MikroDash password | MikroDash is decommissioned (CHANGELOG 0.5.0) — delete the file instead of rotating, if nothing reads it anymore. |
-| `kubernetes/apps/authelia/users_database_secret.yml` | Argon2id password hash | Hashed, lower severity, but still shouldn't be hand-committed — migrate into the ExternalSecret pattern. |
-| `secret/authelia` (`hmac-secret`) | Same value as the shared OIDC client secret above (`dubist1plebyakalb`) | Found 2026-06-22 while seeding the OIDC key — a second instance of secret reuse, independent of the four-client issue above. Rotate separately; HMAC secret and OIDC client secret should never be the same value. |
-| `secret/authelia` (`session-secret`, `storage-key`) | Literal placeholder-style values (`thisisaverysecretsessionsecret`, `thisisaverysecretstoragekey`) | Found 2026-06-22. Low entropy, clearly never rotated from an initial default. Regenerate with real random values. |
-| `secret/authelia` (`redis-password`, `storage-password`) | Same value as the Paperless Postgres password (`TD3fAJ2s1cxJ`) | Found 2026-06-22 — third instance of cross-service secret reuse found this session. Each service should have its own value. |
-
-The pattern across this whole exercise: secrets get reused across unrelated services far
-more than expected. Worth a dedicated pass at some point to enumerate every Vault path and
-confirm no two unrelated secrets share a value — three separate instances of reuse were
-found incidentally, not by deliberately looking for it.
-
-**Recommended order if continuing rotation:** Garage credentials first (other backups
-depend on it being consistent), then the four-way Authelia OIDC client secret (highest
-remaining impact), then the three secret-reuse instances just found, then the rest in any
-order.
+**Recommended order if continuing rotation:** re-verify Grafana admin password and the
+Garage S3 access-key pair against their git-history values first (same "is it still the
+leaked one" check that found SEC-013/014 were real, live exposures, not just stale
+config-location concerns) — that's the highest-value next step given the pattern found
+twice already this repo's history.
 
 Periodically re-running `gitleaks detect --no-git --source=. --baseline-path
 .gitleaks-baseline.json` against the live working tree (not just `gitleaks detect` against

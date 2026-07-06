@@ -174,6 +174,10 @@ graph TB
 | 10 | Management | 10.0.10.0/24 | Proxmox (10.0.10.10), PBS (10.0.10.110), MikroTik API (10.0.10.1) |
 | 20 | Server | 10.0.20.0/24 | k3s (10.0.20.11-13), RPi (10.0.20.2-3), MetalLB (10.0.20.200) |
 | 30 | DMZ | 10.0.30.0/24 | Proxy (10.0.30.2), Games (10.0.30.3) |
+| 40 | IOT | 10.0.40.0/24 | Untrusted / smart-home devices, restricted internet only |
+| 100 | Admin | 10.0.100.0/24 | Trusted admin workstations -- only zone allowed into VLAN 10 |
+
+Full detail (physical port mapping, firewall policy) in [docs/vlan-segmentation.md](docs/vlan-segmentation.md).
 
 ## Terraform Workflow
 
