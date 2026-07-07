@@ -2772,6 +2772,66 @@ of the live image.
 
 ---
 
+### REL-056 — Renovate tiered auto-merge, config only · **CONFIGURED, awaiting review** (2026-07-07)
+
+Autonomy-readiness task 1. Previously every Renovate PR needed a manual merge
+regardless of risk — a patch bump to `blackbox-exporter` got the same manual-review
+treatment as a Postgres major. Gated on task 2 (REL-055, Discord alert coverage) being
+proven live first, per explicit instruction, since auto-merge without working failure
+alerting is the wrong order.
+
+**Two tiers, `renovate.json`:**
+
+1. **Auto-merge** (patch/minor/digest only): stateless kubernetes-managed images, CI
+   GitHub Actions, dev tooling (pre-commit hooks, Terraform providers). Gated on CI
+   green (Renovate's own default behavior — it polls PR status checks before
+   automerging regardless of GitHub branch-protection config) plus a 3-day
+   `minimumReleaseAge` soak, so a bad upstream release doesn't land same-day.
+2. **PR-only** (all update types, not just major): a named list of stateful/critical
+   packages — `hashicorp/vault`, `ghcr.io/authelia/authelia`, `dxflrs/garage`,
+   `vaultwarden/server`, `postgres`, `ghcr.io/immich-app/postgres`, `redis`,
+   `valkey/valkey`, `nextcloud`, `paperlessngx/paperless-ngx`, `gitea/gitea`,
+   `ghcr.io/immich-app/immich-server`, `ghcr.io/immich-app/immich-machine-learning`,
+   `velero/velero-plugin-for-aws` — grouped into one PR per bump wave, labeled
+   `stateful-critical`. All majors, any package, stay PR-only too (existing behavior,
+   kept), labeled `major-update`, one PR per package (not grouped — each major is its
+   own migration).
+3. `docker:pinDigests` + `helpers:pinGitHubActionDigests` presets added for
+   determinism, per instruction.
+
+**Judgment calls made beyond the literal named list** (Vault, Authelia, Longhorn*,
+Garage, and "databases"), flagged for the account owner to correct if wrong:
+
+- `redis`/`valkey/valkey` classified as stateful/critical even though often used as
+  cache rather than data-of-record — cheap to be conservative here, bumps are
+  infrequent.
+- `vaultwarden/server` added — not literally a database, but a credential store; its
+  own AUDIT.md entries already treat its DB as protected critical state.
+- `nextcloud`, `paperlessngx/paperless-ngx`, `gitea/gitea`,
+  `ghcr.io/immich-app/immich-server`/`immich-machine-learning` added — each needs a
+  manual data migration on major bumps (REL-028/029/030/053 all required dump/restore
+  or multi-step upgrades), and REL-020's near-miss showed silent breakage in this class
+  of app is easy to miss.
+- `velero/velero-plugin-for-aws` added — not stateful itself, but a broken backup
+  plugin silently breaks every backup; blast radius alone justifies PR-only.
+- Deliberately left in the auto-merge tier despite having their own persistent state:
+  `headscale` (SQLite of node registrations, recoverable by re-registering),
+  `home-assistant` (automation history, not this repo's stated critical-state list).
+  Move either into the critical tier if that recoverability assessment is wrong.
+
+*No Longhorn in this cluster currently (confirmed via `kubernetes/` search) — CNPG/PVC
+storage runs on `local-path`/`nfs-client` per the REL-010/028 migrations, not Longhorn.
+Named in the instruction as a general "what belongs in this tier" example; no matching
+package exists to add.
+
+**Not yet enabled live:** this PR is config only, not merged. Per instruction, the
+account owner reads the tiering before it takes effect.
+
+**Effort:** Small — one file, `renovate-config-validator` confirms it parses and
+resolves cleanly.
+
+---
+
 ### REL-035b — Memory-overcommit regression guard: two-tier model, not one sum · **RESOLVED** (2026-07-07)
 
 Follow-up to REL-035. That pass fixed CPU-scheduling contention (`cpu.units`) but left
@@ -2988,6 +3048,7 @@ where jams actually stick.
 | REL-057 | Reliability | **PARTIAL** | Autonomy-readiness task 4 (report only): ArgoCD selfHeal PROVEN on for all 41 Applications. cert-manager renewal CONFIGURED but unproven (cert has never actually renewed yet). Backups: schedule proven reliable, but 2 of last 5 daily runs actually FAILED on a Garage S3 timeout (separate from REL-019), and `restores.velero.io` is empty cluster-wide -- Velero-level restore has NEVER been tested (REL-052 tested PBS/hypervisor restore only, a different system). Backup scope includes the `garage` namespace itself, confirming REL-003's circular-dependency risk live (skip-list, not touched) (2026-07-07) |
 | REL-058 | Reliability | **PARTIAL** | DNS query volume 40k->1.8M/7d post-K3s, part 1: live-confirmed (`networkctl status`) DHCP hands out `home.lan` as pod search-domain suffix, and unbound has no authoritative zone for it (unlike `fritz.box`), so every external lookup recurses and fails (~341ms avg). Terraform never declared `domain` on the DHCP network resources and the last state backup shows null -- live drift, likely a manual RouterOS change bypassing Terraform. Added `domain = ""` explicitly to force-correct on next Atlantis apply. Not yet applied (2026-07-07) |
 | REL-059 | Reliability | **PARTIAL** | DNS query volume, part 2: added `local-zone: home.lan. static` to unbound (instant NXDOMAIN, zero recursion, doesn't wait on DHCP leases to renew like REL-058 does). Separately found ptbtime1/2/3.ptb.de (~24% of ALL DNS traffic, ~440k/7d) traced via AdGuard's query log to 3 client IPs on the Fritz!Box's own LAN (192.168.178.20/23/25) -- unrelated to k3s, just noticed at the same time. Added `local-data` overrides (current real IPs) so answering them is free regardless of those unidentified devices' query rate. Config-validated via a disposable container of the live unbound image (no unbound-checkconf binary in this minimal image). Not yet applied (2026-07-07) |
+| REL-056 | Reliability | **PARTIAL** | Autonomy-readiness task 1: tiered Renovate auto-merge -- stateless/CI/dev-tooling patch-minor-digest auto-merges after CI-green + 3-day soak; a named stateful/critical list (Vault/Authelia/Garage/Vaultwarden/DBs/Nextcloud/Paperless/Immich/Gitea/Velero-plugin) plus all majors stay PR-only, grouped+labeled. Digest pinning added. Config-validated, NOT merged -- account owner reads the tiering first per instruction (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
 
 ---
