@@ -317,8 +317,16 @@ metadata:
 spec:
   schedule: "*/5 * * * *"
   concurrencyPolicy: Forbid
+  # REL-061: a single failed run from 2026-06-28/29 (root cause not
+  # determinable -- pod logs already garbage-collected by the time this was
+  # investigated) sat as the one retained failedJobsHistoryLimit entry for
+  # over a week, since nothing rotates a failed Job out until a NEWER
+  # failure replaces it. That kept re-triggering KubeJobFailed's 2h Discord
+  # repeat_interval indefinitely for a problem that was already gone. 24h
+  # TTL is enough time to actually investigate a real failure.
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 86400
       template:
         spec:
           restartPolicy: OnFailure
