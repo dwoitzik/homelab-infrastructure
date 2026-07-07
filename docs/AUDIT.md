@@ -2640,6 +2640,51 @@ Reran the same broken-proxy test against the new `-schema-location` setup: `Erro
 
 ---
 
+### REL-057 — Autonomy-readiness task 4: recovery/self-heal loop, verified · **PARTIAL** (2026-07-07)
+
+Report only, per instruction — no fixes applied, no risky changes. Verified each claim
+against live state rather than trusting "it's configured so it must work."
+
+- **cert-manager renewal: CONFIGURED, not yet proven.** `wildcard-woitzik-dev`'s only
+  `CertificateRequest` is Revision 1, issued 2026-06-03 — it has never actually
+  auto-renewed. `renewalTime: 2026-08-02` (30 days before `notAfter: 2026-09-01`) is
+  correctly scheduled, but that's ~4 weeks in the future from this check (2026-07-07);
+  there's no historical renewal event yet to point to as proof it actually works when
+  the time comes.
+- **ArgoCD self-heal: PROVEN, on everywhere.** All 41 live Applications have
+  `syncPolicy.automated.selfHeal: true`, no exceptions found (`kubectl get applications
+  -n argocd -o json`, checked every one programmatically).
+- **Backups: schedule proven, completion/restore NOT proven — real live gap found.**
+  Velero's `daily-backup` schedule has run reliably for 23+ days of history. But of the
+  5 most recent runs, **2 actually failed** (2026-07-03, 2026-07-04) — `phase: Failed`,
+  `HeadObject ... dial tcp 10.43.126.190:3900: i/o timeout` against Garage. This is
+  separate from and later than the already-fixed REL-019 ENOSPC incident — a live,
+  currently-unexplained ~40% recent failure rate that nobody was alerted to before
+  REL-055's new `VeleroBackupFailed` alert (this session, task 2) existed. The 3
+  `Completed` runs each carry 56–101 warnings (spot-checked one: mostly benign
+  Kopia/socket-file noise — `reposerver-ask-pass.sock: unknown or unsupported`, a
+  documented-safe Velero warning class — not individually audited further).
+  **`kubectl get restores.velero.io -A` across the whole cluster: zero results, ever.**
+  REL-052 tested a PBS (Proxmox Backup Server, hypervisor-level VM/CT) restore — a
+  completely different system. The in-cluster, Velero-level restore path (the one that
+  actually matters for "can this app's data come back after a PVC is lost without
+  losing the whole VM") has never once been exercised. This is exactly the REL-023
+  "backup ran ≠ backup restores" gap the instruction named, still open.
+  - Confirmed the backup schedule's scope is `includedNamespaces: ["*"]` (all except
+    `kube-system`/`kube-public`/`kube-node-lease`) — meaning the `garage` namespace
+    itself is included in what gets backed up, which is precisely REL-003's documented
+    circular dependency (Velero's own S3 backend is in-cluster Garage) — **not touched,
+    it's on the skip-list** — but it's the concrete reason a from-scratch cluster
+    recovery can't currently bootstrap cleanly: Garage needs restoring to get anything
+    back, but Garage is also what everything (including its own backup) was stored in.
+- **Not investigated further:** the exact cause of the 2 Garage `HeadObject` timeouts
+  (transient network blip vs. a recurring pattern), and a full audit of the warning
+  content across all 3 successful runs beyond the one spot-check.
+
+**Effort:** Small — verification only, this section is the report.
+
+---
+
 ### REL-035b — Memory-overcommit regression guard: two-tier model, not one sum · **RESOLVED** (2026-07-07)
 
 Follow-up to REL-035. That pass fixed CPU-scheduling contention (`cpu.units`) but left
@@ -2853,6 +2898,7 @@ where jams actually stick.
 | REL-052 | Reliability | **RESOLVED** | First real, live-verified PBS restore test (`ct-srv-atlantis-01` snapshot restored to a scratch vmid, booted, Docker stack came up clean, data intact, test container destroyed) -- `DISASTER-RECOVERY.md`'s restore procedure had never actually been tried before. Found and documented a real gotcha (PBS restore duplicates the original's static IP/MAC, causing a live conflict if started alongside the still-running original) and a bigger doc-accuracy gap (the runbook still pointed at the Google Drive offsite copy as a fallback for total PBS-storage loss, which REL-051 confirms doesn't actually have usable data) (2026-07-06) |
 | REL-053 | Reliability | **RESOLVED** | Immich major bump v2.7.5->v3.0.1 (PR #273, the last of the 2026-07 deferred Renovate majors) -- checked upstream breaking changes first (API-only, no DB migration needed since VectorChord already in place per REL-030), took a real pg_dumpall backup, merged, verified live: 0 restarts, identical asset/asset_face row counts (11553/5461), API reports v3.0.1, login page reachable (2026-07-06) |
 | REL-054 | Reliability | **RESOLVED** | PR #306's kubeconform rate-limit fix (`-cache` + `actions/cache`) was a mitigation not a fix -- proved live with a broken proxy that a cold-cache/never-seen schema still hard-fails CI on network error (`-ignore-missing-schemas` only catches 404s, not 429s/timeouts). Vendored the 15 built-in-kind schemas actually used under `kubernetes/` into `ci/kubeconform-schemas/`, switched pre-commit + CI to `-schema-location` pointing only at that local dir -- reran the same broken-proxy test, `Errors: 0`, fully offline. CRD kinds (Application/IngressRoute/etc.) still skip via `-ignore-missing-schemas`, unaffected (2026-07-06) |
+| REL-057 | Reliability | **PARTIAL** | Autonomy-readiness task 4 (report only): ArgoCD selfHeal PROVEN on for all 41 Applications. cert-manager renewal CONFIGURED but unproven (cert has never actually renewed yet). Backups: schedule proven reliable, but 2 of last 5 daily runs actually FAILED on a Garage S3 timeout (separate from REL-019), and `restores.velero.io` is empty cluster-wide -- Velero-level restore has NEVER been tested (REL-052 tested PBS/hypervisor restore only, a different system). Backup scope includes the `garage` namespace itself, confirming REL-003's circular-dependency risk live (skip-list, not touched) (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
 
 ---
