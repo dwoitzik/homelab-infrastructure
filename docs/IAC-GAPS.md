@@ -48,6 +48,12 @@ below has risk + effort, and a proposed order at the end.
 
 ### 1. `gitea-secrets` / `nextcloud-secrets` — live placeholder passwords in production
 
+**Status: RESOLVED, #332.** Rotated live (not just in Git) — real `SECRET_KEY`/
+`INTERNAL_TOKEN` for Gitea, real Postgres + admin passwords for Nextcloud, all written
+to Vault and wired via `ExternalSecret`. Full history checked (767 commits): no real
+secret was ever committed, only the placeholder — no history rewrite needed. Left below
+for context; not part of the remaining migration sequence.
+
 **Risk: Critical.** `kubernetes/apps/gitea/secrets.yml` and
 `kubernetes/apps/nextcloud/secrets.yml` are checked into Git as plain `Secret`
 manifests with `stringData` values literally reading `REPLACE_WITH_ADMIN_PASSWORD` —
@@ -183,27 +189,38 @@ whichever of the above PRs touches Secrets anyway).
 
 ## Proposed priority order
 
-1. **`gitea-secrets`/`nextcloud-secrets` placeholder passwords** — Critical, Small
-   effort. Do this first regardless of the rest; a live default-credential exposure in
-   a portfolio repo shouldn't wait behind larger, slower items.
-2. **Vault's own configuration** — High risk, larger effort, but it's the trust root
-   every other item on this list (and every ExternalSecret already in the cluster)
-   depends on. Doing this before item 3/4 means those migrations land on a Terraform-managed
-   Vault instead of adding more ad hoc `vault kv put` calls on top of an already-undocumented
-   base.
-3. **Garage buckets** — High risk, already caused 2 real incidents this session
-   (REL-019, REL-057b). Medium effort but well-scoped.
-4. **Cloudflare DNS zone** — Medium risk concentrated almost entirely in one record
+Ordering principle, stated explicitly: **(1) live-exposed issues before latent ones,
+(2) among latent issues, Vault-into-IaC ranks highest** — it's the trust root for every
+other item here, and currently the least reproducible component in the stack (a lost
+Vault PV recreates nothing from Git).
+
+Applying that: item 1 was the only genuinely *live-exposed* case found in this sweep
+(an actual known-guessable credential, actually accepted by a running service) — it's
+done, via #332. Every remaining item is *latent* (a reproducibility/blast-radius gap,
+not an active exposure), so principle 2 sets the rest of the order — Vault first among
+them, then ranked by how much operational damage a repeat incident would do.
+
+1. ~~`gitea-secrets`/`nextcloud-secrets` placeholder passwords~~ — **done, #332.**
+2. **Vault's own configuration** — highest-priority latent item, per principle 2.
+   Every other item below either stores secrets in Vault already or would if migrated
+   (Garage keys, Cloudflare's own token, homepage's bundle) — doing this first means
+   those migrations land on a Terraform-managed Vault instead of adding more ad hoc
+   `vault kv put` calls on top of an already-undocumented base.
+3. **Garage buckets** — already caused 2 real incidents this session (REL-019,
+   REL-057b). Medium effort, well-scoped.
+4. **Cloudflare DNS zone** — risk concentrated almost entirely in one record
    (`auth.woitzik.dev`); could be split into "import `auth` alone first" (small,
    high-value) then the rest (medium, lower urgency).
-5. **`homepage-secrets`** — Medium risk, Small effort, mechanical — good candidate to
-   bundle with item 1 or 2's PR since it's the same ExternalSecret pattern.
-6. **Proxmox host-level config** — Low-Medium risk. Start with the research spike
-   (what can `bpg/proxmox` actually cover) before committing effort here; may end up
-   partially "document in `DISASTER-RECOVERY.md`" rather than "Terraform resource" for
-   whatever the provider can't reach.
+5. **`homepage-secrets`** — Small effort, mechanical — good candidate to bundle with
+   item 2's PR since it's the same ExternalSecret pattern, once Vault's own mounts are
+   Terraform-managed.
+6. **Proxmox host-level config** — Low-Medium risk, low day-to-day change frequency.
+   Start with the research spike (what can `bpg/proxmox` actually cover) before
+   committing effort here; may end up partially "document in `DISASTER-RECOVERY.md`"
+   rather than "Terraform resource" for whatever the provider can't reach.
 7. **Dead Secret cleanup** (`kasm-secrets`, `mullvad-wg-config`, `seafile-secrets`) —
    No risk, trivial effort. Fold into whichever PR is already touching Secrets;
    doesn't need its own slot in the sequence.
 
-**Not executed in this pass** — this document is the list only, per instruction.
+**Not executed in this pass** — items 2-7 are still just the list, awaiting explicit
+sequencing approval before any of them is worked.
