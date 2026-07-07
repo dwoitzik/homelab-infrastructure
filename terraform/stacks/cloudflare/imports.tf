@@ -19,3 +19,11 @@ import {
   to = cloudflare_dns_record.mc_playit[0]
   id = "1f15ed0f3a8b497302ba339dcab3c060/0a20f0e459e5fb34169ff5d4dda9e8c2"
 }
+
+# auth.woitzik.dev -- created 2025-11-01 via the dashboard, live values
+# (content/proxied/ttl) already match what main.tf declares exactly, so
+# this import is expected to show zero diff.
+import {
+  to = cloudflare_dns_record.auth
+  id = "1f15ed0f3a8b497302ba339dcab3c060/d1bdef517767720d53f186753f71c306"
+}
