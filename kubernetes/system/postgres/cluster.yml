@@ -60,10 +60,17 @@ spec:
   monitoring:
     enablePodMonitor: true
 
+  # REL-057b: was s3://velero/cnpg-postgres-authelia -- CNPG's own barman-cloud
+  # archiving shared Velero's bucket, and its unrecognized top-level directory
+  # tripped Velero's own bucket-validation logic, intermittently marking the
+  # BackupStorageLocation Unavailable (confirmed live, correlates with 2 of the
+  # last 5 daily Velero backups actually failing). One bucket per backup
+  # *system*, not per database, so future CNPG clusters land under their own
+  # prefix here instead of colliding again.
   backup:
     retentionPolicy: "7d"
     barmanObjectStore:
-      destinationPath: s3://velero/cnpg-postgres-authelia
+      destinationPath: s3://cnpg-backups/authelia
       endpointURL: http://garage.apps.svc.cluster.local:3900
       s3Credentials:
         accessKeyId:
