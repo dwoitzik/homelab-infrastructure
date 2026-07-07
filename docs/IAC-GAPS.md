@@ -1,7 +1,10 @@
 # IaC Gaps — hand-created infrastructure with no Git trail
 
-**Status:** audit only, 2026-07-07. No migrations executed. This is the full list, for
-review before any of it is worked.
+**Status:** items 1, 3, 4 (partial), 5, 6 (partial), 7 executed 2026-07-07, each its
+own PR, none merged by this session — see each item below for its PR number. Item 2
+(Vault) deliberately split out and gated on a break-glass proof (done, REL-065) before
+its own migration work even starts. Nothing in this document has been merged or
+applied; every PR is awaiting review.
 
 ## Why this exists
 
@@ -82,6 +85,15 @@ apps with the new credentials to confirm the rotation took.
 
 ### 2. Vault's own configuration — policies, mounts, KV structure
 
+**Status: split out, not started.** Deliberately kept out of the items 3-7 chain per
+explicit instruction — Vault is the trust root behind every other item on this list,
+so a misapply here cascades everywhere, unlike the isolated blast radius of the rest.
+Gated on a break-glass proof first (REL-065, `AUDIT.md`): confirmed a current Velero
+backup of Vault's raft data exists and, for the first time cluster-wide, actually
+performed a real restore + unseal using only the out-of-cluster key copy. That proof is
+done. The actual Terraform-migration work itself is not started — it goes through its
+own plan/PR for review before any apply, separately from this document's chain.
+
 **Risk: High.** There is no `terraform/stacks/vault*` directory. Every Vault
 secrets-engine mount, every KV path structure (`secret/cloudflare`, `secret/garage`,
 `secret/gitea`, etc.), and every policy has been created ad hoc via
@@ -108,6 +120,19 @@ be regenerated.
 
 ### 3. Garage buckets — 4 buckets, zero Terraform
 
+**Status: RESOLVED, #334 (not merged).** New `terraform/stacks/garage` stack manages
+`loki-data`/`velero`/`cnpg-backups` via the `hashicorp/aws` provider against Garage's
+S3-compatible endpoint, native `import {}` blocks (they already exist live). Granted
+the existing `atlantis` Garage key RWO access to all 3 live first (additive, existing
+app keys per bucket verified untouched). Hit and fixed a real bug along the way: the
+resource-managing provider defaulted to virtual-hosted-style addressing
+(`velero.s3.woitzik.dev`, which doesn't resolve), hanging `terraform plan` for 9+
+minutes and stalling the PR's Atlantis lock — fixed with `s3_use_path_style = true`
+(the backend block already had the equivalent). `atlantis plan` now clean: 3 to
+import, 0 to change. Scope is bucket *existence* only — per-key ACL grants stay a
+manual `garage bucket allow` step, Garage's admin API isn't S3-compatible and has no
+Terraform provider here. Documented, not silently half-solved.
+
 **Risk: High.** `garage bucket list` shows 4 buckets (`loki-data`, `velero`,
 `terraform-state`, `cnpg-backups`) — all created via the `/garage` CLI directly, none
 in Terraform. One of these (`terraform-state`) is the backend Terraform itself uses
@@ -125,6 +150,14 @@ admin operations (bucket aliasing, per-key permission grants) cleanly. Needs a s
 research spike before committing to an approach.
 
 ### 4. Cloudflare DNS zone — 4 of ~30 records under Terraform
+
+**Status: `auth.woitzik.dev` done, #335 (not merged); rest still manual.** Imported the
+one highest-consequence record as planned — CNAME to `home.woitzik.dev`, not proxied,
+`ttl=1`, matches live exactly. `atlantis plan`: 1 import, 1 change (adding a
+descriptive `comment` that didn't exist before — zero effect on `content`/`proxied`/
+`ttl`/`type`). The other ~25 records (`headscale`, `home`, `jf`, `link`, `vw`, `www`,
+root, MX, DKIM/DMARC/SPF) are untouched, a future pass, per instruction (one record
+first, not bulk).
 
 **Risk: Medium.** `terraform/stacks/cloudflare/main.tf` manages exactly 4
 `cloudflare_dns_record` resources (`photos`, `atlantis`, `media` — all Cloudflare
@@ -148,6 +181,11 @@ bulk.
 
 ### 5. `homepage-secrets` — 9 real API keys/passwords, no ExternalSecret
 
+**Status: RESOLVED, #336 (not merged).** Extracted the live Secret's 9 real values
+directly into Vault (`secret/homepage`), replaced with a Vault-backed `ExternalSecret`.
+No rotation needed — these were already correct, working credentials, just moved.
+Verified live: all 9 keys present post-sync, pod restarted clean.
+
 **Risk: Medium.** Bundles `HOMEPAGE_VAR_ADGUARD_PASSWORD`, `ARGOCD_TOKEN`,
 `BAZARR_API_KEY`, `GRAFANA_PASSWORD`, `JELLYFIN_API_KEY`, `JELLYSEERR_API_KEY`,
 `RADARR_API_KEY`, `SABNZBD_API_KEY`, `SONARR_API_KEY` — all real, live credentials
@@ -160,6 +198,20 @@ Secret. Mechanical, no live credential rotation needed (reuse the existing value
 
 ### 6. Proxmox host-level config — `jobs.cfg`, `storage.cfg`, `datacenter.cfg`
 
+**Status: PARTIAL, #337 (not merged).** Research spike done: checked the actual
+`bpg/proxmox` provider schema (`terraform providers schema -json`) instead of guessing.
+Coverage turned out better than assumed for 2 of 3 targets — `local-zfs`
+(`storage.cfg`) and `datacenter.cfg`'s keyboard layout both map cleanly, no credentials
+involved, imported both. The other 2 stay manual, for real reasons, not laziness:
+`local-pbs`'s storage password lives in `/etc/pve/priv/storage/local-pbs.pw`
+(root-only, not in this repo's Vault at all — a real follow-up task of its own); the
+vzdump backup job's live shape (`all 1` + `exclude 9000`) has no equivalent in the
+provider's `proxmox_backup_job` resource (only `all` XOR an explicit `vmid`
+include-list) — modeling it today would mean an explicit list that silently stops
+covering any *future* guest, trading this gap for a worse, silent backup regression
+(the same class REL-019/REL-057b already hit). Recommend that one specifically stay a
+documented `DISASTER-RECOVERY.md` runbook step, not force it into Terraform.
+
 **Risk: Low-Medium.** `terraform/stacks/proxmox/*.tf` only manages VM/LXC resources
 (`vm.tf`, `lxc.tf`). The vzdump backup job definition (`REL-063`'s `exclude 9000` fix
 lives here), the storage pool definitions (`local-zfs`, `local-pbs` — including the PBS
@@ -169,13 +221,11 @@ record. Low day-to-day change frequency lowers the risk relative to the items ab
 but it's exactly the kind of thing a from-scratch rebuild (per
 `DISASTER-RECOVERY.md`'s stated goal) would silently miss.
 
-**Effort: Unknown, needs a research spike.** The `bpg/proxmox` Terraform provider (used
-elsewhere in this repo) has only partial coverage of host-level `/etc/pve/*.cfg` —
-needs to be checked stanza-by-stanza before committing to how much of this can actually
-move into Terraform versus staying as a documented manual runbook step in
-`DISASTER-RECOVERY.md`.
-
 ### 7. `kasm-secrets`, `mullvad-wg-config`, `seafile-secrets` — dead cruft, not a migration target
+
+**Status: RESOLVED.** Reconfirmed still dead (no live workload, no git reference for
+any of the 3) immediately before deleting, then `kubectl delete`'d all 3. No PR — no
+git file was ever involved.
 
 **Risk: None (hygiene only).** No live `Deployment`/`Pod`/anything references any of
 these 3 Secrets, and none of them appear anywhere in `kubernetes/` — leftovers from
@@ -201,26 +251,21 @@ not an active exposure), so principle 2 sets the rest of the order — Vault fir
 them, then ranked by how much operational damage a repeat incident would do.
 
 1. ~~`gitea-secrets`/`nextcloud-secrets` placeholder passwords~~ — **done, #332.**
-2. **Vault's own configuration** — highest-priority latent item, per principle 2.
-   Every other item below either stores secrets in Vault already or would if migrated
-   (Garage keys, Cloudflare's own token, homepage's bundle) — doing this first means
-   those migrations land on a Terraform-managed Vault instead of adding more ad hoc
-   `vault kv put` calls on top of an already-undocumented base.
-3. **Garage buckets** — already caused 2 real incidents this session (REL-019,
-   REL-057b). Medium effort, well-scoped.
-4. **Cloudflare DNS zone** — risk concentrated almost entirely in one record
-   (`auth.woitzik.dev`); could be split into "import `auth` alone first" (small,
-   high-value) then the rest (medium, lower urgency).
-5. **`homepage-secrets`** — Small effort, mechanical — good candidate to bundle with
-   item 2's PR since it's the same ExternalSecret pattern, once Vault's own mounts are
-   Terraform-managed.
-6. **Proxmox host-level config** — Low-Medium risk, low day-to-day change frequency.
-   Start with the research spike (what can `bpg/proxmox` actually cover) before
-   committing effort here; may end up partially "document in `DISASTER-RECOVERY.md`"
-   rather than "Terraform resource" for whatever the provider can't reach.
-7. **Dead Secret cleanup** (`kasm-secrets`, `mullvad-wg-config`, `seafile-secrets`) —
-   No risk, trivial effort. Fold into whichever PR is already touching Secrets;
-   doesn't need its own slot in the sequence.
+2. **Vault's own configuration** — highest-priority latent item, per principle 2, and
+   the one exception to "work the rest as a chain": split out on its own track.
+   Break-glass proof done first (REL-065) — a real Velero backup exists and a real
+   restore+unseal was performed using only the out-of-cluster key copy, independent of
+   the in-cluster config this migration would touch. The migration itself goes through
+   its own plan/PR, reviewed before any apply — not started yet.
+3. ~~**Garage buckets**~~ — **done, #334** (not merged).
+4. ~~**Cloudflare DNS zone**~~ — **`auth.woitzik.dev` done, #335** (not merged); rest
+   of the zone (~25 records) still manual, future pass.
+5. ~~**`homepage-secrets`**~~ — **done, #336** (not merged).
+6. ~~**Proxmox host-level config**~~ — **`local-zfs` + keyboard done, #337** (not
+   merged); `local-pbs` and the vzdump job stay manual, for stated reasons (see item 6
+   above), not because the work wasn't attempted.
+7. ~~**Dead Secret cleanup**~~ — **done**, no PR (no git file involved).
 
-**Not executed in this pass** — items 2-7 are still just the list, awaiting explicit
-sequencing approval before any of them is worked.
+**Executed this pass**: items 1, 3, 4 (partial), 5, 6 (partial), 7 — 5 PRs open
+(#334-337, plus #332 for item 1), none merged. Item 2 (Vault) intentionally not
+started beyond its break-glass gate, per instruction.
