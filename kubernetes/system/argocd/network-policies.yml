@@ -1,0 +1,162 @@
+# These 5 NetworkPolicies existed live in the cluster (part of ArgoCD's original
+# manual install bootstrap, 2026-05-31) but were never git-tracked at all -- same
+# orphan-config class as REL-014/035/042. Brought under git here.
+#
+# All 5 originally used `namespaceSelector: {}` to mean "allow from any namespace"
+# on their metrics/cross-component ports. That's valid upstream NetworkPolicy syntax,
+# but k3s's built-in kube-router NetworkPolicy controller does not correctly enforce
+# it -- confirmed live (2026-07-07): deleting the application-controller policy
+# entirely made its metrics port immediately reachable cross-pod; re-adding it with
+# `namespaceSelector: {}` still blocked it; replacing that one rule with
+# `ipBlock: cidr: 10.42.0.0/16` (the cluster's actual pod CIDR) fixed it instantly,
+# confirmed with a real scrape returning live argocd_app_info metrics. This is the
+# reason ArgoCD's own Prometheus metrics were never reachable (REL-055's "GAP" entry)
+# -- not a broken metrics server as first suspected, a NetworkPolicy enforcement bug.
+# Applied the same ipBlock fix to every other policy using the identical
+# `namespaceSelector: {}` pattern (applicationset-controller, dex-server's port 5558
+# rule, notifications-controller, repo-server's port 8084 rule) -- all were equally
+# broken, not just the one port originally in question. Policies using explicit
+# podSelector matches (dex-server's first rule, redis, repo-server's first rule) were
+# already working correctly and are left untouched; not included in this file since
+# they don't need fixing (still enforced live from the original manual apply).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/component: application-controller
+    app.kubernetes.io/name: argocd-application-controller
+    app.kubernetes.io/part-of: argocd
+  name: argocd-application-controller-network-policy
+  namespace: argocd
+spec:
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.42.0.0/16
+      ports:
+        - port: 8082
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-application-controller
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/component: applicationset-controller
+    app.kubernetes.io/name: argocd-applicationset-controller
+    app.kubernetes.io/part-of: argocd
+  name: argocd-applicationset-controller-network-policy
+  namespace: argocd
+spec:
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.42.0.0/16
+      ports:
+        - port: 7000
+          protocol: TCP
+        - port: 8080
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-applicationset-controller
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/component: dex-server
+    app.kubernetes.io/name: argocd-dex-server
+    app.kubernetes.io/part-of: argocd
+  name: argocd-dex-server-network-policy
+  namespace: argocd
+spec:
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-server
+      ports:
+        - port: 5556
+          protocol: TCP
+        - port: 5557
+          protocol: TCP
+    - from:
+        - ipBlock:
+            cidr: 10.42.0.0/16
+      ports:
+        - port: 5558
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-dex-server
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/component: notifications-controller
+    app.kubernetes.io/name: argocd-notifications-controller
+    app.kubernetes.io/part-of: argocd
+  name: argocd-notifications-controller-network-policy
+  namespace: argocd
+spec:
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.42.0.0/16
+      ports:
+        - port: 9001
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-notifications-controller
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/component: repo-server
+    app.kubernetes.io/name: argocd-repo-server
+    app.kubernetes.io/part-of: argocd
+  name: argocd-repo-server-network-policy
+  namespace: argocd
+spec:
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-server
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-application-controller
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-notifications-controller
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-applicationset-controller
+      ports:
+        - port: 8081
+          protocol: TCP
+    - from:
+        - ipBlock:
+            cidr: 10.42.0.0/16
+      ports:
+        - port: 8084
+          protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-repo-server
+  policyTypes:
+    - Ingress

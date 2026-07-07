@@ -3052,6 +3052,76 @@ verifiable bucket split.
 
 ---
 
+### REL-055b — ArgoCD metrics port root-caused: k3s NetworkPolicy `namespaceSelector: {}` doesn't work · **RESOLVED** (2026-07-07)
+
+REL-055 flagged `argocd-application-controller`'s metrics port (8082) as unreachable
+and left it a GAP — `/proc/net/tcp` (IPv4-only) showed nothing listening, and
+`--metrics-port` is documented to default to 8082 with no flag needed, so the earlier
+pass concluded the metrics server itself wasn't starting. That conclusion was wrong,
+and the real cause was more interesting.
+
+**Corrected the earlier misdiagnosis first:** `/proc/net/tcp6` (checked this pass, not
+before) showed a genuine `LISTEN` entry on `:::8082` — Go's dual-stack listener binds
+one IPv6 socket that also serves IPv4-mapped connections, and that never shows up in
+the IPv4-only `/proc/net/tcp` table. The app was listening the whole time; the earlier
+check only looked at half the picture.
+
+**Then found the actual blocker**, methodically: `curl` from another pod to the
+Service, then directly to the pod IP, then to a freshly-recreated pod (ruling out
+stale conntrack/veth state) — all `Connection refused`. But `curl` from *inside* the
+pod's own network namespace to `127.0.0.1:8082` and to its own pod IP both worked
+instantly, and the kubelet's own readiness probe (`httpGet :8082/healthz`) was passing
+continuously (`Ready: true`, zero `Unhealthy` events). That pattern — reachable from
+inside the pod and from the kubelet, refused from every other pod — pointed at
+NetworkPolicy, even though `argocd-application-controller-network-policy`'s
+`from: [{namespaceSelector: {}}]` rule should, per the upstream Kubernetes API spec,
+allow exactly this traffic.
+
+**Proved it live**: temporarily deleted the NetworkPolicy entirely — the metrics
+endpoint immediately became reachable, returning real `argocd_app_info` data.
+Re-added it with the identical `namespaceSelector: {}` rule — immediately blocked
+again. Tried the more explicit `namespaceSelector: {} + podSelector: {}` combined
+form — still blocked. Replaced the rule with `ipBlock: cidr: 10.42.0.0/16` (the
+cluster's actual pod CIDR) — worked instantly. **k3s's built-in kube-router
+NetworkPolicy controller does not correctly enforce a bare `namespaceSelector: {}`
+"allow from all namespaces" rule**, at least in the version running here — a real
+enforcement bug/limitation, not a misconfiguration in this repo.
+
+**Checked blast radius**, not just the one port: all 6 of ArgoCD's other
+NetworkPolicies existed live (none git-tracked — same orphan-config class as
+REL-014/035/042, present since the original 2026-05-31 manual bootstrap). 4 more
+(`applicationset-controller`, `dex-server`'s port 5558 rule, `notifications-controller`,
+`repo-server`'s port 8084 rule) used the identical broken `namespaceSelector: {}`
+pattern on their own metrics/cross-component ports — meaning ArgoCD's other component
+metrics were equally unreachable, not just the application-controller's. Fixed all 5
+with the same `ipBlock` pattern in one file. Left the policies using explicit
+`podSelector` matches alone (dex-server's primary rule, redis, repo-server's primary
+rule, argocd-server's unrestricted rule) — those already worked correctly.
+
+**Wired end-to-end**: added `argocd-metrics` `ServiceMonitor` (co-located in
+`kubernetes/system/monitoring/`, matching the cert-manager/Velero pattern) — confirmed
+live via Prometheus's own targets API (`up`) and a real query
+(`argocd_app_info`, 42 results, real health/sync status per app). This is the
+Prometheus-side visibility REL-055 couldn't get to; it's additive to, not a
+replacement for, REL-055's notifications-controller Discord path (deliberately did not
+add a second Alertmanager rule for the same condition — would double-alert the same
+event through two channels).
+
+- **Live-tested with real traffic, not assumed**: every step (delete-policy test,
+  alternate-syntax test, `ipBlock` test, ServiceMonitor scrape) was verified with an
+  actual `curl`/Prometheus-API result before moving to the next, and diagnostic
+  NetworkPolicy edits were restored/finalized immediately after each test — no window
+  where the controller was left unprotected longer than the ~10s test itself took.
+- All 5 NetworkPolicies and the ServiceMonitor added to git and to their respective
+  Applications' include globs (`argocd-manifests`, `monitoring-manifests`) — same
+  discipline as every other orphan-config fix this session.
+
+**Effort:** Medium — the IPv4/IPv6 misdiagnosis correction and the systematic
+elimination (Service → pod IP → fresh pod → intra-pod → NetworkPolicy) took longer
+than the fix itself, which was a one-line-per-policy syntax change.
+
+---
+
 ### REL-055 — Autonomy-readiness task 2: Discord alert coverage gaps, proven live · **RESOLVED** (2026-07-07)
 
 Audit of steady-state alert coverage (ArgoCD Degraded/OutOfSync, pod CrashLoopBackOff,
@@ -3310,6 +3380,7 @@ where jams actually stick.
 | REL-057b | Reliability | **RESOLVED** | Root-caused REL-057's ~40% recent Velero backup failure rate -- ruled out Garage CPU/memory/crash via Prometheus (all idle/flat during the failure windows), then found CNPG's own barman-cloud archiving for Authelia's Postgres was writing into the *same* Garage bucket Velero owns, tripping Velero's own bucket-validation (`BackupStorageLocation` was live `Unavailable`, "invalid top-level directories: [cnpg-postgres-authelia]"). Fixed with a new scoped bucket (`cnpg-backups`), verified a real base backup + WAL switch landing there *before* deleting the old 3632-object prefix from the shared bucket -- BSL flipped back to `Available` within 30s of the deletion, confirmed live (2026-07-07) |
 | REL-060 | Reliability | **RESOLVED, awaiting merge** | paperless-gpt CrashLoopBackOff since 13:43, traced to `icereed/paperless-gpt:v0.26.0` (auto-merged via PR #314 same day) -- new entrypoint runs `addgroup` at startup, fails under this Deployment's `readOnlyRootFilesystem: true`. Rolled back to v0.25.1 (verified live: clean startup, `1/1 Running`), added the package to renovate.json's PR-only tier so future bumps get manual review. Live cluster still flaps back to v0.26.0 via ApplicationSet-controlled selfHeal until merged -- a standalone-Application syncPolicy pause (used elsewhere this session) doesn't hold for ApplicationSet-generated apps (2026-07-07) |
 | REL-061 | Security | **RESOLVED, awaiting merge** | cloudflare-ddns's API token was a bare hand-created Secret since 2026-06-02, gone dead -- confirmed via Cloudflare's own verify endpoint ("Invalid API Token"). Same secret is also cert-manager's DNS-01 credential, meaning cert renewal would have failed too. Script never checked API response success and always exited 0, masking the failure from KubeJobFailed entirely. Fixed by reusing Terraform/Atlantis's already-working token (verified live: valid, active, real GET+PUT against the actual DNS record both succeeded) wired via a proper Vault ExternalSecret, plus making the script fail loud on real API errors. Separately found nextcloud-cron's "failure" was a single non-recurring event from a week+ ago still re-triggering Alertmanager's 2h repeat -- failedJobsHistoryLimit doesn't expire on its own; added ttlSecondsAfterFinished: 86400 to both CronJobs (2026-07-07) |
+| REL-055b | Reliability | **RESOLVED** | Corrected REL-055's own misdiagnosis of the ArgoCD metrics-port GAP -- `/proc/net/tcp6` (not checked before) showed it was listening dual-stack the whole time. Real cause: k3s's built-in kube-router NetworkPolicy controller doesn't correctly enforce a bare `namespaceSelector: {}` "allow all namespaces" rule -- proved live (delete policy -> works, re-add identical rule -> blocked again, swap to `ipBlock: cidr: 10.42.0.0/16` -> works). Found and fixed the identical broken pattern on 4 more ArgoCD NetworkPolicies (applicationset-controller, dex-server, notifications-controller, repo-server) that were equally unreachable, not just the one port. Added a ServiceMonitor, confirmed live via Prometheus's targets API (`up`) and a real query (`argocd_app_info`, 42 results). All 5 policies were also untracked in git since the 2026-05-31 manual bootstrap -- brought under GitOps here too (2026-07-07) |
 | REL-056 | Reliability | **PARTIAL** | Autonomy-readiness task 1: tiered Renovate auto-merge -- stateless/CI/dev-tooling patch-minor-digest auto-merges after CI-green + 3-day soak; a named stateful/critical list (Vault/Authelia/Garage/Vaultwarden/DBs/Nextcloud/Paperless/Immich/Gitea/Velero-plugin) plus all majors stay PR-only, grouped+labeled. Digest pinning added. Config-validated, NOT merged -- account owner reads the tiering first per instruction (2026-07-07) |
 | REL-055 | Reliability | **RESOLVED** | Autonomy-readiness task 2: CrashLoopBackOff/KubeJobFailed/NodeNotReady existed as rules but shipped severity=warning, never routed to Discord -- added explicit alertname route. ArgoCD Degraded/OutOfSync had zero alerting AND its metrics port turned out to be dead (confirmed live via `/proc/net/tcp`, root cause not found) -- pivoted to `argocd-notifications-controller` (a generic webhook service reusing the same Discord URL), found and fixed a real nil-pointer bug in the sync-failed trigger expression live. cert-manager and Velero (goroutine-driven, no native Job -- `KubeJobFailed` could never catch it) had zero metrics scraping at all -- added ServiceMonitors + PrometheusRules for both. Every fix proven with a real fired alert reaching Discord, user-confirmed both times, not just config review. Also broke and immediately fixed ArgoCD's own application-controller mid-diagnosis (bad `kubectl patch` dropped its exec args, ~2min crash loop, reverted clean) (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
