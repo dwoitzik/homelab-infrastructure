@@ -1,21 +1,61 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": ["config:recommended", "docker:pinDigests", "helpers:pinGitHubActionDigests"],
   "kubernetes": {
     "fileMatch": ["kubernetes/.+\\.yml$"]
   },
+  "minimumReleaseAge": "3 days",
   "packageRules": [
     {
+      "description": "Stateless services + digest pins: patch/minor/digest only, auto-merge after CI green + a 3-day soak so a bad upstream release doesn't land same-day. Rule order matters -- the stateful/critical rule below is listed last so it overrides this one for the specific packages it names.",
       "matchManagers": ["kubernetes"],
-      "matchPackageNames": ["ghcr.io/immich-app/**", "valkey/valkey"],
-      "groupName": "immich stack",
-      "automerge": false
+      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "automerge": true,
+      "platformAutomerge": true
     },
     {
+      "description": "CI tooling (GitHub Actions): low risk, easy to revert, auto-merge after soak.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Dev tooling (pre-commit hooks, Terraform providers): doesn't touch live services, auto-merge after soak.",
+      "matchManagers": ["pre-commit", "terraform"],
+      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Major updates, any package: always PR-only, one PR per package (not grouped -- each major is its own migration, shouldn't be bundled with an unrelated one).",
       "matchManagers": ["kubernetes"],
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "labels": ["major-update"]
+    },
+    {
+      "description": "Stateful/critical services -- databases, Vault, Authelia, Garage, Vaultwarden, and apps whose upgrades need a manual data migration (Nextcloud, Paperless, Immich, Gitea) or whose breakage takes out backups/auth cluster-wide (Velero's own restic/kopia plugin). ALL update types (patch/minor/major) stay PR-only, grouped into one PR per bump wave so they're one glance instead of scattered across the inbox. Listed last so it wins over the stateless auto-merge rule above for these specific packages.",
+      "matchManagers": ["kubernetes"],
+      "matchPackageNames": [
+        "hashicorp/vault",
+        "ghcr.io/authelia/authelia",
+        "dxflrs/garage",
+        "vaultwarden/server",
+        "postgres",
+        "ghcr.io/immich-app/postgres",
+        "redis",
+        "valkey/valkey",
+        "nextcloud",
+        "paperlessngx/paperless-ngx",
+        "gitea/gitea",
+        "ghcr.io/immich-app/immich-server",
+        "ghcr.io/immich-app/immich-machine-learning",
+        "velero/velero-plugin-for-aws"
+      ],
+      "groupName": "stateful/critical services",
+      "labels": ["stateful-critical"],
+      "automerge": false
     }
   ]
 }
