@@ -2849,6 +2849,87 @@ longer than the mechanical CronJob hygiene fixes.
 
 ---
 
+### REL-062 — 2026-07-07 near-nightly host thermal spikes: corrected root cause · **CORRECTED, PROPOSED, awaiting review** (2026-07-07)
+
+**This section replaces an earlier version of this entry that had the root cause
+wrong.** Leaving the correction visible rather than silently rewriting history,
+matching how errors get handled everywhere else in this doc.
+
+**Original claim (wrong):** that `ProxmoxHostHighTemp`/`KubeAPIServerDown` firing at
+03:05 on 2026-07-07 was caused by PBS's `vzdump` job and Velero's Kubernetes backup
+both starting at the literal same instant (03:00), and that staggering Velero's
+schedule away from `vzdump` would address the stacking.
+
+**Why it was wrong:** `mini` runs `Europe/Berlin` (CEST, UTC+2); the k3s VMs (where
+Velero's CronJob schedule is evaluated) run UTC. `jobs.cfg`'s `vzdump` entry says
+`schedule 03:00` — but that's 03:00 **local/CEST**, i.e. **01:00 UTC**. Confirmed
+against `vzdump`'s own live task history: it has run 01:00–~01:15 UTC (occasionally
+up to ~01:47 UTC) every single day for the past month, including 2026-07-07.
+Velero's `0 3 * * *` schedule is 03:00 **UTC**. The two jobs are **2 hours apart in
+real terms and have never overlapped**. The first fix attempted (moving Velero to
+`0 1 * * *`, intending 01:00 as a 4-hour gap from a misread "03:00 UTC" `vzdump`)
+actually moved Velero directly into `vzdump`'s real 01:00 UTC window instead of away
+from it — caught before merge, not applied live, but flagging the mistake plainly.
+
+**What's actually true, re-checked with a full week of history, not one night:**
+queried `node_hwmon_temp_celsius` at 03:00–03:10 UTC for the 6 nights before the
+alert fired:
+
+| Date | Peak temp, 03:00–03:10 UTC |
+|---|---|
+| 2026-07-01 | 84.6°C |
+| 2026-07-02 | 88.4°C |
+| 2026-07-03 | 86.9°C |
+| 2026-07-04 | **90.0°C** |
+| 2026-07-05 | 82.6°C |
+| 2026-07-06 | 81.6°C |
+| 2026-07-07 (alert night) | 85.5°C measured (Prometheus's own scrape resolution) |
+
+**Velero's own backup, alone, pushes host temperature into the 82–90°C range every
+single night** — `vzdump` isn't a factor at all, confirmed. 2026-07-04 was *hotter*
+than the night that actually alerted, and didn't trigger anything. 2026-07-07 wasn't
+a special double-stacking incident — it was this same nightly pattern crossing the
+alert threshold (and `for: 3m` sustain window) clearly enough to actually fire and
+resolve. This has likely been happening, silently, near the edge of the alert
+threshold, for at least a week.
+
+**Corrected findings from the original investigation that still hold** (evidence
+itself was real, just the "vzdump caused it" attribution was wrong):
+
+- `node_load1{group="pve_hosts"}` peaked at **11.29 at 03:03:00 UTC** on an
+  8-core/16-thread host on the alert night — a real, severe load spike, caused by
+  Velero's own backup (`defaultVolumesToFsBackup: true` across every namespace —
+  real kopia filesystem-backup CPU work, not vzdump).
+- `journalctl -u k3s` on `vm-srv-k3s-11` really did show etcd `"apply request took
+  too long"` warnings at 03:03:08 — genuine load-caused degradation, just caused by
+  Velero alone, not a vzdump/Velero combination.
+- CNPG's 2am backup and Renovate's `0 */2 * * *` are still correctly ruled out as
+  contributors — that part of the original analysis was unaffected by the timezone
+  error.
+
+**Revised proposal:** moved Velero's schedule to `0 5 * * *` (05:00 UTC) — clear of
+`vzdump`'s real 01:00–~01:15 UTC window and the existing 04:00 R2 offsite schedule,
+as basic scheduling hygiene against a *future* real collision if either job's timing
+ever changes. **This is explicitly not a thermal fix** — moving the hour doesn't
+reduce how hot Velero's own backup workload runs the host, since Velero alone is
+already sufficient to reach 82–90°C regardless of what time it runs. **Not applied
+live** — left for review.
+
+**The actual finding that matters here, restated plainly:** this isn't a rare
+near-freeze from an unlucky coincidence — it's Velero's regular nightly backup
+running this host to within a few degrees of a real freeze *every night*, and
+2026-07-04 (90°C, no alert) shows the current 85°C/3m alert threshold has already
+been silently grazed at least once without anyone noticing. Whatever the hardware
+cooling plan turns out to be, this is a standing, recurring risk, not a one-time
+event — worth treating with more urgency than the schedule-hygiene change above
+implies on its own.
+
+**Effort:** Medium — the correction took real re-investigation (a full week of
+Prometheus history, not just the one incident night) to catch and fix properly
+rather than just quietly editing the number.
+
+---
+
 ### REL-056 — Renovate tiered auto-merge, config only · **CONFIGURED, awaiting review** (2026-07-07)
 
 Autonomy-readiness task 1. Previously every Renovate PR needed a manual merge
@@ -3381,6 +3462,7 @@ where jams actually stick.
 | REL-060 | Reliability | **RESOLVED, awaiting merge** | paperless-gpt CrashLoopBackOff since 13:43, traced to `icereed/paperless-gpt:v0.26.0` (auto-merged via PR #314 same day) -- new entrypoint runs `addgroup` at startup, fails under this Deployment's `readOnlyRootFilesystem: true`. Rolled back to v0.25.1 (verified live: clean startup, `1/1 Running`), added the package to renovate.json's PR-only tier so future bumps get manual review. Live cluster still flaps back to v0.26.0 via ApplicationSet-controlled selfHeal until merged -- a standalone-Application syncPolicy pause (used elsewhere this session) doesn't hold for ApplicationSet-generated apps (2026-07-07) |
 | REL-061 | Security | **RESOLVED, awaiting merge** | cloudflare-ddns's API token was a bare hand-created Secret since 2026-06-02, gone dead -- confirmed via Cloudflare's own verify endpoint ("Invalid API Token"). Same secret is also cert-manager's DNS-01 credential, meaning cert renewal would have failed too. Script never checked API response success and always exited 0, masking the failure from KubeJobFailed entirely. Fixed by reusing Terraform/Atlantis's already-working token (verified live: valid, active, real GET+PUT against the actual DNS record both succeeded) wired via a proper Vault ExternalSecret, plus making the script fail loud on real API errors. Separately found nextcloud-cron's "failure" was a single non-recurring event from a week+ ago still re-triggering Alertmanager's 2h repeat -- failedJobsHistoryLimit doesn't expire on its own; added ttlSecondsAfterFinished: 86400 to both CronJobs (2026-07-07) |
 | REL-055b | Reliability | **RESOLVED** | Corrected REL-055's own misdiagnosis of the ArgoCD metrics-port GAP -- `/proc/net/tcp6` (not checked before) showed it was listening dual-stack the whole time. Real cause: k3s's built-in kube-router NetworkPolicy controller doesn't correctly enforce a bare `namespaceSelector: {}` "allow all namespaces" rule -- proved live (delete policy -> works, re-add identical rule -> blocked again, swap to `ipBlock: cidr: 10.42.0.0/16` -> works). Found and fixed the identical broken pattern on 4 more ArgoCD NetworkPolicies (applicationset-controller, dex-server, notifications-controller, repo-server) that were equally unreachable, not just the one port. Added a ServiceMonitor, confirmed live via Prometheus's targets API (`up`) and a real query (`argocd_app_info`, 42 results). All 5 policies were also untracked in git since the 2026-05-31 manual bootstrap -- brought under GitOps here too (2026-07-07) |
+| REL-062 | Reliability | **CORRECTED, PROPOSED** | Original entry claimed PBS's vzdump and Velero's backup stacked at the same 03:00 instant -- WRONG, retracted here: mini runs CEST (UTC+2), vzdump's "03:00" is 01:00 UTC, Velero's schedule is 03:00 UTC -- 2 hours apart, never overlapped. Re-checked with a full week of Prometheus history: Velero's OWN backup alone pushes host temp to 82-90C every single night (2026-07-04 hit 90C with zero alert). 2026-07-07's alert wasn't a one-off stacking incident, it's this nightly pattern crossing the alert threshold. Moved schedule to 05:00 UTC (clear of vzdump's real window) as hygiene only -- explicitly not a thermal fix, since Velero alone already reaches 82-90C regardless of the hour. Real takeaway: this is a standing nightly near-freeze risk, not a rare fluke (2026-07-07) |
 | REL-056 | Reliability | **PARTIAL** | Autonomy-readiness task 1: tiered Renovate auto-merge -- stateless/CI/dev-tooling patch-minor-digest auto-merges after CI-green + 3-day soak; a named stateful/critical list (Vault/Authelia/Garage/Vaultwarden/DBs/Nextcloud/Paperless/Immich/Gitea/Velero-plugin) plus all majors stay PR-only, grouped+labeled. Digest pinning added. Config-validated, NOT merged -- account owner reads the tiering first per instruction (2026-07-07) |
 | REL-055 | Reliability | **RESOLVED** | Autonomy-readiness task 2: CrashLoopBackOff/KubeJobFailed/NodeNotReady existed as rules but shipped severity=warning, never routed to Discord -- added explicit alertname route. ArgoCD Degraded/OutOfSync had zero alerting AND its metrics port turned out to be dead (confirmed live via `/proc/net/tcp`, root cause not found) -- pivoted to `argocd-notifications-controller` (a generic webhook service reusing the same Discord URL), found and fixed a real nil-pointer bug in the sync-failed trigger expression live. cert-manager and Velero (goroutine-driven, no native Job -- `KubeJobFailed` could never catch it) had zero metrics scraping at all -- added ServiceMonitors + PrometheusRules for both. Every fix proven with a real fired alert reaching Discord, user-confirmed both times, not just config review. Also broke and immediately fixed ArgoCD's own application-controller mid-diagnosis (bad `kubectl patch` dropped its exec args, ~2min crash loop, reverted clean) (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
