@@ -1064,7 +1064,7 @@ the user noticed before I'd finished diagnosing it.
 
 ---
 
-### REL-020 — Radarr's database hit a transient NFS I/O error on restart; surfaced a live, un-migrated SQLite-on-NFS risk · **PARTIAL** (2026-06-25)
+### REL-020 — Radarr's database hit a transient NFS I/O error on restart; surfaced a live, un-migrated SQLite-on-NFS risk · **RESOLVED** (2026-06-25 incident; underlying risk closed 2026-07-06)
 
 Found while testing `readOnlyRootFilesystem` on the jellyfin/usenet media stack (SEC-012):
 restarting Radarr's pod (to apply the patch) made it fail to start with `Database file:
@@ -1090,13 +1090,16 @@ healthy. Radarr was silently down until this was caught.
   (`Backups/scheduled/radarr_backup_*.zip`) existed as a fallback but wasn't needed.
   sonarr's and bazarr's databases were also checked (`integrity_check: ok`) as a
   precaution.
-- **Not fixed:** the four PVCs (`sonarr-config`, `radarr-config`, `bazarr-config`,
-  `sabnzbd-config`) are still on `nfs-client`. Migrating them to `local-path` (the
-  established fix for every other SQLite app in this repo) is real, separate work —
-  deferred here since this whole stack is already scheduled for removal once the
-  media-acq LXC cutover lands (WRK-006, blocked on a real Mullvad config). If the
-  cutover slips, this should be revisited on its own rather than left as a live,
-  known risk indefinitely.
+- **Resolved, re-checked 2026-07-06:** the WRK-006 cutover this finding was waiting on
+  has completed — confirmed live that `kubectl get deploy/pvc -n apps` returns nothing
+  for `sonarr`/`radarr`/`bazarr`/`sabnzbd` at all, and `ct-srv-media-acq-01`'s
+  `/opt/media-acq` (where these apps' config/SQLite databases now live) is on the LXC's
+  own local ZFS subvolume (`rpool/data/subvol-202-disk-0`), not NFS. The underlying
+  SQLite-on-NFS risk this finding describes no longer applies — not because the PVCs
+  were migrated to `local-path` as originally proposed, but because the apps aren't on
+  any Kubernetes-provisioned storage at all anymore. This closes out cleanly because
+  the dependency (WRK-006) resolved as *correct-by-design* (see WRK-006's own updated
+  entry), not because of a pending removal that might still slip.
 - **Also missing:** none of these five Deployments have a liveness probe, which is why
   Radarr's failure was invisible to Kubernetes. Not added here (would need per-app
   endpoint/auth research, out of scope for this incident) but worth doing regardless of
@@ -2034,7 +2037,7 @@ no source documents.
 
 ---
 
-### WRK-006 — Media acquisition stack: dedicated VPN-isolated LXC (provisioned & deployed, 2026-06-24)
+### WRK-006 — Media acquisition stack: dedicated VPN-isolated LXC · **RESOLVED** (2026-07-06 — verified correct as designed, not "removed")
 
 SABnzbd had a hand-rolled Mullvad WireGuard kill switch (init container + manual
 iptables) but the WireGuard config was a placeholder — fails closed (no leak) but
@@ -2074,8 +2077,30 @@ download traffic itself.
   byte-for-byte final (a few SQLite WAL files were locked by the still-running k8s pods
   during the copy) — the real, final sync happens at actual cutover time with the
   source apps stopped.
-- **Still blocked on:** a real Mullvad WireGuard config (account + generated config
-  from the user — can't be created on their behalf).
+- **Resolution, re-checked 2026-07-06:** the gluetun/Mullvad half of this decision was
+  never completed and is no longer needed. Live-verified via `docker ps` on
+  `ct-srv-media-acq-01` that no `gluetun` container exists — the stack settled on a
+  simpler final design instead, documented in the live `docker-compose.yml`'s own
+  comment block: **SABnzbd connects directly to Eweka over SSL/NNTPS (port 563,
+  `ssl=1`/`ssl_verify=2` confirmed live in `sabnzbd.ini`)** — already fully encrypted
+  end-to-end to the provider, so a VPN/proxy layer on the download path adds no privacy
+  benefit and costs real throughput + risks Eweka flagging the account for
+  apparent IP-sharing (a known issue with VPN IPs shared across many subscribers).
+  **The Tor SOCKS5 proxy stays** for its original, different purpose: NZBHydra2's
+  *indexer search queries* (to NZBGeek/DrunkenSlug/etc. — HTTP requests that are not
+  inherently encrypted/IP-hidden the way NNTPS downloads are). Confirmed live in
+  `nzbhydra.yml`: `proxyType: SOCKS`, `proxyHost`/`proxyPort` pointing at the Tor
+  container (`9150`), configured with no direct-connection fallback — a Tor outage
+  blocks indexer queries rather than silently leaking the home IP (fail-closed by
+  design). One explicit exception exists: `proxyIgnoreDomains: [nzbfinder.ws]`
+  bypasses Tor for that specific indexer. Full rationale captured in
+  `docs/decisions/ADR-013-tor-proxy-indexer-queries.md`.
+- **Not touched, on purpose:** confirmed the SABnzbd-side kill-switch/VPN concern from
+  this finding's original opening was really about the *download* path, which the
+  direct-SSL design already addresses without needing gluetun at all — nothing here
+  was "removed," the architecture that shipped was simply different (and simpler) than
+  ADR-010's original gluetun-for-everything plan, and re-verified as the *correct*
+  choice rather than an incomplete one.
 
 ### WRK-007 — Jellyfin moved to a dedicated GPU-passthrough LXC · **RESOLVED** (2026-06-24)
 
@@ -2690,7 +2715,7 @@ where jams actually stick.
 | REL-017 | Reliability | **RESOLVED** | `mc-server-2` (Minecraft, port 25565) had no DNAT rule at all on the live router -- only the forward-filter ALLOW rule existed, never the actual NAT rewrite. Confirmed via the router's own REST API, fixed, verified with a real protocol-level handshake against the public IP (2026-06-24) |
 | REL-018 | Reliability/Security | **RESOLVED** | `kubernetes/system/*.yml` had zero ArgoCD tracking -- `kubectl apply` couldn't prune removed resources. Found a live regression in the gap: a duplicate, unrestricted `traefik-dashboard` IngressRoute was periodically overwriting the correct path-restricted one via selfHeal. Added `system-manifests` Application, removed the duplicates (2026-06-24, #124) |
 | REL-019 | Reliability | **RESOLVED** | `rpool` hit hard ENOSPC, pausing all three k3s VMs (`qm status: io-error`) -- root cause was Velero's `daily-backup` (30-day TTL, `defaultVolumesToFsBackup: true`) backing up Garage's own data volume into Garage's own S3 backend nightly, an unbounded circular write. Excluded Garage's volumes from FS backup, paused the schedule pending verification, fixed `pve-exporter`'s never-completed auth token (had shipped with a plaintext `REPLACE_WITH_TOKEN_VALUE` placeholder, 401 since deployment), added ZFS capacity alerting (2026-06-25) |
-| REL-020 | Reliability | **PARTIAL** | Radarr's database hit a transient NFS I/O error on restart (no liveness probe, so Kubernetes reported it healthy while actually down) -- `integrity_check` came back clean, a WAL checkpoint fixed it with zero data loss. Surfaced that `sonarr/radarr/bazarr/sabnzbd-config` are still on `nfs-client`, the same storage class already documented unsafe for SQLite -- missed by the original migration audit, not fixed here (stack is slated for removal via WRK-006) (2026-06-25) |
+| REL-020 | Reliability | **RESOLVED** | Radarr's database hit a transient NFS I/O error on restart (no liveness probe, so Kubernetes reported it healthy while actually down) -- `integrity_check` came back clean, a WAL checkpoint fixed it with zero data loss. Surfaced that `sonarr/radarr/bazarr/sabnzbd-config` were on `nfs-client`, the same storage class documented unsafe for SQLite -- closed out 2026-07-06: the WRK-006 cutover completed, these apps no longer run in k8s at all (config lives on the media-acq LXC's local ZFS storage, zero NFS involvement), so the underlying risk no longer exists (2026-06-25 / 2026-07-06) |
 | REL-021 | Reliability/Security | **PARTIAL** | Authelia's readOnlyRootFilesystem (SEC-012) passed a live test, then crash-looped in production hours later (35+ restarts, generic fatal error, no detail) -- a live outage on home.woitzik.dev. Reverted; root cause of the intermittent failure still unknown. Also found and fixed a related but separate SEC-012 regression on homepage (EROFS creating docker.yaml) in the same response (2026-06-25) |
 | REL-022 | Reliability/Security | **RESOLVED** | Third SEC-012 readOnlyRootFilesystem regression, same class as REL-021: open-webui's static branding assets (favicons, splash, loader.js) failed to write under EROFS on every boot. Fixed with an init container that copies the existing static dir into an emptyDir before overlaying it, preserving required assets (fonts/, swagger-ui/) that a bare emptyDir would have wiped (2026-06-25) |
 | REL-023 | Reliability | **PARTIAL** | Garage logging recurring "Unable to decode entry of object" -- traced to 8 corrupted Velero/kopia backup chunks for nfs-provisioner-root and two apps PVs, likely from the REL-019 disk-full window. No live data affected, but a fresh ad-hoc backup reproduced a real, repeatable failure backing up nfs-provisioner-root specifically. Root cause of that cancellation not yet found (2026-06-25) |
@@ -2721,7 +2746,7 @@ where jams actually stick.
 | WRK-003 | Workloads | **RESOLVED** | Paperless fails on cluster restart due to Vault seal gap |
 | WRK-004 | Workloads | **RESOLVED** | paperless-gpt failing on every document; Ollama iGPU (Vulkan) crashing constantly under load -- switched to CPU-only |
 | WRK-005 | Workloads | **PARTIAL** | Paperless data-quality pass: missing archives (nfs-client related, fixed) + 5 "hallucinated" docs were actually scanned upside-down (fixed) + LLM_MODEL occasionally returns chatty-assistant text instead of short field values (low-frequency, not fixed) (2026-06-24) |
-| WRK-006 | Workloads | **IN PROGRESS** | Media acquisition stack moved to a dedicated gluetun/Mullvad-isolated LXC -- provisioned, deployed, kill-switch verified failing closed; blocked on a real Mullvad config + final cutover (2026-06-24, ADR-010) |
+| WRK-006 | Workloads | **RESOLVED** | Media acquisition stack moved to a dedicated LXC (ADR-010). The gluetun/Mullvad half was never finished and isn't needed -- re-verified 2026-07-06: SABnzbd connects directly to Eweka over SSL/NNTPS (already fully encrypted, no VPN benefit), Tor SOCKS5 stays for its original purpose (NZBHydra2 indexer-query IP protection, fail-closed, live-confirmed in nzbhydra.yml). Verified correct as designed, not incomplete -- see ADR-013 |
 | WRK-007 | Workloads | **RESOLVED** | Jellyfin moved to a dedicated GPU-passthrough LXC for VAAPI hardware transcode (shares mini's APU render node with ct-srv-ai-01's ROCm passthrough); config migrated and verified, old k8s resources removed (2026-06-24) |
 | WRK-008 | Workloads | **LOW** | Offsite backup to Cloudflare R2 (`kubernetes/system/velero/offsite-schedule.yml`/`r2-backuplocation.yml`) was scaffolded but never finished -- `r2-backuplocation.yml` has a literal `ACCOUNT_ID` placeholder and its referenced credential secret (`velero-r2-credentials`) doesn't exist anywhere (not Ansible Vault, not HashiCorp Vault). Confirmed not actively broken (Velero/ArgoCD just silently never create the BackupStorageLocation/Schedule, no error state) -- local backups to Garage/archive pool work fine. User decided to leave it deferred rather than complete or remove it now (2026-06-25) |
 | WRK-009 | Workloads | **RESOLVED** | Immich stuck on v1.109.2 with no external access — fresh install v2.7.5 (VectorChord postgres, Valkey, port 2283), Cloudflare Tunnel for `photos.woitzik.dev` (2026-06-27). Since bumped: postgres 14->16 (REL-030, 2026-07-05), server/ML v2.7.5->v3.0.1 (REL-053, 2026-07-06) |
