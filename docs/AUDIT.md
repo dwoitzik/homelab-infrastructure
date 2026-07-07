@@ -2513,6 +2513,43 @@ both sides already agreeing on `16`, a no-op).
 
 ---
 
+### REL-054 — Kubeconform CI/pre-commit rate-limit fix (PR #306) was a mitigation, not durable · **RESOLVED** (2026-07-06)
+
+PR #306 added kubeconform's `-cache` flag backed by `actions/cache`, keyed on the k8s
+version + a hash of the manifest tree, to stop `raw.githubusercontent.com` 429s from
+failing CI on PRs that touched zero Kubernetes manifests. Re-assessed per this audit
+pass's Task 5: verified this was a **mitigation, not a fix** — it reduces repeat network
+calls across cache-hit runs, but a cold cache (first run, evicted after 7 days unused,
+or a manifest introducing a schema never seen before) still falls through to a live
+network call, and a genuine network failure at that point is a **hard error**, not a
+clean skip — `-ignore-missing-schemas` only suppresses true 404s, not 429s/timeouts.
+
+**Proved this live**, not assumed: reran kubeconform against every manifest under
+`kubernetes/` with a deliberately broken proxy (`https_proxy=http://127.0.0.1:1`, so
+any network attempt fails immediately) using the `-cache` approach — a schema not
+already in the cache directory hard-failed CI (`exit 123`), confirming the durability
+gap is real, not theoretical.
+
+**Fix:** vendored the JSON schemas for every built-in kind actually used under
+`kubernetes/` into `ci/kubeconform-schemas/v1.31.0-standalone/` (15 files, 3.0 MB — the
+15 built-in resources; the ~20 CRD kinds like `Application`/`IngressRoute`/`Certificate`
+have no upstream schema in `yannh/kubernetes-json-schema` at all and stay skipped via
+`-ignore-missing-schemas` either way, unaffected by this change). Both the pre-commit
+hook and CI job now use `-schema-location` pointing only at this local directory —
+removed the `actions/cache` step entirely, since there's nothing left to cache against.
+Reran the same broken-proxy test against the new `-schema-location` setup: `Errors: 0`,
+`exit 0` — fully offline, confirmed with network hard-blocked, not just "should work."
+
+- **Refresh path documented:** `ci/kubeconform-schemas/README.md` — a PR introducing a
+  new *built-in* kind not yet vendored needs one local `kubeconform -debug` run + `curl`
+  to add the missing schema file, same one-time cost the old `-cache` approach had on
+  its first-ever cold run, but now it's an explicit, reviewable commit instead of a
+  silent live network dependency in CI.
+- **Blast radius:** CI/pre-commit tooling only — no application manifests changed, no
+  live cluster/host state touched.
+
+---
+
 ### REL-032 — Media acquisition stack: no autoheal, recurring silent queue jams · **RESOLVED** (2026-07-02)
 
 Two distinct "usenet does nothing" recurrences in 24h (2026-07-01 permission bug, 2026-07-02
@@ -2652,6 +2689,7 @@ where jams actually stick.
 | REL-051 | Reliability | **DEFERRED (deliberate)** | PBS offsite backup to Google Drive's cron job was missing live -- confirmed with the account owner this was an intentional disable (insufficient Drive storage quota), not a bug. Stale Vault rclone token (would've clobbered the working live token) fixed anyway; cron explicitly set `state: absent` to match the real decision instead of silently drifting back to `present`. Also fixed an unrelated idempotency bug (PBS force-restart task ran on every Ansible pass, moved to a handler). Underlying Google Drive API throttling on PBS's many-small-file format (~12-week ETA for a full sync) documented for if this is ever revisited with more storage (2026-07-06) |
 | REL-052 | Reliability | **RESOLVED** | First real, live-verified PBS restore test (`ct-srv-atlantis-01` snapshot restored to a scratch vmid, booted, Docker stack came up clean, data intact, test container destroyed) -- `DISASTER-RECOVERY.md`'s restore procedure had never actually been tried before. Found and documented a real gotcha (PBS restore duplicates the original's static IP/MAC, causing a live conflict if started alongside the still-running original) and a bigger doc-accuracy gap (the runbook still pointed at the Google Drive offsite copy as a fallback for total PBS-storage loss, which REL-051 confirms doesn't actually have usable data) (2026-07-06) |
 | REL-053 | Reliability | **RESOLVED** | Immich major bump v2.7.5->v3.0.1 (PR #273, the last of the 2026-07 deferred Renovate majors) -- checked upstream breaking changes first (API-only, no DB migration needed since VectorChord already in place per REL-030), took a real pg_dumpall backup, merged, verified live: 0 restarts, identical asset/asset_face row counts (11553/5461), API reports v3.0.1, login page reachable (2026-07-06) |
+| REL-054 | Reliability | **RESOLVED** | PR #306's kubeconform rate-limit fix (`-cache` + `actions/cache`) was a mitigation not a fix -- proved live with a broken proxy that a cold-cache/never-seen schema still hard-fails CI on network error (`-ignore-missing-schemas` only catches 404s, not 429s/timeouts). Vendored the 15 built-in-kind schemas actually used under `kubernetes/` into `ci/kubeconform-schemas/`, switched pre-commit + CI to `-schema-location` pointing only at that local dir -- reran the same broken-proxy test, `Errors: 0`, fully offline. CRD kinds (Application/IngressRoute/etc.) still skip via `-ignore-missing-schemas`, unaffected (2026-07-06) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
 
 ---

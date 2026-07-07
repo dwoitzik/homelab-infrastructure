@@ -7,7 +7,7 @@ repos:
       - id: check-yaml
         args: [--multi]
       - id: check-added-large-files
-        exclude: ^(ansible/roles/monitoring_core/templates/snmp\.yml\.j2|terraform/providers/.*\.zip)$
+        exclude: ^(ansible/roles/monitoring_core/templates/snmp\.yml\.j2|terraform/providers/.*\.zip|ci/kubeconform-schemas/.*)$
 
   - repo: local
     hooks:
@@ -86,14 +86,20 @@ repos:
         name: Kubeconform
         description: >-
           Validate Kubernetes manifests against the 1.31 API schema.
-          CRD types (unknown schema) are skipped with -ignore-missing-schemas.
-          Non-manifest YAML files (e.g. Authelia user DB) are excluded.
+          Schemas are read entirely from the vendored ci/kubeconform-schemas/
+          directory via -schema-location -- zero network calls, so this can't
+          flake on raw.githubusercontent.com's rate limit. See
+          ci/kubeconform-schemas/README.md to refresh after adding a new kind.
+          CRD types with no upstream schema (Application, IngressRoute, etc.)
+          are skipped with -ignore-missing-schemas, same as always. Non-manifest
+          YAML files (e.g. Authelia user DB) are excluded.
         entry: bash -c '
           export PATH="$HOME/.local/bin:$PATH";
           find kubernetes/ -name "*.yaml" -o -name "*.yml" |
             grep -v users_database |
             xargs kubeconform
               -kubernetes-version 1.31.0
+              -schema-location "ci/kubeconform-schemas/{{ .NormalizedKubernetesVersion }}-standalone/{{ .ResourceKind }}{{ .KindSuffix }}.json"
               -ignore-missing-schemas
               -summary
               -exit-on-error'
