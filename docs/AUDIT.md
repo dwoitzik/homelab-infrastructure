@@ -2722,6 +2722,56 @@ reappearing.
 
 ---
 
+### REL-059 — unbound: answer `home.lan` locally, stop paying full recursion for NTP noise · **CONFIGURED, awaiting apply** (2026-07-07)
+
+Companion to REL-058. Two fixes to `ansible/roles/unbound/templates/unbound.conf.j2`,
+independent of whether/when the DHCP-side fix actually lands (existing leases keep
+`home.lan` until renewal regardless):
+
+1. **`local-zone: "home.lan." static`** — an empty static zone, answers NXDOMAIN
+   instantly from unbound itself for anything under `home.lan` with zero recursion.
+   There was never a real internal zone here to preserve; it was always just a leftover
+   DHCP search-domain suffix. This is the immediate fix that doesn't wait on DHCP leases
+   to renew.
+2. **`local-data` overrides for `ptbtime{1,2,3}.ptb.de`** — these 3 hostnames (AVM/
+   Fritz!Box's default NTP servers) accounted for ~24% of all DNS traffic, ~440k/7d
+   queries. Traced the actual client IPs via AdGuard's own query log
+   (`grep querylog.json`, not guessing): `192.168.178.20/23/25` — the **Fritz!Box's own
+   LAN subnet**, not any k3s node or container. This volume is unrelated to the k3s
+   migration; it was just noticed at the same time. Those 3 devices aren't identified
+   or manageable from this repo, so instead of chasing them down, made answering them
+   free: `local-data` serves the current real IPs (confirmed via `dig`, 2026-07-07)
+   instantly from unbound's own zone with no upstream re-query, regardless of how often
+   the unidentified devices ask or how short ptb.de's actual TTL is. This changes
+   nothing about where the resulting NTP traffic goes, only the cost of answering the
+   DNS query.
+   - **Maintenance note, flagged not hidden:** if ptb.de ever rotates these IPs, NTP
+     sync for whatever's using them silently starts failing instead of being visible as
+     high DNS volume. An occasional `dig ptbtime1.ptb.de` is the cheap way to catch
+     that.
+
+**Validated, not just written:** no `unbound-checkconf` binary in this minimal image, so
+validated by copying the rendered config (zero Jinja variables in this template — it's
+static) into a disposable container from the same image and running
+`unbound -c <file> -d -v`; got `Start of unbound 1.25.1` with no preceding fatal
+parse error before the forced timeout, confirming the syntax parses. Test files cleaned
+up off the live host afterward, nothing left behind, live `unbound.conf` untouched.
+
+- **Not yet applied** — this is an Ansible-managed config file; the actual restart
+  (`community.docker.docker_compose_v2 ... state: restarted`) happens via a normal
+  playbook run, not something to trigger ad hoc outside that workflow.
+- **Not addressed here:** the `ndots:5` pod-level tail (external names still try 3
+  cheap, non-recursing cluster-suffix lookups before the bare name) — the `home.lan`
+  fix above removes the expensive recursion; per-pod `dnsConfig.options: ndots:1` would
+  be a further optional micro-optimization for specific high-QPS external-calling
+  workloads, not applied broadly here given the blast radius of touching every
+  Deployment for a much smaller marginal gain.
+
+**Effort:** Small — one template file, config-validated against a disposable container
+of the live image.
+
+---
+
 ### REL-035b — Memory-overcommit regression guard: two-tier model, not one sum · **RESOLVED** (2026-07-07)
 
 Follow-up to REL-035. That pass fixed CPU-scheduling contention (`cpu.units`) but left
@@ -2937,6 +2987,7 @@ where jams actually stick.
 | REL-054 | Reliability | **RESOLVED** | PR #306's kubeconform rate-limit fix (`-cache` + `actions/cache`) was a mitigation not a fix -- proved live with a broken proxy that a cold-cache/never-seen schema still hard-fails CI on network error (`-ignore-missing-schemas` only catches 404s, not 429s/timeouts). Vendored the 15 built-in-kind schemas actually used under `kubernetes/` into `ci/kubeconform-schemas/`, switched pre-commit + CI to `-schema-location` pointing only at that local dir -- reran the same broken-proxy test, `Errors: 0`, fully offline. CRD kinds (Application/IngressRoute/etc.) still skip via `-ignore-missing-schemas`, unaffected (2026-07-06) |
 | REL-057 | Reliability | **PARTIAL** | Autonomy-readiness task 4 (report only): ArgoCD selfHeal PROVEN on for all 41 Applications. cert-manager renewal CONFIGURED but unproven (cert has never actually renewed yet). Backups: schedule proven reliable, but 2 of last 5 daily runs actually FAILED on a Garage S3 timeout (separate from REL-019), and `restores.velero.io` is empty cluster-wide -- Velero-level restore has NEVER been tested (REL-052 tested PBS/hypervisor restore only, a different system). Backup scope includes the `garage` namespace itself, confirming REL-003's circular-dependency risk live (skip-list, not touched) (2026-07-07) |
 | REL-058 | Reliability | **PARTIAL** | DNS query volume 40k->1.8M/7d post-K3s, part 1: live-confirmed (`networkctl status`) DHCP hands out `home.lan` as pod search-domain suffix, and unbound has no authoritative zone for it (unlike `fritz.box`), so every external lookup recurses and fails (~341ms avg). Terraform never declared `domain` on the DHCP network resources and the last state backup shows null -- live drift, likely a manual RouterOS change bypassing Terraform. Added `domain = ""` explicitly to force-correct on next Atlantis apply. Not yet applied (2026-07-07) |
+| REL-059 | Reliability | **PARTIAL** | DNS query volume, part 2: added `local-zone: home.lan. static` to unbound (instant NXDOMAIN, zero recursion, doesn't wait on DHCP leases to renew like REL-058 does). Separately found ptbtime1/2/3.ptb.de (~24% of ALL DNS traffic, ~440k/7d) traced via AdGuard's query log to 3 client IPs on the Fritz!Box's own LAN (192.168.178.20/23/25) -- unrelated to k3s, just noticed at the same time. Added `local-data` overrides (current real IPs) so answering them is free regardless of those unidentified devices' query rate. Config-validated via a disposable container of the live unbound image (no unbound-checkconf binary in this minimal image). Not yet applied (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
 
 ---

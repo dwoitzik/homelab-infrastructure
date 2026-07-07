@@ -69,6 +69,45 @@ server:
     # Root hints
     root-hints: "/etc/unbound/root.hints"
 
+    # DNS query-volume investigation (2026-07-07): 7d query volume grew ~45x
+    # (40k -> 1.8M) post-K3s migration. Two distinct root causes found, both
+    # fixed here (see docs/AUDIT.md REL-058/REL-059 for the full writeup).
+    #
+    # Root cause 1: DHCP hands out "home.lan" as the pod/node search-domain
+    # suffix (being fixed at the source in terraform/stacks/network/dhcp.tf,
+    # REL-058), but unbound had no authoritative answer for it -- every
+    # lookup recursed all the way out and failed, ~341ms average. Existing
+    # DHCP leases won't pick up the domain fix until they renew/reboot, so
+    # this local-zone is the immediate, unconditional fix regardless of
+    # DHCP state: an empty "static" zone answers NXDOMAIN instantly from
+    # unbound itself, no recursion, for anything under home.lan that isn't
+    # explicitly listed below. There are no real *.home.lan records anyone
+    # intentionally created -- this was always just a leftover DHCP domain
+    # suffix, never a real internal zone.
+    local-zone: "home.lan." static
+
+    # Root cause 2: ptbtime{1,2,3}.ptb.de (AVM/Fritz!Box's default NTP
+    # servers) accounted for ~24% of ALL DNS traffic (~440k/7d queries),
+    # confirmed via AdGuard's query log to come from 3 specific client IPs
+    # on the Fritz!Box's own LAN (192.168.178.20/23/25) -- NOT k3s nodes or
+    # containers, unrelated to the migration, just noticed at the same time.
+    # Those devices aren't identified or manageable from this repo, so
+    # instead of trying to stop them querying, these local-data overrides
+    # make answering them free: unbound serves these instantly from its own
+    # zone data with no upstream re-query, at whatever frequency the
+    # unidentified devices ask, regardless of ptb.de's real (apparently
+    # very short) TTL. Same real IPs those names resolve to today (dig,
+    # 2026-07-07) -- this changes nothing about where NTP traffic actually
+    # goes, only how expensive answering the DNS query is.
+    # Maintenance note: if ptb.de ever rotates these IPs, NTP sync for
+    # whatever's using them would silently start failing instead of DNS
+    # volume being high -- worth an occasional `dig ptbtime1.ptb.de` to
+    # confirm these are still current.
+    local-zone: "ptb.de." transparent
+    local-data: "ptbtime1.ptb.de. A 192.53.103.108"
+    local-data: "ptbtime2.ptb.de. A 192.53.103.104"
+    local-data: "ptbtime3.ptb.de. A 192.53.103.103"
+
 stub-zone:
     name: "fritz.box"
     stub-addr: 192.168.178.1
