@@ -1,19 +1,19 @@
-# Pending Major-Version Upgrades
+# Major-Version Upgrades — completed (formerly "Pending")
 
-Four Renovate PRs are open for major-version bumps on stateful/critical services
+Four Renovate PRs were open for major-version bumps on stateful/critical services
 (PR #204 vault-unseal CLI, PR #214 postgres for nextcloud+paperless, PR #212
 nextcloud app, PR #202 immich-postgres). Renovate only bumps the image tag — none
-of these are safe to merge as-is, because a bare image swap on a database
+of these were safe to merge as-is, because a bare image swap on a database
 container does **not** perform the actual data/schema migration; the new
-major-version binary will refuse to start against the old on-disk format
-(Postgres, Nextcloud) or may behave unpredictably against a mismatched server
-(Vault CLI).
+major-version binary refuses to start against the old on-disk format (Postgres,
+Nextcloud) or may behave unpredictably against a mismatched server (Vault CLI).
 
-This doc is the migration plan for each. **Status as of 2026-07-06: 3 of 4 done.**
-REL-028, REL-029, and REL-030 were all executed and verified during 2026-07-04/05
-(see `docs/AUDIT.md` for each) — this doc's own "nothing has been executed" framing
-was stale for weeks and is corrected here. **Only REL-027 (Vault unseal-CLI) remains
-pending** — its section below is still an accurate, not-yet-run plan.
+This doc was the migration plan for each. **Status as of 2026-07-06: all 4 done.**
+REL-028/029/030 were executed 2026-07-04/05; REL-027 was merged 2026-07-04 and its
+live verification (force-restart + confirm the unseal script actually completes, not
+just that the pod is Running) was done 2026-07-06 — see each section below and
+`docs/AUDIT.md` for details. Nothing is pending anymore; this doc is kept as the
+historical migration record and as a reference plan for similar future major bumps.
 
 **General rule for all four:** snapshot the LXC/VM the k3s node runs on via Proxmox
 *and* take an application-level backup (pg_dump, raft snapshot, etc.) before
@@ -22,7 +22,15 @@ apply happens inside a running pod, not at the VM level.
 
 ---
 
-## REL-027 — Vault unseal-helper CLI: 1.21.4 → 2.0.3 (PR #204)
+## REL-027 — Vault unseal-helper CLI: 1.21.4 → 2.0.3 (PR #204) · DONE (merged 2026-07-04, verified 2026-07-06)
+
+Merged and running for two days before anyone re-checked it. Verified properly on
+2026-07-06 rather than trusting the image tag alone: took a real raft snapshot first,
+then force-deleted the live `vault-0` pod to trigger a genuine re-seal-on-restart, and
+confirmed the unseal script actually completed (`vault-unseal`'s own logs: `"Unseal
+attempt done"`, timestamped right at the restart) with `vault status` showing
+`Sealed: false` immediately after. See `docs/AUDIT.md` REL-027 for the full writeup.
+Plan below kept for reference.
 
 **Scope correction:** this PR does **not** touch the actual Vault server. The
 server's version comes from the `hashicorp/vault` Helm chart default
@@ -212,5 +220,4 @@ nextcloud-half + REL-029 together (they're coupled) → REL-028 paperless-half
 (isolated, do whenever). Don't batch more than one on the same day — each needs
 a clean verification window before the next.~~
 
-REL-030, REL-028, and REL-029 are done (see each section above). **Only REL-027
-remains** — its plan above is still current and ready to execute.
+All four are done — see each section above.
