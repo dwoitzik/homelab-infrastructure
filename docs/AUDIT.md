@@ -3271,6 +3271,72 @@ root-cause documentation, not remediation.
 
 ---
 
+### REL-064 — Post-Velero-fix thermal recheck · **PENDING, 0/3 nights observed** (2026-07-07)
+
+REL-062 (corrected) established that Velero's own nightly backup, alone, pushes host
+temperature to 82–90°C every night regardless of `vzdump` — the schedule move to
+`0 5 * * *` (merged in PR #327, live on `main` as of 2026-07-07 16:03 UTC) is
+explicitly **hygiene, not a thermal fix**. Separately, physical cooling work
+(cleaning/repaste) is being done outside this repo. This entry tracks the open
+question: after both changes, does peak nightly temperature actually drop below 80°C,
+or does Velero's IO/CPU load alone keep driving it high regardless of what time it
+runs?
+
+**Why this can't be answered yet:** the schedule change only took effect today
+(2026-07-07); the first backup run under the new `05:00 UTC` schedule hasn't happened
+yet (next occurrence: 2026-07-08 05:00 UTC). There is no fabricating this — it needs
+2–3 real nights of Prometheus data after both the schedule change and the physical
+cooling work are actually in place. Marking this `PENDING`, not `PROPOSED` or
+`RESOLVED`, is deliberate: this is the same "PROVEN-when-the-graph-drops" standard
+applied to the DNS fixes (REL-058/059) and Velero backup reliability (REL-057b) earlier
+this session — a merged config change is not the same as a proven outcome.
+
+**Pre-fix baseline, already established (from REL-062's corrected investigation, for
+comparison against the recheck data):**
+
+| Date | Peak temp, then-03:00–03:10 UTC window |
+|---|---|
+| 2026-07-01 | 84.6°C |
+| 2026-07-02 | 88.4°C |
+| 2026-07-03 | 86.9°C |
+| 2026-07-04 | 90.0°C |
+| 2026-07-05 | 82.6°C |
+| 2026-07-06 | 81.6°C |
+| 2026-07-07 | 85.5°C (the alert night) |
+
+**Methodology for the recheck** (to run once 2–3 nights have passed after
+`05:00 UTC` under the new schedule):
+
+```promql
+max_over_time(node_hwmon_temp_celsius{group="pve_hosts"}[10m] @ <each 05:00-05:15 UTC timestamp>)
+```
+
+or equivalently, a range query over each night's `05:00–05:15 UTC` window, same method
+used for the pre-fix baseline table above, for direct comparability.
+
+**Decision rule, stated in advance so this isn't re-litigated after the fact:**
+
+- **If peak temp drops below 80°C** across the recheck window: cooling work resolved
+  it, schedule move was hygiene as intended, close this as `RESOLVED`.
+- **If peak temp stays in the 82–90°C range** even after cooling work: Velero's own
+  backup load (not the schedule, not `vzdump`) is the real driver, and the fix has to
+  be load-side, not schedule-side. Candidates to propose at that point (not proposed
+  now — no evidence yet to justify one over another): `--backup-item-operation-timeout`
+  or concurrency limits on Velero's `node-agent` DaemonSet, `ionice`/`nice` wrapping
+  the kopia filesystem-backup process, or narrowing `defaultVolumesToFsBackup` scope
+  (currently every namespace) to only the PVCs that actually need filesystem-level
+  backup instead of relying on volume snapshots where available.
+
+**Not proposing a fix in this PR** — no data yet to justify one, and the decision rule
+above already commits to what would trigger a load-side fix versus closing this as
+resolved by the cooling work. Revisit after 2026-07-10 UTC at the earliest (3 nights
+past the first `05:00 UTC` run).
+
+**Effort:** N/A yet — this is a report-only checkpoint, not a fix. Actual effort will
+depend entirely on which branch of the decision rule above the data lands on.
+
+---
+
 ### REL-055 — Autonomy-readiness task 2: Discord alert coverage gaps, proven live · **RESOLVED** (2026-07-07)
 
 Audit of steady-state alert coverage (ArgoCD Degraded/OutOfSync, pod CrashLoopBackOff,
@@ -3532,6 +3598,7 @@ where jams actually stick.
 | REL-055b | Reliability | **RESOLVED** | Corrected REL-055's own misdiagnosis of the ArgoCD metrics-port GAP -- `/proc/net/tcp6` (not checked before) showed it was listening dual-stack the whole time. Real cause: k3s's built-in kube-router NetworkPolicy controller doesn't correctly enforce a bare `namespaceSelector: {}` "allow all namespaces" rule -- proved live (delete policy -> works, re-add identical rule -> blocked again, swap to `ipBlock: cidr: 10.42.0.0/16` -> works). Found and fixed the identical broken pattern on 4 more ArgoCD NetworkPolicies (applicationset-controller, dex-server, notifications-controller, repo-server) that were equally unreachable, not just the one port. Added a ServiceMonitor, confirmed live via Prometheus's targets API (`up`) and a real query (`argocd_app_info`, 42 results). All 5 policies were also untracked in git since the 2026-05-31 manual bootstrap -- brought under GitOps here too (2026-07-07) |
 | REL-062 | Reliability | **CORRECTED, PROPOSED** | Original entry claimed PBS's vzdump and Velero's backup stacked at the same 03:00 instant -- WRONG, retracted here: mini runs CEST (UTC+2), vzdump's "03:00" is 01:00 UTC, Velero's schedule is 03:00 UTC -- 2 hours apart, never overlapped. Re-checked with a full week of Prometheus history: Velero's OWN backup alone pushes host temp to 82-90C every single night (2026-07-04 hit 90C with zero alert). 2026-07-07's alert wasn't a one-off stacking incident, it's this nightly pattern crossing the alert threshold. Moved schedule to 05:00 UTC (clear of vzdump's real window) as hygiene only -- explicitly not a thermal fix, since Velero alone already reaches 82-90C regardless of the hour. Real takeaway: this is a standing nightly near-freeze risk, not a rare fluke (2026-07-07) |
 | REL-063 | Reliability | **CONFIRMED** | PBS vzdump (the hypervisor safety net, the one backup layer with a real live-tested restore, REL-052) showed ERROR on 7 consecutive nights (06-26 through 07-02), not the 3 first noticed. Pulled every failure's full task log: identical cause each time, VM 9000 (a stopped template, `tpl-debian-13-cloudinit`, not a real guest) timing out on a ZFS base-volume zvol device link, always the LAST item attempted after every real, data-bearing guest had already backed up successfully. The safety net was reliable throughout, including during the failure streak -- only a non-critical template's tail-end backup ever failed. Already fixed 5 days before this check (`exclude 9000` in /etc/pve/jobs.cfg, confirmed via the live command line since 07-03) by someone outside this session -- this pass confirmed and documented it, no remediation needed. Flagged: the fix itself has zero IaC trail, same class of gap as REL-057b's Garage bucket management (2026-07-07) |
+| REL-064 | Reliability | **PENDING, 0/3 nights** | Post-Velero-fix thermal recheck: does peak nightly host temp actually drop below 80C after REL-062's schedule move (05:00 UTC, live as of 2026-07-07 16:03 UTC) plus separate physical cooling work, or does Velero's own IO/CPU load alone keep driving 82-90C regardless of schedule? Can't be answered yet -- the new schedule's first run hasn't happened. Documented pre-fix baseline (7 nights, 81.6-90.0C), exact PromQL methodology, and a decision rule stated in advance (below-80C -> RESOLVED by cooling; still 82-90C -> load-side fix needed, e.g. Velero concurrency limits/ionice/narrower defaultVolumesToFsBackup scope). Revisit 2026-07-10 UTC or later (2026-07-07) |
 | REL-056 | Reliability | **PARTIAL** | Autonomy-readiness task 1: tiered Renovate auto-merge -- stateless/CI/dev-tooling patch-minor-digest auto-merges after CI-green + 3-day soak; a named stateful/critical list (Vault/Authelia/Garage/Vaultwarden/DBs/Nextcloud/Paperless/Immich/Gitea/Velero-plugin) plus all majors stay PR-only, grouped+labeled. Digest pinning added. Config-validated, NOT merged -- account owner reads the tiering first per instruction (2026-07-07) |
 | REL-055 | Reliability | **RESOLVED** | Autonomy-readiness task 2: CrashLoopBackOff/KubeJobFailed/NodeNotReady existed as rules but shipped severity=warning, never routed to Discord -- added explicit alertname route. ArgoCD Degraded/OutOfSync had zero alerting AND its metrics port turned out to be dead (confirmed live via `/proc/net/tcp`, root cause not found) -- pivoted to `argocd-notifications-controller` (a generic webhook service reusing the same Discord URL), found and fixed a real nil-pointer bug in the sync-failed trigger expression live. cert-manager and Velero (goroutine-driven, no native Job -- `KubeJobFailed` could never catch it) had zero metrics scraping at all -- added ServiceMonitors + PrometheusRules for both. Every fix proven with a real fired alert reaching Discord, user-confirmed both times, not just config review. Also broke and immediately fixed ArgoCD's own application-controller mid-diagnosis (bad `kubectl patch` dropped its exec args, ~2min crash loop, reverted clean) (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
