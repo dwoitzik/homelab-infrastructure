@@ -1,0 +1,20 @@
+# Scrapes argocd-application-controller's app health/sync-status metrics
+# (argocd_app_info, argocd_app_health_status, etc.) now that
+# network-policies.yml's fix makes the port actually reachable cross-pod.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: argocd-metrics
+  namespace: argocd
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - argocd
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-metrics
+  endpoints:
+    - port: metrics
+      interval: 60s
