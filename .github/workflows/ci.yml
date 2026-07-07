@@ -75,12 +75,15 @@ jobs:
         run: tflint
 
   host-memory-overcommit-guard:
-    name: Host memory overcommit guard (REL-035)
+    name: Host memory overcommit guard (REL-035b, two-tier)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check total guest memory allocation on mini
+      # Hard gate (VM reservations + ARC + host reserve vs 44 GB) fails this
+      # job; the LXC soft check inside the same script only warns and never
+      # affects its exit code. See scripts/check-host-memory-overcommit.py.
+      - name: Check host memory allocation on mini
         run: python3 scripts/check-host-memory-overcommit.py
 
   terraform-cloudflare:
