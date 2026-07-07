@@ -20,6 +20,12 @@
 # nothing) and was never git-tracked at all -- same orphan-config class as
 # the REL-035/042 bugs above, just never noticed because an empty config
 # doesn't fail loudly.
+#
+# network-policies.yml added 2026-07-07 (REL-055b): same orphan-config class
+# again -- these 5 NetworkPolicies were live since the original 2026-05-31
+# manual bootstrap and never git-tracked. Brought under GitOps here after
+# fixing the bug they had (see the file's own header comment for the
+# namespaceSelector:{} / kube-router NetworkPolicy enforcement finding).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -32,7 +38,7 @@ spec:
     targetRevision: main
     path: kubernetes/system/argocd
     directory:
-      include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret}.yml'
+      include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret,network-policies}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
