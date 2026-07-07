@@ -2785,6 +2785,70 @@ of the live image.
 
 ---
 
+### REL-061 — cloudflare-ddns and nextcloud-cron 2h alert loop: dead token + stale-alert hygiene · **RESOLVED, awaiting merge** (2026-07-07)
+
+Both `cloudflare-ddns` (cert-manager namespace) and `nextcloud-cron` (apps namespace)
+appeared to be "failing on a ~2h loop." Root-caused each — they were two unrelated
+problems that happened to produce the same symptom.
+
+**cloudflare-ddns — a real, currently-live failure, silently masked:** `cloudflare-api-token-secret`
+turned out to be a bare, hand-created Secret (`kubectl apply`'d once on 2026-06-02,
+never touched since — not Vault/ExternalSecret-managed at all). Confirmed live via
+Cloudflare's own `/user/tokens/verify` endpoint: `"Invalid API Token"`. Not the "old
+global API key" hypothesis — the script already used a Bearer token correctly, the
+token itself had simply gone dead. **This same secret is also what
+`letsencrypt-production`'s `ClusterIssuer` uses for DNS-01 challenges** — meaning
+cert-manager's own certificate renewal (already flagged unproven in REL-057) would
+have failed had a real renewal been attempted before this was found.
+
+The script itself made this worse: it never checked `"success"` in either Cloudflare
+API response and always exited 0 regardless, so `KubeJobFailed` had nothing to alert
+on even though DNS updates had been silently broken for an unknown period.
+
+**Fixed:** found the exact same working token already in use by Terraform/Atlantis
+for the `cloudflare` stack (`ansible` vault: `cloudflare_api_token`/
+`vault_atlantis_cloudflare_api_token`) — verified live via Cloudflare's API (valid,
+active, and both `GET` and a real no-op `PUT` against the actual
+`cobblemon.woitzik.dev` record succeeded) before reusing it, rather than minting a new
+token and risking the REL-048 dashboard bug (silently drops permission groups when
+adding a 2nd one) again. Wired it into HashiCorp Vault (`secret/cloudflare`) with a
+proper `ExternalSecret`, replacing the dead hand-created Secret — same fix pattern as
+every other bare-Secret gap found this session. Verified end-to-end: manually
+triggered the CronJob, got a real, correct result (`IP unchanged (178.202.47.0),
+nothing to do`) instead of a masked failure. Also fixed the script to actually check
+`"success"` in both API responses and exit nonzero on a real failure, so this class of
+silent breakage can't recur invisibly.
+
+**nextcloud-cron — a real but old, non-recurring failure, not actually still
+happening:** the alert was firing on a Job from 2026-06-28/29, over a week old.
+Current runs are all clean (`exitCode: 0`). Original failure's pods were already
+garbage-collected by the time this was investigated — root cause not recoverable, and
+given zero recurrence in a week-plus, not worth chasing further.
+
+**The actual "2h loop" for both**: `failedJobsHistoryLimit: 1` keeps exactly one failed
+`Job` object around, but nothing rotates it out until a *newer* failure replaces it —
+it doesn't expire on its own. With no new failures for either job, the same stale
+`Job` sat there indefinitely, and Alertmanager's `repeatInterval: 2h` (REL-055's
+warning-tier route) kept re-notifying Discord for a problem that, for nextcloud-cron,
+was already over a week gone. Deleted both stale `Job` objects live, and added
+`ttlSecondsAfterFinished: 86400` to both CronJobs so a real failure gets 24h to be
+investigated but doesn't linger and re-alert forever afterward.
+
+- **Live-tested throughout**: token verified against the real Cloudflare API before
+  and after wiring; the fixed CronJob triggered manually and produced a genuine
+  (not masked) result; stale Job objects confirmed gone.
+- **Not attempted**: a live ACME DNS-01 challenge to directly prove cert-manager's
+  side works with the new token — the same token already proved `DNS:Edit` write
+  access on this exact zone via the `PUT` test, which is what DNS-01 needs; triggering
+  a real certificate operation just to double-confirm felt like an unnecessary risk in
+  an already-broad fix.
+
+**Effort:** Medium — the ddns token investigation (ruling out global-key first,
+finding the dead token, finding a working replacement already in use elsewhere) took
+longer than the mechanical CronJob hygiene fixes.
+
+---
+
 ### REL-056 — Renovate tiered auto-merge, config only · **CONFIGURED, awaiting review** (2026-07-07)
 
 Autonomy-readiness task 1. Previously every Renovate PR needed a manual merge
@@ -3245,6 +3309,7 @@ where jams actually stick.
 | REL-059 | Reliability | **PARTIAL** | DNS query volume, part 2: added `local-zone: home.lan. static` to unbound (instant NXDOMAIN, zero recursion, doesn't wait on DHCP leases to renew like REL-058 does). Separately found ptbtime1/2/3.ptb.de (~24% of ALL DNS traffic, ~440k/7d) traced via AdGuard's query log to 3 client IPs on the Fritz!Box's own LAN (192.168.178.20/23/25) -- unrelated to k3s, just noticed at the same time. Added `local-data` overrides (current real IPs) so answering them is free regardless of those unidentified devices' query rate. Config-validated via a disposable container of the live unbound image (no unbound-checkconf binary in this minimal image). Not yet applied (2026-07-07) |
 | REL-057b | Reliability | **RESOLVED** | Root-caused REL-057's ~40% recent Velero backup failure rate -- ruled out Garage CPU/memory/crash via Prometheus (all idle/flat during the failure windows), then found CNPG's own barman-cloud archiving for Authelia's Postgres was writing into the *same* Garage bucket Velero owns, tripping Velero's own bucket-validation (`BackupStorageLocation` was live `Unavailable`, "invalid top-level directories: [cnpg-postgres-authelia]"). Fixed with a new scoped bucket (`cnpg-backups`), verified a real base backup + WAL switch landing there *before* deleting the old 3632-object prefix from the shared bucket -- BSL flipped back to `Available` within 30s of the deletion, confirmed live (2026-07-07) |
 | REL-060 | Reliability | **RESOLVED, awaiting merge** | paperless-gpt CrashLoopBackOff since 13:43, traced to `icereed/paperless-gpt:v0.26.0` (auto-merged via PR #314 same day) -- new entrypoint runs `addgroup` at startup, fails under this Deployment's `readOnlyRootFilesystem: true`. Rolled back to v0.25.1 (verified live: clean startup, `1/1 Running`), added the package to renovate.json's PR-only tier so future bumps get manual review. Live cluster still flaps back to v0.26.0 via ApplicationSet-controlled selfHeal until merged -- a standalone-Application syncPolicy pause (used elsewhere this session) doesn't hold for ApplicationSet-generated apps (2026-07-07) |
+| REL-061 | Security | **RESOLVED, awaiting merge** | cloudflare-ddns's API token was a bare hand-created Secret since 2026-06-02, gone dead -- confirmed via Cloudflare's own verify endpoint ("Invalid API Token"). Same secret is also cert-manager's DNS-01 credential, meaning cert renewal would have failed too. Script never checked API response success and always exited 0, masking the failure from KubeJobFailed entirely. Fixed by reusing Terraform/Atlantis's already-working token (verified live: valid, active, real GET+PUT against the actual DNS record both succeeded) wired via a proper Vault ExternalSecret, plus making the script fail loud on real API errors. Separately found nextcloud-cron's "failure" was a single non-recurring event from a week+ ago still re-triggering Alertmanager's 2h repeat -- failedJobsHistoryLimit doesn't expire on its own; added ttlSecondsAfterFinished: 86400 to both CronJobs (2026-07-07) |
 | REL-056 | Reliability | **PARTIAL** | Autonomy-readiness task 1: tiered Renovate auto-merge -- stateless/CI/dev-tooling patch-minor-digest auto-merges after CI-green + 3-day soak; a named stateful/critical list (Vault/Authelia/Garage/Vaultwarden/DBs/Nextcloud/Paperless/Immich/Gitea/Velero-plugin) plus all majors stay PR-only, grouped+labeled. Digest pinning added. Config-validated, NOT merged -- account owner reads the tiering first per instruction (2026-07-07) |
 | REL-055 | Reliability | **RESOLVED** | Autonomy-readiness task 2: CrashLoopBackOff/KubeJobFailed/NodeNotReady existed as rules but shipped severity=warning, never routed to Discord -- added explicit alertname route. ArgoCD Degraded/OutOfSync had zero alerting AND its metrics port turned out to be dead (confirmed live via `/proc/net/tcp`, root cause not found) -- pivoted to `argocd-notifications-controller` (a generic webhook service reusing the same Discord URL), found and fixed a real nil-pointer bug in the sync-failed trigger expression live. cert-manager and Velero (goroutine-driven, no native Job -- `KubeJobFailed` could never catch it) had zero metrics scraping at all -- added ServiceMonitors + PrometheusRules for both. Every fix proven with a real fired alert reaching Discord, user-confirmed both times, not just config review. Also broke and immediately fixed ArgoCD's own application-controller mid-diagnosis (bad `kubectl patch` dropped its exec args, ~2min crash loop, reverted clean) (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |

@@ -12,8 +12,17 @@ spec:
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
+  # REL-061: without this, a failed Job object sits forever once it's the
+  # single most-recent failure (failedJobsHistoryLimit only rotates out old
+  # failures when a NEWER one arrives -- it doesn't expire on its own). That
+  # meant a real failure from days/weeks ago kept re-triggering
+  # KubeJobFailed's 2h Discord repeat_interval indefinitely, long after the
+  # underlying problem was gone, making a stale alert look like an ongoing
+  # one. 24h is long enough to actually investigate a real failure before
+  # it's cleaned up.
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 86400
       template:
         spec:
           restartPolicy: OnFailure
@@ -60,14 +69,33 @@ spec:
                     -H "Authorization: Bearer ${CF_API_TOKEN}" \
                     -H "Content-Type: application/json" \
                     "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records?type=A&name=${RECORD_NAME}")
+                  # REL-061: previously this script never checked "success" in
+                  # either response and always exited 0, so a dead/invalid
+                  # API token (confirmed live: this exact failure, silently,
+                  # for an unknown period) never surfaced as a failed Job --
+                  # KubeJobFailed had nothing to alert on even though DNS
+                  # updates were completely broken. Fail loud now instead.
+                  if ! echo "$RECORD_JSON" | grep -q '"success":true'; then
+                    echo "Cloudflare API rejected the record lookup: $RECORD_JSON"
+                    exit 1
+                  fi
                   RECORD_ID=$(echo "$RECORD_JSON" | sed -n 's/.*"id":"\([a-f0-9]*\)".*/\1/p' | head -1)
                   RECORD_IP=$(echo "$RECORD_JSON" | sed -n 's/.*"content":"\([0-9.]*\)".*/\1/p' | head -1)
+                  if [ -z "$RECORD_ID" ]; then
+                    echo "Could not find DNS record for ${RECORD_NAME} in response: $RECORD_JSON"
+                    exit 1
+                  fi
                   if [ "$CURRENT_IP" = "$RECORD_IP" ]; then
                     echo "IP unchanged ($CURRENT_IP), nothing to do"
                     exit 0
                   fi
                   echo "IP changed: $RECORD_IP -> $CURRENT_IP, updating record $RECORD_ID"
-                  curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${RECORD_ID}" \
+                  UPDATE_JSON=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${RECORD_ID}" \
                     -H "Authorization: Bearer ${CF_API_TOKEN}" \
                     -H "Content-Type: application/json" \
-                    --data "{\"type\":\"A\",\"name\":\"${RECORD_NAME}\",\"content\":\"${CURRENT_IP}\",\"ttl\":300,\"proxied\":false}"
+                    --data "{\"type\":\"A\",\"name\":\"${RECORD_NAME}\",\"content\":\"${CURRENT_IP}\",\"ttl\":300,\"proxied\":false}")
+                  echo "$UPDATE_JSON"
+                  if ! echo "$UPDATE_JSON" | grep -q '"success":true'; then
+                    echo "Cloudflare API rejected the record update"
+                    exit 1
+                  fi
