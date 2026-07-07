@@ -37,6 +37,11 @@
 #   Recommendation: leave this one as a documented manual runbook step
 #   in DISASTER-RECOVERY.md, not a Terraform resource, until the
 #   provider supports all+exclude directly.
+#
+# Merged 2026-07-07 (PR #337) with the import{} blocks below already clean
+# (2 to import, 0 to change) -- but the actual `terraform apply` that
+# performs the import hasn't run yet. Pending explicit per-project
+# authorization before applying.
 # =============================================================================
 
 # Short-form resource names (not the proxmox_virtual_environment_* prefix
