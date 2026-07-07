@@ -42,3 +42,13 @@ import {
   to = proxmox_virtual_environment_vm.vm_srv_k3s_13_worker
   id = "pve-mgmt-01/213"
 }
+
+import {
+  to = proxmox_storage_zfspool.local_zfs
+  id = "local-zfs"
+}
+
+import {
+  to = proxmox_cluster_options.datacenter
+  id = "cluster"
+}
