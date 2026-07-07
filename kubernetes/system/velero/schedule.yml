@@ -16,25 +16,29 @@ spec:
   # unrelated backup/maintenance traffic no longer competes for the
   # contended fast SSD. See AUDIT.md REL-019.
   #
-  # REL-062: was "0 3 * * *", same instant as PBS's own vzdump job
-  # (/etc/pve/jobs.cfg on mini, `schedule 03:00`, backs up every VM/CT on
-  # the host, snapshot mode) -- confirmed live via Prometheus that this
-  # exact overlap correlates with the 2026-07-07 03:00-03:10 thermal
-  # incident (host temp sensor peaked 85.5C measured, host load1 peaked
-  # 11.29 on an 8C/16T host, real etcd "apply request took too long"
-  # warnings on vm-srv-k3s-11 at 03:03).
+  # REL-062: CORRECTED 2026-07-07, see AUDIT.md for the full retraction --
+  # the original version of this comment claimed this schedule ("0 3 * * *")
+  # collided with PBS's own vzdump job (jobs.cfg on mini says "03:00") and
+  # moved it to "0 1 * * *" to separate them. That was wrong: mini runs
+  # Europe/Berlin (CEST, UTC+2), so vzdump's configured "03:00" is 01:00 UTC
+  # -- confirmed against its own live task history, which runs 01:00-~01:15
+  # UTC every day. This CronJob's schedule is evaluated in UTC by the k8s
+  # controller, so "0 1 * * *" actually MOVED Velero directly INTO vzdump's
+  # real window instead of away from it -- the opposite of the intent.
   #
-  # First moved to 03:45 (giving vzdump's own typical 20-40min duration a
-  # head start), then widened to 01:00 -- 45min wasn't enough margin
-  # against a long vzdump run (200GB+ could plausibly exceed the 41min
-  # worst-case seen so far and re-collide). 01:00 gives ~4h of separation
-  # from vzdump's 03:00 start regardless of how long either run takes,
-  # while still leaving Velero's own ~9min run well clear of PBS's job in
-  # both directions and clear of the 04:00 R2 offsite schedule
-  # (offsite-schedule.yml). This reduces *concurrent load*, not the
-  # thermal ceiling itself -- physical cooling is a hardware fix, out of
-  # scope for a schedule change.
-  schedule: "0 1 * * *"
+  # The two jobs never overlapped in the first place. The real finding
+  # (confirmed via a full week of Prometheus history, not one night): Velero's
+  # own backup ALONE pushes host temp into the 82-90C range every single
+  # night at 03:00 UTC, regardless of vzdump -- 2026-07-04 hit 90C with no
+  # alert at all. 2026-07-07's ProxmoxHostHighTemp/KubeAPIServerDown wasn't a
+  # one-off double-stacking incident, it was this same nightly pattern
+  # crossing the alert threshold clearly enough to fire. Moving the schedule
+  # doesn't fix that -- Velero's own backup workload (defaultVolumesToFsBackup
+  # across every namespace) is heavy enough on its own. Kept clear of
+  # vzdump's real 01:00-~01:15 UTC window and the 04:00 R2 offsite schedule
+  # as basic hygiene, not as a thermal fix -- physical cooling is a hardware
+  # problem, out of scope for a schedule change.
+  schedule: "0 5 * * *"
   template:
     ttl: 168h0m0s
     includedNamespaces:
