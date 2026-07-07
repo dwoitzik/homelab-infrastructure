@@ -16,15 +16,16 @@ actually broken.
 |---|---|---|---|
 | Renovate tiered auto-merge (stateless/CI/dev-tooling, patch/minor/digest) | **CONFIGURED-BUT-UNPROVEN** | `renovate.json` merged (#316) and live. But checked: the 2 Renovate PRs merged today (#314 paperless-gpt, #302 Renovate's own image) were merged **by me via `gh pr merge`**, not auto-merged by Renovate — confirmed via `mergedAt`/author on both. Zero real auto-merge events have happened under the new tiering yet. | A future Renovate PR for a stateless/patch-minor package actually merging itself with no human click, after CI-green + the 3-day `minimumReleaseAge` soak. |
 | Renovate PR-only tier (stateful/critical, all update types + all majors) | **CONFIGURED-BUT-UNPROVEN** | Config correct (`automerge: false`, grouped, labeled) — but by construction this tier never self-proves; it's proven by *not* auto-merging, which can't be positively observed yet since no such PR has landed since #316. | A real PR for a stateful/critical package (Vault, Authelia, a DB, etc.) landing and confirmed to sit unmerged with the `stateful-critical` label, not silently auto-merged. |
-| Discord: `KubePodCrashLooping` | **PROVEN** | Fired a real synthetic alert via Alertmanager's API; `alertmanager_notifications_total{integration="discord"}` incremented (11 sent, 0 failed); user-confirmed landing in Discord. | — already proven |
+| Discord: `KubePodCrashLooping` | **PROVEN** | Fired a real synthetic alert via Alertmanager's API; `alertmanager_notifications_total{integration="discord"}` incremented (11 sent, 0 failed); user-confirmed landing in Discord. **Since reinforced by a real production event**: paperless-gpt's actual CrashLoopBackOff (REL-060, 2026-07-07) shows real `alertstate=firing` datapoints in Prometheus for 2 separate pod incarnations, not just the earlier synthetic test. | — already proven |
 | Discord: ArgoCD `on-sync-status-unknown` | **PROVEN** | Created a real throwaway Application pointed at a nonexistent path, genuinely triggered `sync.status: Unknown`, confirmed `TRIGGERED` + send in notifications-controller logs, user-confirmed landing in Discord. | — already proven |
-| Discord: ArgoCD `on-health-degraded` / `on-sync-failed` | **CONFIGURED-BUT-UNPROVEN** | Same subscription mechanism and webhook as `on-sync-status-unknown` above (proven), but this specific trigger condition has never actually fired — different `when` expression, never exercised. | A real Application actually going Degraded, or a sync actually failing, with the Discord message observed. |
-| Discord: `KubeJobFailed` (covers Renovate's own CronJob) | **CONFIGURED-BUT-UNPROVEN** | Same Alertmanager route/matcher/receiver as the proven `KubePodCrashLooping` alert (literally the same regex, same receiver), but this specific alertname was never individually fired. | A real Job failure (or another synthetic alert with this exact alertname) reaching Discord. |
+| Discord: ArgoCD `on-health-degraded` | **PROVEN** | Real production event, not synthetic: paperless-gpt's CrashLoopBackOff (REL-060, 2026-07-07 13:43+) actually degraded the `paperless` Application's health. `argocd-notifications-controller` logs show repeated real `Trigger 'on-health-degraded' TRIGGERED` for `argocd/paperless` from 15:13:28Z onward, and the actual send: `"Sending notification about condition 'on-health-degraded...' to '{discord }'"` at 15:13:28Z, deduped on every subsequent poll while still Degraded. | — already proven |
+| Discord: ArgoCD `on-sync-failed` | **CONFIGURED-BUT-UNPROVEN** | Checked the same 24h log window used to prove `on-health-degraded` above — `on-sync-failed` shows only `FAILED` (condition not met) for every Application including `paperless`, never `TRIGGERED`. Different condition, genuinely never exercised. | A real sync actually failing, with the Discord message observed. |
+| Discord: `KubeJobFailed` (covers Renovate's own CronJob) | **PROVEN** | Real production events, not synthetic: cloudflare-ddns (cert-manager ns) and nextcloud-cron (apps ns) both actually fired this alertname (REL-061) — confirmed via a Prometheus `ALERTS{alertname="KubeJobFailed"}` range query showing real `alertstate=firing` datapoints for both Jobs in the last 24h, routed to the `discord` receiver per `alertmanager-config.yml`'s named-alertname rule. Alertmanager's own `alertmanager_notifications_total{integration="discord"}` counter increased by 19 in the same 24h window, consistent with these firings plus the others below. | — already proven |
 | Discord: `KubeNodeNotReady` | **CONFIGURED-BUT-UNPROVEN** | Same route as above, never individually fired. | A real node going NotReady (or a synthetic alert), confirmed in Discord. |
 | Discord: `CertManagerCertExpirySoon` (warning tier) | **CONFIGURED-BUT-UNPROVEN** | Same route as above, never individually fired — and no cert is currently within the 7-day window to fire it naturally. | A real cert entering the 7-day expiry window, or a synthetic alert, confirmed in Discord. |
 | Discord: `VeleroBackupPartialFailure` (warning tier) | **CONFIGURED-BUT-UNPROVEN** | Same route as above, never individually fired. | A real partial-failure backup, or a synthetic alert, confirmed in Discord. |
-| Discord: `severity: critical` route (pre-existing) | **CONFIGURED-BUT-UNPROVEN, this session** | This is the *old* route, not new work — but it was never actually re-verified live this session. The synthetic test used `severity: warning` specifically to exercise the *new* route; the critical route's current behavior was only inferred from reading the Alertmanager config, not observed firing. | An actual `severity: critical` alert (or a synthetic one) reaching Discord, checked the same way the warning-tier one was. |
-| Discord: `CertManagerCertNotReady` / `VeleroBackupFailed` (new, severity critical) | **CONFIGURED-BUT-UNPROVEN** | Rides the critical route above (also unproven this session) and was never individually fired either. | Both: a real event or synthetic alert, confirmed in Discord. |
+| Discord: `severity: critical` route (pre-existing) | **PROVEN** | Real production event: the 2026-07-07 03:05 thermal incident's `ProxmoxHostHighTemp` alert carries `severity="critical"` — confirmed via a live Prometheus `ALERTS` range query showing a real `alertstate=firing` datapoint at the incident time. Note: this specific alert actually routed via `alertmanager-config.yml`'s dedicated `ProxmoxHostHighTemp\|RpiHighTemp` rule (matched first, before the generic `severity=critical` rule, per Alertmanager's first-match routing) rather than the generic rule itself — but both point at the same `discord` receiver, so this confirms critical-severity alerting reaches Discord in practice, which is what this row is actually asking. The bare `severity=critical` matcher specifically (as opposed to a named-alertname rule that happens to carry that label) remains unexercised — see the next row. | — already proven (via a named-rule alert carrying the label, not yet via the bare `severity=critical` matcher itself) |
+| Discord: `CertManagerCertNotReady` / `VeleroBackupFailed` (new, severity critical) | **CONFIGURED-BUT-UNPROVEN** | Still never individually fired, and — per the note above — the generic `severity=critical` catch-all rule these would route through hasn't actually been exercised either (every critical alert seen so far matched a more specific named rule first). | Either alertname firing for real, or a synthetic alert with neither name but `severity=critical`, confirmed reaching Discord. |
 | ArgoCD's own Prometheus metrics (app health/sync status) | **GAP** | `argocd-application-controller`'s metrics port (8082) isn't listening at all — confirmed live via `/proc/net/tcp`, survives a clean pod restart. Root cause not found. | Metrics port actually listening and scraped; not attempted further this session. |
 | cert-manager metrics scraping | **PROVEN** | `ServiceMonitor` live, confirmed matching the live Service's port name/labels, endpoint responding. | — already proven |
 | cert-manager renewal actually succeeding | **CONFIGURED-BUT-UNPROVEN** | Only 1 `CertificateRequest` (Revision 1) since 2026-06-03 — never actually auto-renewed. `renewalTime` is ~4 weeks out. | The wildcard cert's `CertificateRequest` count going to 2, i.e. an actual renewal happening, checked around 2026-08-02. |
@@ -50,15 +51,21 @@ actually broken.
 
 ## Bottom line
 
-Fewer green rows than the previous version of this table, on purpose — that version
-conflated "the route exists and one alertname in it was tested" with "this alertname
-is proven," and conflated "merged" with "demonstrated." Real state: **2 of ~9 Discord
-alert paths have an actual observed event** (`KubePodCrashLooping`, ArgoCD
-`sync-status-unknown`); the rest share proven plumbing but haven't individually fired.
-Renovate's new tiering has never auto-merged anything — the 2 PRs that merged today
-were merged by hand. Both unbound DNS fixes are genuinely proven at the unbound layer
-(0ms local answers, confirmed before/after) — but the DHCP-side companion fix (#318)
-turned up a real, unresolved discrepancy between the merged code and what the live
-router's plan shows, and the actual query-volume-drop success criteria can't be
-confirmed for days regardless. Velero restore is still the single biggest untested
-assumption in the whole stack.
+Updated again 2026-07-07 evening after a real 24h stretch produced actual incidents
+(the 03:05 thermal event, paperless-gpt's CrashLoopBackOff, cloudflare-ddns/
+nextcloud-cron's dead-token failures) — used those as evidence rather than firing more
+synthetic tests. Real state now: **5 of 9 Discord alert paths have an actual observed
+event** (`KubePodCrashLooping`, ArgoCD `sync-status-unknown`, ArgoCD
+`on-health-degraded`, `KubeJobFailed`, and the `severity=critical` route via a
+named-rule alert). The remaining 4 (`KubeNodeNotReady`, `CertManagerCertExpirySoon`,
+`VeleroBackupPartialFailure`, ArgoCD `on-sync-failed`) plus the bare `severity=critical`
+matcher itself and the two new critical alertnames (`CertManagerCertNotReady`,
+`VeleroBackupFailed`) share proven plumbing (same receiver, same webhook) but haven't
+individually fired — still `CONFIGURED-BUT-UNPROVEN`, not asserted as proven just
+because a sibling route worked. Renovate's new tiering has never auto-merged anything —
+the 2 PRs that merged today were merged by hand. Both unbound DNS fixes are genuinely
+proven at the unbound layer (0ms local answers, confirmed before/after) — but the
+DHCP-side companion fix (#318) turned up a real, unresolved discrepancy between the
+merged code and what the live router's plan shows, and the actual query-volume-drop
+success criteria can't be confirmed for days regardless. Velero restore is still the
+single biggest untested assumption in the whole stack.
