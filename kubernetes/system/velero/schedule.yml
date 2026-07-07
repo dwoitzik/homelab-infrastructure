@@ -15,7 +15,26 @@ spec:
   # migrated off rpool onto the archive pool (1.3TB+ free), so even
   # unrelated backup/maintenance traffic no longer competes for the
   # contended fast SSD. See AUDIT.md REL-019.
-  schedule: "0 3 * * *"
+  #
+  # REL-062: was "0 3 * * *", same instant as PBS's own vzdump job
+  # (/etc/pve/jobs.cfg on mini, `schedule 03:00`, backs up every VM/CT on
+  # the host, snapshot mode) -- confirmed live via Prometheus that this
+  # exact overlap correlates with the 2026-07-07 03:00-03:10 thermal
+  # incident (host temp sensor peaked 85.5C measured, host load1 peaked
+  # 11.29 on an 8C/16T host, real etcd "apply request took too long"
+  # warnings on vm-srv-k3s-11 at 03:03).
+  #
+  # First moved to 03:45 (giving vzdump's own typical 20-40min duration a
+  # head start), then widened to 01:00 -- 45min wasn't enough margin
+  # against a long vzdump run (200GB+ could plausibly exceed the 41min
+  # worst-case seen so far and re-collide). 01:00 gives ~4h of separation
+  # from vzdump's 03:00 start regardless of how long either run takes,
+  # while still leaving Velero's own ~9min run well clear of PBS's job in
+  # both directions and clear of the 04:00 R2 offsite schedule
+  # (offsite-schedule.yml). This reduces *concurrent load*, not the
+  # thermal ceiling itself -- physical cooling is a hardware fix, out of
+  # scope for a schedule change.
+  schedule: "0 1 * * *"
   template:
     ttl: 168h0m0s
     includedNamespaces:
