@@ -754,7 +754,7 @@ ago and `ROADMAP.md` claiming the SLO definitions were done.
 
 ---
 
-### REL-015 — Discord alerting silently broken: Prometheus Operator can't use `webhook_url_file` · **PARTIAL** (2026-06-24, manual stopgap in place, durable fix not done)
+### REL-015 — Discord alerting silently broken: Prometheus Operator can't use `webhook_url_file` · **RESOLVED** (2026-06-24 stopgap, durable fix landed 2026-07-05 via REL-042)
 
 Found while rotating a leaked Discord webhook (separate incident, user-initiated).
 Updating the webhook in Vault and forcing an `ExternalSecret`/config-reloader refresh
@@ -796,19 +796,15 @@ Alertmanager entirely: `204` success).
   value secret. This is **not durable** — it lives only in the live cluster, not git,
   and would be silently lost if anything ever forces a full clean resync of this secret
   (same failure mode that caused this in the first place).
-- **Proper fix, not done:** migrate the Discord receiver and its routing
-  (`severity = critical`, the `ProxmoxHostHighTemp`/`RpiHighTemp` special-case route,
-  the inhibit rule) from the raw `alertmanager.config:` Helm block to a proper
-  `AlertmanagerConfig` CRD referencing the existing `alertmanager-discord-webhook`
-  Secret via `discordConfigs[].apiURL.{name,key}` — confirmed via `kubectl explain` this
-  is exactly the field Prometheus Operator expects, and per its own docs this path
-  validates secrets directly via the Kubernetes API, not file-path reading. **Deliberately
-  not attempted live tonight**: doing this safely also means porting the *entire*
-  existing routing tree (not just the receiver) to CRD format to avoid an
-  AlertmanagerConfig getting awkwardly nested under the still-present raw config's
-  routes, and that interaction needed more careful testing than was responsible to do
-  blind, on live alerting infrastructure, this late in a long session that had already
-  hit several other incidents.
+- **Proper fix — done 2026-07-05, see REL-042:** migrated the Discord receiver and its
+  full routing tree (`severity = critical`, the `ProxmoxHostHighTemp`/`RpiHighTemp`
+  special-case route, the inhibit rule) to a self-contained `AlertmanagerConfig` CRD.
+  That work also surfaced and fixed a second, independent bug blocking it
+  (`monitoring-manifests`'s tracking glob was itself missing the two files needed to
+  ever apply this fix, so it had silently been a no-op for 8+ days even after being
+  written) — see REL-042 for the full writeup. Verified end-to-end via a real test
+  alert with `alertmanager_notifications_total{integration="discord"}` incrementing,
+  0 failures.
 - **Lesson:** the same one as REL-014, reinforced — a Secret/config object existing
   with no errors from `kubectl apply` (or even a `config-reloader` "Reload triggered"
   log line) is not evidence the *content* is correct or that the producing controller
@@ -1481,17 +1477,18 @@ do not (postgres cluster, redis, argocd itself, infrastructure resources).
 
 ---
 
-### GIT-004 — Proxmox provider version uses pessimistic constraint `~> 0.69` · **LOW**
+### GIT-004 — Proxmox provider version uses pessimistic constraint `~> 0.69` · **RESOLVED** (stale, re-checked 2026-07-06)
 
-`terraform/stacks/proxmox/providers.tf` uses `version = "~> 0.69"` for the `bpg/proxmox`
-provider. The latest available is v0.100.x. This constraint allows upgrades within the
-0.x minor series but the current pinned version is far behind.
+`terraform/stacks/proxmox/providers.tf` originally used `version = "~> 0.69"` for the
+`bpg/proxmox` provider, well behind the latest available at the time.
 
-The network stack (`routeros`) pins to an exact version (`1.99.1`), which is better practice.
-
-- **Fix:** Update to a specific version (`version = "0.100.0"` or current latest); test
-  with `terraform plan`; commit the updated `.terraform.lock.hcl`.
-- **Effort:** Small.
+- **Re-checked 2026-07-06:** already resolved — this constraint has been progressively
+  bumped by Renovate across several past PRs (#182, #235, and others) and now reads
+  `~> 0.111`. Checked the Terraform Registry directly: `0.111.1` is the actual latest
+  release across the entire provider, and `.terraform.lock.hcl` already resolves to
+  exactly that version. There is nothing to bump — this finding was simply never
+  marked resolved after Renovate did the work.
+- **Effort:** None needed — already done.
 
 ---
 
@@ -1663,6 +1660,58 @@ but is not fully automated.
 - **Fix:** Document the exact rebuild procedure in `docs/disaster-recovery.md` (which
   doesn't exist yet — see DOC-001).
 - **Effort:** Documentation.
+
+---
+
+### IAC-005 — Cleanup batch: dead `minio` container, stale merged branches, 2 stale doc claims · **RESOLVED** (2026-07-06)
+
+Found during the `docs/STATUS.md` re-assessment pass (2026-07-06): a handful of small,
+independent, low-risk items worth batching into one cleanup PR rather than opening
+several trivial PRs.
+
+- **Dead `minio` container removed from `ct-srv-docker-01`.** Created 2026-04-03,
+  `/data` was 535 KB (effectively empty), zero traffic, zero Ansible/git
+  representation — a leftover from before Garage replaced it (matches the "legacy —
+  superseded by Garage" note already in `docs/secrets-inventory.md` since
+  2026-06-19). Snapshotted the LXC (`pct snapshot 200 pre-minio-removal-2026-07-06`)
+  before touching anything, then `docker rm -f minio` + deleted `/opt/minio`.
+  Confirmed no systemd unit/compose file/restart trigger would ever recreate it, and
+  the host's other containers (promtail, node_exporter, watchtower) were unaffected.
+- **Branch hygiene cleanup, real count smaller than first estimated.** `git branch -a
+  --no-merged` initially showed ~74 stale-looking branches, but that ancestry check is
+  unreliable across squash-merges (a squashed commit is never a literal ancestor of the
+  original branch's commits, so every squash-merged branch shows as "not merged" even
+  when fully redundant). A `git fetch --prune` first cleaned up the majority — those
+  were stale local remote-tracking refs for branches GitHub had already deleted via
+  `--delete-branch`, not real branches. Of the 7 genuinely remaining remote branches,
+  checked each one's actual PR merge state via `gh pr list` (the reliable signal,
+  not ancestry/cherry-pick matching) plus a zero-unique-commits check as a fallback:
+  **4 confirmed merged, deleted** (`chore/rotate-cloudflare-dns-token` #283,
+  `feat/rel029-nextcloud-app-upgrade` #259/#260, `fix/authelia-hardening-and-searxng`
+  #229, `fix/paperless-gpt-prompts` — no PR record but zero commits ahead of `main`).
+  **3 deliberately left alone**: `renovate/ghcr.io-renovatebot-renovate-43.x` backs the
+  currently-open PR #302; `renovate/nextcloud-34.x` (#212) and `renovate/postgres-18.x`
+  (#214) are genuinely closed-not-merged — their intent was fulfilled via REL-028/029's
+  separate manual migration PRs instead, but deleting an abandoned branch with real
+  unique commits is a judgment call, not an automatic cleanup, so left for the account
+  owner to confirm. Also cleaned up 8 local-only branches on this checkout (same
+  verification method, zero effect on the remote repo).
+- **`docs/runbooks/pending-major-upgrades.md`** corrected — it opened with "nothing
+  here has been executed" despite 3 of its 4 tracked migrations (REL-028/029/030)
+  having completed and been verified weeks earlier. Only REL-027 (Vault unseal-CLI)
+  is still genuinely pending.
+- **REL-015 marked RESOLVED**, cross-referenced to REL-042 (the actual durable fix,
+  landed and verified 2026-07-05) — it had sat as PARTIAL since 2026-06-24 despite
+  being closed out.
+- **GIT-004 marked RESOLVED** — the Proxmox provider constraint (`~> 0.111`) already
+  tracks the latest available release (`0.111.1`, confirmed against the Terraform
+  Registry directly); Renovate had already done the work across several past PRs,
+  the finding just was never marked closed.
+- **Lesson, same theme as the rest of this session's docs-drift findings:** every
+  one of these was "already fixed" or "safe to fix trivially" — the actual work was
+  small. What made them findings at all was that nobody had gone back to confirm
+  status after the underlying fact changed. A periodic "is this finding still
+  accurate" pass is worth as much as finding new bugs.
 
 ---
 
@@ -2620,7 +2669,7 @@ where jams actually stick.
 | REL-012 | Reliability | **PARTIAL, likely improved** | k3s control plane (etcd) crash-looping, etcd apply latency up to 14.3s under disk I/O contention; alerting added 2026-06-24. After REL-019's Garage migration freed rpool from 96-100% to 60%, hourly "apply request took too long" counts dropped 1608->337->23->2 tracking the migration timeline -- not yet marked RESOLVED (one prior false-calm window already on record), revisit after a full day clean (2026-06-25) |
 | REL-013 | Reliability | **RESOLVED** | Uptime Kuma (23 monitors @ 60s) and Prometheus blackbox-exporter (9 targets @ 30s) both probing largely the same domains, doubled again by a `search home.lan` DNS suffix -- bumped both intervals (2026-06-24) |
 | REL-014 | Reliability | **RESOLVED** | Every custom PrometheusRule (SLO alerts, hardware-temp alerts) was silently never evaluated -- missing `release: kube-prometheus-stack` label never matched Prometheus's ruleSelector. Fixed, verified live via /api/v1/rules (2026-06-24) |
-| REL-015 | Reliability | **PARTIAL** | Discord alerting silently broken -- Prometheus Operator can't validate `webhook_url_file` in raw Helm config (tries reading the file from its own pod, which never has it mounted), generated secret was 24 days stale. Manual stopgap restores delivery; durable fix (AlertmanagerConfig CRD) not attempted live (2026-06-24) |
+| REL-015 | Reliability | **RESOLVED** | Discord alerting silently broken -- Prometheus Operator can't validate `webhook_url_file` in raw Helm config, generated secret was 24 days stale. Manual stopgap restored delivery 2026-06-24; durable fix (AlertmanagerConfig CRD) landed and verified end-to-end via REL-042 (2026-07-05) |
 | REL-016 | Reliability | **PARTIAL** | `mini` froze solid during an Ollama CPU inference test (18GB model, likely disk-contention cascade per REL-005/REL-012), needed a manual power-cycle; 5 LXCs had `onboot=0` and didn't auto-recover. Capped AI LXC CPU (6 cores + manual cpulimit, bpg/proxmox has no `limit` attribute), set onboot=1 manually (provider doesn't read this attribute back either). Root disk contention still unresolved (2026-06-24) |
 | REL-017 | Reliability | **RESOLVED** | `mc-server-2` (Minecraft, port 25565) had no DNAT rule at all on the live router -- only the forward-filter ALLOW rule existed, never the actual NAT rewrite. Confirmed via the router's own REST API, fixed, verified with a real protocol-level handshake against the public IP (2026-06-24) |
 | REL-018 | Reliability/Security | **RESOLVED** | `kubernetes/system/*.yml` had zero ArgoCD tracking -- `kubectl apply` couldn't prune removed resources. Found a live regression in the gap: a duplicate, unrestricted `traefik-dashboard` IngressRoute was periodically overwriting the correct path-restricted one via selfHeal. Added `system-manifests` Application, removed the duplicates (2026-06-24, #124) |
@@ -2639,11 +2688,12 @@ where jams actually stick.
 | GIT-010 | GitOps | **RESOLVED** | `postgres-cluster` Application's directory glob never matched its ExternalSecret filename -- silently unmanaged by GitOps since creation, fixed (2026-06-24) |
 | GIT-011 | GitOps | **RESOLVED** | Two LXC-creation blockers found provisioning WRK-006: Atlantis's TF token isn't root@pam (blocks device_passthrough on create), and `usb-templates`' Proxmox storage registration was missing (disk was fine, re-registered) (2026-06-24) |
 | GIT-003 | GitOps | **HIGH** | System components are manual-apply; no drift detection -- confirmed this silently broke both GIT-010 and REL-011's fixes until caught manually (2026-06-24) |
-| GIT-004 | GitOps | **LOW** | Proxmox provider version constraint far behind latest |
+| GIT-004 | GitOps | **RESOLVED** | Proxmox provider constraint was far behind at first audit; already bumped to `~> 0.111` (latest available, `0.111.1`) by Renovate across several since-merged PRs -- just never marked resolved (2026-07-06) |
 | GIT-005 | GitOps | **DEFERRED** | Offsite backup (R2/B2) deliberately skipped -- neither provider offers a true no-cost guarantee that fits the "never pay" requirement without tradeoffs (2026-06-24) |
 | IAC-001 | IaC | **RESOLVED** | ~50% of app Deployments lack resource limits |
 | IAC-002 | IaC | **RESOLVED** | MikroTik firewall hardening apply blocked on Atlantis's k3s-hosted availability -- superseded by ADR-012 (Atlantis moved to its own LXC), network stack applies cleanly now (re-checked 2026-07-06) |
 | IAC-003 | IaC | **LOW** | No automated k3s VM rebuild procedure |
+| IAC-005 | IaC | **RESOLVED** | Cleanup batch from the STATUS.md re-assessment: removed dead `minio` container (ct-srv-docker-01, unused since April, snapshotted first), deleted 4 confirmed-merged remote branches + 8 local (the initial ~74 estimate was inflated by stale local refs a `git fetch --prune` cleared), corrected 2 stale doc claims (pending-major-upgrades.md, REL-015), marked GIT-004 resolved (2026-07-06) |
 | DOC-001 | Docs | **RESOLVED** | DISASTER-RECOVERY.md does not exist -- added at repo root covering all 6 required tiers + per-service restore table (2026-06-23); this summary row was stale, the detailed entry already said RESOLVED |
 | DOC-002 | Docs | **RESOLVED** | ROADMAP.md already fully English -- stale finding, translated at some point but never marked resolved (re-checked 2026-07-06) |
 | DOC-003 | Docs | **RESOLVED** | compute-nodes.md has stale ingress description |

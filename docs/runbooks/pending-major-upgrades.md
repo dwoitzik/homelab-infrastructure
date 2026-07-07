@@ -9,9 +9,11 @@ major-version binary will refuse to start against the old on-disk format
 (Postgres, Nextcloud) or may behave unpredictably against a mismatched server
 (Vault CLI).
 
-This doc is the migration plan for each. Nothing here has been executed — each
-section needs an explicit go-ahead before its steps are run, per one section at a
-time (see `docs/AUDIT.md` REL-027..030 for tracking).
+This doc is the migration plan for each. **Status as of 2026-07-06: 3 of 4 done.**
+REL-028, REL-029, and REL-030 were all executed and verified during 2026-07-04/05
+(see `docs/AUDIT.md` for each) — this doc's own "nothing has been executed" framing
+was stale for weeks and is corrected here. **Only REL-027 (Vault unseal-CLI) remains
+pending** — its section below is still an accurate, not-yet-run plan.
 
 **General rule for all four:** snapshot the LXC/VM the k3s node runs on via Proxmox
 *and* take an application-level backup (pg_dump, raft snapshot, etc.) before
@@ -57,7 +59,12 @@ REL-007 fixed. This wouldn't be noticed until the next full cluster/VM restart.
 
 ---
 
-## REL-028 — Postgres for Nextcloud + Paperless: 16.14 → 18.4 (PR #214)
+## REL-028 — Postgres for Nextcloud + Paperless: 16.14 → 18.4 (PR #214) · DONE (2026-07-04/05)
+
+Executed via `pg_dump`/restore into fresh PVCs as planned below, both halves. See
+`docs/AUDIT.md` REL-028 for the verified outcome (including a PG18 mount-point
+gotcha found live: a single `/var/lib/postgresql` mount is required, not the old
+`data`+`subPath` convention). Plan kept below for reference/future similar bumps.
 
 **Scope correction:** this is **not** the Authelia CNPG cluster — CNPG's
 `postgres-authelia` (`kubernetes/system/postgres/cluster.yml`) has no explicit
@@ -101,7 +108,13 @@ extra tooling).
 
 ---
 
-## REL-029 — Nextcloud app: 30.0.17 → 34.0.1 (PR #212)
+## REL-029 — Nextcloud app: 30.0.17 → 34.0.1 (PR #212) · DONE (2026-07-05)
+
+All 4 sequential upgrade passes (30→31→32→33→34) executed as planned below. See
+`docs/AUDIT.md` REL-029 for the verified outcome (including a live capability-drop
+regression found and reverted: the image's entrypoint needs `CAP_SETGID` to spawn
+`www-data` workers, permanently, not just during the upgrade). Plan kept below for
+reference.
 
 **Depends on REL-028's nextcloud half being done first** (Nextcloud 34 requires
 a modern Postgres; do the DB upgrade before the app upgrade so app upgrade steps
@@ -141,7 +154,13 @@ session, not a quick merge.
 
 ---
 
-## REL-030 — Immich Postgres (VectorChord): 14 → 16 (PR #202)
+## REL-030 — Immich Postgres (VectorChord): 14 → 16 (PR #202) · DONE (2026-07-05)
+
+Executed via `pg_dumpall`/restore into a fresh PVC as planned below. See
+`docs/AUDIT.md` REL-030 for the verified outcome (asset/asset_face row counts
+matched pre/post, VectorChord extension confirmed loaded and functioning). Plan
+kept below for reference. (Immich's app layer itself was later also bumped,
+`v2.7.5`→`v3.0.1`, tracked separately as REL-053 — unrelated to this DB-only plan.)
 
 Scope: `immich-postgres` `StatefulSet` (`kubernetes/apps/immich/immich.yml`),
 image `ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0` →
@@ -188,7 +207,10 @@ version-pinned by this PR, only its DB).
 
 ## Suggested order
 
-REL-027 (lowest risk, ~30 min) → REL-030 (isolated, one app) → REL-028
+~~REL-027 (lowest risk, ~30 min) → REL-030 (isolated, one app) → REL-028
 nextcloud-half + REL-029 together (they're coupled) → REL-028 paperless-half
 (isolated, do whenever). Don't batch more than one on the same day — each needs
-a clean verification window before the next.
+a clean verification window before the next.~~
+
+REL-030, REL-028, and REL-029 are done (see each section above). **Only REL-027
+remains** — its plan above is still current and ready to execute.
