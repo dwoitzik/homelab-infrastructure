@@ -1,10 +1,10 @@
 # IaC Gaps — hand-created infrastructure with no Git trail
 
-**Status:** items 1, 3, 4 (partial), 5, 6 (partial), 7 executed 2026-07-07, each its
-own PR, none merged by this session — see each item below for its PR number. Item 2
-(Vault) deliberately split out and gated on a break-glass proof (done, REL-065) before
-its own migration work even starts. Nothing in this document has been merged or
-applied; every PR is awaiting review.
+**Status:** items 1, 3, 4 (partial), 5, 6 (partial), 7 executed and merged 2026-07-07
+(#332, #334, #335, #336, #337). Item 2 (Vault) deliberately split out — its
+break-glass proof is done and merged (REL-065, #333), but the actual Terraform
+migration has not started and is pending explicit go-ahead. Nothing in item 2's
+migration has been applied.
 
 ## Why this exists
 
@@ -51,7 +51,7 @@ below has risk + effort, and a proposed order at the end.
 
 ### 1. `gitea-secrets` / `nextcloud-secrets` — live placeholder passwords in production
 
-**Status: RESOLVED, #332.** Rotated live (not just in Git) — real `SECRET_KEY`/
+**Status: RESOLVED, #332 (merged).** Rotated live (not just in Git) — real `SECRET_KEY`/
 `INTERNAL_TOKEN` for Gitea, real Postgres + admin passwords for Nextcloud, all written
 to Vault and wired via `ExternalSecret`. Full history checked (767 commits): no real
 secret was ever committed, only the placeholder — no history rewrite needed. Left below
@@ -85,14 +85,16 @@ apps with the new credentials to confirm the rotation took.
 
 ### 2. Vault's own configuration — policies, mounts, KV structure
 
-**Status: split out, not started.** Deliberately kept out of the items 3-7 chain per
-explicit instruction — Vault is the trust root behind every other item on this list,
-so a misapply here cascades everywhere, unlike the isolated blast radius of the rest.
+**Status: break-glass proven and merged (#333); Terraform migration NOT started, pending
+explicit go-ahead.** Deliberately kept out of the items 3-7 chain per explicit
+instruction — Vault is the trust root behind every other item on this list, so a
+misapply here cascades everywhere, unlike the isolated blast radius of the rest.
 Gated on a break-glass proof first (REL-065, `AUDIT.md`): confirmed a current Velero
 backup of Vault's raft data exists and, for the first time cluster-wide, actually
 performed a real restore + unseal using only the out-of-cluster key copy. That proof is
-done. The actual Terraform-migration work itself is not started — it goes through its
-own plan/PR for review before any apply, separately from this document's chain.
+done and merged. **The actual migration work (Terraform-managing Vault's mounts/
+policies) has not been started** — it goes through its own plan/PR for review before
+any apply, separately from this document's chain, once explicitly approved.
 
 **Risk: High.** There is no `terraform/stacks/vault*` directory. Every Vault
 secrets-engine mount, every KV path structure (`secret/cloudflare`, `secret/garage`,
@@ -120,18 +122,22 @@ be regenerated.
 
 ### 3. Garage buckets — 4 buckets, zero Terraform
 
-**Status: RESOLVED, #334 (not merged).** New `terraform/stacks/garage` stack manages
-`loki-data`/`velero`/`cnpg-backups` via the `hashicorp/aws` provider against Garage's
-S3-compatible endpoint, native `import {}` blocks (they already exist live). Granted
-the existing `atlantis` Garage key RWO access to all 3 live first (additive, existing
-app keys per bucket verified untouched). Hit and fixed a real bug along the way: the
-resource-managing provider defaulted to virtual-hosted-style addressing
-(`velero.s3.woitzik.dev`, which doesn't resolve), hanging `terraform plan` for 9+
-minutes and stalling the PR's Atlantis lock — fixed with `s3_use_path_style = true`
-(the backend block already had the equivalent). `atlantis plan` now clean: 3 to
-import, 0 to change. Scope is bucket *existence* only — per-key ACL grants stay a
-manual `garage bucket allow` step, Garage's admin API isn't S3-compatible and has no
-Terraform provider here. Documented, not silently half-solved.
+**Status: RESOLVED, #334 (merged). Code merged — imports not yet applied.** New
+`terraform/stacks/garage` stack manages `loki-data`/`velero`/`cnpg-backups` via the
+`hashicorp/aws` provider against Garage's S3-compatible endpoint, native `import {}`
+blocks (they already exist live). Granted the existing `atlantis` Garage key RWO
+access to all 3 live first (additive, existing app keys per bucket verified
+untouched). Hit and fixed a real bug along the way: the resource-managing provider
+defaulted to virtual-hosted-style addressing (`velero.s3.woitzik.dev`, which doesn't
+resolve), hanging `terraform plan` for 9+ minutes and stalling the PR's Atlantis lock —
+fixed with `s3_use_path_style = true` (the backend block already had the equivalent).
+`atlantis plan` clean: 3 to import, 0 to change. **The actual `terraform apply` that
+performs the import hasn't run yet** — merging the PR only lands the code; an
+`atlantis apply -p garage` (or the next Atlantis apply cycle) still needs to happen for
+these 3 buckets to actually enter Terraform state. Scope is bucket *existence* only —
+per-key ACL grants stay a manual `garage bucket allow` step, Garage's admin API isn't
+S3-compatible and has no Terraform provider here. Documented, not silently
+half-solved.
 
 **Risk: High.** `garage bucket list` shows 4 buckets (`loki-data`, `velero`,
 `terraform-state`, `cnpg-backups`) — all created via the `/garage` CLI directly, none
@@ -151,13 +157,15 @@ research spike before committing to an approach.
 
 ### 4. Cloudflare DNS zone — 4 of ~30 records under Terraform
 
-**Status: `auth.woitzik.dev` done, #335 (not merged); rest still manual.** Imported the
-one highest-consequence record as planned — CNAME to `home.woitzik.dev`, not proxied,
-`ttl=1`, matches live exactly. `atlantis plan`: 1 import, 1 change (adding a
-descriptive `comment` that didn't exist before — zero effect on `content`/`proxied`/
-`ttl`/`type`). The other ~25 records (`headscale`, `home`, `jf`, `link`, `vw`, `www`,
-root, MX, DKIM/DMARC/SPF) are untouched, a future pass, per instruction (one record
-first, not bulk).
+**Status: `auth.woitzik.dev` done, #335 (merged, apply pending); rest still manual.**
+Imported the one highest-consequence record as planned — CNAME to `home.woitzik.dev`,
+not proxied, `ttl=1`, matches live exactly. `atlantis plan`: 1 import, 1 change (adding
+a descriptive `comment` that didn't exist before — zero effect on `content`/`proxied`/
+`ttl`/`type`). **Merging the PR only lands the code — the import itself still needs an
+`atlantis apply -p cloudflare`** (or the next apply cycle) before this record actually
+enters Terraform state. The other ~25 records (`headscale`, `home`, `jf`, `link`, `vw`,
+`www`, root, MX, DKIM/DMARC/SPF) are untouched, a future pass, per instruction (one
+record first, not bulk).
 
 **Risk: Medium.** `terraform/stacks/cloudflare/main.tf` manages exactly 4
 `cloudflare_dns_record` resources (`photos`, `atlantis`, `media` — all Cloudflare
@@ -181,10 +189,11 @@ bulk.
 
 ### 5. `homepage-secrets` — 9 real API keys/passwords, no ExternalSecret
 
-**Status: RESOLVED, #336 (not merged).** Extracted the live Secret's 9 real values
+**Status: RESOLVED, #336 (merged).** Extracted the live Secret's 9 real values
 directly into Vault (`secret/homepage`), replaced with a Vault-backed `ExternalSecret`.
 No rotation needed — these were already correct, working credentials, just moved.
-Verified live: all 9 keys present post-sync, pod restarted clean.
+Verified live *before* the PR was even opened (applied directly, then the manifest
+merged to match) — unlike items 3/4/6, there's no separate apply step pending here.
 
 **Risk: Medium.** Bundles `HOMEPAGE_VAR_ADGUARD_PASSWORD`, `ARGOCD_TOKEN`,
 `BAZARR_API_KEY`, `GRAFANA_PASSWORD`, `JELLYFIN_API_KEY`, `JELLYSEERR_API_KEY`,
@@ -198,11 +207,13 @@ Secret. Mechanical, no live credential rotation needed (reuse the existing value
 
 ### 6. Proxmox host-level config — `jobs.cfg`, `storage.cfg`, `datacenter.cfg`
 
-**Status: PARTIAL, #337 (not merged).** Research spike done: checked the actual
-`bpg/proxmox` provider schema (`terraform providers schema -json`) instead of guessing.
-Coverage turned out better than assumed for 2 of 3 targets — `local-zfs`
+**Status: PARTIAL, #337 (merged, apply pending).** Research spike done: checked the
+actual `bpg/proxmox` provider schema (`terraform providers schema -json`) instead of
+guessing. Coverage turned out better than assumed for 2 of 3 targets — `local-zfs`
 (`storage.cfg`) and `datacenter.cfg`'s keyboard layout both map cleanly, no credentials
-involved, imported both. The other 2 stay manual, for real reasons, not laziness:
+involved, imported both. **Merging the PR only lands the code — the import itself
+still needs an `atlantis apply -p proxmox`** before these 2 resources actually enter
+Terraform state. The other 2 stay manual, for real reasons, not laziness:
 `local-pbs`'s storage password lives in `/etc/pve/priv/storage/local-pbs.pw`
 (root-only, not in this repo's Vault at all — a real follow-up task of its own); the
 vzdump backup job's live shape (`all 1` + `exclude 9000`) has no equivalent in the
@@ -250,22 +261,30 @@ done, via #332. Every remaining item is *latent* (a reproducibility/blast-radius
 not an active exposure), so principle 2 sets the rest of the order — Vault first among
 them, then ranked by how much operational damage a repeat incident would do.
 
-1. ~~`gitea-secrets`/`nextcloud-secrets` placeholder passwords~~ — **done, #332.**
+1. ~~`gitea-secrets`/`nextcloud-secrets` placeholder passwords~~ — **done, #332
+   (merged).**
 2. **Vault's own configuration** — highest-priority latent item, per principle 2, and
    the one exception to "work the rest as a chain": split out on its own track.
-   Break-glass proof done first (REL-065) — a real Velero backup exists and a real
-   restore+unseal was performed using only the out-of-cluster key copy, independent of
-   the in-cluster config this migration would touch. The migration itself goes through
-   its own plan/PR, reviewed before any apply — not started yet.
-3. ~~**Garage buckets**~~ — **done, #334** (not merged).
-4. ~~**Cloudflare DNS zone**~~ — **`auth.woitzik.dev` done, #335** (not merged); rest
-   of the zone (~25 records) still manual, future pass.
-5. ~~**`homepage-secrets`**~~ — **done, #336** (not merged).
-6. ~~**Proxmox host-level config**~~ — **`local-zfs` + keyboard done, #337** (not
-   merged); `local-pbs` and the vzdump job stay manual, for stated reasons (see item 6
-   above), not because the work wasn't attempted.
+   Break-glass proof done and merged (REL-065, #333) — a real Velero backup exists and
+   a real restore+unseal was performed using only the out-of-cluster key copy,
+   independent of the in-cluster config this migration would touch. **The migration
+   itself has not started** — goes through its own plan/PR, reviewed before any apply,
+   once explicitly approved.
+3. ~~**Garage buckets**~~ — **#334 merged**; import itself still needs an `atlantis
+   apply -p garage` to actually take effect.
+4. ~~**Cloudflare DNS zone**~~ — **`auth.woitzik.dev`, #335 merged**; import itself
+   still needs an `atlantis apply -p cloudflare`. Rest of the zone (~25 records) still
+   manual, future pass.
+5. ~~**`homepage-secrets`**~~ — **#336 merged, fully applied** (verified live before
+   the PR was opened).
+6. ~~**Proxmox host-level config**~~ — **`local-zfs` + keyboard, #337 merged**; import
+   itself still needs an `atlantis apply -p proxmox`. `local-pbs` and the vzdump job
+   stay manual, for stated reasons (see item 6 above), not because the work wasn't
+   attempted.
 7. ~~**Dead Secret cleanup**~~ — **done**, no PR (no git file involved).
 
-**Executed this pass**: items 1, 3, 4 (partial), 5, 6 (partial), 7 — 5 PRs open
-(#334-337, plus #332 for item 1), none merged. Item 2 (Vault) intentionally not
-started beyond its break-glass gate, per instruction.
+**End state after this session**: items 1, 3, 4 (partial), 5, 6 (partial), 7 all
+merged (#332, #334, #335, #336, #337). Items 3, 4, and 6 land their Terraform code but
+still need an explicit `atlantis apply` per project before the actual imports take
+effect — that hasn't been run. Item 2 (Vault): break-glass proof merged, migration
+itself intentionally not started, pending explicit go-ahead.
