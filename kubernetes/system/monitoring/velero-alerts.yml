@@ -1,0 +1,53 @@
+# Task 2 (autonomy-readiness): Velero backup failures had zero alerting.
+# Velero doesn't run backups as a native Kubernetes Job (it's a goroutine
+# inside the velero controller pod), so the generic KubeJobFailed rule can
+# never catch this -- confirmed live (`kubectl get cronjob -A` shows no
+# Velero-owned CronJob; backups are driven by the velero.io Schedule CRD
+# instead). Velero exposes its own /metrics on port 8085 -- confirmed live
+# (curl returned real velero_backup_* series, nothing was scraping it before
+# this).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: velero
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - velero
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: velero
+  endpoints:
+    - port: http-monitoring
+      interval: 60s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-velero-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: velero
+      rules:
+        - alert: VeleroBackupFailed
+          expr: |
+            increase(velero_backup_failure_total[1h]) > 0
+          labels:
+            severity: critical
+          annotations:
+            summary: "Velero backup failed"
+            description: "At least one Velero backup has failed in the last hour ({{ $labels.schedule }}). REL-023: a failed/incomplete backup is not automatically retried -- check `velero backup describe` for the reason."
+        - alert: VeleroBackupPartialFailure
+          expr: |
+            increase(velero_backup_partial_failure_total[1h]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "Velero backup partially failed"
+            description: "At least one Velero backup completed with PartialFailure in the last hour ({{ $labels.schedule }}) -- some resources were skipped. Check `velero backup describe` before assuming the backup is complete."

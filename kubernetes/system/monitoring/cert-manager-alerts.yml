@@ -1,0 +1,59 @@
+# Task 2 (autonomy-readiness): cert-manager had zero metrics scraping and zero
+# alerting -- a renewal failure would go unnoticed until the cert actually
+# expired and something started refusing TLS connections. cert-manager
+# exposes its own /metrics on port 9402 (confirmed live: cert-manager Service
+# already has this port, just nothing was scraping it).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cert-manager
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - cert-manager
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+  endpoints:
+    - port: tcp-prometheus-servicemonitor
+      interval: 60s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-cert-manager-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: cert-manager
+      rules:
+        # Direct renewal-failure signal: cert-manager itself considers the
+        # cert not Ready (ACME/issuer error, CSR rejected, etc.) for a
+        # sustained period -- not just "will expire soon."
+        - alert: CertManagerCertNotReady
+          expr: |
+            max by (name, namespace, exported_namespace) (
+              certmanager_certificate_ready_status{condition="False"}
+            ) == 1
+          for: 30m
+          labels:
+            severity: critical
+          annotations:
+            summary: "cert-manager certificate {{ $labels.name }} is not Ready"
+            description: "Certificate {{ $labels.name }} in {{ $labels.exported_namespace }} has been in a non-Ready state for 30m+ -- renewal is failing, not just approaching expiry."
+        # Early-warning companion: catches the case where the Ready status
+        # itself is stale/missing but the cert is genuinely close to expiry.
+        - alert: CertManagerCertExpirySoon
+          expr: |
+            certmanager_certificate_expiration_timestamp_seconds - time() < 86400 * 7
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "cert-manager certificate {{ $labels.name }} expires within 7 days"
+            description: "Certificate {{ $labels.name }} in {{ $labels.exported_namespace }} expires in under 7 days and hasn't renewed yet."

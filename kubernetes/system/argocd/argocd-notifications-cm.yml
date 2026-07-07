@@ -1,0 +1,76 @@
+# Task 2 (autonomy-readiness): ArgoCD app Degraded/OutOfSync had ZERO alerting.
+# The obvious path (scrape argocd-application-controller's Prometheus metrics,
+# alert on argocd_app_health_status/argocd_app_info) turned out to be dead on
+# arrival: the controller's metrics port (8082) is not actually listening
+# despite the Service/Endpoint/container port all being configured correctly
+# and the binary's own --help confirming port 8082 is its default -- confirmed
+# live via /proc/net/tcp inside the pod, even after a clean pod restart. Root
+# cause not found; not worth blocking this fix on debugging a closed-source-
+# behaving default in someone else's binary.
+#
+# Fixed instead via ArgoCD's own built-in notifications-controller (already
+# running, already doing nothing -- argocd-notifications-cm didn't exist in
+# git or have any data before this). Uses a generic `webhook` service (not the
+# named `discord` integration, which needs a bot token) pointed at the same
+# Discord incoming-webhook URL already used by Alertmanager
+# (secret/alertmanager:discord-webhook-url in Vault) -- one Discord channel,
+# one webhook URL, two independent delivery paths (Alertmanager for
+# Prometheus-metric alerts, this for ArgoCD's own app-state events).
+#
+# `subscriptions:` (this exact top-level key) is ArgoCD's documented
+# mechanism for a default, cluster-wide subscription -- it applies to every
+# Application without needing a per-Application or per-AppProject
+# annotation. Deliberately used instead of annotating the live `default`
+# AppProject (untracked in git, auto-created, cluster-wide blast radius if a
+# hand-written spec here ever drifted from live under selfHeal+prune).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-notifications-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  service.webhook.discord: |
+    url: $discord-webhook-url
+    headers:
+      - name: Content-Type
+        value: application/json
+
+  trigger.on-health-degraded: |
+    - when: app.status.health.status == 'Degraded'
+      send: [app-degraded]
+  trigger.on-sync-failed: |
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Error', 'Failed']
+      send: [app-sync-failed]
+  trigger.on-sync-status-unknown: |
+    - when: app.status.sync.status == 'Unknown'
+      send: [app-sync-unknown]
+
+  template.app-degraded: |
+    webhook:
+      discord:
+        method: POST
+        body: |
+          {"content": "🔴 **ArgoCD Degraded**: `{{.app.metadata.name}}` health is Degraded. <https://argo.woitzik.dev/applications/{{.app.metadata.name}}>"}
+  template.app-sync-failed: |
+    webhook:
+      discord:
+        method: POST
+        body: |
+          {"content": "🔴 **ArgoCD Sync Failed**: `{{.app.metadata.name}}` — phase `{{.app.status.operationState.phase}}`. <https://argo.woitzik.dev/applications/{{.app.metadata.name}}>"}
+  template.app-sync-unknown: |
+    webhook:
+      discord:
+        method: POST
+        body: |
+          {"content": "🟡 **ArgoCD Sync Status Unknown**: `{{.app.metadata.name}}`. <https://argo.woitzik.dev/applications/{{.app.metadata.name}}>"}
+
+  subscriptions: |
+    - recipients:
+        - discord
+      triggers:
+        - on-health-degraded
+        - on-sync-failed
+        - on-sync-status-unknown

@@ -13,6 +13,13 @@
 # every other Application) are deliberately left out of automated sync until
 # each has been individually diffed against live state -- selfHeal+prune on
 # those objects has cluster-wide blast radius if git and live have drifted.
+#
+# argocd-notifications-cm.yml and notifications-external-secret.yml added
+# 2026-07-07 (autonomy-readiness task 2): argocd-notifications-cm existed
+# live with zero data (notifications-controller running but configured to do
+# nothing) and was never git-tracked at all -- same orphan-config class as
+# the REL-035/042 bugs above, just never noticed because an empty config
+# doesn't fail loudly.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -25,7 +32,7 @@ spec:
     targetRevision: main
     path: kubernetes/system/argocd
     directory:
-      include: '{ingressroute,external-secret}.yml'
+      include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
