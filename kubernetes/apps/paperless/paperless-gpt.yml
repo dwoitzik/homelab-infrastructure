@@ -18,8 +18,17 @@ spec:
           - name: ndots
             value: "1"
       containers:
+      # REL-060: pinned at v0.25.1, NOT auto-mergeable past this without manual
+      # verification. v0.26.0 (PR #314, merged 2026-07-07) CrashLoopBackOff'd
+      # immediately -- confirmed live via `kubectl logs --previous`:
+      # `addgroup: /etc/group: Read-only file system`. v0.26.0's entrypoint
+      # added a startup addgroup/adduser step that fails under this
+      # deployment's `readOnlyRootFilesystem: true` (SEC-012 hardening).
+      # Rolled back rather than relaxing the security context. If bumping
+      # again, test in a scratch Deployment with the same securityContext
+      # first, not a live rollout.
       - name: paperless-gpt
-        image: icereed/paperless-gpt:v0.26.0
+        image: icereed/paperless-gpt:v0.25.1
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -104,7 +113,7 @@ spec:
           mountPath: /app/db
       initContainers:
       - name: seed-prompts
-        image: icereed/paperless-gpt:v0.26.0
+        image: icereed/paperless-gpt:v0.25.1
         command:
         - sh
         - -c

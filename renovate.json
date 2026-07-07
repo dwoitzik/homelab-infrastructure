@@ -35,7 +35,7 @@
       "labels": ["major-update"]
     },
     {
-      "description": "Stateful/critical services -- databases, Vault, Authelia, Garage, Vaultwarden, and apps whose upgrades need a manual data migration (Nextcloud, Paperless, Immich, Gitea) or whose breakage takes out backups/auth cluster-wide (Velero's own restic/kopia plugin). ALL update types (patch/minor/major) stay PR-only, grouped into one PR per bump wave so they're one glance instead of scattered across the inbox. Listed last so it wins over the stateless auto-merge rule above for these specific packages.",
+      "description": "Stateful/critical services -- databases, Vault, Authelia, Garage, Vaultwarden, and apps whose upgrades need a manual data migration (Nextcloud, Paperless, Immich, Gitea) or whose breakage takes out backups/auth cluster-wide (Velero's own restic/kopia plugin). ALL update types (patch/minor/major) stay PR-only, grouped into one PR per bump wave so they're one glance instead of scattered across the inbox. Listed last so it wins over the stateless auto-merge rule above for these specific packages. icereed/paperless-gpt added 2026-07-07 (REL-060) after v0.26.0 auto-merged and immediately CrashLoopBackOff'd -- its entrypoint isn't stable against this repo's readOnlyRootFilesystem hardening across versions, needs manual verification per bump.",
       "matchManagers": ["kubernetes"],
       "matchPackageNames": [
         "hashicorp/vault",
@@ -51,7 +51,8 @@
         "gitea/gitea",
         "ghcr.io/immich-app/immich-server",
         "ghcr.io/immich-app/immich-machine-learning",
-        "velero/velero-plugin-for-aws"
+        "velero/velero-plugin-for-aws",
+        "icereed/paperless-gpt"
       ],
       "groupName": "stateful/critical services",
       "labels": ["stateful-critical"],
