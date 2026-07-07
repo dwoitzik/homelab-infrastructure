@@ -3337,6 +3337,76 @@ depend entirely on which branch of the decision rule above the data lands on.
 
 ---
 
+### REL-065 — Vault break-glass proof: real restore test, first ever cluster-wide · **PROVEN** (2026-07-07)
+
+Prerequisite check before starting the Vault-into-IaC migration (docs/IAC-GAPS.md item
+2, split out from the rest by explicit instruction): prove Vault can actually be
+recovered — unsealed and its data read — without depending on the very in-cluster
+config the migration would touch, and confirm a current backup exists and has actually
+been test-restored (not just assumed to exist because the namespace isn't excluded).
+
+**Backup existence, checked first:** `vault`'s `PersistentVolumeClaim` (`data-vault-0`,
+raft storage, `local-path`) has a real, current `PodVolumeBackup` in today's
+`daily-backup-20260707160048` — `Completed`, 113,221,632 bytes, not zero-byte or
+skipped.
+
+**Out-of-band unseal material, checked before touching anything:** the live
+`vault-unseal-keys` Kubernetes Secret only holds `key1`/`key2` (2 of the Shamir 3-share
+total, matching the in-cluster auto-unseal sidecar's `vault-unseal` Deployment). All 3
+shares plus the root token are *also* stored outside the cluster entirely, in
+`ansible/group_vars/all/vault.yml` (Ansible Vault-encrypted, checked into Git) —
+`vault_unseal_key_1/2/3` and `vault_root_token`. `key3` exists only there, never live in
+the cluster — a genuine spare, not just a second copy of what's already in-cluster.
+
+**The actual test:** triggered a real `velero.io/v1 Restore` of the `vault` namespace
+from `daily-backup-20260707160048` into a scratch namespace (`vault-restore-test`,
+`namespaceMapping`) — **the first Velero restore ever performed cluster-wide** (
+`kubectl get restores.velero.io -A` had zero results before this, the single biggest
+gap flagged in `AUTONOMY-STATUS.md`). Completed clean: 36/36 items restored, real PVC
+(`data-vault-0`, 5Gi, bound) with the actual raft data — `vault status` on the restored
+pod showed `Initialized: true`, `Sealed: true`, `Total Shares: 3`, `Threshold: 2` before
+any unseal attempt, confirming the restored data itself is real and intact, not empty.
+
+**Unsealed using only the out-of-cluster copy**, deliberately with `key1` + `key3` — a
+different 2-of-3 combination than the live sidecar's `key1`+`key2`, so this also proves
+`key3` (the never-used spare) is genuinely valid, not just present. Result: `Sealed:
+false`, real `Raft Committed Index`/`Raft Applied Index` populated. Zero dependency on
+the in-cluster `vault-unseal-keys` Secret or the `vault-unseal` sidecar for this —
+pulled both keys fresh from the Ansible Vault file each time.
+
+**Data integrity, not just "it unseals":** using the root token (also pulled from the
+out-of-band copy), `vault kv list secret/` on the restored instance returned real paths
+(`authelia`, `cloudflare`, `garage`, `immich`, etc.). Cross-checked one exactly:
+`secret/cloudflare`'s `created_time` on the restored instance
+(`2026-07-07T15:08:53.934402985Z`) is byte-for-byte identical to the same path's
+`created_time` on the live instance — genuine data match, not coincidental structure.
+`secret/gitea` (written ~18:58 UTC today, after the 16:00 UTC backup) is correctly
+*absent* from the restored instance — the expected backup-point-in-time gap, not a
+missing-data bug, and further confirms this is a real point-in-time snapshot rather
+than something reading live state.
+
+Scratch namespace and the `Restore` object torn down immediately after — confirmed
+`namespace "vault-restore-test" not found` before moving on, same discipline as
+REL-052's hypervisor-level restore test.
+
+**Direct answer to the two gate questions:** yes, break-glass works — the out-of-cluster
+unseal-key/root-token copy is genuinely valid and sufficient on its own, and a current
+backup exists and has now actually been test-restored, for the first time, cluster-wide.
+**This is separately the first proof that Velero restore works at all** — the biggest
+gap in `AUTONOMY-STATUS.md` was "zero restores, ever" with no evidence either way; this
+is one real data point, for one namespace, not a blanket clear of every service's
+restorability.
+
+**Stopping here, as instructed** — the Vault-into-IaC change itself (Terraform-managing
+Vault's mounts/policies) is not part of this PR and has not been started.
+
+**Effort:** Medium — the restore itself was fast (Velero mechanics), but sourcing and
+verifying the out-of-band key material, picking a deliberately different unseal
+combination to prove the spare share, and the byte-for-byte data cross-check took more
+care than a bare "did it unseal" check would have.
+
+---
+
 ### REL-055 — Autonomy-readiness task 2: Discord alert coverage gaps, proven live · **RESOLVED** (2026-07-07)
 
 Audit of steady-state alert coverage (ArgoCD Degraded/OutOfSync, pod CrashLoopBackOff,
@@ -3599,6 +3669,7 @@ where jams actually stick.
 | REL-062 | Reliability | **CORRECTED, PROPOSED** | Original entry claimed PBS's vzdump and Velero's backup stacked at the same 03:00 instant -- WRONG, retracted here: mini runs CEST (UTC+2), vzdump's "03:00" is 01:00 UTC, Velero's schedule is 03:00 UTC -- 2 hours apart, never overlapped. Re-checked with a full week of Prometheus history: Velero's OWN backup alone pushes host temp to 82-90C every single night (2026-07-04 hit 90C with zero alert). 2026-07-07's alert wasn't a one-off stacking incident, it's this nightly pattern crossing the alert threshold. Moved schedule to 05:00 UTC (clear of vzdump's real window) as hygiene only -- explicitly not a thermal fix, since Velero alone already reaches 82-90C regardless of the hour. Real takeaway: this is a standing nightly near-freeze risk, not a rare fluke (2026-07-07) |
 | REL-063 | Reliability | **CONFIRMED** | PBS vzdump (the hypervisor safety net, the one backup layer with a real live-tested restore, REL-052) showed ERROR on 7 consecutive nights (06-26 through 07-02), not the 3 first noticed. Pulled every failure's full task log: identical cause each time, VM 9000 (a stopped template, `tpl-debian-13-cloudinit`, not a real guest) timing out on a ZFS base-volume zvol device link, always the LAST item attempted after every real, data-bearing guest had already backed up successfully. The safety net was reliable throughout, including during the failure streak -- only a non-critical template's tail-end backup ever failed. Already fixed 5 days before this check (`exclude 9000` in /etc/pve/jobs.cfg, confirmed via the live command line since 07-03) by someone outside this session -- this pass confirmed and documented it, no remediation needed. Flagged: the fix itself has zero IaC trail, same class of gap as REL-057b's Garage bucket management (2026-07-07) |
 | REL-064 | Reliability | **PENDING, 0/3 nights** | Post-Velero-fix thermal recheck: does peak nightly host temp actually drop below 80C after REL-062's schedule move (05:00 UTC, live as of 2026-07-07 16:03 UTC) plus separate physical cooling work, or does Velero's own IO/CPU load alone keep driving 82-90C regardless of schedule? Can't be answered yet -- the new schedule's first run hasn't happened. Documented pre-fix baseline (7 nights, 81.6-90.0C), exact PromQL methodology, and a decision rule stated in advance (below-80C -> RESOLVED by cooling; still 82-90C -> load-side fix needed, e.g. Velero concurrency limits/ionice/narrower defaultVolumesToFsBackup scope). Revisit 2026-07-10 UTC or later (2026-07-07) |
+| REL-065 | Reliability | **PROVEN** | Vault break-glass gate, before starting the Vault-into-IaC migration (IAC-GAPS item 2): confirmed a current Velero backup of vault's raft PVC exists (113MB, Completed today), then performed the first-ever cluster-wide Velero restore (36/36 items, real PVC with real raft data) into a scratch namespace. Unsealed it using ONLY the out-of-cluster copy (Ansible Vault-encrypted, not the live k8s Secret), deliberately with key1+key3 (not the live sidecar's key1+key2) to also prove the never-used spare share is genuinely valid. Cross-checked data integrity: secret/cloudflare's created_time matched the live instance byte-for-byte; secret/gitea (written after the backup) was correctly absent, confirming a real point-in-time snapshot. Scratch namespace torn down after. Vault-into-IaC change itself not started, per instruction (2026-07-07) |
 | REL-056 | Reliability | **PARTIAL** | Autonomy-readiness task 1: tiered Renovate auto-merge -- stateless/CI/dev-tooling patch-minor-digest auto-merges after CI-green + 3-day soak; a named stateful/critical list (Vault/Authelia/Garage/Vaultwarden/DBs/Nextcloud/Paperless/Immich/Gitea/Velero-plugin) plus all majors stay PR-only, grouped+labeled. Digest pinning added. Config-validated, NOT merged -- account owner reads the tiering first per instruction (2026-07-07) |
 | REL-055 | Reliability | **RESOLVED** | Autonomy-readiness task 2: CrashLoopBackOff/KubeJobFailed/NodeNotReady existed as rules but shipped severity=warning, never routed to Discord -- added explicit alertname route. ArgoCD Degraded/OutOfSync had zero alerting AND its metrics port turned out to be dead (confirmed live via `/proc/net/tcp`, root cause not found) -- pivoted to `argocd-notifications-controller` (a generic webhook service reusing the same Discord URL), found and fixed a real nil-pointer bug in the sync-failed trigger expression live. cert-manager and Velero (goroutine-driven, no native Job -- `KubeJobFailed` could never catch it) had zero metrics scraping at all -- added ServiceMonitors + PrometheusRules for both. Every fix proven with a real fired alert reaching Discord, user-confirmed both times, not just config review. Also broke and immediately fixed ArgoCD's own application-controller mid-diagnosis (bad `kubectl patch` dropped its exec args, ~2min crash loop, reverted clean) (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
