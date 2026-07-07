@@ -2685,6 +2685,43 @@ against live state rather than trusting "it's configured so it must work."
 
 ---
 
+### REL-058 — DHCP `home.lan` domain drift, DNS query-volume investigation part 1 · **CONFIGURED, awaiting apply** (2026-07-07)
+
+DNS query volume grew from ~40k/7d to 1.8M/7d after the k3s migration. First root cause:
+live-confirmed (`networkctl status` on a k3s VM) that DHCP is handing out `home.lan` as
+the search-domain suffix, which kubelet then appends to every pod's `resolv.conf`
+(standard `ClusterFirst` DNS policy behavior). With the pod default `ndots:5`, this
+means every external hostname lookup also tries `<name>.home.lan` — and unbound has no
+authoritative zone for `home.lan` (unlike `fritz.box`, which already has a real
+stub-zone to the router), so every one of these recurses all the way out and fails.
+Confirmed ~341ms average for these vs. instant for a local answer.
+
+**Found live drift, not just a config gap:** `terraform/stacks/network/dhcp.tf` never
+declared a `domain` attribute on any `routeros_ip_dhcp_server_network` resource, and
+the last `terraform.tfstate.backup` on disk shows `domain: null` for every network —
+yet the live DHCP lease clearly delivers `home.lan`. Either someone set it manually via
+Winbox at some point (bypassing Terraform, against `CLAUDE.local.md`'s explicit rule),
+or an apply after that state backup set it and it was never declared in code to catch
+future drift. Couldn't get a live read of the router's current value directly (no
+router credentials in this shell, and pulling real state needed backend init this pass
+didn't do) — the fix doesn't depend on knowing which explanation is correct.
+
+**Fix:** declared `domain = ""` explicitly on both `vlan_networks` (all VLANs) and
+`vlan10_network` — forces Terraform to detect and correct this drift on the next
+Atlantis apply regardless of the current live value, and prevents it from silently
+reappearing.
+
+- **Not yet applied** — Terraform network changes only go through Atlantis
+  (`atlantis apply` comment), never applied locally, per `CLAUDE.local.md`.
+- **Caveat:** existing DHCP leases keep `home.lan` until they renew or the client
+  reboots — this won't take effect instantly fleet-wide even once merged and applied.
+- See REL-059 for the unbound-side companion fix (answering `home.lan` locally instead
+  of relying solely on removing it at the source) and the NTP query-volume finding.
+
+**Effort:** Small — two-line Terraform change, `terraform validate`/`tflint` clean.
+
+---
+
 ### REL-035b — Memory-overcommit regression guard: two-tier model, not one sum · **RESOLVED** (2026-07-07)
 
 Follow-up to REL-035. That pass fixed CPU-scheduling contention (`cpu.units`) but left
@@ -2899,6 +2936,7 @@ where jams actually stick.
 | REL-053 | Reliability | **RESOLVED** | Immich major bump v2.7.5->v3.0.1 (PR #273, the last of the 2026-07 deferred Renovate majors) -- checked upstream breaking changes first (API-only, no DB migration needed since VectorChord already in place per REL-030), took a real pg_dumpall backup, merged, verified live: 0 restarts, identical asset/asset_face row counts (11553/5461), API reports v3.0.1, login page reachable (2026-07-06) |
 | REL-054 | Reliability | **RESOLVED** | PR #306's kubeconform rate-limit fix (`-cache` + `actions/cache`) was a mitigation not a fix -- proved live with a broken proxy that a cold-cache/never-seen schema still hard-fails CI on network error (`-ignore-missing-schemas` only catches 404s, not 429s/timeouts). Vendored the 15 built-in-kind schemas actually used under `kubernetes/` into `ci/kubeconform-schemas/`, switched pre-commit + CI to `-schema-location` pointing only at that local dir -- reran the same broken-proxy test, `Errors: 0`, fully offline. CRD kinds (Application/IngressRoute/etc.) still skip via `-ignore-missing-schemas`, unaffected (2026-07-06) |
 | REL-057 | Reliability | **PARTIAL** | Autonomy-readiness task 4 (report only): ArgoCD selfHeal PROVEN on for all 41 Applications. cert-manager renewal CONFIGURED but unproven (cert has never actually renewed yet). Backups: schedule proven reliable, but 2 of last 5 daily runs actually FAILED on a Garage S3 timeout (separate from REL-019), and `restores.velero.io` is empty cluster-wide -- Velero-level restore has NEVER been tested (REL-052 tested PBS/hypervisor restore only, a different system). Backup scope includes the `garage` namespace itself, confirming REL-003's circular-dependency risk live (skip-list, not touched) (2026-07-07) |
+| REL-058 | Reliability | **PARTIAL** | DNS query volume 40k->1.8M/7d post-K3s, part 1: live-confirmed (`networkctl status`) DHCP hands out `home.lan` as pod search-domain suffix, and unbound has no authoritative zone for it (unlike `fritz.box`), so every external lookup recurses and fails (~341ms avg). Terraform never declared `domain` on the DHCP network resources and the last state backup shows null -- live drift, likely a manual RouterOS change bypassing Terraform. Added `domain = ""` explicitly to force-correct on next Atlantis apply. Not yet applied (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
 
 ---
