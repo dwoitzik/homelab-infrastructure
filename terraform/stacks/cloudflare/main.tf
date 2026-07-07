@@ -144,6 +144,23 @@ resource "cloudflare_dns_record" "tunnel_media" {
   comment = "Jellyfin media server -- routed via Cloudflare tunnel"
 }
 
+# auth.woitzik.dev -- Authelia, gating almost every other exposed service.
+# docs/IAC-GAPS.md item 4: the highest-consequence record in the zone that
+# wasn't under Terraform (26 of ~30 records still aren't, imported one at a
+# time per that doc rather than in bulk, to keep each diff reviewable and
+# avoid a live DNS blip if a representation doesn't exactly match on first
+# plan). NOT a Cloudflare Tunnel CNAME like the others above -- rides
+# home.woitzik.dev's dynamic-DNS chain (direct WAN access), not proxied.
+resource "cloudflare_dns_record" "auth" {
+  zone_id = var.zone_id
+  name    = "auth"
+  type    = "CNAME"
+  content = "home.woitzik.dev"
+  proxied = false
+  ttl     = 1
+  comment = "Authelia SSO -- gates almost every other exposed service"
+}
+
 # mc.woitzik.dev -> playit.gg tunnel for Minecraft (port 25565, main server).
 # Only created once var.mc_playit_hostname is set in tfvars.
 # Set up playit agent on ct-dmz-games-01 first, then fill in the hostname.
