@@ -49,6 +49,22 @@ spec:
           - matchType: "="
             name: severity
             value: critical
+      # Task 2 (autonomy-readiness): these specific alertnames matter at
+      # steady-state (crash-looping pods, failed Jobs -- which covers
+      # Renovate's own CronJob, since Velero doesn't use a native Job -- see
+      # velero-alerts.yml, a node going NotReady, and cert-manager's expiry
+      # early-warning) but ship severity=warning upstream/by design, so the
+      # severity=critical route above doesn't catch them. Named explicitly
+      # rather than routing all severity=warning, which would also forward
+      # noisy/routine warnings (KubeMemoryQuotaOvercommit, etc.) not worth a
+      # Discord ping.
+      - receiver: discord
+        groupWait: 30s
+        repeatInterval: 2h
+        matchers:
+          - matchType: "=~"
+            name: alertname
+            value: "KubePodCrashLooping|KubeJobFailed|KubeNodeNotReady|CertManagerCertExpirySoon|VeleroBackupPartialFailure"
   receivers:
     - name: "null"
     - name: discord

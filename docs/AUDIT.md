@@ -2903,6 +2903,116 @@ two-tier model instead of the single sum.
 
 ---
 
+### REL-055 — Autonomy-readiness task 2: Discord alert coverage gaps, proven live · **RESOLVED** (2026-07-07)
+
+Audit of steady-state alert coverage (ArgoCD Degraded/OutOfSync, pod CrashLoopBackOff,
+node/host pressure, cert-manager renewal failure, backup job failure, Renovate's own
+failures) found real gaps, and every fix was proven with a real fired alert reaching
+Discord, not just config review.
+
+**Gaps found, live:**
+
+- `KubePodCrashLooping` and `KubeJobFailed` (the latter covers Renovate's own CronJob)
+  both already exist as upstream kube-prometheus-stack rules, but ship
+  `severity: warning` — the existing Alertmanager route only forwarded
+  `severity: critical` plus 2 temp alerts. Neither was reaching Discord.
+- `KubeNodeNotReady` — same gap: a node actually going NotReady wouldn't have paged.
+- **ArgoCD Degraded/OutOfSync had zero alerting, and the obvious fix path was dead on
+  arrival:** `argocd-application-controller`'s metrics port (8082) is not actually
+  listening, confirmed live via `/proc/net/tcp` inside the pod, even after a clean pod
+  restart — Service/Endpoint/container port are all correctly configured, and the
+  binary's own `--help` confirms 8082 is its default. Root cause not found; not worth
+  blocking this fix on debugging an upstream binary's undocumented behavior.
+- **cert-manager**: zero metrics scraping, zero alerting. Renewal failure would only be
+  noticed when something started refusing TLS.
+- **Velero backup failures**: zero alerting. Velero doesn't run backups as a native
+  Kubernetes Job (it's a goroutine inside the velero pod, driven by a `velero.io`
+  `Schedule` CRD, confirmed via `kubectl get cronjob -A` showing nothing owned by
+  Velero) — the generic `KubeJobFailed` rule could never have caught this regardless of
+  its severity-routing gap above.
+- `argocd-notifications-cm` existed live with **zero data** — the notifications
+  controller has been running for weeks doing nothing, and was never git-tracked at
+  all (same orphan-config class as REL-035/042, just silent instead of loud since an
+  empty config doesn't fail).
+
+**Fixed:**
+
+1. **ArgoCD** — pivoted off the broken metrics port entirely. Wired ArgoCD's own
+   `argocd-notifications-controller` (already running) with a generic `webhook` service
+   (not the named `discord` integration, which needs a bot token) pointed at the same
+   Discord incoming-webhook URL Alertmanager already uses
+   (`secret/alertmanager:discord-webhook-url`) — one webhook URL, two independent
+   delivery paths. Triggers: `on-health-degraded`, `on-sync-failed`,
+   `on-sync-status-unknown`, subscribed via the `subscriptions:` top-level key (ArgoCD's
+   documented default-subscription mechanism — applies to every Application with zero
+   per-app or per-AppProject annotations, deliberately avoiding touching the live
+   `default` AppProject, which is untracked in git and cluster-wide blast radius if a
+   hand-written spec ever drifted under selfHeal+prune).
+   - Found and fixed a real bug in the first draft live: `on-sync-failed`'s expression
+     (`app.status.operationState.phase in [...]`) threw `cannot fetch phase from <nil>`
+     for every app whose `operationState` was nil (i.e. most apps, most of the time) —
+     fixed with a nil guard (`app.status.operationState != nil && ...`).
+   - `argocd-notifications-cm.yml` and a new `notifications-external-secret.yml`
+     (Merge-policy ExternalSecret for the webhook URL) added to git and to
+     `manifests-application.yml`'s include glob — the same explicit, non-wildcard glob
+     pattern this repo already uses for `kubernetes/system/*`, so this doesn't repeat
+     the REL-014/035/042 "committed but never synced" bug class.
+2. **cert-manager** — new `ServiceMonitor` (port `tcp-prometheus-servicemonitor`,
+   confirmed matches the live Service) + `PrometheusRule`: `CertManagerCertNotReady`
+   (severity critical, direct renewal-failure signal — cert stuck non-Ready 30m+) and
+   `CertManagerCertExpirySoon` (severity warning, <7 days to expiry as an early-warning
+   companion).
+3. **Velero** — new `ServiceMonitor` (port `http-monitoring`, confirmed the live Service
+   responds with real `velero_backup_*` series) + `PrometheusRule`: `VeleroBackupFailed`
+   (severity critical) and `VeleroBackupPartialFailure` (severity warning).
+4. **Alertmanager routing** — added one new route to `alertmanager-config.yml` matching
+   `alertname =~ "KubePodCrashLooping|KubeJobFailed|KubeNodeNotReady|
+   CertManagerCertExpirySoon|VeleroBackupPartialFailure"` explicitly, rather than
+   routing all `severity=warning` (which would also forward routine noise like
+   `KubeMemoryQuotaOvercommit`). `CertManagerCertNotReady` and `VeleroBackupFailed` are
+   `severity: critical` and need no new routing — they already flow through the
+   existing critical route.
+
+**Proved live, both delivery paths, not just config review:**
+
+- Fired a real synthetic `KubePodCrashLooping` alert directly at Alertmanager's API
+  (`POST /api/v2/alerts`, executed from inside the Alertmanager pod itself — its API
+  binds to `127.0.0.1` only by design, confirmed via `/proc/net/tcp`, connection
+  refused from any other pod is expected, not a bug). Confirmed via
+  `alertmanager_notifications_total{integration="discord"}` incrementing (11 sent, 0
+  failed) and user-confirmed landing in Discord.
+- Created a real throwaway `Application` (`synthetic-test-task2-proof`) pointed at a
+  nonexistent repo path — genuinely triggered `sync.status: Unknown` (not simulated),
+  confirmed `on-sync-status-unknown` `TRIGGERED` in the notifications-controller logs
+  and a real send to Discord, user-confirmed landing. Deleted afterward.
+- **Live-testing gotcha hit again** (same class as the REL-042 lesson already in
+  memory): ArgoCD's `selfHeal` reverted my live-applied test edits back to git's
+  (unmodified) state within seconds of each `kubectl apply`, because git didn't have
+  these changes yet. Temporarily set `syncPolicy.automated: null` on both
+  `monitoring-manifests` and `argocd-manifests` for the duration of live testing,
+  restored `{prune: true, selfHeal: true}` on both immediately after — confirmed both
+  back to `Synced`/`Healthy` with zero drift before moving on.
+- **Also broke and immediately fixed ArgoCD's own `application-controller` mid-diagnosis**:
+  a `kubectl patch --type=json` meant to test an explicit `--metrics-port=8082` flag
+  replaced the container's `args` entirely (`command` was empty; the actual binary
+  invocation lived in `args`), crash-looping the controller for about 2 minutes.
+  Reverted immediately, force-recreated the pod, confirmed `1/1 Running`, 0 restarts,
+  reconciling normally, before continuing.
+
+**Not fixed, flagged instead:**
+
+- ArgoCD's own metrics port being unreachable remains unexplained. The notifications
+  path above makes it non-blocking for this task, but it means ArgoCD's health/sync
+  state still isn't visible to Prometheus/Grafana at all — worth a dedicated look, not
+  bundled into this PR.
+- cert-manager pod has 137 restarts over 14 days (noticed in passing while checking its
+  Service) — not chased down, flagged for a separate look.
+
+**Effort:** Medium — mostly investigation (finding the ArgoCD metrics gap took the
+longest), the fixes themselves are each small, focused manifests.
+
+---
+
 ### REL-032 — Media acquisition stack: no autoheal, recurring silent queue jams · **RESOLVED** (2026-07-02)
 
 Two distinct "usenet does nothing" recurrences in 24h (2026-07-01 permission bug, 2026-07-02
@@ -3049,6 +3159,7 @@ where jams actually stick.
 | REL-058 | Reliability | **PARTIAL** | DNS query volume 40k->1.8M/7d post-K3s, part 1: live-confirmed (`networkctl status`) DHCP hands out `home.lan` as pod search-domain suffix, and unbound has no authoritative zone for it (unlike `fritz.box`), so every external lookup recurses and fails (~341ms avg). Terraform never declared `domain` on the DHCP network resources and the last state backup shows null -- live drift, likely a manual RouterOS change bypassing Terraform. Added `domain = ""` explicitly to force-correct on next Atlantis apply. Not yet applied (2026-07-07) |
 | REL-059 | Reliability | **PARTIAL** | DNS query volume, part 2: added `local-zone: home.lan. static` to unbound (instant NXDOMAIN, zero recursion, doesn't wait on DHCP leases to renew like REL-058 does). Separately found ptbtime1/2/3.ptb.de (~24% of ALL DNS traffic, ~440k/7d) traced via AdGuard's query log to 3 client IPs on the Fritz!Box's own LAN (192.168.178.20/23/25) -- unrelated to k3s, just noticed at the same time. Added `local-data` overrides (current real IPs) so answering them is free regardless of those unidentified devices' query rate. Config-validated via a disposable container of the live unbound image (no unbound-checkconf binary in this minimal image). Not yet applied (2026-07-07) |
 | REL-056 | Reliability | **PARTIAL** | Autonomy-readiness task 1: tiered Renovate auto-merge -- stateless/CI/dev-tooling patch-minor-digest auto-merges after CI-green + 3-day soak; a named stateful/critical list (Vault/Authelia/Garage/Vaultwarden/DBs/Nextcloud/Paperless/Immich/Gitea/Velero-plugin) plus all majors stay PR-only, grouped+labeled. Digest pinning added. Config-validated, NOT merged -- account owner reads the tiering first per instruction (2026-07-07) |
+| REL-055 | Reliability | **RESOLVED** | Autonomy-readiness task 2: CrashLoopBackOff/KubeJobFailed/NodeNotReady existed as rules but shipped severity=warning, never routed to Discord -- added explicit alertname route. ArgoCD Degraded/OutOfSync had zero alerting AND its metrics port turned out to be dead (confirmed live via `/proc/net/tcp`, root cause not found) -- pivoted to `argocd-notifications-controller` (a generic webhook service reusing the same Discord URL), found and fixed a real nil-pointer bug in the sync-failed trigger expression live. cert-manager and Velero (goroutine-driven, no native Job -- `KubeJobFailed` could never catch it) had zero metrics scraping at all -- added ServiceMonitors + PrometheusRules for both. Every fix proven with a real fired alert reaching Discord, user-confirmed both times, not just config review. Also broke and immediately fixed ArgoCD's own application-controller mid-diagnosis (bad `kubectl patch` dropped its exec args, ~2min crash loop, reverted clean) (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
 
 ---
