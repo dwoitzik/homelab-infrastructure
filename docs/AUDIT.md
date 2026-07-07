@@ -3203,6 +3203,74 @@ than the fix itself, which was a one-line-per-policy syntax change.
 
 ---
 
+### REL-063 — PBS `vzdump` failure streak root-caused: safety net was reliable throughout · **CONFIRMED, already fixed outside this repo** (2026-07-07)
+
+Flagged in passing during REL-062: `vzdump` (PBS's hypervisor-level backup — the
+*only* backup layer that's ever had a real, live-tested restore, REL-052) had shown
+`ERROR` status on several recent nights. Given this is the safety net under the whole
+cluster, root-caused it properly rather than leaving it as a loose end.
+
+**Full picture, not just the 3 nights first noticed:** 7 consecutive failures, not 3 —
+2026-06-26 (an off-schedule 14:07 run), then every single scheduled night from
+2026-06-27 through 2026-07-02. Pulled the actual task log for all 7 via
+`pvenode task log <UPID>`, not just the summary status.
+
+**Every single failure is the identical error, same VM, no variation:**
+
+```text
+INFO: Finished Backup of VM 302 (...)
+INFO: Starting Backup of VM 9000 (qemu)
+ERROR: Backup of VM 9000 failed - timeout: no zvol device link for 'base-9000-disk-0' found after 300 sec.
+INFO: Backup job finished with errors
+```
+
+VM 9000 is `tpl-debian-13-cloudinit` — a **stopped template**, not a running guest
+(`qm list` confirms: `STATUS stopped`, and it's the only VMID in the 9000+
+template-numbering range on this host). Its disk is a ZFS `base-9000-disk-0` volume
+— the read-only linked-clone source Proxmox uses for cloning new VMs from, not a
+disk meant to be independently vzdump'd the normal way. This is a known category of
+Proxmox+ZFS quirk: `base-*` template volumes don't always present a normal zvol
+device symlink the way a regular VM disk does, and `vzdump` waiting on that symlink
+appearing can time out.
+
+**Critically: VM 9000 was always the *last* item attempted, after every real guest had
+already finished successfully.** Checked each failure log for the full sequence, not
+just the error line — every real, data-bearing guest (`ct-mgmt-pbs-01`,
+`ct-srv-docker-01`, `ct-srv-ai-01`, `ct-srv-media-acq-01`, `ct-srv-jellyfin-01`,
+`ct-srv-atlantis-01`, `ct-srv-nfs-01`, `ct-dmz-proxy-01`, `ct-dmz-games-01`, and the 3
+k3s VMs) **completed its backup successfully every single one of those 7 nights.**
+The "job failed" status was real, but it meant "the tail-end backup of a template with
+no unique data timed out" — not "the safety net didn't run."
+
+**Already fixed, confirmed live — not by this investigation:** `jobs.cfg`'s current
+`vzdump` config has `exclude 9000`, and the actual command line PBS logged starting
+2026-07-03 (`vzdump --all 1 ... --exclude 9000 ...`) confirms it took effect exactly
+when the failures stopped. Someone (not this session) fixed this already; this pass
+just confirmed and documented what actually happened and why.
+
+**Direct answer to "is the hypervisor safety net actually reliable, or just proven
+once":** reliable, for real guests, throughout — including during the failure streak.
+The one thing that wasn't reliable was backing up a non-critical template that holds
+no unique data (it's a clone source, re-creatable from the same base image), and that
+was already fixed 5 days before this check.
+
+- **Real gap, though**: the fix (`exclude 9000` in `/etc/pve/jobs.cfg`) lives entirely
+  in Proxmox-native config, outside this repo's Terraform/Ansible management — same
+  class of "real change, zero IaC trail" gap already flagged for Garage bucket
+  management in REL-057b. Not fixed here (this task was report-only per instruction),
+  but worth folding into that same follow-up IaC-coverage pass rather than opening a
+  third one.
+- **Not investigated further**: whether other templates might hit the same issue if
+  added later — there's only the one template VMID on this host right now, so a
+  broader `exclude` range (e.g. all `9xxx` VMIDs) wasn't necessary to recommend as a
+  preventive measure, just noting it as a future consideration if more templates get
+  added.
+
+**Effort:** Small — the failures were already fixed; this was verification and
+root-cause documentation, not remediation.
+
+---
+
 ### REL-055 — Autonomy-readiness task 2: Discord alert coverage gaps, proven live · **RESOLVED** (2026-07-07)
 
 Audit of steady-state alert coverage (ArgoCD Degraded/OutOfSync, pod CrashLoopBackOff,
@@ -3463,6 +3531,7 @@ where jams actually stick.
 | REL-061 | Security | **RESOLVED, awaiting merge** | cloudflare-ddns's API token was a bare hand-created Secret since 2026-06-02, gone dead -- confirmed via Cloudflare's own verify endpoint ("Invalid API Token"). Same secret is also cert-manager's DNS-01 credential, meaning cert renewal would have failed too. Script never checked API response success and always exited 0, masking the failure from KubeJobFailed entirely. Fixed by reusing Terraform/Atlantis's already-working token (verified live: valid, active, real GET+PUT against the actual DNS record both succeeded) wired via a proper Vault ExternalSecret, plus making the script fail loud on real API errors. Separately found nextcloud-cron's "failure" was a single non-recurring event from a week+ ago still re-triggering Alertmanager's 2h repeat -- failedJobsHistoryLimit doesn't expire on its own; added ttlSecondsAfterFinished: 86400 to both CronJobs (2026-07-07) |
 | REL-055b | Reliability | **RESOLVED** | Corrected REL-055's own misdiagnosis of the ArgoCD metrics-port GAP -- `/proc/net/tcp6` (not checked before) showed it was listening dual-stack the whole time. Real cause: k3s's built-in kube-router NetworkPolicy controller doesn't correctly enforce a bare `namespaceSelector: {}` "allow all namespaces" rule -- proved live (delete policy -> works, re-add identical rule -> blocked again, swap to `ipBlock: cidr: 10.42.0.0/16` -> works). Found and fixed the identical broken pattern on 4 more ArgoCD NetworkPolicies (applicationset-controller, dex-server, notifications-controller, repo-server) that were equally unreachable, not just the one port. Added a ServiceMonitor, confirmed live via Prometheus's targets API (`up`) and a real query (`argocd_app_info`, 42 results). All 5 policies were also untracked in git since the 2026-05-31 manual bootstrap -- brought under GitOps here too (2026-07-07) |
 | REL-062 | Reliability | **CORRECTED, PROPOSED** | Original entry claimed PBS's vzdump and Velero's backup stacked at the same 03:00 instant -- WRONG, retracted here: mini runs CEST (UTC+2), vzdump's "03:00" is 01:00 UTC, Velero's schedule is 03:00 UTC -- 2 hours apart, never overlapped. Re-checked with a full week of Prometheus history: Velero's OWN backup alone pushes host temp to 82-90C every single night (2026-07-04 hit 90C with zero alert). 2026-07-07's alert wasn't a one-off stacking incident, it's this nightly pattern crossing the alert threshold. Moved schedule to 05:00 UTC (clear of vzdump's real window) as hygiene only -- explicitly not a thermal fix, since Velero alone already reaches 82-90C regardless of the hour. Real takeaway: this is a standing nightly near-freeze risk, not a rare fluke (2026-07-07) |
+| REL-063 | Reliability | **CONFIRMED** | PBS vzdump (the hypervisor safety net, the one backup layer with a real live-tested restore, REL-052) showed ERROR on 7 consecutive nights (06-26 through 07-02), not the 3 first noticed. Pulled every failure's full task log: identical cause each time, VM 9000 (a stopped template, `tpl-debian-13-cloudinit`, not a real guest) timing out on a ZFS base-volume zvol device link, always the LAST item attempted after every real, data-bearing guest had already backed up successfully. The safety net was reliable throughout, including during the failure streak -- only a non-critical template's tail-end backup ever failed. Already fixed 5 days before this check (`exclude 9000` in /etc/pve/jobs.cfg, confirmed via the live command line since 07-03) by someone outside this session -- this pass confirmed and documented it, no remediation needed. Flagged: the fix itself has zero IaC trail, same class of gap as REL-057b's Garage bucket management (2026-07-07) |
 | REL-056 | Reliability | **PARTIAL** | Autonomy-readiness task 1: tiered Renovate auto-merge -- stateless/CI/dev-tooling patch-minor-digest auto-merges after CI-green + 3-day soak; a named stateful/critical list (Vault/Authelia/Garage/Vaultwarden/DBs/Nextcloud/Paperless/Immich/Gitea/Velero-plugin) plus all majors stay PR-only, grouped+labeled. Digest pinning added. Config-validated, NOT merged -- account owner reads the tiering first per instruction (2026-07-07) |
 | REL-055 | Reliability | **RESOLVED** | Autonomy-readiness task 2: CrashLoopBackOff/KubeJobFailed/NodeNotReady existed as rules but shipped severity=warning, never routed to Discord -- added explicit alertname route. ArgoCD Degraded/OutOfSync had zero alerting AND its metrics port turned out to be dead (confirmed live via `/proc/net/tcp`, root cause not found) -- pivoted to `argocd-notifications-controller` (a generic webhook service reusing the same Discord URL), found and fixed a real nil-pointer bug in the sync-failed trigger expression live. cert-manager and Velero (goroutine-driven, no native Job -- `KubeJobFailed` could never catch it) had zero metrics scraping at all -- added ServiceMonitors + PrometheusRules for both. Every fix proven with a real fired alert reaching Discord, user-confirmed both times, not just config review. Also broke and immediately fixed ArgoCD's own application-controller mid-diagnosis (bad `kubectl patch` dropped its exec args, ~2min crash loop, reverted clean) (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
