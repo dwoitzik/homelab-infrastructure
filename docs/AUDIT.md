@@ -2903,6 +2903,78 @@ two-tier model instead of the single sum.
 
 ---
 
+### REL-057b — Velero backup failures root-caused: CNPG and Velero shared one bucket · **RESOLVED** (2026-07-07)
+
+Root-caused the ~40% recent Velero backup failure rate flagged in REL-057 (2 of last 5
+daily runs failed, `HeadObject` timeout against Garage). Ruled out the obvious
+suspects with live evidence before landing on the real cause:
+
+- **Not Garage CPU/memory load**: queried Prometheus for the exact failure windows
+  (2026-07-03/04, 03:00 UTC) — Garage was idle, ~9 MiB RSS, negligible CPU, nowhere
+  near its 1 CPU / 1Gi limits.
+- **Not a Garage crash/restart**: `kube_pod_container_status_restarts_total` flat
+  across both windows.
+- **A real but coincidental finding, not the cause**: both the NFS server
+  (`ct-srv-nfs-01`, backs the `archive` ZFS pool Garage's data PV lives on) and `mini`
+  itself rebooted on 2026-07-04, after both failures — a `dmesg` hung-task trail on the
+  NFS host looked promising at first but turned out to postdate the failures entirely
+  (ring buffer cleared by the reboot), so it couldn't be correlated. Left as a loose
+  end, not chased further since the real cause was found separately.
+
+**The actual cause**: `kubernetes/system/postgres/cluster.yml`'s CNPG cluster
+(`postgres-authelia`) had its own `barmanObjectStore` WAL/base-backup archiving pointed
+at `s3://velero/cnpg-postgres-authelia` — **the same Garage bucket Velero itself owns**.
+Confirmed live: `kubectl get backupstoragelocation default -n velero` showed
+`phase: Unavailable`, `message: 'invalid top-level directories: [cnpg-postgres-authelia]'`
+— Velero's own bucket-validation logic doesn't tolerate an unrecognized top-level
+directory and periodically flags the whole location unavailable. `garage bucket info
+velero` confirmed two independent writers (access keys aliased `velero` and
+`cnpg-backup`) sharing one bucket, 18711 objects, 200GB. This explains the
+intermittent (not constant) failure pattern: whether a given backup run lands during
+an Available or Unavailable window depends on Velero's own periodic validation timing
+relative to CNPG's writes.
+
+**Fixed**, in the exact order needed to never leave Authelia without a valid backup:
+
+1. Created a new, separate Garage bucket (`cnpg-backups`) and a scoped access key
+   (RWO on that bucket only) — one bucket per *backup system*, not per database, so a
+   future second CNPG cluster lands under its own prefix (`s3://cnpg-backups/<name>`)
+   instead of colliding again.
+2. Repointed `cluster.yml`'s `destinationPath` to `s3://cnpg-backups/authelia` and
+   `external-secret.yml`'s Vault properties to the new scoped credential (added to the
+   existing `secret/garage` Vault path as `cnpg-backups-access-key-id`/
+   `cnpg-backups-secret-access-key`, alongside the pre-existing `velero-*` properties).
+3. **Verified before deleting anything**: triggered a real, on-demand CNPG `Backup` —
+   completed, `destinationPath: s3://cnpg-backups/authelia`, confirmed live via `garage
+   bucket info cnpg-backups` (6 objects, 12MB). Forced a WAL switch
+   (`pg_switch_wal()`) and confirmed a 7th object landed — both base backup *and*
+   continuous WAL archiving proven writing to the new bucket before touching the old
+   one.
+4. Only then deleted the old `cnpg-postgres-authelia/` prefix from the `velero` bucket
+   (3632 objects) via a disposable `aws-cli` pod using Velero's own credential (already
+   scoped to that bucket).
+5. **`BackupStorageLocation` flipped back to `Available`** within ~30s of the deletion
+   completing — confirmed live, not inferred.
+
+**Live-tested throughout** (ArgoCD `postgres-cluster` Application's `selfHeal`
+temporarily disabled during testing, same pattern as REL-042/055, restored after) —
+manifests committed to git match exactly what was verified live, not written blind
+and hoped to match.
+
+- **Blast radius**: Authelia's CNPG backup destination only. The live database itself
+  was never touched — only where its WAL/base-backup archive writes to. Old backup
+  data was deleted only after the new chain was independently confirmed working.
+- **Follow-up, deliberately not bundled here**: Garage bucket management (`cnpg-backups`
+  and the pre-existing `velero`/`loki-data`/`terraform-state` buckets) is entirely
+  hand-created, zero Terraform/GitOps management — a real IaC gap, tracked separately
+  so it doesn't entangle with this auth-critical fix.
+
+**Effort:** Medium — mostly investigation (ruling out Garage load/crash, chasing the
+NFS-host dead end) before finding the actual cause; the fix itself was a clean,
+verifiable bucket split.
+
+---
+
 ### REL-055 — Autonomy-readiness task 2: Discord alert coverage gaps, proven live · **RESOLVED** (2026-07-07)
 
 Audit of steady-state alert coverage (ArgoCD Degraded/OutOfSync, pod CrashLoopBackOff,
@@ -3158,6 +3230,7 @@ where jams actually stick.
 | REL-057 | Reliability | **PARTIAL** | Autonomy-readiness task 4 (report only): ArgoCD selfHeal PROVEN on for all 41 Applications. cert-manager renewal CONFIGURED but unproven (cert has never actually renewed yet). Backups: schedule proven reliable, but 2 of last 5 daily runs actually FAILED on a Garage S3 timeout (separate from REL-019), and `restores.velero.io` is empty cluster-wide -- Velero-level restore has NEVER been tested (REL-052 tested PBS/hypervisor restore only, a different system). Backup scope includes the `garage` namespace itself, confirming REL-003's circular-dependency risk live (skip-list, not touched) (2026-07-07) |
 | REL-058 | Reliability | **PARTIAL** | DNS query volume 40k->1.8M/7d post-K3s, part 1: live-confirmed (`networkctl status`) DHCP hands out `home.lan` as pod search-domain suffix, and unbound has no authoritative zone for it (unlike `fritz.box`), so every external lookup recurses and fails (~341ms avg). Terraform never declared `domain` on the DHCP network resources and the last state backup shows null -- live drift, likely a manual RouterOS change bypassing Terraform. Added `domain = ""` explicitly to force-correct on next Atlantis apply. Not yet applied (2026-07-07) |
 | REL-059 | Reliability | **PARTIAL** | DNS query volume, part 2: added `local-zone: home.lan. static` to unbound (instant NXDOMAIN, zero recursion, doesn't wait on DHCP leases to renew like REL-058 does). Separately found ptbtime1/2/3.ptb.de (~24% of ALL DNS traffic, ~440k/7d) traced via AdGuard's query log to 3 client IPs on the Fritz!Box's own LAN (192.168.178.20/23/25) -- unrelated to k3s, just noticed at the same time. Added `local-data` overrides (current real IPs) so answering them is free regardless of those unidentified devices' query rate. Config-validated via a disposable container of the live unbound image (no unbound-checkconf binary in this minimal image). Not yet applied (2026-07-07) |
+| REL-057b | Reliability | **RESOLVED** | Root-caused REL-057's ~40% recent Velero backup failure rate -- ruled out Garage CPU/memory/crash via Prometheus (all idle/flat during the failure windows), then found CNPG's own barman-cloud archiving for Authelia's Postgres was writing into the *same* Garage bucket Velero owns, tripping Velero's own bucket-validation (`BackupStorageLocation` was live `Unavailable`, "invalid top-level directories: [cnpg-postgres-authelia]"). Fixed with a new scoped bucket (`cnpg-backups`), verified a real base backup + WAL switch landing there *before* deleting the old 3632-object prefix from the shared bucket -- BSL flipped back to `Available` within 30s of the deletion, confirmed live (2026-07-07) |
 | REL-056 | Reliability | **PARTIAL** | Autonomy-readiness task 1: tiered Renovate auto-merge -- stateless/CI/dev-tooling patch-minor-digest auto-merges after CI-green + 3-day soak; a named stateful/critical list (Vault/Authelia/Garage/Vaultwarden/DBs/Nextcloud/Paperless/Immich/Gitea/Velero-plugin) plus all majors stay PR-only, grouped+labeled. Digest pinning added. Config-validated, NOT merged -- account owner reads the tiering first per instruction (2026-07-07) |
 | REL-055 | Reliability | **RESOLVED** | Autonomy-readiness task 2: CrashLoopBackOff/KubeJobFailed/NodeNotReady existed as rules but shipped severity=warning, never routed to Discord -- added explicit alertname route. ArgoCD Degraded/OutOfSync had zero alerting AND its metrics port turned out to be dead (confirmed live via `/proc/net/tcp`, root cause not found) -- pivoted to `argocd-notifications-controller` (a generic webhook service reusing the same Discord URL), found and fixed a real nil-pointer bug in the sync-failed trigger expression live. cert-manager and Velero (goroutine-driven, no native Job -- `KubeJobFailed` could never catch it) had zero metrics scraping at all -- added ServiceMonitors + PrometheusRules for both. Every fix proven with a real fired alert reaching Discord, user-confirmed both times, not just config review. Also broke and immediately fixed ArgoCD's own application-controller mid-diagnosis (bad `kubectl patch` dropped its exec args, ~2min crash loop, reverted clean) (2026-07-07) |
 | IAC-004 | IaC | **RESOLVED** | Re-checked after REL-038 unblocked the network stack's plan (it had never successfully planned before due to the same backend DNS issue, layered on top of years of never-applied drift). Real plan: destroys the 4 WAN Minecraft port-forward rules (`fwd_wan_minecraft`/`fwd_wan_cobblemon`/`dstnat_minecraft`/`dstnat_cobblemon`) -- **intentional** per PR #216 (2026-07-01, already merged) which moved Minecraft to a playit.gg tunnel instead. Was held from applying while the replacement DNS record was blocked by the Cloudflare token's missing DNS scope (2026-07-04). Unblocked 2026-07-05: rotated to a properly-scoped token (see REL-048), cut over `mc.woitzik.dev` to the playit.gg CNAME live, confirmed the tunnel reachable (`doing-sigma.gl.joinmc.link:25565` TCP open), then applied the 4-rule destroy (PR #286) -- same stale-import-block bug as GIT-008 (REL-047) blocked 3 of these 4 resources until that was found and fixed. Live-verified Minecraft still reachable via playit.gg after the router-side cleanup. |
