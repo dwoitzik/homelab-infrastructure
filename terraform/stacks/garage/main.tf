@@ -16,6 +16,11 @@
 # provider covering it. Those grants are untouched by this stack and remain
 # a manual `garage bucket allow` step -- a known, documented gap, not
 # silently half-solved. See the effort note in docs/IAC-GAPS.md item 3.
+#
+# Merged 2026-07-07 (PR #334) with the import{} blocks below already clean
+# (3 to import, 0 to change) -- but the actual `terraform apply` that
+# performs the import hasn't run yet. Pending explicit per-project
+# authorization before applying.
 # =============================================================================
 
 resource "aws_s3_bucket" "loki_data" {
