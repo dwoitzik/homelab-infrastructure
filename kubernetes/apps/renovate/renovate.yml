@@ -70,15 +70,36 @@ spec:
                   value: "dwoitzik <woitzikdavid18@gmail.com>"
                 - name: LOG_LEVEL
                   value: info
+                # REL-066: repo growth (this session's IAC-GAPS work added
+                # terraform/stacks/garage, terraform/stacks/proxmox's
+                # host-config.tf, and several new ExternalSecrets --
+                # depCount went from ~190 to 217) pushed every run's RSS
+                # past the 1Gi container limit starting ~2026-07-08 ~00:36 --
+                # confirmed via `kubectl get pod ... -o json`, every retry
+                # for 16+ hours ended `exitCode:137, reason:OOMKilled`, not a
+                # crash/error (log just cuts off mid-extraction with no exit
+                # message, which is the OOMKill signature -- SIGKILL gives
+                # the process no chance to log anything). Not a config
+                # regression (PR #316's tiered-automerge, a bad image tag) --
+                # confirmed via job history: the 3 runs before this repo
+                # growth landed succeeded cleanly on the same image/config.
+                # --max-old-space-size caps V8's own heap; actual container
+                # RSS also includes git clone/worktree data and non-heap
+                # buffers, typically 20-50% more than the heap cap -- so it
+                # must stay meaningfully under the container's memory limit,
+                # not equal to it. Raised proportionally with the limit below
+                # (896Mi heap under a 1Gi limit left ~13% headroom, too
+                # tight for a repo that just grew -- 1536Mi under 2Gi keeps
+                # the same ~25% headroom with room for further growth).
                 - name: NODE_OPTIONS
-                  value: "--max-old-space-size=896"
+                  value: "--max-old-space-size=1536"
               resources:
                 requests:
                   cpu: 100m
-                  memory: 512Mi
+                  memory: 768Mi
                 limits:
                   cpu: 500m
-                  memory: 1Gi
+                  memory: 2Gi
           volumes:
             - name: tmp
               emptyDir: {}
