@@ -20,6 +20,19 @@
 # namespace as this object) so the operator doesn't auto-inject a
 # `namespace=monitoring` matcher that would otherwise silently drop every
 # alert from every other namespace (which is most of them).
+#
+# Alert-storm fix (2026-07-08): each route below set repeatInterval but not
+# groupInterval, so all 3 inherited the global default (group_interval: 5m,
+# confirmed live via `amtool config show`). group_interval controls how soon
+# a notification resends when a NEW alert joins an already-notified group --
+# groupBy is [alertname, namespace], so e.g. 4 distinct KubeJobFailed
+# instances (different failed Jobs, same namespace) all collapse into one
+# group, and each new one joining re-triggered a send within 5m instead of
+# waiting for repeatInterval. Root cause of that batch: renovate's CronJob
+# crashlooping every 2h since ~00:36, each run spawning a new failed Job --
+# see docs/AUDIT.md. Explicit groupInterval added to each route so bursts of
+# related alerts (a crashlooping CronJob, a flapping node, etc.) get folded
+# into the existing notification cadence instead of restarting it.
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:
@@ -37,14 +50,16 @@ spec:
     routes:
       - receiver: discord
         groupWait: 30s
-        repeatInterval: 2h
+        groupInterval: 4h
+        repeatInterval: 4h
         matchers:
           - matchType: "=~"
             name: alertname
             value: "ProxmoxHostHighTemp|RpiHighTemp"
       - receiver: discord
         groupWait: 30s
-        repeatInterval: 2h
+        groupInterval: 4h
+        repeatInterval: 4h
         matchers:
           - matchType: "="
             name: severity
@@ -60,7 +75,8 @@ spec:
       # Discord ping.
       - receiver: discord
         groupWait: 30s
-        repeatInterval: 2h
+        groupInterval: 4h
+        repeatInterval: 4h
         matchers:
           - matchType: "=~"
             name: alertname
