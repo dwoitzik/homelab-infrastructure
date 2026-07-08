@@ -510,6 +510,10 @@ import {
   id = "*1"
 }
 import {
+  to = routeros_snmp_community.prometheus_default
+  id = "*0"
+}
+import {
   to = routeros_snmp.settings
   id = "*0"
 }
