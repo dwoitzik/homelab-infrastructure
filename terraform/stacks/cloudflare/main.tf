@@ -151,6 +151,11 @@ resource "cloudflare_dns_record" "tunnel_media" {
 # avoid a live DNS blip if a representation doesn't exactly match on first
 # plan). NOT a Cloudflare Tunnel CNAME like the others above -- rides
 # home.woitzik.dev's dynamic-DNS chain (direct WAN access), not proxied.
+#
+# Merged 2026-07-07 (PR #335) with the import{} block below already clean
+# (1 to import, 1 comment-only change) -- but the actual `terraform apply`
+# that performs the import hasn't run yet. Pending explicit per-project
+# authorization before applying.
 resource "cloudflare_dns_record" "auth" {
   zone_id = var.zone_id
   name    = "auth"
