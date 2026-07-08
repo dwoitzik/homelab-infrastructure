@@ -1,0 +1,70 @@
+# Standalone prometheus/snmp_exporter deployment -- WAN monitoring follow-on
+# from the Discord-voice bufferbloat investigation (see feat(network) WAN QoS
+# PR). Before this, the router had zero Prometheus/SNMP metrics at all --
+# there was no historical data to correlate voice degradation against
+# backup/pull schedules, only live snapshots taken during the investigation
+# itself. This closes that gap going forward.
+#
+# No router-side change needed: SNMP is already enabled
+# (terraform/stacks/network/snmp.tf, community "homelab-monitor", already
+# scoped to 10.0.20.0/24 -- the server VLAN this pod runs in). This PR is
+# purely the k8s-side scrape target, mirroring blackbox-exporter.yml's
+# standalone-Deployment pattern (kube-prometheus-stack's Helm subchart for
+# this doesn't render under ArgoCD for the same reason blackbox's doesn't).
+#
+# Uses the official image's bundled default snmp.yml (no custom generator
+# build needed) -- the if_mib module walks ifHCInOctets/ifHCOutOctets
+# (64-bit interface byte counters), ifSpeed, and ifOperStatus, which is
+# exactly what's needed to see ether1's actual upload/download rate over
+# time and correlate it against scheduled jobs (Velero, renovate) or
+# anything else, instead of inferring it after the fact.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-snmp-exporter
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-snmp-exporter
+  template:
+    metadata:
+      labels:
+        app: prometheus-snmp-exporter
+    spec:
+      containers:
+        - name: snmp-exporter
+          image: prom/snmp-exporter:v0.28.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 9116
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-snmp-exporter
+  namespace: monitoring
+spec:
+  ports:
+    - name: http
+      port: 9116
+      targetPort: http
+  selector:
+    app: prometheus-snmp-exporter
