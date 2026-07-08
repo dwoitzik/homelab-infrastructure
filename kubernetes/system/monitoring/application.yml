@@ -271,6 +271,22 @@ spec:
                     replacement: 'pve-exporter.monitoring.svc.cluster.local:9221'
                   - source_labels: [__param_target]
                     target_label: instance
+              - job_name: 'snmp-mikrotik'
+                metrics_path: /snmp
+                params:
+                  module: [if_mib]
+                static_configs:
+                  - targets:
+                      - '10.0.10.1'
+                    labels:
+                      group: 'mikrotik'
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - target_label: __address__
+                    replacement: 'prometheus-snmp-exporter.monitoring.svc.cluster.local:9116'
+                  - source_labels: [__param_target]
+                    target_label: instance
               - job_name: 'blackbox-http'
                 scrape_interval: 60s
                 metrics_path: /probe
