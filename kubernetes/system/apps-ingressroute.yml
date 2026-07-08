@@ -68,6 +68,12 @@ spec:
   routes:
   - match: Host(`photos.woitzik.dev`)
     kind: Rule
+    # SEC hardening (2026-07-08): no rate limiting existed on this route at
+    # all -- Immich has no external auth in front of it (mobile app needs
+    # API-token auth, not Authelia's browser redirect), so this is the only
+    # brute-force/abuse mitigation on login and upload. See
+    # apps/immich/middleware.yml for the limit rationale.
+    middlewares: [{name: immich-ratelimit}]
     services: [{name: immich-server, port: 2283}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
