@@ -1,0 +1,45 @@
+# Alert Response Runbook
+
+Purpose: a noisy night in Discord shouldn't require re-deriving context from
+`docs/AUDIT.md`. For every alert type actually seen in this repo's history, this
+doc says plainly: is it real (investigate now) or a reporting artifact / self-heals
+(check, but don't panic)? Grounded in real fired incidents, not generic advice — see
+`docs/AUDIT.md` and `docs/AUTONOMY-STATUS.md` for the underlying evidence.
+
+**How to use this at 3am**: find the alertname below, read the one-line verdict, do
+the one-line check. If it says "self-heals," confirm the check and go back to bed —
+don't start a root-cause investigation for something that resolves on its own.
+
+| Alertname | Verdict | Real incident this is based on | 30-second check | Don't |
+|---|---|---|---|---|
+| `KubePodCrashLooping` | **Real — investigate now** | paperless-gpt's actual CrashLoopBackOff (REL-060) drove this and `on-health-degraded` together. | `kubectl get pods -A \| grep -v Running\|Completed`, then `kubectl logs --previous` on the crashing pod. | Don't assume it'll clear itself — CrashLoopBackOff means the container is actively failing to start, it doesn't self-heal. |
+| `KubeJobFailed` | **Real, but check for a storm first** | Two failure modes seen: (1) a genuinely dead credential (cloudflare-ddns/nextcloud-cron, REL-061) — one-off, fix the credential. (2) A CronJob crashlooping (renovate OOM, REL-066) — generates a *new* failed Job every schedule tick, and floods Discord because `groupBy` collapses same-namespace failures into one group that re-notifies on every new member. | `kubectl get jobs -A --sort-by=.metadata.creationTimestamp \| tail -20` — one failure = investigate that Job. Several failures of the *same* CronJob in a row = it's crashlooping, `kubectl patch cronjob <name> -p '{"spec":{"suspend":true}}'` first (reversible), diagnose after. | Don't fix the flood by raising `repeat_interval` alone if it's actually `group_interval` re-notifying on new group members (see REL-066/#340) — check which one is actually short before touching either. |
+| `KubeNodeNotReady` | **Real — investigate now** | Never fired for real yet (CONFIGURED-BUT-UNPROVEN as of 2026-07-08). | `kubectl get nodes`, then check the node's host (Proxmox console / SSH) for a hang or reboot. | Don't ignore it waiting for auto-recovery — a NotReady node doesn't reschedule its own workloads until it's back, and nothing here auto-reboots a hung VM. |
+| `CertManagerCertExpirySoon` | **Warning — plan, don't panic** | Never fired for real yet. It's an early-warning tier (7-day window), not "cert is already expired." | `kubectl get certificate -A`, check `renewalTime` on the flagged cert. | Don't treat this the same urgency as an actual expired cert — you have days, not minutes. |
+| `CertManagerCertNotReady` | **Real — investigate now** | Never fired for real yet. Unlike the warning above, this means renewal actually failed, not "coming due." | `kubectl describe certificate <name>`, check `cert-manager` pod logs for ACME/DNS-01 errors. | — |
+| `VeleroBackupPartialFailure` | **Real, but check scope first** | Never fired for real yet. Velero's own full-failure rate has been as high as 40% in a 5-day window (REL-057b class) from a Garage `HeadObject` timeout — a *partial* failure is one namespace/volume within an otherwise-completed backup, less severe than a full failure. | `velero backup describe <name> --details`, check which namespace/volume actually failed. | Don't treat a partial failure on a low-value namespace (e.g. a scratch/test one) with the same urgency as one on `vault` or a database namespace — check *which* volume before triaging severity. |
+| `VeleroBackupFailed` | **Real — investigate now** | Real full-failure incidents have happened (Garage `HeadObject` timeouts, REL-057b class) — 2 of 5 daily backups failed in one stretch, unexplained. | `velero backup logs <name> \| tail -50`, check Garage's own health (`kubectl exec -n apps deploy/garage -c garage -- /garage status`). | Don't assume "it'll succeed tomorrow" — this repo has a real precedent of a *recurring* ~40% failure rate that needed root-causing, not just retrying. |
+| ArgoCD `on-sync-status-unknown` | **Usually a reporting artifact — verify before reacting** | The 2026-07-08 14:07 event: nearly every Application went `Unknown` simultaneously. Checked every flagged app's *actual* running pods afterward — all healthy, zero real breakage. Root cause not pinned exactly (no crash/restart/CPU-spike evidence found), most consistent with a brief control-plane/watch-connection blip that self-healed before leaving log evidence. | `kubectl get application -n argocd \| grep -v Synced` — if it's already back to `Synced`/`Healthy` by the time you look, it was a blip. If it's *still* Unknown minutes later, that's different — check `argocd-repo-server`/`argocd-application-controller` pod health and restart counts. | Don't assume every app flagged Unknown is actually broken — check real pod state (`kubectl get pods -n <ns>`) before restarting anything. Simultaneous mass-Unknown across unrelated apps = shared dependency blip, not N separate real failures. |
+| ArgoCD `on-health-degraded` | **Real — investigate now** | paperless-gpt's actual CrashLoopBackOff genuinely degraded the Application's health (REL-060) — this fired correctly and meant exactly what it said. | `kubectl get application <name> -n argocd -o jsonpath='{.status.health}'`, then check the actual pods in that Application's namespace. | — |
+| ArgoCD `on-sync-failed` | **Real — investigate now** | Never fired for real yet — different condition from `on-health-degraded`/`on-sync-status-unknown`, don't conflate them. | `argocd app get <name>` or `kubectl describe application <name> -n argocd`, check the sync error message directly — usually a manifest/CRD validation failure. | — |
+| `AlertmanagerClusterFailedToSendAlerts` | **Real if confirmed — but verify it actually fired** | Reported as firing during the 2026-07-08 14:07 event, but a Prometheus `ALERTS` range-query check afterward found **zero datapoints** for this alertname in that window — couldn't confirm it actually fired as claimed. Possible brief blip too short for a scrape to catch, or misattribution. | `ALERTS{alertname="AlertmanagerClusterFailedToSendAlerts"}` range query over the suspected window before assuming it's real. If confirmed firing, this is urgent — it means you may be *missing other real alerts* right now, not just this one. | Don't skip verification just because it was reported — this specific alertname has a track record of being hard to confirm after the fact in this stack. |
+| `ProxmoxHostHighTemp` / `RpiHighTemp` (severity=critical route) | **Real — investigate now** | Multiple real firings: 2026-07-07 03:05 (82-90°C range across 7 nights, REL-062) and a second occurrence 2026-07-08 01:05. This is the most reliably real alert in the stack — every occurrence checked so far was a genuine thermal event, not a reporting artifact. | Check current temps directly (`node_hwmon_temp_celsius` in Prometheus) and what's running (`kubectl top nodes`, check for an active Velero backup or vzdump job). | Don't dismiss a second occurrence as "already known" — REL-064's own recheck is explicitly tracking whether the schedule/load fixes actually worked, a repeat firing is new evidence either way. |
+| `KubeAPIServerHighLatency` | **Usually self-heals — verify, don't chase a single spike** | A single 8.8s latency spike at 2026-07-08 03:09 coincided with (but wasn't conclusively tied to) the 14:07 ArgoCD mass-Unknown event same day. | Check if it's a one-off spike (`histogram_quantile(0.99, rate(apiserver_request_duration_seconds_bucket[5m]))` around the timestamp) or sustained. A single brief spike with no other symptoms is usually a transient etcd/apiserver blip. | Don't treat one isolated spike as an outage — check whether it's sustained or paired with other symptoms (mass ArgoCD Unknown, pod scheduling failures) before escalating. |
+
+## Meta-lessons from this session's actual incidents
+
+- **A flood of the same alertname doesn't always mean `repeat_interval` is
+  misconfigured.** The renovate incident (REL-066/#340) looked like a
+  `repeat_interval` problem but was actually `group_interval` — unset on the
+  specific routes, inheriting a 5-minute global default, re-notifying every time a
+  *new* alert instance joined an already-notified group. Check both before touching
+  either.
+- **Simultaneous mass-alerts across unrelated services point at a shared
+  dependency, not N independent failures.** The 14:07 ArgoCD event and the
+  concurrent `AlertmanagerClusterFailedToSendAlerts` report are the pattern to
+  recognize: check the shared substrate (control plane, Alertmanager itself,
+  network) before triaging each flagged app individually.
+- **"Reporting artifact" still means "check it."** Every artifact-classified row
+  above was verified by actually checking live pod/app state, not assumed clean
+  because it "usually self-heals." The distinction this doc draws is about urgency
+  and where to look first, not about skipping verification.
