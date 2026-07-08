@@ -1,9 +1,11 @@
 # Autonomy Status
 
 Honest scorecard against `docs/OPERATING-MODEL.md`'s target steady state. Updated
-2026-07-07 after the autonomy-readiness PRs (#314–319) merged and, where applicable,
-were applied/verified live. Every row reflects an actual check, not a config read —
-see `docs/AUDIT.md` REL-055 through REL-059 for the full evidence behind each.
+2026-07-08 after a live verification sweep (Minecraft fleet, playit.gg, autoheal,
+Minecraft PBS coverage, and fresh evidence from a real same-session incident) on top
+of the 2026-07-07 autonomy-readiness pass (#314–319). Every row reflects an actual
+check, not a config read — see `docs/AUDIT.md` REL-055 through REL-059, REL-066 for
+the full evidence behind each.
 
 **Legend**: **PROVEN** — a real event has already happened and been observed (an
 actual alert reaching Discord, an actual automated grab→import cycle, an actual
@@ -20,11 +22,11 @@ actually broken.
 | Discord: ArgoCD `on-sync-status-unknown` | **PROVEN** | Created a real throwaway Application pointed at a nonexistent path, genuinely triggered `sync.status: Unknown`, confirmed `TRIGGERED` + send in notifications-controller logs, user-confirmed landing in Discord. | — already proven |
 | Discord: ArgoCD `on-health-degraded` | **PROVEN** | Real production event, not synthetic: paperless-gpt's CrashLoopBackOff (REL-060, 2026-07-07 13:43+) actually degraded the `paperless` Application's health. `argocd-notifications-controller` logs show repeated real `Trigger 'on-health-degraded' TRIGGERED` for `argocd/paperless` from 15:13:28Z onward, and the actual send: `"Sending notification about condition 'on-health-degraded...' to '{discord }'"` at 15:13:28Z, deduped on every subsequent poll while still Degraded. | — already proven |
 | Discord: ArgoCD `on-sync-failed` | **CONFIGURED-BUT-UNPROVEN** | Checked the same 24h log window used to prove `on-health-degraded` above — `on-sync-failed` shows only `FAILED` (condition not met) for every Application including `paperless`, never `TRIGGERED`. Different condition, genuinely never exercised. | A real sync actually failing, with the Discord message observed. |
-| Discord: `KubeJobFailed` (covers Renovate's own CronJob) | **PROVEN** | Real production events, not synthetic: cloudflare-ddns (cert-manager ns) and nextcloud-cron (apps ns) both actually fired this alertname (REL-061) — confirmed via a Prometheus `ALERTS{alertname="KubeJobFailed"}` range query showing real `alertstate=firing` datapoints for both Jobs in the last 24h, routed to the `discord` receiver per `alertmanager-config.yml`'s named-alertname rule. Alertmanager's own `alertmanager_notifications_total{integration="discord"}` counter increased by 19 in the same 24h window, consistent with these firings plus the others below. | — already proven |
+| Discord: `KubeJobFailed` (covers Renovate's own CronJob) | **PROVEN** | Real production events, not synthetic: cloudflare-ddns (cert-manager ns) and nextcloud-cron (apps ns) both actually fired this alertname (REL-061) — confirmed via a Prometheus `ALERTS{alertname="KubeJobFailed"}` range query showing real `alertstate=firing` datapoints for both Jobs in the last 24h, routed to the `discord` receiver per `alertmanager-config.yml`'s named-alertname rule. **Reinforced 2026-07-08, directly observed live rather than reconstructed from logs**: renovate's CronJob OOM-crashlooped (REL-066) since ~00:36, generating a new failed Job every ~2h; caught 4 concurrent real `KubeJobFailed` firings via `amtool alert query` mid-incident, watched the Discord flood happen, root-caused it to `group_interval` (not `repeat_interval`) inheriting a 5m default, fixed live, confirmed the corrected 4h cadence via the regenerated Alertmanager secret. This alertname's real-world path — including the failure mode that makes it noisy under a crashloop — is now proven end-to-end, not just "reaches Discord once." | — already proven |
 | Discord: `KubeNodeNotReady` | **CONFIGURED-BUT-UNPROVEN** | Same route as above, never individually fired. | A real node going NotReady (or a synthetic alert), confirmed in Discord. |
 | Discord: `CertManagerCertExpirySoon` (warning tier) | **CONFIGURED-BUT-UNPROVEN** | Same route as above, never individually fired — and no cert is currently within the 7-day window to fire it naturally. | A real cert entering the 7-day expiry window, or a synthetic alert, confirmed in Discord. |
 | Discord: `VeleroBackupPartialFailure` (warning tier) | **CONFIGURED-BUT-UNPROVEN** | Same route as above, never individually fired. | A real partial-failure backup, or a synthetic alert, confirmed in Discord. |
-| Discord: `severity: critical` route (pre-existing) | **PROVEN** | Real production event: the 2026-07-07 03:05 thermal incident's `ProxmoxHostHighTemp` alert carries `severity="critical"` — confirmed via a live Prometheus `ALERTS` range query showing a real `alertstate=firing` datapoint at the incident time. Note: this specific alert actually routed via `alertmanager-config.yml`'s dedicated `ProxmoxHostHighTemp\|RpiHighTemp` rule (matched first, before the generic `severity=critical` rule, per Alertmanager's first-match routing) rather than the generic rule itself — but both point at the same `discord` receiver, so this confirms critical-severity alerting reaches Discord in practice, which is what this row is actually asking. The bare `severity=critical` matcher specifically (as opposed to a named-alertname rule that happens to carry that label) remains unexercised — see the next row. | — already proven (via a named-rule alert carrying the label, not yet via the bare `severity=critical` matcher itself) |
+| Discord: `severity: critical` route (pre-existing) | **PROVEN** | Real production event: the 2026-07-07 03:05 thermal incident's `ProxmoxHostHighTemp` alert carries `severity="critical"` — confirmed via a live Prometheus `ALERTS` range query showing a real `alertstate=firing` datapoint at the incident time. **A second real occurrence found 2026-07-08**: a range query over 2026-07-07 through 2026-07-08 shows `ProxmoxHostHighTemp` reaching `pending` at 2026-07-07 01:05 and actual `firing` at 2026-07-08 01:05 — not yet attributed to a specific cause (REL-064's own recheck is still pending 07-10+ data; not conflating the two). Note: this specific alert actually routed via `alertmanager-config.yml`'s dedicated `ProxmoxHostHighTemp\|RpiHighTemp` rule (matched first, before the generic `severity=critical` rule, per Alertmanager's first-match routing) rather than the generic rule itself — but both point at the same `discord` receiver, so this confirms critical-severity alerting reaches Discord in practice, which is what this row is actually asking. The bare `severity=critical` matcher specifically (as opposed to a named-alertname rule that happens to carry that label) remains unexercised — see the next row. | — already proven (via a named-rule alert carrying the label, not yet via the bare `severity=critical` matcher itself) |
 | Discord: `CertManagerCertNotReady` / `VeleroBackupFailed` (new, severity critical) | **CONFIGURED-BUT-UNPROVEN** | Still never individually fired, and — per the note above — the generic `severity=critical` catch-all rule these would route through hasn't actually been exercised either (every critical alert seen so far matched a more specific named rule first). | Either alertname firing for real, or a synthetic alert with neither name but `severity=critical`, confirmed reaching Discord. |
 | ArgoCD's own Prometheus metrics (app health/sync status) | **GAP** | `argocd-application-controller`'s metrics port (8082) isn't listening at all — confirmed live via `/proc/net/tcp`, survives a clean pod restart. Root cause not found. | Metrics port actually listening and scraped; not attempted further this session. |
 | cert-manager metrics scraping | **PROVEN** | `ServiceMonitor` live, confirmed matching the live Service's port name/labels, endpoint responding. | — already proven |
@@ -39,33 +41,47 @@ actually broken.
 | PBS (hypervisor-level) backup + restore | **PROVEN** | REL-052 (prior session): real restore of the Atlantis LXC from a PBS backup to a scratch VMID, booted clean, data intact, verified end-to-end. Different system from Velero — don't conflate. | — already proven |
 | ArgoCD selfHeal | **PROVEN** | All 41 live Applications confirmed `syncPolicy.automated.selfHeal: true`, checked programmatically, zero exceptions. | — already proven |
 | Usenet acquisition pipeline (NZBHydra2→SABnzbd→Sonarr/Radarr) | **PROVEN** | Real history evidence: Sonarr grabbed GoT S01 05:37 on 2026-07-05, all 10 episodes imported by 06:32 same day, unattended. Radarr same pattern. RSS sync confirmed on a 15-min timer. | — already proven |
-| Media stack autoheal (crash/hang recovery) | **PROVEN (prior session, REL-032)** | Docker healthchecks + `autoheal` sidecar + queue watchdog, verified working during the 2026-07-01/02 incident sweep. Not re-verified live this pass. | — already proven, aging evidence |
+| Media stack autoheal (crash/hang recovery) | **PROVEN** | Docker healthchecks + `autoheal` sidecar + queue watchdog, originally verified during the 2026-07-01/02 incident sweep. **Re-verified live 2026-07-08**: `autoheal` container running on `ct-srv-media-acq-01` (10.0.20.253), `Up 4 days (healthy)`, 8 containers on the host currently reporting healthy status via their healthchecks. | — already proven |
 | Jellyfin library auto-refresh on new import | **CONFIGURED-BUT-UNPROVEN** | Zero Sonarr/Radarr→Jellyfin webhook notifications configured — relies entirely on Jellyfin's own realtime filesystem monitor (on by default, no override found disabling it). No API-confirmed timestamp obtained. | A real import's timestamp cross-checked against Jellyfin picking up the file, or an accessible API key to query it directly. |
 | Immich background job processing (thumbnails, ML, checksum) | **PROVEN** | Real log entry confirming an unattended scheduled job completed (`Finished checksum job, covered all assets`, ~7h old at check time). | — already proven |
 | Immich photo upload/backup | **Not applicable to server-side verification** | Client-triggered (mobile app background upload) — inherently outside what can be verified from the server side. | n/a |
 | Minecraft container auto-restart | **PROVEN** | `restart: unless-stopped` confirmed in the Ansible role and live on both running containers. | — already proven |
-| Minecraft backup coverage | **PROVEN (prior session)** | Confirmed via PBS nightly backup in an earlier pass. Not re-verified live this pass. | — already proven, aging evidence |
-| Minecraft — full fleet accounted for | **GAP (verification gap)** | Only 2 of a previously-referenced "4 servers" were found running on the games host. Other 2 not chased down. | Locating and checking the other 2, or confirming "4" was stale. |
-| playit.gg tunnel reconnect behavior | **GAP (verification gap)** | No container matching that name found on the games host this pass — reconnect behavior unconfirmed. | Finding the actual tunnel process and observing a reconnect. |
+| Minecraft backup coverage | **PROVEN** | Confirmed via PBS nightly backup in an earlier pass. **Re-verified live 2026-07-08**: `ct-dmz-games-01` is VMID 302 (not the excluded 9000), covered by the `all 1 / exclude 9000` vzdump job — `pvesm list local-pbs` shows real completed daily snapshots for VMID 302 on 07-04, 07-05, 07-06, 07-07, and 07-08 (most recent: 01:11:53 UTC today), not just config coverage. | — already proven |
+| Minecraft — full fleet accounted for | **PROVEN** | Was flagged as a verification gap ("4 servers" referenced, only 2 found). **Resolved 2026-07-08**: checked both the IaC (`ansible/roles/minecraft/tasks/main.yml` defines exactly 2 services, `minecraft-2`/`mc-server-2` and `cobblemon`/`mc-server-cobblemon`) and live state (`docker ps` on `ct-dmz-games-01` shows exactly those 2 containers, both `healthy`) — they match exactly. "4" was stale; the fleet is fully accounted for at 2. | — already proven |
+| playit.gg tunnel reconnect behavior | **CONFIGURED-BUT-UNPROVEN** | Was a verification gap (no container matching that name found). **Corrected 2026-07-08**: playit runs as a native systemd service (`playit.service`, not a Docker container — the earlier `docker ps` check was looking in the wrong place), confirmed `active (running)` since 2026-07-04, `NRestarts=0`, no reconnect/disconnect/error lines in the last 48h of `journalctl`. Process existence and stability are now proven — but zero disconnect events have occurred in its 4-day uptime, so reconnect *behavior* specifically has never been exercised to observe. Did not force a disconnect to test this: that's a live change to a running game service, out of scope for a report-only verification pass. | A real disconnect (network blip, playit-side maintenance) or a deliberately-authorized forced restart, with the reconnect observed in the logs. |
 | Backup circular dependency (Garage backs up into itself) | **Known, accepted risk — not touched** | REL-003 (skip-list, architectural). Confirmed live: Velero's `includedNamespaces: ["*"]` includes `garage` itself — the reason a from-scratch cluster recovery can't currently bootstrap cleanly. | Not in scope for PROVEN/GAP — architectural decision pending a design session. |
 
 ## Bottom line
 
-Updated again 2026-07-07 evening after a real 24h stretch produced actual incidents
-(the 03:05 thermal event, paperless-gpt's CrashLoopBackOff, cloudflare-ddns/
-nextcloud-cron's dead-token failures) — used those as evidence rather than firing more
-synthetic tests. Real state now: **5 of 9 Discord alert paths have an actual observed
-event** (`KubePodCrashLooping`, ArgoCD `sync-status-unknown`, ArgoCD
-`on-health-degraded`, `KubeJobFailed`, and the `severity=critical` route via a
-named-rule alert). The remaining 4 (`KubeNodeNotReady`, `CertManagerCertExpirySoon`,
+Updated 2026-07-08 after a live verification sweep closed 3 of the 4 open
+verification gaps and 2 aging-evidence rows got fresh live re-checks, on top of
+2026-07-07 evening's real-incident evidence (the 03:05 thermal event, paperless-gpt's
+CrashLoopBackOff, cloudflare-ddns/nextcloud-cron's dead-token failures). Real state
+now: **5 of 9 Discord alert paths have an actual observed event**
+(`KubePodCrashLooping`, ArgoCD `sync-status-unknown`, ArgoCD `on-health-degraded`,
+`KubeJobFailed`, and the `severity=critical` route via a named-rule alert) — and 2 of
+those 5 (`KubeJobFailed`, `severity=critical`/thermal) now have a *second* independent
+real occurrence from 2026-07-08 reinforcing the original proof, not just resting on
+the 07-07 evidence. The remaining 4 (`KubeNodeNotReady`, `CertManagerCertExpirySoon`,
 `VeleroBackupPartialFailure`, ArgoCD `on-sync-failed`) plus the bare `severity=critical`
 matcher itself and the two new critical alertnames (`CertManagerCertNotReady`,
 `VeleroBackupFailed`) share proven plumbing (same receiver, same webhook) but haven't
 individually fired — still `CONFIGURED-BUT-UNPROVEN`, not asserted as proven just
 because a sibling route worked. Renovate's new tiering has never auto-merged anything —
-the 2 PRs that merged today were merged by hand. Both unbound DNS fixes are genuinely
-proven at the unbound layer (0ms local answers, confirmed before/after) — but the
-DHCP-side companion fix (#318) turned up a real, unresolved discrepancy between the
-merged code and what the live router's plan shows, and the actual query-volume-drop
-success criteria can't be confirmed for days regardless. Velero restore is still the
-single biggest untested assumption in the whole stack.
+the 2 PRs that merged on 07-07 were merged by hand.
+
+**Verification gaps closed 2026-07-08**: Minecraft fleet ("4 servers" was stale — only
+2 ever existed, matches IaC exactly, now **PROVEN**), Minecraft PBS backup coverage
+(re-verified with 5 consecutive real daily snapshots, now **PROVEN**), media stack
+autoheal (re-verified live and healthy, now **PROVEN**). One gap partially closed:
+playit.gg's tunnel process was found (a systemd service, not a Docker container — the
+original check looked in the wrong place) and is stable, but reconnect behavior
+specifically remains **CONFIGURED-BUT-UNPROVEN** since zero disconnects have occurred
+to observe recovery from, and forcing one was out of scope for a report-only pass.
+
+Both unbound DNS fixes are genuinely proven at the unbound layer (0ms local answers,
+confirmed before/after) — but the DHCP-side companion fix (#318) turned up a real,
+unresolved discrepancy between the merged code and what the live router's plan shows,
+and the actual query-volume-drop success criteria can't be confirmed for days
+regardless. Velero restore is still the single biggest untested assumption in the
+whole stack.
