@@ -64,6 +64,20 @@ spec:
               mountPath: /tmp
             - name: run
               mountPath: /var/run/headscale
+          # Live-tested: GET /health on the http port returns {"status":"pass"}.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 4
           resources:
             requests:
               cpu: 50m

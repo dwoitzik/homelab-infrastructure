@@ -426,6 +426,20 @@ spec:
         # initContainer seeds a writable copy first.
         - name: next-dir
           mountPath: /app/.next
+        # Live-tested: /api/healthcheck returns "up".
+        readinessProbe:
+          httpGet:
+            path: /api/healthcheck
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /api/healthcheck
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          failureThreshold: 4
         resources:
           requests:
             cpu: 50m
