@@ -30,6 +30,24 @@ spec:
         env:
         - name: SIGNUPS_ALLOWED
           value: "true"
+        # Reliability sweep (2026-07-08): no health probes at all -- a hang
+        # (not a crash) would go undetected indefinitely, Kubernetes would
+        # keep routing traffic to an unresponsive pod forever. TCP-only
+        # (not HTTP path-based) because this image has no wget/curl to
+        # verify a real HTTP endpoint against live before trusting it --
+        # matches the SEC-012 lesson (a wrong assumed endpoint caused a
+        # false-positive failure loop earlier this session). Still catches
+        # the main risk: the process being completely dead/not listening.
+        livenessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
         resources:
           requests:
             cpu: 25m

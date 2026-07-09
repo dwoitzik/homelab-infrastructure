@@ -80,6 +80,26 @@ spec:
             type: RuntimeDefault
         ports:
         - containerPort: 9091
+        # Reliability sweep (2026-07-08): no health probes at all -- a hang
+        # (not a crash) would go undetected indefinitely, and Authelia
+        # gates almost every other exposed service, so an undetected hang
+        # here is a wide-blast-radius outage. /api/health confirmed live
+        # (`{"status":"OK"}`, port 9091) -- it's also already the exact
+        # endpoint blackbox-exporter scrapes externally
+        # (blackbox-authelia-health job), so this is a known-good path, not
+        # a guess.
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 9091
+          initialDelaySeconds: 15
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 9091
+          initialDelaySeconds: 5
+          periodSeconds: 10
         volumeMounts:
         - name: config
           mountPath: /config

@@ -112,6 +112,26 @@ spec:
               containerPort: 3901
             - name: admin
               containerPort: 3903
+          # Reliability sweep (2026-07-08): no health probes at all -- a
+          # hang here is high blast radius, every backup (Velero, CNPG) and
+          # this repo's own Terraform state depend on Garage. TCP-only
+          # (not HTTP path-based): this image has no wget/curl to verify a
+          # real endpoint against live before trusting it, and Garage's
+          # admin API health-check path wasn't confirmed live -- matches
+          # the SEC-012 lesson (a wrong assumed endpoint caused a
+          # false-positive failure loop earlier this session). Still
+          # catches the main risk: the S3 API process being completely
+          # dead/not listening.
+          livenessProbe:
+            tcpSocket:
+              port: s3
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: s3
+            initialDelaySeconds: 5
+            periodSeconds: 10
           volumeMounts:
             - name: config
               mountPath: /etc/garage.toml
