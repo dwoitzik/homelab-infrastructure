@@ -15,7 +15,7 @@ Start with [docs/OPERATIONS.md](docs/OPERATIONS.md) if you want to know where th
 | Hypervisor | Proxmox VE (Ryzen 7 5825U, 64 GB RAM) |
 | Networking | MikroTik RB5009 (Terraform-managed firewall) |
 | Edge DNS | 2× Raspberry Pi 4B — AdGuard Home + Unbound |
-| Kubernetes | k3s v1.31 — 3-node cluster, single control-plane + etcd, 2 agent-only workers — see `docs/k3s-architecture.md` |
+| Kubernetes | k3s v1.31 — 3-node cluster. Intended/documented design is single control-plane + etcd (see `docs/k3s-architecture.md`); live topology has drifted to 2-member etcd, a known issue with a fix proposed in [ADR-014](docs/decisions/ADR-014-etcd-topology.md), not yet applied. |
 | Ingress + TLS | Traefik + cert-manager (wildcard `*.woitzik.dev` via DNS-01) |
 | Storage | NFS (`ct-srv-nfs-01`, ZFS-backed) — Longhorn fully removed |
 | GitOps (k8s) | ArgoCD — ApplicationSet watching `kubernetes/apps/*` |
@@ -120,7 +120,7 @@ graph TB
 │       ├── tempo/             # Distributed tracing backend
 │       ├── traefik/           # Traefik ingress (+ traefik-config/)
 │       ├── vault/             # HashiCorp Vault + auto-unseal sidecar
-│       ├── velero/            # Cluster backup to Garage S3 (+ Cloudflare R2 offsite)
+│       ├── velero/            # Cluster backup to Garage S3 (Cloudflare R2 offsite configured, not yet active)
 │       ├── apps-ingressroute.yml   # All app IngressRoutes
 │       └── other-ingressroute.yml  # System IngressRoutes (ArgoCD, Grafana)
 ├── terraform/
