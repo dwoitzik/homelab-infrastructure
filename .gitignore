@@ -39,3 +39,16 @@ terraform.rc
 # Ansible vault password
 .ansible_vault_pass
 .aider*
+
+# Internal operational trackers (2026-07-09): this repo is also a public
+# portfolio artifact (see CLAUDE.local.md). AUDIT.md/AUTONOMY-STATUS.md/
+# IAC-GAPS.md are working incident/audit logs -- REL-0xx findings, live
+# credential rotation narratives, internal investigation detail -- useful
+# for day-to-day ops but not portfolio material and not something that
+# should accumulate indefinitely in a public repo's history going forward.
+# Content preserved outside this repo (not deleted), tracking stopped here
+# rather than rewriting existing git history -- matches this repo's
+# established norm of not rewriting history without a specific reason to.
+docs/AUDIT.md
+docs/AUTONOMY-STATUS.md
+docs/IAC-GAPS.md
