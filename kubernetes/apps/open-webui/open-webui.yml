@@ -118,6 +118,20 @@ spec:
           mountPath: /tmp
         - name: static
           mountPath: /app/backend/open_webui/static
+        # Live-tested: /health -> {"status":true}, no auth needed.
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          failureThreshold: 4
       volumes:
       - name: data
         persistentVolumeClaim:

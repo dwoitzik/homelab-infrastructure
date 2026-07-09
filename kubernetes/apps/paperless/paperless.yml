@@ -112,6 +112,31 @@ spec:
         # (same pattern as home-assistant in this pass).
         - name: run
           mountPath: /run
+        # Live-tested via Pod IP: /api/ needs a Host header override --
+        # PAPERLESS_ALLOWED_HOSTS is an explicit list (domains + specific
+        # node IPs), no pod-network CIDR, so kubelet's real Pod-IP Host
+        # header 400s otherwise (same class the homepage batch caught).
+        # 302 redirect to schema/view/ is a valid pass -- kubelet's httpGet
+        # treats any 200<=code<400 as success.
+        readinessProbe:
+          httpGet:
+            path: /api/
+            port: 8000
+            httpHeaders:
+              - name: Host
+                value: "docs.woitzik.dev"
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /api/
+            port: 8000
+            httpHeaders:
+              - name: Host
+                value: "docs.woitzik.dev"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          failureThreshold: 4
       volumes:
       - name: tmp
         emptyDir: {}
