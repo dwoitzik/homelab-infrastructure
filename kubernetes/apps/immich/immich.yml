@@ -23,6 +23,25 @@ spec:
       containers:
       - name: postgres
         image: ghcr.io/immich-app/postgres:16-vectorchord0.4.3-pgvectors0.2.0
+        # SEC hardening (2026-07-08): was running as root (confirmed live via
+        # `kubectl exec ... id`) with no securityContext at all. pgdata is
+        # already owned 999:0 on disk (the image's own entrypoint already
+        # chowns it on first init) so runAsUser:999 needs no extra chown
+        # step, unlike immich-server/immich-ml below. readOnlyRootFilesystem
+        # deliberately NOT added here yet -- postgres needs a writable
+        # /var/run/postgresql for its unix socket, not currently mounted as
+        # a separate volume, and getting that wrong breaks DB connectivity
+        # outright. Deferred as a follow-up requiring dedicated testing, not
+        # rushed into this pass.
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
+          allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
         ports:
         - containerPort: 5432
         env:
@@ -154,6 +173,22 @@ spec:
         options:
           - name: ndots
             value: "1"
+      # SEC hardening attempted 2026-07-08, deferred: was running as root
+      # (confirmed live) despite already having most other hardening
+      # (readOnlyRootFilesystem, capability drop). The image has a standard
+      # Node.js "node" user (uid/gid 1000, confirmed via /etc/passwd), but
+      # /usr/src/app/upload is root:root on disk AND is NFS-backed
+      # (10.0.20.100:/usb-immich-library, 54GB of mostly small files) --
+      # an initContainer `chown -R` to fix that hung for 2+ minutes without
+      # completing and was live-tested, caught, and rolled back (NFS chown
+      # over many small files is metadata-operation-bound, not
+      # bandwidth-bound -- this isn't a "wait longer" problem). Deferred as
+      # a genuine design decision, not silently dropped: needs either a
+      # scheduled low-traffic-window background chown (could take a long
+      # time, must not block pod startup) or accepting root here as a
+      # documented residual risk, mitigated by the capability
+      # drop/no-priv-escalation/readOnlyRootFilesystem/seccomp already in
+      # place. Flagged in the hardening report, not resolved in this PR.
       containers:
       - name: immich-server
         image: ghcr.io/immich-app/immich-server:v3.0.1
@@ -249,10 +284,30 @@ spec:
         options:
           - name: ndots
             value: "1"
+      # SEC hardening (2026-07-08): was running as root (confirmed live).
+      # Unlike immich-server this image has no named non-root user in
+      # /etc/passwd (no "node"-style convention) -- using uid/gid 65534
+      # (nobody), the same arbitrary-non-root convention already used
+      # elsewhere in this repo (blackbox-exporter, snmp-exporter). /cache's
+      # top level is already 777 (any uid can write), but its subdirectories
+      # (clip/facial-recognition/huggingface/ocr, holding downloaded models)
+      # are root:root 755 -- chowning them so 65534 can actually read/write
+      # the cached models instead of silently re-downloading on every
+      # restart.
+      initContainers:
+      - name: fix-cache-ownership
+        image: ghcr.io/immich-app/immich-machine-learning:v3.0.1
+        command: ["chown", "-R", "65534:65534", "/cache"]
+        volumeMounts:
+        - name: cache
+          mountPath: /cache
       containers:
       - name: immich-ml
         image: ghcr.io/immich-app/immich-machine-learning:v3.0.1
         securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           seccompProfile:
