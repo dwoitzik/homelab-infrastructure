@@ -45,7 +45,7 @@ alone justifies the operator's footprint.
   itself stay healthy for Postgres to be manageable
 - WAL archiving to Garage S3 makes Postgres backup availability dependent on Garage's
   in-cluster uptime — the same circular-dependency risk already flagged for Velero
-  (see the accepted-risk list in `docs/AUDIT.md` if that's still tracked separately)
+  (Garage backs up into itself; see the Garage circularity design discussion)
 - WAL archiving alone is not a restorable backup without a base backup to restore
   from — a `ScheduledBackup` resource has since been added (`postgres-authelia-backup`,
   running daily), so PITR now has a real base backup + WAL chain behind it, not just
