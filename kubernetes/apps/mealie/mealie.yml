@@ -66,6 +66,21 @@ spec:
             # file system" otherwise.
             - name: nltk-data
               mountPath: /app/nltk_data
+          # Live-tested via Pod IP: /api/app/about is public, returns real
+          # version/config JSON, no auth/host-header issue.
+          readinessProbe:
+            httpGet:
+              path: /api/app/about
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /api/app/about
+              port: 9000
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            failureThreshold: 4
           resources:
             requests:
               cpu: 100m
