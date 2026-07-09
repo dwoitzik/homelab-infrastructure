@@ -101,6 +101,22 @@ spec:
             # seed-then-mount pattern as /etc/s6 above.
             - name: ssh-etc
               mountPath: /etc/ssh
+          # Live-tested: /api/healthz returns {"status":"pass"}. Generous
+          # initialDelay -- Recreate strategy + SQLite means a full restart
+          # can take a while to open the DB file.
+          readinessProbe:
+            httpGet:
+              path: /api/healthz
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /api/healthz
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 4
           resources:
             requests:
               cpu: 100m
