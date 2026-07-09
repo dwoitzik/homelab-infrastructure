@@ -55,7 +55,7 @@ configuration matters more than GitOps/Helm uniformity.
   matches the already-accepted pattern for the DMZ LXCs, and the privacy requirement
   takes priority here.
 - Adds a sixth host to the inventory and a new role to maintain.
-- Modest additional load on `rpool` (REL-005 is already at ~80%) — root disk only
+- Modest additional load on `rpool` (currently ~66% used) — root disk only
   (~25GB), media itself stays on the existing NFS mount, not duplicated.
 
 ## Amendment — 2026-06-26: VPN approach revised
