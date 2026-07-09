@@ -91,15 +91,34 @@ spec:
                 # (896Mi heap under a 1Gi limit left ~13% headroom, too
                 # tight for a repo that just grew -- 1536Mi under 2Gi keeps
                 # the same ~25% headroom with room for further growth).
+                #
+                # 2026-07-09 recurrence: OOMKilled again under the same 2Gi
+                # limit -- confirmed via `kubectl describe pod` on the last 3
+                # failing jobs (exitCode 137, reason OOMKilled), 3 retries
+                # each. Not a repo-growth or config-change repeat of the
+                # above: no commits landed between the last clean run and the
+                # first failure that materially grew dep count (219 deps/67
+                # files, same order as before), and the internal-docs
+                # relocation (#355/#356) merged *after* failures had already
+                # started, plus Renovate never scans .md files anyway. Read
+                # as: 2Gi was already marginal (one clean pass wasn't proof
+                # it was sized right), and normal run-to-run variance --
+                # digest-pin lookups across 128 container images in the
+                # kubernetes manager, or host memory pressure (this host has
+                # a documented swap-under-pressure history, see
+                # docs/OPERATIONS.md) -- was enough to tip it over. Raised to
+                # 3Gi/2304Mi heap, same ~25% non-heap headroom ratio as the
+                # prior bump, for more real margin instead of re-chasing the
+                # same edge again.
                 - name: NODE_OPTIONS
-                  value: "--max-old-space-size=1536"
+                  value: "--max-old-space-size=2304"
               resources:
                 requests:
                   cpu: 100m
-                  memory: 768Mi
+                  memory: 1Gi
                 limits:
                   cpu: 500m
-                  memory: 2Gi
+                  memory: 3Gi
           volumes:
             - name: tmp
               emptyDir: {}
