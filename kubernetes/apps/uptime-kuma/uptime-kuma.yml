@@ -54,6 +54,22 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+          # Live-tested via Pod IP: "/" 302s to /dashboard then 200s --
+          # kubelet's httpGet probe treats any 200<=code<400 as success, so
+          # the redirect itself is a valid pass, not just the final 200.
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 4
           volumeMounts:
             - name: uptime-kuma-data
               mountPath: /app/data
