@@ -96,6 +96,14 @@ If the router needs to be rebuilt from scratch:
 5. Backup job coverage uses `all: 1` (every VM/CT, including all 3 k3s VMs and the NFS LXC)
    — confirm the restored job still does after rebuild; this was missing coverage
    historically (see resolved `REL-002` in `docs/AUDIT.md`).
+6. `/etc/vzdump.conf` carries hand-set `bwlimit: 51200` and `ionice: 7` (added
+   2026-07-09, load/thermal-smoothing for the 03:00 job — `node_load1` was spiking to
+   80 and correlated with recurring `ProxmoxHostHighTemp` firings). This file has no
+   Terraform equivalent (no provider resource models these global vzdump defaults) and
+   will **not** survive a fresh Proxmox install — re-add both lines by hand after
+   rebuild, before the first scheduled backup runs, or the load/thermal spike returns
+   silently. Tracked internally as a known hand-config gap alongside the rest of this
+   host's un-managed settings (storage pools, datacenter config).
 
 ---
 
