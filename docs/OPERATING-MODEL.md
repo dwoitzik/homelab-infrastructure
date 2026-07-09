@@ -87,9 +87,9 @@ See `docs/STEADY-STATE-RUNBOOK.md` for what to actually do when each of these fi
   hope than a guarantee for the untested services. Extending this coverage is a manual,
   deliberate DR-drill task, not something to automate blindly.
 - **Full cluster rebuild from bare metal** — documented in `DISASTER-RECOVERY.md`, not
-  automated. `mini` is a single point of failure by hardware design (see
-  `CLAUDE.local.md`); the target is fast, well-documented *recovery*, not zero-touch
-  *failover*, because true HA isn't achievable on this hardware.
+  automated. `mini` is a single point of failure by hardware design; the target is fast,
+  well-documented *recovery*, not zero-touch *failover*, because true HA isn't achievable
+  on this hardware.
 
 ## Non-goals
 
