@@ -65,6 +65,18 @@ spec:
           limits:
             cpu: 1000m
             memory: 1Gi
+        # Live-tested: `pg_isready -U immich` -> "accepting connections".
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "immich"]
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "immich"]
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          failureThreshold: 4
         volumeMounts:
         - name: db
           mountPath: /var/lib/postgresql/data
@@ -130,6 +142,18 @@ spec:
           limits:
             cpu: 100m
             memory: 128Mi
+        # Live-tested: `valkey-cli ping` -> PONG.
+        readinessProbe:
+          exec:
+            command: ["valkey-cli", "ping"]
+          initialDelaySeconds: 5
+          periodSeconds: 15
+        livenessProbe:
+          exec:
+            command: ["valkey-cli", "ping"]
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          failureThreshold: 4
         volumeMounts:
         - name: tmp
           mountPath: /tmp
@@ -235,6 +259,20 @@ spec:
           limits:
             cpu: 2000m
             memory: 4Gi
+        # Live-tested via Pod IP: /api/server/ping -> {"res":"pong"}, no auth.
+        readinessProbe:
+          httpGet:
+            path: /api/server/ping
+            port: 2283
+          initialDelaySeconds: 15
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /api/server/ping
+            port: 2283
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          failureThreshold: 4
         volumeMounts:
         - name: library
           mountPath: /usr/src/app/upload
@@ -334,6 +372,21 @@ spec:
           limits:
             cpu: 4000m
             memory: 4Gi
+        # Live-tested via Pod IP: /ping -> "pong". Longer initialDelay -- ML
+        # models load into memory on startup before this responds.
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 3003
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 3003
+          initialDelaySeconds: 40
+          periodSeconds: 30
+          failureThreshold: 4
         volumeMounts:
         - name: cache
           mountPath: /cache
