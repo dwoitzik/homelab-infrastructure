@@ -180,3 +180,26 @@ resource "cloudflare_dns_record" "mc_playit" {
   ttl     = 300
   comment = "Minecraft server -- routed via playit.gg tunnel (not CF tunnel)"
 }
+
+# cobblemon.woitzik.dev -- exposed-service hardening pass (2026-07-08),
+# docs/IAC-GAPS.md-class finding: zero IaC trail, and stale. Both port
+# forwards for Minecraft (25565) and Cobblemon (25566) were removed
+# 2026-07-01 (see terraform/stacks/network/nat_portforward.tf) -- 25565 was
+# replaced by the playit.gg tunnel above, but 25566 was deliberately made
+# internal-only with no replacement external path. This A record predates
+# that removal and was never cleaned up: confirmed it's dead, not a live
+# exposure -- points at 178.202.47.0 while home.woitzik.dev's real current
+# DDNS IP is different (178.202.46.102, checked live), and the port itself
+# doesn't respond at the stale IP either. Bringing it under Terraform first
+# (this import) rather than deleting it directly outside IaC; recommend a
+# deliberate follow-up to actually remove it once reviewed, not bundled
+# here.
+resource "cloudflare_dns_record" "cobblemon_stale" {
+  zone_id = var.zone_id
+  name    = "cobblemon"
+  type    = "A"
+  content = "178.202.47.0"
+  proxied = false
+  ttl     = 300
+  comment = "STALE -- confirmed dead 2026-07-08, port-forward removed 2026-07-01, recommend deletion"
+}
