@@ -55,6 +55,21 @@ spec:
             # confirmed live, fails with "Read-only file system" otherwise.
             - name: run
               mountPath: /run
+          # Live-tested: /manifest.json is public (no auth token needed,
+          # unlike /api/*) and returns 200 once the frontend is up.
+          readinessProbe:
+            httpGet:
+              path: /manifest.json
+              port: 8123
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /manifest.json
+              port: 8123
+            initialDelaySeconds: 45
+            periodSeconds: 30
+            failureThreshold: 4
           resources:
             requests:
               cpu: 200m
