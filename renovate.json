@@ -35,6 +35,13 @@
       "labels": ["major-update"]
     },
     {
+      "description": "Terraform provider majors: made explicit rather than relying on Renovate's default (automerge unset = false). This is the exact bump class that caused the 2026-07-09 OOM/outage (hashicorp/aws 5.x->6.x) -- a major provider bump can pull a full new release's worth of platform builds through the terraform manager's checksum-verification path, so it always needs a human glance before merge, not just a green CI run.",
+      "matchManagers": ["terraform"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["major-update"]
+    },
+    {
       "description": "Stateful/critical services -- databases, Vault, Authelia, Garage, Vaultwarden, and apps whose upgrades need a manual data migration (Nextcloud, Paperless, Immich, Gitea) or whose breakage takes out backups/auth cluster-wide (Velero's own restic/kopia plugin). ALL update types (patch/minor/major) stay PR-only, grouped into one PR per bump wave so they're one glance instead of scattered across the inbox. Listed last so it wins over the stateless auto-merge rule above for these specific packages. icereed/paperless-gpt was added after a version auto-merged and immediately CrashLoopBackOff'd -- its entrypoint isn't stable against this repo's readOnlyRootFilesystem hardening across versions, needs manual verification per bump.",
       "matchManagers": ["kubernetes"],
       "matchPackageNames": [
