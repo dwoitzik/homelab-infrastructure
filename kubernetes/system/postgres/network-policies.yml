@@ -1,0 +1,110 @@
+# SEC hardening follow-up to the vault netpol pass (2026-07-09): the
+# `database` namespace had ZERO NetworkPolicies -- confirmed via
+# `kubectl get networkpolicy -n database` (empty) -- meaning any pod
+# anywhere in the cluster could reach postgres-authelia/redis-authelia
+# with no network-layer restriction. This is Authelia's actual data --
+# the trust root for every login in the homelab -- same class of gap as
+# Vault, just not caught in that pass.
+#
+# Real traffic pattern checked before writing this, not guessed:
+# - Authelia (namespace apps) is the only consumer -- connects to
+#   postgres-authelia-rw:5432 (session/config storage) and
+#   redis-authelia:6379 (session cache), confirmed via
+#   kubernetes/apps/authelia/configmap.yml's storage/session hosts.
+# - CNPG's PodMonitor (enablePodMonitor: true in cluster.yml) exposes
+#   metrics on :9187, scraped by Prometheus (monitoring namespace).
+# - The CNPG operator (cnpg-system) calls each instance pod's
+#   instance-manager status API directly on :8000 for health/failover
+#   decisions -- confirmed via the live pod's declared ports
+#   (postgresql:5432, metrics:9187, status:8000).
+#
+# cnpg-system itself is deliberately NOT given a default-deny in this
+# pass: it serves the CNPG admission webhook (cnpg-webhook-service:443)
+# that the kube-apiserver calls for every Cluster/Backup CRD operation
+# cluster-wide. Apiserver-to-pod traffic in k3s doesn't originate from a
+# normal namespaced pod IP, so a default-deny here risks silently
+# breaking webhook admission for ALL CNPG resources cluster-wide --
+# combined with the operator's already-flaky restart history (confirmed
+# live: 299 restarts over 21 days, most recent ~2h before this pass),
+# that's a real risk of making an already-fragile component worse for a
+# namespace that holds no secrets/data itself. Flagged, not guessed at.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: database
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: database
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: database
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-apps
+  namespace: database
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: apps
+      ports:
+        - port: 5432
+          protocol: TCP
+        - port: 6379
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-monitoring
+  namespace: database
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9187
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-cnpg-operator
+  namespace: database
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+      ports:
+        - port: 8000
+          protocol: TCP
