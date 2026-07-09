@@ -91,6 +91,18 @@ spec:
           mountPath: /var/run/postgresql
         - name: tmp
           mountPath: /tmp
+        # Live-tested: pg_isready -U paperless -> accepting connections.
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "paperless"]
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "paperless"]
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          failureThreshold: 4
       volumes:
       - name: data
         persistentVolumeClaim:
@@ -159,6 +171,18 @@ spec:
             drop: ["ALL"]
         ports:
         - containerPort: 6379
+        # Live-tested: redis-cli ping -> PONG.
+        readinessProbe:
+          exec:
+            command: ["redis-cli", "ping"]
+          initialDelaySeconds: 5
+          periodSeconds: 15
+        livenessProbe:
+          exec:
+            command: ["redis-cli", "ping"]
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          failureThreshold: 4
         volumeMounts:
         - name: tmp
           mountPath: /tmp
@@ -216,6 +240,20 @@ spec:
             drop: ["ALL"]
         ports:
         - containerPort: 3000
+        # Live-tested: /health -> {"status":"up",...chromium/libreoffice...}.
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          failureThreshold: 4
         volumeMounts:
         - name: tmp
           mountPath: /tmp
@@ -237,6 +275,22 @@ spec:
             drop: ["ALL"]
         ports:
         - containerPort: 9998
+        # Live-tested: GET / -> 200, Tika's server index page. No dedicated
+        # lightweight health endpoint in this Tika version; the index page
+        # is static and cheap enough to poll.
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9998
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9998
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          failureThreshold: 4
         volumeMounts:
         - name: tmp
           mountPath: /tmp
