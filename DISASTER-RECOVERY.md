@@ -35,11 +35,11 @@ If the router needs to be rebuilt from scratch:
    - Manually create the Terraform API user/password matching
      `terraform/stacks/network/provider.tf`.
    - `cd terraform/stacks/network && terraform init && terraform plan` — review carefully,
-     then apply via the normal Atlantis PR flow once Atlantis itself is reachable (it's
-     k3s-hosted — this is a chicken/egg case; if both router AND cluster are gone, restore
-     a minimal k3s + Atlantis first using a `terraform apply` run locally with
-     `-target` on just enough resources to get Atlantis's IP/VLAN reachable, then hand the
-     rest back to Atlantis).
+     then apply via the normal Atlantis PR flow once Atlantis itself is reachable. Atlantis
+     runs on its own dedicated LXC (`ct-srv-atlantis-01`), independent of k3s — if the
+     router is gone but the LXC survives, Atlantis is usable as soon as network config is
+     back. If both the router and the LXC are gone, restore the LXC via Tier 1 first (or
+     recreate it from `terraform/stacks/proxmox/`), then hand the rest back to Atlantis.
 3. Verify VLANs 10/20/30/40/100 and the default-drop firewall chains are back before
    reconnecting anything else — see `docs/vlan-segmentation.md`.
 
@@ -84,18 +84,18 @@ If the router needs to be rebuilt from scratch:
 
    If the local 2TB USB HDD (`/mnt/pbs-storage`) is also gone, there is currently
    **no working offsite fallback for this** — the Google Drive sync (`docs/backup-strategy.md`
-   Stage 3) is deliberately disabled (insufficient Drive storage, see `REL-051` in
-   `docs/AUDIT.md`) and even when it briefly ran, it never got far enough for a real
-   PBS datastore worth restoring from (Google's API throttling on PBS's many-small-file
-   format made the initial sync impractical). **This means total loss of both `mini`'s
-   ZFS pool and the USB HDD simultaneously is currently unrecoverable at the VM/LXC
-   layer** — only k3s workloads (Velero → Garage S3, itself also in-cluster, see
-   `GIT-001`/`REL-003`) would have any path back, and only if Garage's own data
-   survived. This is the single biggest real gap in this recovery plan as written;
-   revisit once REL-051's offsite question is resolved.
+   Stage 3) is deliberately disabled (insufficient Drive storage), and even when it
+   briefly ran, it never got far enough for a real PBS datastore worth restoring from
+   (Google's API throttling on PBS's many-small-file format made the initial sync
+   impractical). **This means total loss of both `mini`'s ZFS pool and the USB HDD
+   simultaneously is currently unrecoverable at the VM/LXC layer** — only k3s workloads
+   (Velero → Garage S3, itself also in-cluster and subject to the same gap described in
+   Tier 5 below) would have any path back, and only if Garage's own data survived. This
+   is the single biggest real gap in this recovery plan as written; revisit once an
+   offsite backup target is actually working end-to-end.
 5. Backup job coverage uses `all: 1` (every VM/CT, including all 3 k3s VMs and the NFS LXC)
    — confirm the restored job still does after rebuild; this was missing coverage
-   historically (see resolved `REL-002` in `docs/AUDIT.md`).
+   historically and is worth re-verifying after any change to the job.
 6. `/etc/vzdump.conf` carries hand-set `bwlimit: 51200` and `ionice: 7` (added
    2026-07-09, load/thermal-smoothing for the 03:00 job — `node_load1` was spiking to
    80 and correlated with recurring `ProxmoxHostHighTemp` firings). This file has no
@@ -177,8 +177,7 @@ ArgoCD will start reconciling everything from `main` immediately — including s
 ExternalSecrets, which will fail until Vault is unsealed (Tier 4). This is expected; pods
 referencing not-yet-existing secrets will sit in `ContainerCreating`/`Pending` until then.
 Authelia and `postgres-paperless` specifically have a `wait-for-vault-secret` initContainer
-for exactly this reason (see `REL-007` in `docs/AUDIT.md`) — they'll wait quietly rather
-than crash-loop.
+for exactly this reason — they'll wait quietly rather than crash-loop.
 
 ---
 
@@ -227,11 +226,12 @@ durable source for anything that was ever manually seeded into Vault — see
 will have anything to sync.
 
 **Note:** Vault's own raft storage PVC is on `storageClassName: nfs-client`
-(`kubernetes/system/vault/application.yml`) — tracked as `REL-009` in `docs/AUDIT.md`,
-lower severity than the SQLite cases in `GIT-006` since BoltDB's locking model tolerates
-NFS better, but not proven safe long-term. If Vault's data is ever found corrupted on
-NFS, treat it the same as the `GIT-006` Garage incident: stop the pod, attempt
-`vault operator raft snapshot` or fall back to full re-init per this tier.
+(`kubernetes/system/vault/application.yml`) — a known, accepted risk. Raft's own
+consensus tolerates NFS better than a plain SQLite/BoltDB file would (see the
+Garage/SQLite gotcha in Per-Service Restore below), but it's not proven safe long-term.
+If Vault's data is ever found corrupted on NFS, treat it the same as that Garage
+incident: stop the pod, attempt `vault operator raft snapshot`, or fall back to full
+re-init per this tier.
 
 ---
 
@@ -243,7 +243,7 @@ Garage S3, which is itself an app restored as part of the ApplicationSet):
 ```bash
 # Garage must be healthy and reachable before Velero can read its own backup bucket —
 # if Garage's data PVC was lost, Garage starts empty and Velero has nothing to restore
-# from until the offsite copy (R2, not yet active — see REL-003) is wired up instead.
+# from until the offsite copy (Cloudflare R2, not yet active) is wired up instead.
 velero backup get
 velero restore create --from-backup <latest-daily-backup-name>
 ```
@@ -259,11 +259,11 @@ velero restore create --from-backup <name> --include-namespaces apps
 velero restore create --from-backup <name> --selector app=<label>
 ```
 
-**Known gap (REL-003):** Velero's only backend right now is Garage S3, which is
-in-cluster — if the whole cluster (not just one VM) was lost, Garage's backup bucket is
-gone too, and this tier has nothing to restore from. The Cloudflare R2 offsite copy
-(`daily-offsite` Schedule) is configured but inactive pending R2 credentials. Until that's
-turned on, the **real** worst-case recovery path is PBS VM-level restore (Tier 1) of the
+**Known gap:** Velero's only backend right now is Garage S3, which is in-cluster — if the
+whole cluster (not just one VM) was lost, Garage's backup bucket is gone too, and this
+tier has nothing to restore from. The Cloudflare R2 offsite copy (`daily-offsite`
+Schedule) is configured but deliberately not turned on yet (see `docs/backup-strategy.md`).
+Until it is, the **real** worst-case recovery path is PBS VM-level restore (Tier 1) of the
 k3s VMs themselves, which carries Garage's PVC data along with the VM disk — not Velero.
 
 ---
@@ -275,14 +275,14 @@ restores the data, ExternalSecrets re-syncs the secret). The exceptions:
 
 | App | Storage class | Gotcha |
 |---|---|---|
-| Garage (`garage-meta`) | `local-path` | Node-pinned. If the bound node is gone, restore the PVC from Velero fs-backup to a fresh PV on whichever node it (re)binds to — see the `GIT-006` writeup in `docs/AUDIT.md` for the seed-via-busybox-pod technique. |
+| Garage (`garage-meta`) | `local-path` | Node-pinned. If the bound node is gone, restore the PVC from Velero fs-backup to a fresh PV on whichever node it (re)binds to. Technique: spin up a temporary `busybox` pod mounting the empty new PVC, `kubectl cp` or a Velero fs-restore populates it, then let Garage's own Deployment take over once the data's in place. |
 | Headscale, Vaultwarden, Gitea, Mealie, Open WebUI, paperless-ai, Home Assistant | `local-path` | Same node-pinning caveat as Garage. All were migrated off `nfs-client` specifically because SQLite/BoltDB don't tolerate NFS locking — do **not** move them back. |
 | Authelia (`postgres-authelia`, CNPG) | `nfs-client` (PVC) + Garage S3 (barman WAL archive, `kubernetes/system/postgres/cluster.yml`) | CNPG's `bootstrap.initdb.secret` only runs once at cluster creation — changing the `postgres-authelia-user` k8s Secret post-bootstrap does **not** change the live Postgres password. To rotate or restore with a known password: `kubectl exec -n database postgres-authelia-1 -c postgres -- psql -U postgres -c "ALTER USER authelia WITH PASSWORD '...'"`. Barman is configured for continuous WAL archiving, and a daily `ScheduledBackup` (`0 2 * * *`, `kubernetes/system/postgres/scheduled-backup.yml`) now produces a base backup to restore from via barman; the PVC restore (Tier 5) or a manual `pg_dump`/`psql` round-trip as documented inline in `cluster.yml` remain available as fallbacks. |
 | Authelia OIDC config (`kubernetes/apps/authelia/configmap.yml`) | — | Client secrets are argon2id hashes of the plaintext stored in each downstream service (Proxmox, PBS, ArgoCD, Grafana). If Vault is rebuilt from scratch (Tier 4 worst case), these hashes survive in git, but the matching plaintext secrets in Proxmox/PBS/ArgoCD/Grafana's own OIDC client configs do not — re-run the relevant `pvesh`/`proxmox-backup-manager`/`kubectl patch` commands from `docs/secrets-inventory.md` to re-align them. |
 | Nextcloud | `nfs-client` (incl. its own `postgres:16-alpine` StatefulSet, not CNPG) | Plain Postgres, not CNPG — no barman backup. Recovery relies entirely on Velero PVC restore (Tier 5) or PBS VM-level restore (Tier 1) of the NFS LXC. |
 | Immich (`immich-db` PVC) | `nfs-client` (postgres + library) | **Immich v2.7.5** uses `ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0` (PG14, VectorChord). The `immich-db` PVC holds the postgres datadir; `immich-library` holds the photo/video files. Both are on `nfs-client` and covered by Velero fs-backup. **Critical:** after a PVC restore, confirm the postgres container starts clean — if there are `PGDATA` version mismatch errors (e.g. data directory was written by a different PG version), a fresh-DB recovery is the only path: scale down all Immich pods, wipe `/data/pgdata` via a busybox pod, and scale back up (ArgoCD/postgres will reinitialize). Users must re-create their accounts and re-upload photos in that scenario — there is no incremental migration path available from a cold-start PVC failure with version mismatch. Photos themselves survive on `immich-library` PVC even if the database is wiped. |
 | Immich (Cloudflare Tunnel) | — | `photos.woitzik.dev` routes through Cloudflare Tunnel (tunnel ID `1f2e0f78-214b-4f59-881d-37e22625ae6e`). If the `cloudflared` Deployment in the `apps` namespace is down, or if the Cloudflare API token in Ansible Vault is rotated without updating `atlantis-secrets`, the tunnel will be disconnected and external access will stop. Internal access via `*.woitzik.dev` wildcard → Traefik still works for VPN-connected clients. The Cloudflare DNS CNAME record (`photos → <tunnel>.cfargotunnel.com`) was created via Terraform in the `terraform/stacks/cloudflare/` stack and is in remote TF state. |
-| Jellyfin `media` PVC | direct NFS mount (not nfs-client provisioner) | **Not covered by Velero at all.** Recovery depends entirely on the NFS LXC's own PBS backup (Tier 1) — confirm `ct_srv_nfs_01` (vmid 220) is actually in the PBS job's scope (it is, per `all: 1`, as of the `REL-002` fix). |
+| Jellyfin `media` PVC | direct NFS mount (not nfs-client provisioner) | **Not covered by Velero at all.** Recovery depends entirely on the NFS LXC's own PBS backup (Tier 1) — confirm `ct_srv_nfs_01` (vmid 220) is actually in the PBS job's scope (it is, per `all: 1` in the vzdump job — this was missing coverage at one point, worth re-confirming after any PBS job edit). |
 | `ct-srv-nfs-01` (NFS LXC) | — | Backs nearly every `nfs-client` PVC cluster-wide. **Never run concurrent backup/restore reads across multiple apps' directories against it at once** — it OOM'd at 512MB RAM under exactly that load on 2026-06-23 (now provisioned with 2GB + 1GB swap). Restore/copy one app's data at a time. |
 | MegaStar7 / Cobblemon, other Minecraft servers | Proxmox LXC (`ct_dmz_games_01`), not k8s | Restore via Tier 1 (PBS) only — entirely outside ArgoCD/Velero's scope. Memory was raised 12→16GB (+2GB swap) after repeated OOM-driven timeouts; if recreating from Terraform instead of restoring from a PBS snapshot, confirm `terraform/stacks/proxmox/lxc.tf`'s `ct_dmz_games_01` block still reflects that before going live. |
 
@@ -300,4 +300,4 @@ After working through the tiers above, confirm before declaring recovery complet
 - [ ] Spot-check 2-3 apps end-to-end through their real URL (`https://*.woitzik.dev`), through Authelia login
 - [ ] `https://photos.woitzik.dev` reachable from outside the VPN (Cloudflare Tunnel path) — Immich login works and photo upload succeeds
 - [ ] `velero backup get` and PBS job history both show a *new* successful run post-recovery, not just stale pre-incident entries
-- [ ] Update `docs/AUDIT.md` / this doc with anything that didn't go as written here — this runbook is only as good as its last real test
+- [ ] Update this doc with anything that didn't go as written here — this runbook is only as good as its last real test
