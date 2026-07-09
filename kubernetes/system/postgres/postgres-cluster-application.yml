@@ -13,7 +13,7 @@ spec:
     targetRevision: HEAD
     path: kubernetes/system/postgres
     directory:
-      include: '{cluster,external-secret,scheduled-backup,backup-config}.yml'
+      include: '{cluster,external-secret,scheduled-backup,backup-config,network-policies}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: database
