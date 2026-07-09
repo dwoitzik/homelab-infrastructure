@@ -106,19 +106,31 @@ spec:
                 # digest-pin lookups across 128 container images in the
                 # kubernetes manager, or host memory pressure (this host has
                 # a documented swap-under-pressure history, see
-                # docs/OPERATIONS.md) -- was enough to tip it over. Raised to
-                # 3Gi/2304Mi heap, same ~25% non-heap headroom ratio as the
-                # prior bump, for more real margin instead of re-chasing the
-                # same edge again.
+                # docs/OPERATIONS.md) -- was enough to tip it over.
+                #
+                # Real dmesg oom-kill records pulled from the node (not just
+                # Prometheus scrape samples) showed every one of the 20 kills
+                # landing at MainThread anon-rss ~2054-2064Mi (+file-rss/
+                # pgtables overhead, ~2.12-2.14Gi total) -- consistently only
+                # ~30-40Mi over the 2Gi cap. That's censored data: the kernel
+                # kills the instant the cgroup limit is crossed, so it proves
+                # 2Gi was insufficient, not what the true uncapped peak would
+                # have been. Rather than another marginal guess, raised to
+                # 4Gi/3072Mi heap (same 75%/25% heap-to-limit ratio as prior
+                # bumps) -- roughly 2x the measured near-kill value, real
+                # slack instead of a repeat near-miss. If this OOMs too, the
+                # next step is measuring the true uncapped peak directly
+                # (one-off diagnostic Job with a generous temporary cap),
+                # not a third blind raise.
                 - name: NODE_OPTIONS
-                  value: "--max-old-space-size=2304"
+                  value: "--max-old-space-size=3072"
               resources:
                 requests:
                   cpu: 100m
                   memory: 1Gi
                 limits:
                   cpu: 500m
-                  memory: 3Gi
+                  memory: 4Gi
           volumes:
             - name: tmp
               emptyDir: {}
