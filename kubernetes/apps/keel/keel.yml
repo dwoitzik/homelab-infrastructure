@@ -87,6 +87,21 @@ spec:
               value: "false"
             - name: NOTIFICATION_LEVEL
               value: "info"
+          # Live-tested via Pod IP (matches kubelet's probe behavior exactly,
+          # not a localhost curl): /healthz -> 200, empty body.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9300
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9300
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 4
           resources:
             requests:
               cpu: 25m

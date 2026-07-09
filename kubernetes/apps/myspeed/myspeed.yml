@@ -53,6 +53,20 @@ spec:
           # persisted: every restart/reschedule/redeploy showed the
           # first-run setup wizard again, silently, since day one.
           mountPath: /myspeed/data
+        # Live-tested via Pod IP: "/" returns 200 with the frontend HTML.
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5216
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5216
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          failureThreshold: 4
         resources:
           requests:
             cpu: 50m

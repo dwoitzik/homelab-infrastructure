@@ -73,6 +73,21 @@ spec:
           mountPath: /etc/searxng/settings.yml
           subPath: settings.yml
           readOnly: true
+        # Live-tested via Pod IP: "/" returns 200 with the search page HTML,
+        # no host-validation issue (unlike homepage's Next.js middleware).
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          failureThreshold: 4
         resources:
           requests:
             cpu: 100m
