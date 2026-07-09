@@ -110,27 +110,42 @@ spec:
                 #
                 # Real dmesg oom-kill records pulled from the node (not just
                 # Prometheus scrape samples) showed every one of the 20 kills
-                # landing at MainThread anon-rss ~2054-2064Mi (+file-rss/
-                # pgtables overhead, ~2.12-2.14Gi total) -- consistently only
-                # ~30-40Mi over the 2Gi cap. That's censored data: the kernel
-                # kills the instant the cgroup limit is crossed, so it proves
-                # 2Gi was insufficient, not what the true uncapped peak would
-                # have been. Rather than another marginal guess, raised to
-                # 4Gi/3072Mi heap (same 75%/25% heap-to-limit ratio as prior
-                # bumps) -- roughly 2x the measured near-kill value, real
-                # slack instead of a repeat near-miss. If this OOMs too, the
-                # next step is measuring the true uncapped peak directly
-                # (one-off diagnostic Job with a generous temporary cap),
-                # not a third blind raise.
+                # landing at MainThread anon-rss ~2054-2064Mi -- consistently
+                # only ~30-40Mi over the 2Gi cap. That's censored data: the
+                # kernel kills the instant the cgroup limit is crossed, so it
+                # proved 2Gi was insufficient, not what the true uncapped
+                # peak was. Raised to 4Gi -- ALSO OOMKilled (anon-rss
+                # ~4.12-4.15Gi at kill, same near-the-cap pattern), and the
+                # retry loop's CPU/memory pressure on this node (which also
+                # runs one of two etcd members) contributed to a real
+                # cluster-wide apiserver outage on 2026-07-09 16:34.
+                #
+                # Root-caused properly after that (uncapped diagnostic run,
+                # isolated on a non-k3s LXC with 12Gi headroom, real GitHub
+                # token, real branches): NOT a leak. True peak ~3.99Gi, one
+                # transient spike from Renovate's terraform manager
+                # SHA256-hashing all 14 platform builds of a major
+                # hashicorp/aws provider bump (5.x->6.53.0) at the default
+                # concurrentRequestLimit (16 simultaneous provider-zip
+                # downloads buffered in memory). Given real headroom, GC
+                # reclaims it fine and the run finishes clean (exit 0). Under
+                # a tight cgroup limit, the hard kill lands mid-spike before
+                # GC catches up. Real fix is in renovate.json (hostRules:
+                # concurrentRequestLimit=2 for releases.hashicorp.com),
+                # flattening the peak at the source. This resource bump is
+                # now backed by the real measured peak instead of a
+                # multiplier guess: 6Gi/4608Mi heap, ~1.5x the confirmed
+                # 3.99Gi peak, real GC margin rather than hoping the ceiling
+                # survives a spike untouched.
                 - name: NODE_OPTIONS
-                  value: "--max-old-space-size=3072"
+                  value: "--max-old-space-size=4608"
               resources:
                 requests:
                   cpu: 100m
                   memory: 1Gi
                 limits:
                   cpu: 500m
-                  memory: 4Gi
+                  memory: 6Gi
           volumes:
             - name: tmp
               emptyDir: {}

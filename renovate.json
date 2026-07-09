@@ -35,7 +35,7 @@
       "labels": ["major-update"]
     },
     {
-      "description": "Stateful/critical services -- databases, Vault, Authelia, Garage, Vaultwarden, and apps whose upgrades need a manual data migration (Nextcloud, Paperless, Immich, Gitea) or whose breakage takes out backups/auth cluster-wide (Velero's own restic/kopia plugin). ALL update types (patch/minor/major) stay PR-only, grouped into one PR per bump wave so they're one glance instead of scattered across the inbox. Listed last so it wins over the stateless auto-merge rule above for these specific packages. icereed/paperless-gpt added 2026-07-07 (REL-060) after v0.26.0 auto-merged and immediately CrashLoopBackOff'd -- its entrypoint isn't stable against this repo's readOnlyRootFilesystem hardening across versions, needs manual verification per bump.",
+      "description": "Stateful/critical services -- databases, Vault, Authelia, Garage, Vaultwarden, and apps whose upgrades need a manual data migration (Nextcloud, Paperless, Immich, Gitea) or whose breakage takes out backups/auth cluster-wide (Velero's own restic/kopia plugin). ALL update types (patch/minor/major) stay PR-only, grouped into one PR per bump wave so they're one glance instead of scattered across the inbox. Listed last so it wins over the stateless auto-merge rule above for these specific packages. icereed/paperless-gpt was added after a version auto-merged and immediately CrashLoopBackOff'd -- its entrypoint isn't stable against this repo's readOnlyRootFilesystem hardening across versions, needs manual verification per bump.",
       "matchManagers": ["kubernetes"],
       "matchPackageNames": [
         "hashicorp/vault",
@@ -57,6 +57,13 @@
       "groupName": "stateful/critical services",
       "labels": ["stateful-critical"],
       "automerge": false
+    }
+  ],
+  "hostRules": [
+    {
+      "description": "2026-07-09 OOM root cause: a major hashicorp/aws provider bump (5.x->6.53.0) makes Renovate's terraform manager fetch and SHA256-hash every platform build of the release (14 builds) to keep .terraform.lock.hcl valid. Renovate's default concurrentRequestLimit (16) meant up to 16 of those provider zips could be buffered in memory at once, producing a real transient peak of ~4GiB in a single ~30s window (confirmed via an isolated, generously-capped diagnostic run -- not a leak, the process finished cleanly at exit 0 given real headroom). Under the CronJob's tight memory limit, the cgroup killed it mid-spike before GC could reclaim. Capping concurrency here flattens the peak at the source instead of just hoping a bigger ceiling survives it.",
+      "matchHost": "releases.hashicorp.com",
+      "concurrentRequestLimit": 2
     }
   ]
 }
