@@ -426,17 +426,28 @@ spec:
         # initContainer seeds a writable copy first.
         - name: next-dir
           mountPath: /app/.next
-        # Live-tested: /api/healthcheck returns "up".
+        # Live-tested: /api/healthcheck returns "up". Host header override is
+        # required -- HOMEPAGE_ALLOWED_HOSTS only permits home.woitzik.dev
+        # (+ loopback), and kubelet's httpGet probe otherwise sends the Pod
+        # IP as Host, which Next.js's host validation middleware 400s on.
+        # Confirmed live: this bit both readiness and liveness probes and
+        # actually restarted the pod once before being caught.
         readinessProbe:
           httpGet:
             path: /api/healthcheck
             port: 3000
+            httpHeaders:
+              - name: Host
+                value: "localhost:3000"
           initialDelaySeconds: 10
           periodSeconds: 15
         livenessProbe:
           httpGet:
             path: /api/healthcheck
             port: 3000
+            httpHeaders:
+              - name: Host
+                value: "localhost:3000"
           initialDelaySeconds: 15
           periodSeconds: 30
           failureThreshold: 4
