@@ -27,3 +27,9 @@ import {
   to = cloudflare_dns_record.auth
   id = "1f15ed0f3a8b497302ba339dcab3c060/d1bdef517767720d53f186753f71c306"
 }
+
+# cobblemon.woitzik.dev -- stale, confirmed dead, see comment in main.tf.
+import {
+  to = cloudflare_dns_record.cobblemon_stale
+  id = "1f15ed0f3a8b497302ba339dcab3c060/1c5c2580525de38556147349088ac0e8"
+}
