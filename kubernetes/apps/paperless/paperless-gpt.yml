@@ -111,6 +111,22 @@ spec:
           mountPath: /app/config
         - name: db
           mountPath: /app/db
+        ports:
+        - containerPort: 8080
+        # Live-tested via Pod IP: "/" returns 200 with the frontend HTML.
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          failureThreshold: 4
       initContainers:
       - name: seed-prompts
         image: icereed/paperless-gpt:v0.25.1

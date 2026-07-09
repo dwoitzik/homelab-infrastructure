@@ -87,6 +87,18 @@ spec:
               mountPath: /var/run/postgresql
             - name: tmp
               mountPath: /tmp
+          # Live-tested: pg_isready -U nextcloud -> accepting connections.
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "nextcloud"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "nextcloud"]
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 4
           resources:
             requests:
               cpu: 100m
@@ -161,6 +173,18 @@ spec:
               drop: ["ALL"]
           ports:
             - containerPort: 6379
+          # Live-tested: redis-cli ping -> PONG.
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 4
           volumeMounts:
             - name: tmp
               mountPath: /tmp
@@ -273,6 +297,29 @@ spec:
               mountPath: /usr/local/etc/php/conf.d
             - name: apache-run
               mountPath: /var/run/apache2
+          # Live-tested via Pod IP: /status.php needs a Host header override
+          # -- NEXTCLOUD_TRUSTED_DOMAINS only permits nextcloud.woitzik.dev,
+          # kubelet's real Pod-IP Host header would otherwise 400 (same
+          # failure class the homepage batch caught).
+          readinessProbe:
+            httpGet:
+              path: /status.php
+              port: 80
+              httpHeaders:
+                - name: Host
+                  value: "nextcloud.woitzik.dev"
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /status.php
+              port: 80
+              httpHeaders:
+                - name: Host
+                  value: "nextcloud.woitzik.dev"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 4
           resources:
             requests:
               cpu: 200m
