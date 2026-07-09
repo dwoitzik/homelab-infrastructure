@@ -51,9 +51,10 @@ Live-confirmed rather than assumed from the original design intent:
 - No infrastructure change from this ADR — it documents and preserves an existing,
   correct, already-live design that a routine audit pass nearly removed based on an
   incomplete read of what the Tor proxy actually protects.
-- See `docs/AUDIT.md` WRK-006 (closed as "verified correct as designed," not "removed")
-  and REL-020 (the SQLite-on-NFS risk this was entangled with is independently
-  resolved — the whole stack no longer runs on Kubernetes/NFS at all).
+- A routine audit initially flagged this for removal, then closed as "verified correct
+  as designed" once the actual protection this provides was understood. The
+  SQLite-on-NFS risk this was entangled with is independently resolved — the whole
+  stack no longer runs on Kubernetes/NFS at all.
 - See ADR-010's 2026-06-26 amendment for the original, fuller reasoning behind
   dropping gluetun/Mullvad in favor of this two-layer model — this ADR exists
   alongside it for discoverability, not as a replacement.

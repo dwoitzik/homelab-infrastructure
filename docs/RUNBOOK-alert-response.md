@@ -1,10 +1,9 @@
 # Alert Response Runbook
 
-Purpose: a noisy night in Discord shouldn't require re-deriving context from
-`docs/AUDIT.md`. For every alert type actually seen in this repo's history, this
-doc says plainly: is it real (investigate now) or a reporting artifact / self-heals
-(check, but don't panic)? Grounded in real fired incidents, not generic advice — see
-`docs/AUDIT.md` and `docs/AUTONOMY-STATUS.md` for the underlying evidence.
+Purpose: a noisy night in Discord shouldn't require re-deriving context from scratch.
+For every alert type actually seen in this repo's history, this doc says plainly: is it
+real (investigate now) or a reporting artifact / self-heals (check, but don't panic)?
+Grounded in real fired incidents, not generic advice.
 
 **How to use this at 3am**: find the alertname below, read the one-line verdict, do
 the one-line check. If it says "self-heals," confirm the check and go back to bed —

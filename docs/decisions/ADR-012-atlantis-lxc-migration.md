@@ -44,11 +44,11 @@ docker-compose — the same pattern already used for `ct-srv-media-acq-01`,
 - Matches the repo's existing pattern for single-purpose management
   services running as LXCs rather than k8s workloads (`ct-mgmt-pbs-01`,
   `ct-srv-nfs-01`).
-- Removing Atlantis from the k3s NetworkPolicy surface (REL-034's
-  `allow-atlantis-ingress` rule) simplifies that policy back to a plain
-  intra-namespace allow — the whole class of "does an in-cluster pod have
-  unauthenticated access to the Terraform-apply UI" risk goes away since
-  Atlantis is no longer reachable from inside the cluster at all.
+- Removing Atlantis from the k3s NetworkPolicy surface simplifies the
+  in-cluster policy back to a plain intra-namespace allow — the whole
+  class of "does an in-cluster pod have unauthenticated access to the
+  Terraform-apply UI" risk goes away since Atlantis is no longer
+  reachable from inside the cluster at all.
 
 ## Trade-offs
 
@@ -68,12 +68,18 @@ docker-compose — the same pattern already used for `ct-srv-media-acq-01`,
 
 - `kubernetes/apps/atlantis/atlantis.yml` (Deployment, Service, ConfigMap,
   PVC) removed.
-- `kubernetes/apps/network-policies.yml`'s `allow-atlantis-ingress` /
-  REL-034 exclusion on `allow-intra-namespace` removed — no longer
+- `kubernetes/apps/network-policies.yml`'s `allow-atlantis-ingress` rule
+  and its exclusion on `allow-intra-namespace` removed — no longer
   applicable once Atlantis isn't a pod.
-- `kubernetes/system/apps-ingressroute.yml`'s Atlantis IngressRoute removed
-  (Cloudflare Tunnel routes directly to the LXC's IP now, never went
-  through Traefik in the first place per REL-034's finding).
+- `kubernetes/system/apps-ingressroute.yml`'s Atlantis IngressRoute
+  removed at cutover, with the Cloudflare Tunnel repointed directly at the
+  LXC's IP. **Update**: this was corrected shortly after — the direct
+  routing bypassed Authelia entirely, and Atlantis has no auth of its own,
+  so it briefly served its full plan/apply UI to unauthenticated public
+  requests. Fixed by re-adding the IngressRoute through Traefik with the
+  same Authelia-gated pattern used elsewhere, while leaving the GitHub
+  webhook path ungated (its HMAC signature is its own auth, and forcing it
+  through Authelia's redirect would break delivery).
 - `terraform/stacks/cloudflare/main.tf` tunnel ingress for
   `atlantis.woitzik.dev` repointed from
   `http://atlantis.apps.svc.cluster.local:4141` to

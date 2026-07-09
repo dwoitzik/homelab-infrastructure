@@ -2,8 +2,9 @@
 
 Companion to `docs/OPERATING-MODEL.md`. That document says what the system is supposed
 to do; this one says what to actually do when it doesn't, or when you're adding
-something new. If an alert type here isn't wired yet, `docs/AUTONOMY-STATUS.md` says
-so — check there before assuming silence means "nothing's wrong."
+something new. Not every alert type described as "supposed to fire" has necessarily
+been exercised by a real event yet — check before assuming silence means "nothing's
+wrong."
 
 ## Adding a new service
 
@@ -11,8 +12,9 @@ so — check there before assuming silence means "nothing's wrong."
    up automatically by the `homelab-apps` ApplicationSet, no manual Application object
    needed. System/infrastructure components go under `kubernetes/system/<name>/` and
    need their own `Application` manifest with an explicit `directory.include` glob
-   (**not** a wildcard — see REL-014/035/042 in `docs/AUDIT.md` for why an untracked or
-   silently-orphaned file in this directory has bitten this repo three times).
+   (**not** a wildcard — an untracked or silently-orphaned file in this directory has
+   bitten this repo more than once: edits sat in git having zero live effect because
+   nothing was watching the file).
 2. **Secrets**: never commit a plaintext secret. Use an `ExternalSecret` pointing at
    Vault (`ansible/group_vars/all/vault.yml`, `vault_` prefix convention for the
    underlying Ansible-side secret, or a `secret/<app>` path in Vault directly for
@@ -30,7 +32,7 @@ so — check there before assuming silence means "nothing's wrong."
    `kubernetes/system/monitoring/`). If a new alert needs to reach Discord and isn't
    `severity: critical`, add its `alertname` explicitly to the warning-tier route in
    `alertmanager-config.yml` — don't just flip to routing all `severity: warning`, that
-   floods Discord with routine noise (see REL-055).
+   floods Discord with routine noise.
 5. **Docs**: every component gets a README/runbook per `CLAUDE.local.md`'s quality bar
    — what it is, how to deploy, how to restore, dependencies. Add a Mermaid diagram
    entry if it changes the architecture picture.
@@ -65,8 +67,8 @@ but repeated failures mean Renovate has been silently not-updating anything.
 Check `kubectl get nodes` and `kubectl describe node <name>` for the reason (kubelet
 down, network partition, resource exhaustion). If it's `mini`-hosted (all 3 k3s VMs
 are), also check the host directly (`qm status`, `ssh` to `mini`) — this hardware has a
-documented history of ZFS I/O stalls under RAM pressure (REL-016), which manifests
-exactly as nodes going NotReady under load.
+documented history of ZFS I/O stalls under RAM pressure, which manifests exactly as
+nodes going NotReady under load.
 
 ### `CertManagerCertNotReady` / `CertManagerCertExpirySoon`
 
@@ -79,12 +81,15 @@ re-mute it.
 ### `VeleroBackupFailed` / `VeleroBackupPartialFailure`
 
 `kubectl logs -n velero deploy/velero --tail=200 | grep <backup-name>` for the actual
-error. As of REL-057, Garage (the in-cluster S3 backend) has an unexplained
-intermittent `HeadObject` timeout — if that's the cause again, this is a known-but-not-
-root-caused issue, not a new one. **Do not assume "Completed" backups are restorable**
-— no Velero restore has ever been tested (REL-057); if you're responding to this alert
-because you actually need data back, treat the restore itself as unverified territory,
-not a solved problem.
+error. Garage (the in-cluster S3 backend) has previously shown an intermittent
+`BackupStorageLocation: Unavailable` error caused by another workload (CNPG's Postgres
+backup archiving) writing into the same shared bucket Velero owns — Velero's own bucket
+validation flags the unrecognized directory. Fixed once by giving CNPG its own scoped
+bucket, but the failure mode is worth knowing if it resurfaces: check
+`kubectl describe backupstoragelocation -n velero default` for the exact message before
+assuming it's something new. Velero restore has been tested successfully at least once
+(a full namespace restore, cross-checked byte-for-byte against live data) — not a
+blanket guarantee for every service, but no longer entirely unverified territory either.
 
 ### ArgoCD `on-health-degraded` / `on-sync-failed` / `on-sync-status-unknown`
 
@@ -94,9 +99,9 @@ in the Application spec or a repo access issue, not the app's own manifests bein
 wrong. `Degraded` health means the app's own resources report unhealthy (check
 `kubectl describe` on the specific resource ArgoCD flags) — remember selfHeal is on
 everywhere, so if you're debugging by editing live resources, either work fast or
-temporarily set `syncPolicy.automated: null` on that one Application first (see
-REL-055/042 for why — selfHeal will silently revert live edits back to git's current
-state within seconds otherwise), and restore it before you finish.
+temporarily set `syncPolicy.automated: null` on that one Application first — selfHeal
+will silently revert live edits back to git's current state within seconds otherwise
+— and restore it before you finish.
 
 ## Recurring cadence (nothing here is optional busywork — each ties to a documented incident)
 
@@ -106,7 +111,9 @@ state within seconds otherwise), and restore it before you finish.
   no separate manual cadence.
 - **Gitleaks full-history + baseline re-verification**: periodic manual re-run
   recommended (`gitleaks detect --no-git --source=. --baseline-path
-  .gitleaks-baseline.json`) — SEC-013 found 2 real still-live secrets hiding behind a
-  stale baseline entry that the pre-commit hook alone would never have caught.
-- **DR drill**: no fixed cadence yet, but REL-057 found Velero restore has never been
-  tested even once — the next one shouldn't be "when a real incident forces it."
+  .gitleaks-baseline.json`) — a baseline entry can quietly go stale and hide a real
+  still-live secret that the pre-commit hook alone would never catch; found this happen
+  once already.
+- **DR drill**: no fixed cadence yet. A full namespace restore has been tested once —
+  worth repeating periodically and extending to other services, not something to
+  rediscover for the first time mid-incident.

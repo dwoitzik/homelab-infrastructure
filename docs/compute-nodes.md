@@ -15,25 +15,25 @@
 
 ### VMs & Containers (`onboot`)
 
-Table re-verified 2026-07-06 against `terraform/stacks/proxmox/{lxc,vm}.tf` directly
+Table re-verified against `terraform/stacks/proxmox/{lxc,vm}.tf` directly
 (cores/`dedicated` memory) -- several values here had drifted from what's actually
-defined, and 3 LXCs added since the initial pass (`ct-srv-media-acq-01` WRK-006,
-`ct-srv-jellyfin-01` WRK-007, `ct-srv-atlantis-01` ADR-012) were missing entirely.
+defined, and 3 LXCs added since the initial pass (`ct-srv-media-acq-01`,
+`ct-srv-jellyfin-01`, `ct-srv-atlantis-01` -- see ADR-012) were missing entirely.
 
 | Hostname | Type | Cores | RAM | Role |
 | :--- | :--- | :--- | :--- | :--- |
 | `ct-mgmt-pbs-01` | LXC | 2 | 2 GB | Proxmox Backup Server |
 | `ct-srv-docker-01` | LXC | 4 | 4 GB | Legacy Docker workloads |
-| `ct-srv-ai-01` | LXC | 6 | 32 GB | Ollama / LLM inference (GPU Passthrough) -- cores cut 8->6 (REL-035/REL-016, host CPU overcommit) |
+| `ct-srv-ai-01` | LXC | 6 | 32 GB | Ollama / LLM inference (GPU Passthrough) -- cores cut from 8 after host CPU overcommit |
 | `ct-srv-nfs-01` | LXC | 2 | 2 GB | NFS storage server (ZFS-backed, `nfs-client` StorageClass for all k3s PVCs) |
 | `ct-srv-media-acq-01` | LXC | 2 | 4 GB | Media acquisition stack (Mullvad-wrapped, ADR-010) |
-| `ct-srv-jellyfin-01` | LXC | 2 | 2 GB | Jellyfin (GPU-passthrough hardware transcode, WRK-007) |
+| `ct-srv-jellyfin-01` | LXC | 2 | 2 GB | Jellyfin (GPU-passthrough hardware transcode) |
 | `ct-srv-atlantis-01` | LXC | 2 | 2 GB | Atlantis GitOps runner (moved off k3s, ADR-012) |
 | `vm-srv-k3s-11` | VM | 4 | 12 GB | k3s control-plane + embedded etcd (sole server) |
 | `vm-srv-k3s-12` | VM | 4 | 8 GB | k3s agent (worker only, no etcd) |
 | `vm-srv-k3s-13` | VM | 4 | 8 GB | k3s agent (worker only, no etcd) |
 | `ct-dmz-proxy-01` | LXC | 2 | 1 GB | DMZ reverse proxy (Public Facing) |
-| `ct-dmz-games-01` | LXC | 2 | 8 GB | Game servers -- cores cut 4->2 (REL-031), memory 16GB->8GB (REL-035, observed peak ~4.7GB) |
+| `ct-dmz-games-01` | LXC | 2 | 8 GB | Game servers -- cores cut from 4, memory right-sized to 8GB after observing a ~4.7GB peak |
 
 `vm-srv-k3s-11` is the sole control-plane + etcd server; `vm-srv-k3s-12` and `-13` are
 agent (worker) nodes only. A 3-node embedded-etcd HA setup was tried and reverted — all
@@ -61,7 +61,7 @@ backed by `ct-srv-nfs-01`.
 | ZFS dirty data | Capped at 1 GB (`zfs_dirty_data_max`, down from the 4 GB default) | Forces smaller, more frequent flushes instead of large write-behind batches |
 | ZFS txg timeout | 5s (`zfs_txg_timeout`, down from 15s default) | Same goal — shorter sync intervals, smaller worst-case throttle stalls under write pressure |
 | USB Storage | `nofail, device-timeout=5s` | USB dropout must not block boot/crash host |
-| VM/LXC `onboot` | **Enabled (`onboot=1`) for every VM/LXC** (re-verified live 2026-07-06 via `pvesh get .../config`) | Originally disabled 2026-06-22 for isolated debugging (see prior note), but reversed shortly after -- REL-001/REL-002/REL-016 each independently re-enabled it (control-plane VMs, PBS, and 5 more LXCs that failed to recover after a real host freeze) once the debugging need passed. This row hadn't been updated since the original 2026-06-22 decision despite being reversed weeks ago. `bpg/proxmox`'s LXC resource doesn't reliably manage this attribute (confirmed in `terraform/stacks/proxmox/lxc.tf`'s REL-016 comments -- plan always shows "No changes" regardless of live value), so it's applied manually (`pct set <id> -onboot 1`) and needs reapplying if a container is ever recreated. |
+| VM/LXC `onboot` | **Enabled (`onboot=1`) for every VM/LXC** (re-verified live via `pvesh get .../config`) | Originally disabled for isolated debugging during a host-freeze investigation, then reversed once that need passed -- control-plane VMs, PBS, and several LXCs had failed to auto-recover after a real host freeze while this was off. `bpg/proxmox`'s LXC resource doesn't reliably manage this attribute (`terraform plan` always shows "No changes" regardless of live value), so it's applied manually (`pct set <id> -onboot 1`) and needs reapplying if a container is ever recreated. |
 
 ---
 
