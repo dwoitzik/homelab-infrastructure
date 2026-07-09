@@ -1,0 +1,62 @@
+# SEC hardening (2026-07-08): the vault namespace had ZERO NetworkPolicies
+# at all -- confirmed via `kubectl get networkpolicy -n vault` (empty) --
+# meaning any pod anywhere in the cluster (including a compromised Immich
+# or a future workload) could reach Vault's API with no network-layer
+# restriction whatsoever. Vault is the trust root every ExternalSecret in
+# the cluster reads from live; this was the single biggest gap found in
+# the cross-cutting isolation check of this hardening pass.
+#
+# Real traffic pattern checked before writing this, not guessed:
+# - External Secrets Operator's central controller (namespace
+#   external-secrets) is what actually calls Vault's API via the
+#   ClusterSecretStore -- individual app pods do NOT call Vault directly,
+#   ESO resolves secrets centrally and writes plain k8s Secrets into each
+#   app's namespace. So only the external-secrets namespace needs
+#   cross-namespace access, not every namespace with an ExternalSecret.
+# - vault-unseal (same namespace) calls vault-0's API directly.
+# - Vault has no ServiceMonitor / isn't Prometheus-scraped currently
+#   (checked), so no monitoring-namespace allow is needed.
+# - Vault has no external Ingress route at all (not exposed via
+#   Traefik/Cloudflare) -- purely cluster-internal.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: vault
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-external-secrets
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: external-secrets
+      ports:
+        - port: 8200
+          protocol: TCP

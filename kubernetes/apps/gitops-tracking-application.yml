@@ -1,0 +1,52 @@
+# SEC hardening pass (2026-07-08): network-policies.yml and
+# traefik-websockets.yml are loose files directly under kubernetes/apps/,
+# not subdirectories -- the homelab-apps ApplicationSet
+# (kubernetes/system/argocd/... generator: `directories: [{path:
+# "kubernetes/apps/*"}]`) only generates an Application per SUBDIRECTORY,
+# so these two files were never actually covered by "kubernetes/apps/*
+# gets this automatically" despite that being the documented assumption
+# elsewhere (see monitoring/manifests-application.yml's own REL-014
+# comment, which states that assumption directly).
+#
+# Confirmed live, not assumed: both resources carry
+# `kubectl.kubernetes.io/last-applied-configuration` (raw `kubectl apply`)
+# with no `argocd.argoproj.io/tracking-id` annotation at all -- applied
+# once by hand, never reconciled against git since. Found via real drift:
+# the live `allow-intra-namespace` NetworkPolicy still excludes atlantis
+# from its podSelector even though network-policies.yml's own comment
+# says that exclusion was already reverted (Atlantis moved off k3s onto
+# its own LXC, ADR-012) -- the git file was edited, but nothing was
+# watching it to actually apply that edit. A separate live policy,
+# allow-atlantis-ingress, still exists too -- entirely orphaned, matching
+# zero real pods (atlantis isn't a k3s pod anymore), removed from git at
+# some point but never pruned live since nothing tracks this path to prune
+# it.
+#
+# allow-from-database-to-garage (real, CNPG backup traffic, REL-057b) was
+# added to network-policies.yml in the same commit as this file so the
+# first sync's prune doesn't delete something backups depend on.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apps-loose-manifests
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dwoitzik/homelab-infrastructure.git
+    targetRevision: main
+    path: kubernetes/apps
+    directory:
+      # Includes itself, matching monitoring/manifests-application.yml's
+      # same pattern -- otherwise a future edit to THIS Application's own
+      # spec would hit the exact bootstrap gap this file exists to fix.
+      include: "{network-policies,traefik-websockets,gitops-tracking-application}.yml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: apps
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
