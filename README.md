@@ -23,7 +23,7 @@ Start with [docs/OPERATIONS.md](docs/OPERATIONS.md) if you want to know where th
 | Auth | Authelia — SSO/OIDC for all protected services |
 | VPN | Headscale (self-hosted Tailscale control plane), OIDC login via Authelia |
 | Secrets | Ansible Vault (host-level) + HashiCorp Vault w/ auto-unseal (k8s, via ExternalSecrets) |
-| Backups | Velero → Garage S3 (k8s, incl. PVC data via Kopia) + PBS → rclone → Google Drive (VMs). Offsite (Cloudflare R2) configured, pending credentials. |
+| Backups | Velero → Garage S3 (k8s, incl. PVC data via Kopia) + Proxmox Backup Server (VMs/LXCs). Neither offsite leg is active yet — see `docs/backup-strategy.md`. |
 
 ## Architecture
 
