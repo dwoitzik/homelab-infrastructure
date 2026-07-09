@@ -45,15 +45,14 @@ alone justifies the operator's footprint.
   itself stay healthy for Postgres to be manageable
 - WAL archiving to Garage S3 makes Postgres backup availability dependent on Garage's
   in-cluster uptime — the same circular-dependency risk already flagged for Velero
-  (REL-003)
-- WAL archiving alone is not a restorable backup: barman needs a base backup to restore
-  from, and no `ScheduledBackup` resource exists yet (tracked as REL-011) — today,
-  restoring `postgres-authelia` from scratch still depends on the PVC itself (Velero/PBS),
-  not on barman/PITR
+  (see the accepted-risk list in `docs/AUDIT.md` if that's still tracked separately)
+- WAL archiving alone is not a restorable backup without a base backup to restore
+  from — a `ScheduledBackup` resource has since been added (`postgres-authelia-backup`,
+  running daily), so PITR now has a real base backup + WAL chain behind it, not just
+  the PVC-level Velero/PBS copies.
 
 ## Consequences
 
 `postgres-authelia` is now a CNPG `Cluster`, monitored via the bundled PodMonitor and
 Grafana dashboard. Any future Postgres workload in this cluster should default to CNPG
-rather than a bare StatefulSet. Closing REL-011 (adding a `ScheduledBackup`) is required
-before PITR is actually usable for disaster recovery.
+rather than a bare StatefulSet.

@@ -40,10 +40,10 @@ redundancy plus Velero backups (see `docs/backup-strategy.md`).
 
 **`nfs-client` is NOT safe for embedded databases** (SQLite, BoltDB, etc.) — NFS's
 locking/WAL model is incompatible with how these engines manage concurrent access.
-Garage's metadata store corrupted this way on 2026-06-23 (see GIT-006 in `docs/AUDIT.md`).
+Garage's metadata store corrupted this way in practice, which is what prompted the migration below.
 Every app found to be SQLite-backed was migrated to `local-path` instead: Garage
 (`garage-meta`), Headscale, Vaultwarden, Gitea, Mealie, Open WebUI, Home Assistant
-(paperless-ai was removed entirely in WRK-005, see `docs/AUDIT.md`). **`local-path`
+(paperless-ai was removed entirely as a service, unrelated to storage). **`local-path`
 PVs are node-pinned** — a pod using one can only ever schedule
 back onto the node it first bound to; if that node is lost, the data is gone unless
 restored from a Velero backup. New apps with an embedded DB should default to
@@ -113,7 +113,7 @@ Prometheus scrapes from both in-cluster and external targets:
 | Docker LXC (10.0.20.252) | Static config | 9100 |
 | AI LXC (10.0.20.251) | Static config | 9100 |
 | PBS (10.0.10.110) | Static config | 9100 |
-| Media-acq, Jellyfin, Atlantis LXCs | Static config (`node_exporter_native`, added after this doc was first written -- WRK-006/007, ADR-012) | 9100 |
+| Media-acq, Jellyfin, Atlantis LXCs | Static config (`node_exporter_native`, added after this doc was first written -- see ADR-012 for the Atlantis LXC) | 9100 |
 | DMZ proxy + games LXCs (10.0.30.2-3) | Static config (`monitoring_agent` role's docker-based node_exporter, distinct from `node_exporter_native` used elsewhere) | 9100 |
 | Proxmox host (10.0.10.10) | PVE exporter in-cluster | 9221 |
 
