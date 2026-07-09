@@ -1,0 +1,26 @@
+# SEC hardening (2026-07-08): photos.woitzik.dev had no rate limiting at
+# all -- checked every Middleware CRD in the cluster, none applied here.
+# Immich's own login/API has no external auth layer in front of it (see
+# immich.yml's ingress route comment -- deliberate, the mobile app needs
+# API-token auth, not an Authelia browser redirect), so this is the only
+# brute-force/abuse mitigation on the login and upload endpoints.
+# average/burst set generously for real usage (mobile background sync can
+# burst many small requests when uploading a batch of photos) while still
+# bounding a credential-stuffing or scraping attempt.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: immich-ratelimit
+  namespace: apps
+spec:
+  rateLimit:
+    average: 50
+    burst: 100
+    period: 1s
+    # No explicit sourceCriterion/ipStrategy -- Traefik resolves the real
+    # client IP from X-Forwarded-For using the entrypoint's already-configured
+    # trustedIPs (10.42.0.0/16, 10.0.0.0/8, see traefik's
+    # forwardedHeaders.trustedIPs arg), so an explicit depth here risked
+    # getting the hop-count wrong and bucketing every user behind the
+    # Cloudflare Tunnel as one shared IP -- a functional bug, not just
+    # cosmetic, since that would rate-limit all real users together.
