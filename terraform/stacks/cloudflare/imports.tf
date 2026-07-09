@@ -29,6 +29,10 @@ import {
 }
 
 # cobblemon.woitzik.dev -- stale, confirmed dead, see comment in main.tf.
+# Note: #352 merged this import block without an `atlantis apply` first
+# (process slip -- Atlantis refuses commands on closed PRs), so state never
+# actually picked it up. This comment line exists only to force a fresh
+# plan/apply cycle for the cloudflare project against unchanged code.
 import {
   to = cloudflare_dns_record.cobblemon_stale
   id = "1f15ed0f3a8b497302ba339dcab3c060/1c5c2580525de38556147349088ac0e8"
