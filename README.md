@@ -22,7 +22,7 @@ Start with [docs/OPERATIONS.md](docs/OPERATIONS.md) if you want to know where th
 | GitOps (TF) | Atlantis — self-hosted, exposed via Cloudflare Tunnel |
 | Auth | Authelia — SSO/OIDC for all protected services |
 | VPN | Headscale (self-hosted Tailscale control plane), OIDC login via Authelia |
-| Secrets | Ansible Vault (host-level) + HashiCorp Vault w/ auto-unseal (k8s, via ExternalSecrets) — see `docs/secrets-inventory.md` |
+| Secrets | Ansible Vault (host-level) + HashiCorp Vault w/ auto-unseal (k8s, via ExternalSecrets) |
 | Backups | Velero → Garage S3 (k8s, incl. PVC data via Kopia) + PBS → rclone → Google Drive (VMs). Offsite (Cloudflare R2) configured, pending credentials. |
 
 ## Architecture
@@ -42,7 +42,10 @@ graph TB
         LB["MetalLB\n10.0.20.200"]
         TR["Traefik\nEdge router · TLS termination"]
         ARGO["ArgoCD\nGitOps · kubernetes/apps/*"]
-        APPS["Applications\nNextcloud · Paperless · Vaultwarden\nMealie · Gitea · Home Assistant\nOpen WebUI · Uptime Kuma · Garage S3"]
+        APPS["Applications\nNextcloud · Paperless · Vaultwarden\nMealie · Gitea · Home Assistant\nOpen WebUI · Uptime Kuma · Immich"]
+        VAULT["HashiCorp Vault\nauto-unseal · secrets root"]
+        ESO["External Secrets Operator"]
+        GARAGE["Garage\nS3-compatible object storage"]
         MON["Monitoring\nPrometheus · Grafana · Loki"]
     end
 
@@ -66,6 +69,9 @@ graph TB
     TR --> APPS
     TR --> MON
     TR --> ATLLXC
+    ESO -. "resolves secrets" .-> VAULT
+    ESO -. "writes k8s Secrets" .-> APPS
+    APPS -. "backup archive" .-> GARAGE
     MK --> RPI1
     RPI1 -. "sync" .-> RPI2
     MK --> PBS
@@ -87,7 +93,7 @@ graph TB
 │   │   ├── home-assistant/    # Smart home hub
 │   │   ├── homepage/          # Dashboard
 │   │   ├── immich/            # Photo library (Cloudflare Tunnel external access)
-│   │   ├── jellyfin/          # External-service pointer to the GPU-passthrough LXC (WRK-007)
+│   │   ├── jellyfin/          # External-service pointer to the GPU-passthrough LXC
 │   │   ├── keel/              # Image auto-update
 │   │   ├── mealie/            # Recipe manager
 │   │   ├── myspeed/           # Internet speed-test history
