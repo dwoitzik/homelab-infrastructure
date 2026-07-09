@@ -5,10 +5,10 @@ through every app being reachable again. It assumes total loss of the `mini` hos
 VMs, everything). For partial losses (one VM, one PVC, one secret), skip to the relevant
 tier or to [Per-Service Restore](#per-service-restore) below.
 
-**Design philosophy** (see `CLAUDE.local.md` and `docs/k3s-architecture.md`): this homelab
-targets *recovery*, not high availability. `mini` is a single point of failure by hardware
-constraint — there's no second host to fail over to. Every tier below exists so that a
-full rebuild is a *documented, repeatable procedure*, not an improvisation.
+**Design philosophy** (see `docs/k3s-architecture.md`): this homelab targets *recovery*,
+not high availability. `mini` is a single point of failure by hardware constraint —
+there's no second host to fail over to. Every tier below exists so that a full rebuild is
+a *documented, repeatable procedure*, not an improvisation.
 
 **RTO/RPO targets:**
 
