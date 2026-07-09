@@ -124,3 +124,36 @@ for an untested one.
   applying Option A, so whatever caused the drift gets closed too, not just its symptom.
 - This ADR doesn't cover the Garage circularity / NFS SPOF question — separate
   known design session, not conflated here.
+
+## Update 2026-07-09: Option A attempted, rolled back
+
+A real attempt at Option A was made the same day this ADR was written. Pre-flight
+backups were taken (fresh etcd snapshot on `.11` + Proxmox VM snapshots of both `.11`
+and `.13`), then `.13` was cordoned and drained as the first mechanical step.
+
+The drain alone — before any etcd member was actually removed — was enough to take the
+API server unavailable cluster-wide and spike `.12`'s load to 29+. Same signature as the
+renovate-triggered incident that originally surfaced this ADR: a load event on the
+shared NVMe degrading the whole control plane, not something specific to etcd surgery
+itself. Uncordoning `.13` didn't recover it; the API stayed degraded and load kept
+climbing for several minutes afterward.
+
+Rolled back cleanly via the pre-op snapshots — both VMs restored, cluster back to 3/3
+Ready. The rollback itself had a real cost worth recording plainly: it reverted `.11`
+and `.13`'s disk state to the snapshot point, which (since those two VMs are the etcd
+members) reverted etcd's stored state for the entire cluster to that point in time, not
+just those two nodes. Anything written after the snapshot and before the rollback —
+local-path-backed services scheduled on those nodes specifically (Vaultwarden, Gitea,
+Headscale, Garage metadata, Uptime Kuma, Authelia's auth logs were all on `.13`;
+Tailscale subnet-router state was on `.11`) — is at risk for that window. GitOps-managed
+manifests (ArgoCD-tracked resources) self-healed automatically once ArgoCD reconciled
+against git; two manual bootstrap-only Application manifests (files with no parent
+Application watching them) did not and had to be manually re-applied.
+
+**Conclusion for the next attempt:** this cluster falls over on a plain `kubectl drain`
+of one node — that's a lower bar than etcd member removal itself. The host's shared-NVMe
+I/O fragility has to be resolved first (hardware cooling fix + the PBS `bwlimit`/`ionice`
+load-smoothing already in place, proven effective over a real multi-night baseline) before
+etcd surgery is safe to attempt again. Option A is now downstream of the cooling fix, not
+an independent, schedulable task — attempting it again before that's confirmed stable
+would just repeat this same outcome.
