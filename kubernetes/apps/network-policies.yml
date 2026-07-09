@@ -101,3 +101,30 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: velero
+---
+# Allow database namespace (CNPG/Authelia postgres) to reach Garage S3 --
+# CNPG's barman-cloud backup plugin archives WAL/base-backups here (see
+# REL-057b). Found live but with zero IaC trail during the 2026-07-08
+# hardening pass, alongside discovering this whole file has zero ArgoCD
+# Application tracking it (see gitops-tracking-application.yml) -- added
+# here BEFORE enabling that tracking's automated prune, since pruning
+# first would have deleted this and broken CNPG's backup archiving.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-database-to-garage
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: garage
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: database
+      ports:
+        - port: 3900
+          protocol: TCP
