@@ -33,9 +33,9 @@ shares from the Secret are required) while removing the manual "someone has to r
 `vault operator unseal` by hand after every reboot" step, which is not viable for a
 homelab that reboots unattended.
 
-The poll interval was originally 30 seconds; it was reduced to 5 seconds 2026-06-23
-(REL-007) specifically to shrink the window during which dependent pods see Vault as
-sealed and their ExternalSecrets fail to sync.
+The poll interval was originally 30 seconds; it was reduced to 5 seconds specifically
+to shrink the window during which dependent pods see Vault as sealed and their
+ExternalSecrets fail to sync.
 
 ## Trade-offs
 
@@ -49,11 +49,11 @@ sealed and their ExternalSecrets fail to sync.
   and any ExternalSecret depending on it cannot sync — mitigated, not eliminated, by faster
   polling and `wait-for-vault-secret` initContainers on the two apps observed crash-looping
   (Authelia, `postgres-paperless`)
-- Vault's own raft storage (`data-vault-0`) sits on the `nfs-client` StorageClass, the same
-  storage layer that caused SQLite corruption elsewhere in the cluster (GIT-006). Raft uses
-  BoltDB, which has similar though less severe (single-writer, not WAL/shared-mmap) locking
-  needs — no corruption seen yet, but this is flagged separately (REL-009) as deserving its
-  own dedicated migration given Vault's blast radius as the secrets root
+- Vault's own raft storage (`data-vault-0`) has since been moved onto the `local-path`
+  StorageClass (fast local SSD, not NFS) specifically to avoid the same class of
+  file-locking risk that caused SQLite corruption for other services on NFS earlier in
+  this project's history — Vault's blast radius as the secrets root made it worth
+  getting right rather than waiting for a problem to surface
 
 ## Consequences
 
