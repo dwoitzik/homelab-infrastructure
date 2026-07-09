@@ -67,14 +67,14 @@ remove its etcd data dir, enable/start `k3s-agent.service` pointed at `.11`.
   the same shared NVMe that already has a documented I/O-stall history, see
   `docs/OPERATIONS.md`'s Proxmox-freeze writeup).
 - **Fault tolerance:** None gained or lost versus today's *intended* design — `mini` is
-  a single physical host either way (see `CLAUDE.local.md`: *"Zero-downtime HA is NOT
-  achievable with this hardware — do not pretend otherwise"*). A host-level failure
-  takes out all three k3s VMs regardless of etcd member count, since they all live on
-  the same disk. Multi-member etcd only protects against a *single-VM*-level failure
-  while the host stays healthy — a narrower and less likely failure mode than the
-  host-level and resource-contention issues this repo has actually hit repeatedly
-  (REL-012 etcd timeout tuning, the ZFS ARC-pressure host freeze, today's renovate
-  incident).
+  a single physical host either way, and zero-downtime HA was never achievable on this
+  hardware to begin with. A host-level failure takes out all three k3s VMs regardless of
+  etcd member count, since they all live on the same disk. Multi-member etcd only
+  protects against a *single-VM*-level failure while the host stays healthy — a narrower
+  and less likely failure mode than the host-level and resource-contention issues this
+  repo has actually hit repeatedly (the etcd heartbeat/election timeout tuning documented
+  inline in `ansible/k3s-cluster/inventory.yml`, the ZFS ARC-pressure host freeze, today's
+  renovate incident).
 - **Downside:** None identified. This is restoring a decision already made for good,
   documented reasons.
 
@@ -84,21 +84,21 @@ Add `rpi1`/`rpi2` as genuine etcd members alongside `.11`, giving true majority-
 tolerance (any one of three can fail without losing the control plane).
 
 - **Resource cost:** Low compute-wise (etcd itself is light), but two hard blockers:
-  - **`CLAUDE.local.md` is explicit and unconditional: "RPi SD cards are write-fragile.
-    Keep etcd/SQLite... off them."** etcd's raft log is fsync-heavy, exactly the write
-    pattern that kills SD cards fastest. This isn't a soft preference, it's a hardware
-    guardrail already in this repo for a reason. Doing this safely means USB-SSD boot
-    for both RPis first — a real prerequisite project, not a config flag.
+  - **RPi SD cards are write-fragile, and this repo already treats that as a hard
+    guardrail, not a soft preference.** etcd's raft log is fsync-heavy, exactly the write
+    pattern that kills SD cards fastest. Doing this safely means USB-SSD boot for both
+    RPis first — a real prerequisite project, not a config flag.
   - The RPis currently run AdGuard + Unbound — the whole network's DNS path. Adding a
     k3s control-plane/etcd role to them mixes two critical-path responsibilities on the
     same small boxes: a k3s/etcd problem could now plausibly degrade DNS, and vice versa.
     That's a real increase in blast radius for a system that's deliberately kept simple
     today.
-  - Network latency from RPi-to-`mini` adds jitter to etcd's raft consensus. REL-012
-    already had to loosen etcd's heartbeat/election timeouts (100ms→500ms,
-    1000ms→5000ms) just to tolerate *local* NVMe I/O stalls on one host — a cross-host
-    link to lower-powered ARM boards is a plausible new source of the same class of
-    instability, on a different axis than what REL-012 fixed.
+  - Network latency from RPi-to-`mini` adds jitter to etcd's raft consensus. This repo's
+    etcd config (`ansible/k3s-cluster/inventory.yml`) already had to loosen the default
+    heartbeat/election timeouts (100ms→500ms, 1000ms→5000ms) just to tolerate *local*
+    NVMe I/O stalls on one host — a cross-host link to lower-powered ARM boards is a
+    plausible new source of the same class of instability, on a different axis than what
+    that tuning fixed.
 - **Fault tolerance gained:** Real — survives one VM or the RPi hardware failing
   independently, not just a documentation/config guarantee. But it does **not** protect
   against the actual biggest risk this repo has already accepted and documented: `mini`

@@ -33,9 +33,9 @@ wrong."
    `severity: critical`, add its `alertname` explicitly to the warning-tier route in
    `alertmanager-config.yml` — don't just flip to routing all `severity: warning`, that
    floods Discord with routine noise.
-5. **Docs**: every component gets a README/runbook per `CLAUDE.local.md`'s quality bar
-   — what it is, how to deploy, how to restore, dependencies. Add a Mermaid diagram
-   entry if it changes the architecture picture.
+5. **Docs**: every component gets a README/runbook — what it is, how to deploy, how to
+   restore, dependencies. Add a Mermaid diagram entry if it changes the architecture
+   picture.
 6. **Snapshot first**: before applying anything that touches running state (not a
    brand-new empty namespace), take a Proxmox VM/CT snapshot or Longhorn/PV snapshot.
    If you can't snapshot, stop and ask — this is a hard guardrail, not a suggestion.
