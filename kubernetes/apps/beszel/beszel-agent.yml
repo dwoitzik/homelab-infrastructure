@@ -1,0 +1,64 @@
+# In-cluster agent, monitoring the k3s node it lands on. Verifies the
+# hub<->agent path actually works end-to-end (real host CPU/mem/disk data,
+# not just an empty dashboard) without needing SSH access to `mini` itself
+# or fighting the authelia-gated IngressRoute for a machine-to-machine
+# connection. Broader host coverage (mini, both RPis) is a natural
+# follow-up, not done here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: beszel-agent
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: beszel-agent
+  template:
+    metadata:
+      labels:
+        app: beszel-agent
+    spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
+      containers:
+        - name: beszel-agent
+          image: henrygd/beszel-agent:0.18.7
+          env:
+            - name: LISTEN
+              value: "45876"
+            # Not a secret -- this is the hub's own PUBLIC key
+            # (`curl http://beszel:8090/api/beszel/getkey`), used by the
+            # agent to authenticate incoming connections from the hub.
+            # Plain value, same as any other non-sensitive config here.
+            - name: KEY
+              value: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPHky1YnLyBGCY1iEcWyjE7ZmuhCbgksxFgvNl/+EBSO"
+          securityContext:
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 45876
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 96Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: beszel-agent
+  namespace: apps
+spec:
+  ports:
+    - port: 45876
+      targetPort: 45876
+  selector:
+    app: beszel-agent
