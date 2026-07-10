@@ -26,6 +26,13 @@
 # manual bootstrap and never git-tracked. Brought under GitOps here after
 # fixing the bug they had (see the file's own header comment for the
 # namespaceSelector:{} / kube-router NetworkPolicy enforcement finding).
+#
+# system-app-bootstrap.yml added 2026-07-10: this same orphan-config class,
+# but for the Application-bootstrap files themselves across all of
+# kubernetes/system/* (see that file's own header for the full sweep and
+# the list of 18 affected Applications). Tracking it here closes the loop
+# so this new file doesn't become yet another instance of the exact
+# pattern it exists to fix.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -38,7 +45,7 @@ spec:
     targetRevision: main
     path: kubernetes/system/argocd
     directory:
-      include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret,network-policies}.yml'
+      include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret,network-policies,system-app-bootstrap}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
