@@ -10,22 +10,19 @@ resource "routeros_ip_pool" "vlan_pools" {
   ranges   = ["10.0.${each.value}.10-10.0.${each.value}.254"]
 }
 
-# domain explicitly set to "" -- these networks were live-confirmed handing out
-# "home.lan" as the DHCP domain-search suffix (via networkctl status on a k3s VM),
-# but this attribute was never declared in this resource at all, and the last
-# terraform.tfstate.backup on disk shows domain=null for every network. That's
-# drift: someone set it manually via Winbox at some point, bypassing Terraform
-# (against CLAUDE.local.md's "never make manual RouterOS changes" rule), or an
-# earlier Terraform apply set it and this state backup predates it. Either way,
-# every pod in the k3s cluster inherits this via kubelet's DNS policy (which
-# appends the node's own search domain to every pod's resolv.conf), causing a
-# needless recursive DNS lookup for "*.home.lan" on top of every external name
-# resolution attempt (ndots:5 default). unbound has no authoritative answer for
-# home.lan (unlike fritz.box, which has a real stub-zone), so every one of these
-# recurses all the way out and fails -- confirmed ~341ms average vs. instant for
-# a local answer. Declaring domain = "" here forces Terraform to detect and
-# correct this drift on the next Atlantis apply, regardless of what the live
-# value actually is.
+# CORRECTED 2026-07-10 (was wrong): this was originally written believing
+# RouterOS's own DHCP server was handing out "home.lan" as the DHCP
+# domain-search suffix. Root-caused properly: the live router genuinely has
+# no domain/search config anywhere in `/ip dhcp-server`, `/ip dhcp-server
+# network`, or `/ip dns` (confirmed via the REST API, all absent, not just
+# empty) -- DHCP was never the source, which is exactly why this resource's
+# plan always showed zero diff against live state. The real source is
+# Proxmox's own cloud-init generator falling back to the PVE node's
+# configured search domain (`pvesh get /nodes/.../dns` -> home.lan) when a
+# VM's `initialization.dns.domain` is left unset -- see
+# terraform/stacks/proxmox/vm.tf's k3s VM comments for the actual fix.
+# `domain = ""` is left declared here since it's harmless and correctly
+# matches live reality, not because this resource is the fix.
 resource "routeros_ip_dhcp_server_network" "vlan_networks" {
   for_each   = local.homelab_vlans
   address    = "10.0.${each.value}.0/24"
