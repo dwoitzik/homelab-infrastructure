@@ -24,6 +24,23 @@ spec:
           data:
             INHERITED_ANNOTATIONS: app.kubernetes.io/*
             INHERITED_LABELS: app.kubernetes.io/*
+        # 310 restarts/21d root-caused live (2026-07-10): every restart's
+        # "previous" log ends in leader-election lease-renewal timing out
+        # against the apiserver ("context deadline exceeded" on the Lease
+        # PUT), which makes controller-runtime exit the whole process the
+        # instant leadership is lost -- by design, so a healthy replica can
+        # take over. With a single replica (no HA here, matches the rest of
+        # this host's design) there's nothing to take over, so a apiserver
+        # latency blip just kills and restarts the only operator pod. Same
+        # underlying cause as this host's other I/O-fragility incidents
+        # (see docs/decisions/ADR-014-etcd-topology.md), same fix shape as
+        # the etcd heartbeat/election timeout loosening already applied in
+        # ansible/k3s-cluster/inventory.yml for the identical reason.
+        # Defaults are 15s/10s; both flags confirmed to exist via the live
+        # binary's --help (v1.25.0), not guessed.
+        additionalArgs:
+          - --leader-lease-duration=60
+          - --leader-renew-deadline=50
   destination:
     server: https://kubernetes.default.svc
     namespace: cnpg-system

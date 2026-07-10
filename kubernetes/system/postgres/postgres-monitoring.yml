@@ -1,0 +1,28 @@
+# CNPG's own auto-generated PodMonitor (cluster.yml's
+# monitoring.enablePodMonitor, now set to false) only carries the
+# `cnpg.io/cluster` label. This cluster's
+# Prometheus (kube-prometheus-stack) requires `release: kube-prometheus-stack`
+# on every PodMonitor via its podMonitorSelector -- confirmed live
+# (`kubectl get prometheus -o jsonpath='{.spec.podMonitorSelector}'`) -- so the
+# operator-generated one was never actually selected despite CNPG reporting it
+# as created. No CNPG CRD field (checked the installed 1.25.0 schema) adds
+# metadata labels to the generated PodMonitor -- podMonitorRelabelings only
+# rewrites already-scraped samples, it can't make Prometheus notice the object
+# in the first place. Git-managed replacement instead, both labels present.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres-authelia
+  namespace: database
+  labels:
+    cnpg.io/cluster: postgres-authelia
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - database
+  selector:
+    matchLabels:
+      cnpg.io/cluster: postgres-authelia
+  podMetricsEndpoints:
+    - port: metrics

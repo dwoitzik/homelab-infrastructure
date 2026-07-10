@@ -11,8 +11,10 @@
 #   postgres-authelia-rw:5432 (session/config storage) and
 #   redis-authelia:6379 (session cache), confirmed via
 #   kubernetes/apps/authelia/configmap.yml's storage/session hosts.
-# - CNPG's PodMonitor (enablePodMonitor: true in cluster.yml) exposes
-#   metrics on :9187, scraped by Prometheus (monitoring namespace).
+# - CNPG's PodMonitor (postgres-monitoring.yml, git-managed -- the
+#   operator's own auto-generated one was never actually scraped, missing
+#   Prometheus's required `release` label) exposes metrics on :9187,
+#   scraped by Prometheus (monitoring namespace).
 # - The CNPG operator (cnpg-system) calls each instance pod's
 #   instance-manager status API directly on :8000 for health/failover
 #   decisions -- confirmed via the live pod's declared ports

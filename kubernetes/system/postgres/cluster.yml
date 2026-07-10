@@ -57,8 +57,14 @@ spec:
       memory: 512Mi
       cpu: 500m
 
+  # PodMonitor generated here is deliberately disabled -- CNPG's own
+  # auto-generated one only carries the `cnpg.io/cluster` label, but this
+  # cluster's Prometheus requires `release: kube-prometheus-stack` on every
+  # PodMonitor (podMonitorSelector), so it was silently never scraped despite
+  # showing Synced/Healthy in ArgoCD. See postgres-monitoring.yml for the
+  # git-managed replacement carrying both labels.
   monitoring:
-    enablePodMonitor: true
+    enablePodMonitor: false
 
   # REL-057b: was s3://velero/cnpg-postgres-authelia -- CNPG's own barman-cloud
   # archiving shared Velero's bucket, and its unrecognized top-level directory
