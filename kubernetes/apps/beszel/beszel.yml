@@ -36,7 +36,10 @@ spec:
             value: "1"
       containers:
         - name: beszel
-          image: henrygd/beszel:latest
+          # Pinned, not :latest -- Kyverno's disallow-latest-tag policy
+          # rejects unpinned tags (caught live: the first deploy attempt was
+          # blocked by the admission webhook before any pod was created).
+          image: henrygd/beszel:0.18.7
           env:
             # Internal-only -- no Cloudflare DNS record for this host (see
             # the IngressRoute below), so this is only ever reached via the
