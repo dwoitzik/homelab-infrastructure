@@ -1,0 +1,62 @@
+# PROPOSED, NOT YET APPLIED -- closes the orphaned-bootstrap-file trap class
+# hit 3 times now (gitops-tracking-application.yml, postgres-cluster's own
+# Application file, cloudnative-pg's own Application file -- all silently
+# had zero live effect from a git edit until manually kubectl apply'd).
+#
+# Root cause, confirmed via a full sweep of all 41 live ArgoCD Applications
+# (2026-07-10): kubernetes/apps/* is auto-discovered by
+# apps-applicationset.yaml, but nothing equivalent exists for
+# kubernetes/system/* -- each of those Applications needed one manual
+# bootstrap apply, and most were never added to any sibling's
+# directory.include afterward. 18 of 41 live Applications' own defining
+# file turned out to be untracked this way: cert-manager, chaos-mesh,
+# cloudnative-pg, external-secrets, kyverno, loki, promtail (same file as
+# loki), metallb, nfs-provisioner, tempo, traefik, vault, vault-manifests
+# (its own file), velero, velero-manifests (its own file), argocd-manifests
+# (its own file), system-manifests (its own file), postgres-cluster (its
+# own file). Full detail in the 2026-07-10 sweep report.
+#
+# This Application tracks every kubernetes/system/*/application.yml and
+# kubernetes/system/*/manifests-application.yml file (one level deep,
+# recursive), plus 2 irregularly-named files that don't match that pattern:
+# postgres/postgres-cluster-application.yml and monitoring/loki.yml (which
+# also defines promtail).
+#
+# Deliberately does NOT include ArgoCD's own core config (argocd-cm.yml,
+# argocd-cmd-params-cm.yml, argocd-rbac-cm.yml, apps-applicationset.yaml) --
+# those stay excluded on purpose, same reasoning argocd-manifests.yml's own
+# header already gives: selfHeal+prune on ArgoCD's own bootstrap config has
+# cluster-wide blast radius if git and live have drifted, and that
+# reasoning applies here too. The include patterns below only match
+# "application.yml"/"manifests-application.yml" exactly, which naturally
+# excludes those 4 differently-named files -- no separate exclude needed.
+#
+# NOT APPLIED: a first sync here reconciles ~15 previously-untracked files
+# at once. Most currently match git already (created via kubectl apply,
+# not hand-edited since), but that wasn't verified file-by-file, and this
+# Application's own recurse+glob include syntax hasn't been dry-run against
+# the live ArgoCD instance yet either. Needs an explicit go before applying,
+# same as any other change with cluster-wide reach.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: system-app-bootstrap
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dwoitzik/homelab-infrastructure.git
+    targetRevision: main
+    path: kubernetes/system
+    directory:
+      recurse: true
+      include: '{*/application.yml,*/manifests-application.yml,postgres/postgres-cluster-application.yml,monitoring/loki.yml}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
