@@ -27,12 +27,17 @@
 # fixing the bug they had (see the file's own header comment for the
 # namespaceSelector:{} / kube-router NetworkPolicy enforcement finding).
 #
-# system-app-bootstrap.yml added 2026-07-10: this same orphan-config class,
-# but for the Application-bootstrap files themselves across all of
-# kubernetes/system/* (see that file's own header for the full sweep and
-# the list of 18 affected Applications). Tracking it here closes the loop
-# so this new file doesn't become yet another instance of the exact
-# pattern it exists to fix.
+# system-app-bootstrap.yml (proposed 2026-07-10, NOT yet in the include list
+# below on purpose): same orphan-config class, but for the Application-
+# bootstrap files themselves across all of kubernetes/system/* (see that
+# file's own header for the full sweep and the list of 18 affected
+# Applications). Deliberately NOT added to this include list yet -- this
+# Application has selfHeal:true and is already live, so adding it here
+# would auto-create system-app-bootstrap on the next sync, which itself
+# recurse-syncs ~15 previously-untracked files across a dozen namespaces in
+# one shot. That's real cluster-wide reach and needs an explicit go, not a
+# side effect of an unrelated merge. Add "system-app-bootstrap" to this
+# include list as the actual "go" step, not before.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -45,7 +50,7 @@ spec:
     targetRevision: main
     path: kubernetes/system/argocd
     directory:
-      include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret,network-policies,system-app-bootstrap}.yml'
+      include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret,network-policies}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
