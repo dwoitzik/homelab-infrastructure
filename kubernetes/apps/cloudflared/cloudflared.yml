@@ -19,7 +19,7 @@ spec:
             value: "1"
       containers:
       - name: cloudflared
-        image: cloudflare/cloudflared:2026.6.1
+        image: cloudflare/cloudflared:2026.7.0@sha256:5e49861633763e8933475477c20bae6039ed47f32c1d267a34babc347f28f0df
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
