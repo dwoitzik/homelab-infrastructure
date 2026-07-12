@@ -37,6 +37,20 @@ spec:
         backgroundController:
           enabled: false
         cleanupController:
+          # 337 restarts/16d root-caused live (2026-07-10): --previous logs
+          # show the exact same leader-election lease-renewal timeout
+          # against the apiserver as cnpg-operator's REL-069 fix
+          # ("context deadline exceeded", "leadership lost, stopped
+          # leading", full shutdown) -- single-replica controller
+          # self-terminates on any apiserver latency blip. Kyverno's
+          # leader-election is custom (pkg/leaderelection), not
+          # controller-runtime's, so there's no direct lease-duration
+          # flag -- but LeaseDuration/RenewDeadline are computed as
+          # 6x/5x --leaderElectionRetryPeriod (default 2s -> 12s/10s).
+          # Scaling retryPeriod to 10s gives 60s/50s, matching the
+          # cnpg-operator fix's numbers exactly.
+          extraArgs:
+            - --leaderElectionRetryPeriod=10s
           tolerations:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
