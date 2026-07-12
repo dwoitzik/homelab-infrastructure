@@ -50,7 +50,7 @@ spec:
           # Scaling retryPeriod to 10s gives 60s/50s, matching the
           # cnpg-operator fix's numbers exactly.
           extraArgs:
-            - --leaderElectionRetryPeriod=10s
+            leaderElectionRetryPeriod: 10s
           tolerations:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
