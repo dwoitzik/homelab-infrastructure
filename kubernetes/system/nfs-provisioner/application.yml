@@ -37,6 +37,19 @@ spec:
         # for the same single-writer PV instead of one. This chart has never
         # supported >1 replica; see upstream project docs/issues.
         replicaCount: 1
+        # REL-071 (2026-07-10, applied 2026-07-12): this pod's own root-mount
+        # volume (the entire shared NFS export, /persistentvolumes) was
+        # getting fs-backed-up by Velero as one 33.4GB/207s blob every
+        # night -- confirmed live via real PodVolumeBackup stats, ~65% of
+        # total bytes in that run. Genuinely redundant: every individual
+        # app's own PVC (a subdirectory of this same tree) is already
+        # backed up separately via its own pod's mount. Verified this
+        # targets the actually-contended disk (rpool, confirmed via
+        # findmnt/zfs list) before excluding it, unlike the first
+        # (wrong) hypothesis of excluding garage-data/immich-library,
+        # which live on separate USB-attached disks entirely.
+        podAnnotations:
+          backup.velero.io/backup-volumes-excludes: nfs-subdir-external-provisioner-root
         resources:
           requests:
             cpu: 10m
