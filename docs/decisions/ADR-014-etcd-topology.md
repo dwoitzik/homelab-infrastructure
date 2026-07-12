@@ -157,3 +157,48 @@ load-smoothing already in place, proven effective over a real multi-night baseli
 etcd surgery is safe to attempt again. Option A is now downstream of the cooling fix, not
 an independent, schedulable task — attempting it again before that's confirmed stable
 would just repeat this same outcome.
+
+## Plan for the next attempt (added 2026-07-12)
+
+Approved in principle, deliberately not scheduled yet — this is downstream of the
+cooling fix per the conclusion above, and both surgeries touch `.11`/`.13` (the etcd
+members), so they go in the **same maintenance window**, not two separate ones: fresh
+snapshots taken once, both fixes applied, one recovery plan if something goes wrong.
+
+**Step 0 — clear the `home.lan` search-domain drift first, before touching etcd.**
+Root-caused separately (see `docs/AUDIT.md` REL-068 / the 2026-07-10 DNS sweep):
+Proxmox's cloud-init generator falls back to the PVE node's own configured search
+domain (`pvesh get /nodes/pve-mgmt-01/dns` → `home.lan`) whenever a VM's
+`initialization.dns.domain` is left unset — confirmed live, not RouterOS/DHCP as
+originally suspected. `domain = ""` is already declared in
+`terraform/stacks/proxmox/vm.tf` for all 3 k3s VMs, but that block is in
+`lifecycle.ignore_changes`, so it has zero effect on the already-provisioned VMs by
+itself. The actual fix, both parts done in the same window as the etcd work below:
+
+1. `pvesh set /nodes/pve-mgmt-01/dns -search ""` — clears the PVE node's own default.
+   No Terraform resource models this (same class of gap as `vzdump.conf`/`local-pbs`'s
+   password, see `IAC-GAPS.md` item 6); one-time manual host config, document it there
+   once done.
+2. Cloud-init regen + network re-apply on `.11`, `.12`, `.13` so their live netplan
+   config actually drops `search: home.lan` — this is the part that touches all 3 VMs,
+   including both etcd members, hence bundling with the etcd window rather than doing
+   it standalone.
+
+Doing this *before* the etcd member change (not after, not in parallel) means the etcd
+surgery itself starts from a clean, already-verified-stable network config, rather than
+debugging two changes at once if something goes wrong mid-window.
+
+**Not urgent on its own.** The `.home.lan` NXDOMAIN traffic (27% of all DNS queries,
+confirmed 2026-07-10) is a cosmetic cost in the meantime, not a functional one — unbound
+answers it locally at ~2ms via the existing static-zone fix (REL-059), so nothing is
+slow or broken, it's just wasted query volume. No reason to rush this ahead of the
+cooling fix just to silence it.
+
+**Trigger condition to actually schedule this window:** hardware cooling fix confirmed
+stable (a real multi-night baseline showing peak temp reliably under the
+`ProxmoxHostHighTemp` 85°C/3min threshold, not just one or two good nights) — same bar
+already stated above for Option A itself. When that's met, this becomes: fresh Proxmox
+VM snapshots of `.11`/`.13` → DNS fix (steps 1-2 above) → verify cluster still healthy →
+etcd single-server revert (Option A, full mechanic already documented earlier in this
+ADR) → verify → done. One window, one set of snapshots, one rollback plan if either part
+goes wrong.
