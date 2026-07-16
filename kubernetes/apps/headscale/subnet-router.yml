@@ -34,7 +34,7 @@ spec:
             value: "1"
       containers:
         - name: tailscale
-          image: tailscale/tailscale:stable
+          image: tailscale/tailscale:stable@sha256:d54b2e6a9c09f0e5ec52e82b9ad4af3d446b54a7c08075e92f11c39dd410105f
           env:
             - name: TS_AUTHKEY
               valueFrom:

@@ -64,7 +64,7 @@ spec:
             value: "1"
       containers:
         - name: keel
-          image: keelhq/keel:0.20.0
+          image: keelhq/keel:0.20.0@sha256:8c7492034b10f3cf718e8ab9f860501aeb5bf13812fa675695ea59c191295fa4
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false

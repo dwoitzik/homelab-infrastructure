@@ -34,7 +34,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: renovate
-              image: ghcr.io/renovatebot/renovate:43.253.2
+              image: ghcr.io/renovatebot/renovate:43.253.2@sha256:9a6cec287092c47656ecba629b7acc095c6fba7a85ca2f5b34e25f418a36c411
               # SEC-012: runAsNonRoot reverted after the same admission
               # failure pattern hit other images in this pass (image's
               # default user turned out to be root, not assumed non-root) --

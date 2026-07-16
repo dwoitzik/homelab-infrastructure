@@ -58,7 +58,7 @@ spec:
             value: "1"
       containers:
       - name: searxng
-        image: searxng/searxng:2026.7.1-c5d8d05f0
+        image: searxng/searxng:2026.7.1-c5d8d05f0@sha256:6c1e8797ba29a47d575dea4805e3138976bfe1333fab630418de03930bd14803
         securityContext:
           allowPrivilegeEscalation: false
           seccompProfile:

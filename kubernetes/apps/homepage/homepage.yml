@@ -353,7 +353,7 @@ spec:
             value: "1"
       initContainers:
       - name: copy-next
-        image: ghcr.io/gethomepage/homepage:v1.13.2
+        image: ghcr.io/gethomepage/homepage:v1.13.2@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
         command: ["sh", "-c", "cp -a /app/.next/. /next-init/"]
         securityContext:
           allowPrivilegeEscalation: false
@@ -366,7 +366,7 @@ spec:
           mountPath: /next-init
       containers:
       - name: homepage
-        image: ghcr.io/gethomepage/homepage:v1.13.2
+        image: ghcr.io/gethomepage/homepage:v1.13.2@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true

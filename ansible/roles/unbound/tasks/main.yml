@@ -26,7 +26,7 @@
     content: |
       services:
         unbound:
-          image: klutchell/unbound:latest
+          image: klutchell/unbound:latest@sha256:4718d579152d49a3eaf7cbc1ce67f4e2e0d6f396be8f604a2416a94e7a250be8
           container_name: unbound
           restart: unless-stopped
           mem_limit: 256m
@@ -45,7 +45,7 @@
             - /opt/unbound/conf/root.hints:/etc/unbound/root.hints
 
         autoheal:
-          image: willfarrell/autoheal:latest
+          image: willfarrell/autoheal:latest@sha256:d1392205b4463b4f2adeaf0983c3acd9eb57784c58904e0d40f62a385b74e608
           container_name: autoheal
           restart: always
           mem_limit: 64m

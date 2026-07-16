@@ -28,7 +28,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: ddns
-              image: curlimages/curl:8.21.0
+              image: curlimages/curl:8.21.0@sha256:7c12af72ceb38b7432ab85e1a265cff6ae58e06f95539d539b654f2cfa64bb13
               # SEC-012: curlimages/curl's default image user is root --
               # confirmed live, runAsNonRoot alone fails admission.
               securityContext:

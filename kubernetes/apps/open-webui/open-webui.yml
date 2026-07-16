@@ -53,7 +53,7 @@ spec:
       # existing files while making the directory writable.
       initContainers:
       - name: copy-static
-        image: ghcr.io/open-webui/open-webui:v0.10.2
+        image: ghcr.io/open-webui/open-webui:v0.10.2@sha256:9fcea9c6e32ab60b0498f3986c6cdf651ddbe61db48d2213a3d28048ddd673d4
         command: ["sh", "-c", "cp -a /app/backend/open_webui/static/. /static-init/"]
         securityContext:
           allowPrivilegeEscalation: false
@@ -70,7 +70,7 @@ spec:
             value: "1"
       containers:
       - name: open-webui
-        image: ghcr.io/open-webui/open-webui:v0.10.2
+        image: ghcr.io/open-webui/open-webui:v0.10.2@sha256:9fcea9c6e32ab60b0498f3986c6cdf651ddbe61db48d2213a3d28048ddd673d4
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true

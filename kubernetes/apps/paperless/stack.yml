@@ -16,7 +16,7 @@ spec:
     spec:
       initContainers:
       - name: wait-for-vault-secret
-        image: busybox:1.38
+        image: busybox:1.38@sha256:fd8d9aa63ba2f0982b5304e1ee8d3b90a210bc1ffb5314d980eb6962f1a9715d
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -229,7 +229,7 @@ spec:
             value: "1"
       containers:
       - name: gotenberg
-        image: gotenberg/gotenberg:8.34.0
+        image: gotenberg/gotenberg:8.34.0@sha256:67097317623a503ba2a6a7e9ae8db6929a1f7e1bbd88077bacf2d325fbdab923
         command: ["gotenberg", "--chromium-allow-list=file:///tmp/.*"]
         securityContext:
           allowPrivilegeEscalation: false
@@ -265,7 +265,7 @@ spec:
             cpu: 1000m
             memory: 1Gi
       - name: tika
-        image: apache/tika:3.3.1.0
+        image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true

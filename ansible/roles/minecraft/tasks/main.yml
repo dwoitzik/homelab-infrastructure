@@ -15,7 +15,7 @@
     content: |
       services:
         minecraft-2:
-          image: itzg/minecraft-server
+          image: itzg/minecraft-server@sha256:09d89595207c35ea7d973db90bc02eb9063ff4cf59f9b17876737431f0e69267
           container_name: mc-server-2
           environment:
             EULA: "TRUE"
@@ -32,7 +32,7 @@
 
         cobblemon:
           # Cobblemon 1.7.x requires Java 21 specifically - the "latest" tag ships Java 25
-          image: itzg/minecraft-server:java21
+          image: itzg/minecraft-server:java21@sha256:64432f9a015ec299584564b5123045b5038bc3e2b56bf681b89dc73806c14e09
           container_name: mc-server-cobblemon
           environment:
             EULA: "TRUE"

@@ -25,7 +25,7 @@
     content: |
       services:
         adguardhome:
-          image: adguard/adguardhome
+          image: adguard/adguardhome@sha256:1ea34eafe5dc691007946e8eaab7bf46b0de9412f39213d8c06e48b53bf9a6c5
           container_name: adguardhome
           restart: always
           network_mode: host
@@ -57,7 +57,7 @@
         content: |
           services:
             adguardhome-sync:
-              image: ghcr.io/bakito/adguardhome-sync
+              image: ghcr.io/bakito/adguardhome-sync@sha256:fb7224aeeab74d68990c3ecf51594a6f92428fcc93c7a162c3bc221e77a49025
               container_name: adguardhome-sync
               restart: unless-stopped
               mem_limit: 128m
