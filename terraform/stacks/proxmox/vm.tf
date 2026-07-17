@@ -201,7 +201,11 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
 }
 
 resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
-  # memory capped at 8 GB (was 16 GB) — pure agent node, same rationale as k3s-12.
+  # raised 8→12 GB dedicated (2026-07-17): k3s-13 hosts Garage (local-path PVC,
+  # can't migrate), Immich, Loki — all memory-hungry. 4 GB was insufficient;
+  # Garage OOM'd and couldn't reschedule due to REL-073 torn-state (local-path
+  # node affinity). 12 GB dedicated + 4 GB floating = 16 GB max, matching the
+  # ROADMAP target. Host has 64 GB DDR4 — room for the increase.
   vm_id     = 213
   name      = "vm-srv-k3s-13"
   node_name = local.target_node
@@ -235,7 +239,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   }
 
   memory {
-    dedicated = 8192
+    dedicated = 12288
     floating  = 4096
   }
 
