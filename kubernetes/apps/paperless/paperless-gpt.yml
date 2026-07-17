@@ -28,7 +28,7 @@ spec:
       # again, test in a scratch Deployment with the same securityContext
       # first, not a live rollout.
       - name: paperless-gpt
-        image: icereed/paperless-gpt:v0.25.1
+        image: icereed/paperless-gpt:v0.26.1@sha256:6b9024d1adebfcd6bd7ec5e9da2ca17f9879b1fb5ce749d72905bbb121091ef8
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -129,7 +129,7 @@ spec:
           failureThreshold: 4
       initContainers:
       - name: seed-prompts
-        image: icereed/paperless-gpt:v0.25.1
+        image: icereed/paperless-gpt:v0.26.1@sha256:6b9024d1adebfcd6bd7ec5e9da2ca17f9879b1fb5ce749d72905bbb121091ef8
         command:
         - sh
         - -c

@@ -49,7 +49,7 @@ spec:
             value: "1"
       containers:
       - name: postgres
-        image: postgres:18.4
+        image: postgres:18.4@sha256:32ca0af8e77bfb8c6610c488e4691f83f972a3e9e64d3b02facf3ab111ad5500
         # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
         # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
         # the postgres user -- confirmed live, dropping all capabilities
@@ -148,7 +148,7 @@ spec:
             value: "1"
       containers:
       - name: redis
-        image: redis:8.8.0
+        image: redis:8.8.0@sha256:234c902a2db49461a129e2d4aeff85b28cf20187ed274a67f6e50995fa713c7b
         # REL-031-redis (2026-07-05): same latent bug found live on
         # redis-nextcloud -- no PVC at all, but default redis persistence
         # settings still try to write RDB snapshots, which fail against the

@@ -22,7 +22,7 @@ spec:
             value: "1"
       containers:
       - name: postgres
-        image: ghcr.io/immich-app/postgres:16-vectorchord0.4.3-pgvectors0.2.0
+        image: ghcr.io/immich-app/postgres:16-vectorchord0.4.3-pgvectors0.2.0@sha256:1a078b237c1d9b420b0ee59147386b4aa60d3a07a8e6a402fc84a57e41b043a4
         # SEC hardening (2026-07-08): was running as root (confirmed live via
         # `kubectl exec ... id`) with no securityContext at all. pgdata is
         # already owned 999:0 on disk (the image's own entrypoint already
@@ -121,7 +121,7 @@ spec:
             value: "1"
       containers:
       - name: valkey
-        image: valkey/valkey:9.1.0-alpine
+        image: valkey/valkey:9.1.0-alpine@sha256:c9b77919daeba2c02ad954d0c844cc4e7142069d177b89c5fd771f405daf9e02
         command: ["valkey-server", "--save", "", "--appendonly", "no"]
         securityContext:
           allowPrivilegeEscalation: false

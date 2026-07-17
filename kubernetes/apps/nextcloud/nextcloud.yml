@@ -51,7 +51,7 @@ spec:
             value: "1"
       containers:
         - name: postgres
-          image: postgres:18.4-alpine
+          image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
           # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
           # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
           # the postgres user -- confirmed live (same failure as
@@ -147,7 +147,7 @@ spec:
             value: "1"
       containers:
         - name: redis
-          image: redis:8.8.0-alpine
+          image: redis:8.8.0-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
           # REL-031-redis (2026-07-05): this container has no PVC at all, but
           # was still running with redis's default persistence settings --
           # confirmed live it kept trying (and failing) to write RDB
@@ -237,7 +237,7 @@ spec:
             value: "1"
       containers:
         - name: nextcloud
-          image: nextcloud:34.0.1-apache
+          image: nextcloud:34.0.1-apache@sha256:e15c14f83a90484e497dabc7d01248370f69e1de353c072b8aa15dbd19d5fd9b
           # REL-029 regression (2026-07-05): re-hardening to `drop: ["ALL"]"`
           # after the upgrade chain broke the container permanently, not just
           # during upgrades -- Apache's main process needs CAP_SETGID itself
@@ -329,7 +329,7 @@ spec:
               memory: 1Gi
       initContainers:
         - name: copy-php-conf
-          image: nextcloud:34.0.1-apache
+          image: nextcloud:34.0.1-apache@sha256:e15c14f83a90484e497dabc7d01248370f69e1de353c072b8aa15dbd19d5fd9b
           command: ["sh", "-c", "cp -a /usr/local/etc/php/conf.d/. /writable-conf/"]
           volumeMounts:
             - name: php-conf
@@ -393,7 +393,7 @@ spec:
                   topologyKey: kubernetes.io/hostname
           containers:
             - name: nextcloud-cron
-              image: nextcloud:34.0.1-apache
+              image: nextcloud:34.0.1-apache@sha256:e15c14f83a90484e497dabc7d01248370f69e1de353c072b8aa15dbd19d5fd9b
               command: [php, -f, /var/www/html/cron.php]
               securityContext:
                 allowPrivilegeEscalation: false
