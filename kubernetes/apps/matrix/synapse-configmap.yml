@@ -31,8 +31,6 @@ data:
     signing_key_path: "/data/keys/server.signing.key"
     trusted_servers: []
     allow_guest_access: false
-    user_consent:
-      version: 1
     rate_limit:
       login:
         per_second: 0.17
