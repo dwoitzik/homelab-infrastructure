@@ -25,6 +25,7 @@ spec:
           - sh
           - -c
           - |
+            mkdir -p /data/keys
             cp /source/homeserver.yaml /data/homeserver.yaml
             cp /source/log.config /data/log.config
             sed -i "s|\${SYNAPSE_DB_PASSWORD}|$SYNAPSE_DB_PASSWORD|g" /data/homeserver.yaml
