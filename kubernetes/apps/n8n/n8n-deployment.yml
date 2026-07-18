@@ -38,8 +38,8 @@ spec:
         - name: DB_POSTGRESDB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: n8n-db-credentials
-              key: password
+              name: n8n-secrets
+              key: DB_POSTGRESDB_PASSWORD
         - name: N8N_HOST
           value: n8n.woitzik.dev
         - name: N8N_PROTOCOL

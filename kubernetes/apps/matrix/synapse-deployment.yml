@@ -25,10 +25,13 @@ spec:
           - sh
           - -c
           - |
+            set -ex
             mkdir -p /data/keys
+            rm -f /data/homeserver.yaml /data/log.config
             cp /source/homeserver.yaml /data/homeserver.yaml
             cp /source/log.config /data/log.config
             sed -i "s|\${SYNAPSE_DB_PASSWORD}|$SYNAPSE_DB_PASSWORD|g" /data/homeserver.yaml
+            grep password /data/homeserver.yaml
             python3 -m synapse.app.homeserver \
               --config-path /data/homeserver.yaml \
               --generate-keys \
@@ -37,8 +40,8 @@ spec:
         - name: SYNAPSE_DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: synapse-db-credentials
-              key: password
+              name: synapse-secrets
+              key: SYNAPSE_DB_PASSWORD
         volumeMounts:
         - name: data
           mountPath: /data
