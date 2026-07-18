@@ -1,0 +1,13 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: excalidraw
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`draw.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: excalidraw, port: 80}]
+  tls: {secretName: wildcard-woitzik-dev-tls}

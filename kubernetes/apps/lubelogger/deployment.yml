@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lubelogger
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: lubelogger
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: lubelogger
+  template:
+    metadata:
+      labels:
+        app: lubelogger
+    spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
+      containers:
+      - name: lubelogger
+        image: hargata/lubelogger:v1.6.9
+        ports:
+        - containerPort: 5000
+          name: http
+        env:
+        - name: DefaultConnectionStrings__SQLite_ConnectionString
+          value: "Data Source=/data/LubeLogger.db"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          failureThreshold: 4
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        securityContext:
+          allowPrivilegeEscalation: false
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: lubelogger-data
