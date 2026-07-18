@@ -1,0 +1,60 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-synapse
+  namespace: database
+spec:
+  instances: 1
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"
+
+  bootstrap:
+    initdb:
+      database: synapse
+      owner: synapse
+      secret:
+        name: postgres-synapse-user
+
+  storage:
+    size: 10Gi
+    storageClass: local-path
+
+  affinity:
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+  monitoring:
+    enablePodMonitor: false
+
+  backup:
+    retentionPolicy: "7d"
+    barmanObjectStore:
+      destinationPath: s3://cnpg-backups/synapse
+      endpointURL: http://garage.apps.svc.cluster.local:3900
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-garage-backup
+          key: access-key-id
+        secretAccessKey:
+          name: cnpg-garage-backup
+          key: secret-access-key
+        region:
+          name: cnpg-backup-config
+          key: region
+      wal:
+        compression: gzip
+      data:
+        compression: gzip

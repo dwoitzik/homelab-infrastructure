@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: synapse-config
+  namespace: apps
+data:
+  homeserver.yaml: |
+    server_name: "woitzik.dev"
+    pid_file: /data/homeserver.pid
+    listeners:
+      - port: 8008
+        tls: false
+        type: http
+        x_forwarded: true
+        bind_addresses: ['0.0.0.0']
+    database:
+      name: psycopg2
+      args:
+        user: synapse
+        password: "${SYNAPSE_DB_PASSWORD}"
+        database: synapse
+        host: postgres-synapse-rw.database.svc.cluster.local
+        port: 5432
+        cp_min: 5
+        cp_max: 10
+    log_config: "/data/log.config"
+    media_store_path: /media
+    enable_registration: false
+    enable_registration_without_verification: false
+    report_stats: false
+    signing_key_path: "/data/keys/server.signing.key"
+    trusted_servers: []
+    allow_guest_access: false
+    user_consent:
+      version: 1
+    rate_limit:
+      login:
+        per_second: 0.17
+        burst_count: 3
+      message:
+        per_second: 0.2
+        burst_count: 10
+      invite:
+        per_second: 0.003
+        burst_count: 10
+    upload_size: 52428800
+    max_upload_size: 52428800
+    url_preview_enabled: false
+    thumbnail_sizes:
+      - width: 32
+        height: 32
+        method: scale
+      - width: 96
+        height: 96
+        method: scale
+      - width: 640
+        height: 480
+        method: scale
+    password_config:
+      enabled: true
+      minimum_length: 8
+      require_uppercase: false
+      require_digit: false
+      require_symbol: false
+  log.config: |
+    version: 1
+    formatters:
+      raw:
+        format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: raw
+    root:
+      level: WARN
+      handlers:
+        - console
+    disable_existing_loggers: false

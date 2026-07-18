@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synapse
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: synapse
+    app.kubernetes.io/part-of: matrix
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: synapse
+  template:
+    metadata:
+      labels:
+        app: synapse
+    spec:
+      initContainers:
+      - name: init-config
+        image: matrixdotorg/synapse:latest
+        command:
+          - sh
+          - -c
+          - |
+            cp /source/homeserver.yaml /data/homeserver.yaml
+            cp /source/log.config /data/log.config
+            sed -i "s|\${SYNAPSE_DB_PASSWORD}|$SYNAPSE_DB_PASSWORD|g" /data/homeserver.yaml
+            python3 -m synapse.app.homeserver \
+              --config /data/homeserver.yaml \
+              --generate-keys \
+              --report-stats=no \
+              -c /data/homeserver.yaml
+        env:
+        - name: SYNAPSE_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: synapse-db-credentials
+              key: password
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: source
+          mountPath: /source
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+      containers:
+      - name: synapse
+        image: matrixdotorg/synapse:latest
+        command: ["python3", "-m", "synapse.app.homeserver"]
+        args:
+          - "--config"
+          - "/data/homeserver.yaml"
+        ports:
+        - containerPort: 8008
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /_matrix/client/versions
+            port: 8008
+          initialDelaySeconds: 30
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /_matrix/client/versions
+            port: 8008
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          failureThreshold: 4
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: media
+          mountPath: /media
+      securityContext:
+        fsGroup: 991
+        runAsUser: 991
+        runAsNonRoot: true
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: synapse-data
+      - name: media
+        persistentVolumeClaim:
+          claimName: synapse-media
+      - name: source
+        configMap:
+          name: synapse-config

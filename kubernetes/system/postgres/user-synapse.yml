@@ -1,0 +1,14 @@
+# Bootstrap secret for CNPG initdb.
+# Create BEFORE applying cluster-synapse.yml:
+#   kubectl create secret generic postgres-synapse-user -n database \
+#     --from-literal=username=synapse \
+#     --from-literal=password=$(openssl rand -base64 32)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-synapse-user
+  namespace: database
+type: Opaque
+stringData:
+  username: synapse
+  password: REPLACE_ME

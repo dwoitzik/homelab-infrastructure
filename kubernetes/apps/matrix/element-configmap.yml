@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: element-config
+  namespace: apps
+data:
+  config.json: |
+    {
+      "default_server_config": {
+        "m.homeserver": {
+          "base_url": "https://matrix.woitzik.dev",
+          "server_name": "woitzik.dev"
+        }
+      },
+      "disable_custom_urls": false,
+      "disable_guests": true,
+      "disable_login_language_detector": false,
+      "disable_3pid_login": true,
+      "brand": "Element",
+      "integrations_ui_url": "",
+      "integrations_rest_url": "",
+      "integrations_widgets_url": "",
+      "enable_firewall": true,
+      "roomDirectory": {
+        "servers": ["woitzik.dev"]
+      },
+      "privacy_policy_url": "",
+      "features": {
+        "feature_registration": false
+      },
+      "element_call": {
+        "enabled": false
+      },
+      "showLabsSettings": false,
+      "default_theme": "dark"
+    }
