@@ -47,6 +47,11 @@ spec:
           limits:
             cpu: 200m
             memory: 256Mi
+        volumeMounts:
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        - name: nginx-run
+          mountPath: /var/run
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -54,6 +59,11 @@ spec:
             type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
+      volumes:
+      - name: nginx-cache
+        emptyDir: {}
+      - name: nginx-run
+        emptyDir: {}
       securityContext:
         fsGroup: 1000
         runAsUser: 1000
