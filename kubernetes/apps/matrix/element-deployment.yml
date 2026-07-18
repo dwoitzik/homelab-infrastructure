@@ -23,6 +23,11 @@ spec:
       containers:
       - name: element-web
         image: vectorim/element-web:v1.12.23
+        env:
+        - name: PORT
+          value: "80"
+        - name: BIND
+          value: "0.0.0.0"
         ports:
         - containerPort: 80
           name: http
