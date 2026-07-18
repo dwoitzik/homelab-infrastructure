@@ -108,6 +108,22 @@ data:
             icon: vaultwarden.png
             href: https://vault.woitzik.dev
             description: Password Manager
+        - Matrix / Element:
+            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/matrix.svg
+            href: https://element.woitzik.dev
+            description: Encrypted Messenger · Matrix Federation
+        - n8n:
+            icon: n8n.png
+            href: https://n8n.woitzik.dev
+            description: Workflow Automation · 400+ Integrations
+        - FreshRSS:
+            icon: freshrss.png
+            href: https://rss.woitzik.dev
+            description: RSS Feed Aggregator
+        - Linkding:
+            icon: linkding.png
+            href: https://links.woitzik.dev
+            description: Bookmark Manager
         - Garage S3:
             icon: minio.png
             href: https://s3.woitzik.dev
@@ -235,7 +251,7 @@ data:
       columns: 3
     Apps:
       style: grid
-      columns: 5
+      columns: 4
     Media:
       style: grid
       columns: 6
