@@ -1,0 +1,27 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: matrix-element-web
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`element.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: element-web, port: 80}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
+---
+# Synapse client API (federation delegated via .well-known on matrix.woitzik.dev)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: matrix-synapse
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`matrix.woitzik.dev`)
+    kind: Rule
+    services: [{name: synapse, port: 8008}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
