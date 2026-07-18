@@ -29,10 +29,9 @@ spec:
             cp /source/log.config /data/log.config
             sed -i "s|\${SYNAPSE_DB_PASSWORD}|$SYNAPSE_DB_PASSWORD|g" /data/homeserver.yaml
             python3 -m synapse.app.homeserver \
-              --config /data/homeserver.yaml \
+              --config-path /data/homeserver.yaml \
               --generate-keys \
-              --report-stats=no \
-              -c /data/homeserver.yaml
+              --report-stats=no
         env:
         - name: SYNAPSE_DB_PASSWORD
           valueFrom:
@@ -57,7 +56,7 @@ spec:
         image: matrixdotorg/synapse:v1.156.0
         command: ["python3", "-m", "synapse.app.homeserver"]
         args:
-          - "--config"
+          - "--config-path"
           - "/data/homeserver.yaml"
         ports:
         - containerPort: 8008

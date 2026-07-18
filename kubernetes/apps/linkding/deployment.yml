@@ -58,12 +58,7 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /etc/linkding/data
-        securityContext:
-          allowPrivilegeEscalation: false
-          seccompProfile:
-            type: RuntimeDefault
-          capabilities:
-            drop: ["ALL"]
+
       volumes:
       - name: data
         persistentVolumeClaim:
