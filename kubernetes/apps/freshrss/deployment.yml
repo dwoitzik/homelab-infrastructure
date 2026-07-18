@@ -23,7 +23,7 @@ spec:
             value: "1"
       containers:
       - name: freshrss
-        image: freshrss/freshrss:latest
+        image: freshrss/freshrss:1.29.1
         ports:
         - containerPort: 80
           name: http

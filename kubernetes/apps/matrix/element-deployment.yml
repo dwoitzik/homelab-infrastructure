@@ -22,7 +22,7 @@ spec:
             value: "1"
       containers:
       - name: element-web
-        image: vectorim/element-web:latest
+        image: vectorim/element-web:v1.12.23
         ports:
         - containerPort: 80
           name: http

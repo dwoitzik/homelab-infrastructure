@@ -23,7 +23,7 @@ spec:
             value: "1"
       containers:
       - name: linkding
-        image: sissbruecker/linkding:latest
+        image: sissbruecker/linkding:1.45.0
         ports:
         - containerPort: 9090
           name: http
