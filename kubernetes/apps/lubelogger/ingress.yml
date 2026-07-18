@@ -1,0 +1,13 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: lubelogger
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`cars.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: authelia}]
+    services: [{name: lubelogger, port: 80}]
+  tls: {secretName: wildcard-woitzik-dev-tls}

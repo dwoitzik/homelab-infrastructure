@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lubelogger
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: lubelogger
+spec:
+  ports:
+  - port: 80
+    targetPort: 5000
+    name: http
+  selector:
+    app: lubelogger
