@@ -20,7 +20,7 @@ spec:
     spec:
       initContainers:
       - name: init-config
-        image: matrixdotorg/synapse:latest
+        image: matrixdotorg/synapse:v1.156.0
         command:
           - sh
           - -c
@@ -54,7 +54,7 @@ spec:
             memory: 128Mi
       containers:
       - name: synapse
-        image: matrixdotorg/synapse:latest
+        image: matrixdotorg/synapse:v1.156.0
         command: ["python3", "-m", "synapse.app.homeserver"]
         args:
           - "--config"
