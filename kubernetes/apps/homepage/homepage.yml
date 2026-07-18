@@ -124,6 +124,18 @@ data:
             icon: linkding.png
             href: https://links.woitzik.dev
             description: Bookmark Manager
+        - Excalidraw:
+            icon: excalidraw.png
+            href: https://draw.woitzik.dev
+            description: Whiteboard · Collaborative Drawing
+        - Gotify:
+            icon: gotify.png
+            href: https://gotify.woitzik.dev
+            description: Push Notifications · Self-hosted
+        - LubeLogger:
+            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/lubelogger.svg
+            href: https://cars.woitzik.dev
+            description: Vehicle Maintenance Tracker
         - Garage S3:
             icon: minio.png
             href: https://s3.woitzik.dev
