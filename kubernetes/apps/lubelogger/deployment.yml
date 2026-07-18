@@ -25,7 +25,7 @@ spec:
       - name: lubelogger
         image: hargata/lubelogger:v1.6.9
         ports:
-        - containerPort: 5000
+        - containerPort: 8080
           name: http
         env:
         - name: DefaultConnectionStrings__SQLite_ConnectionString
