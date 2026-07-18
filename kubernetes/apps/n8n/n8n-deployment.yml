@@ -23,7 +23,7 @@ spec:
             value: "1"
       containers:
       - name: n8n
-        image: docker.io/n8nio/n8n:latest
+        image: docker.io/n8nio/n8n:2.31.3
         env:
         - name: DB_TYPE
           value: postgresdb
