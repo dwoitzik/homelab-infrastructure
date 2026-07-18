@@ -73,7 +73,7 @@ data:
         class: logging.StreamHandler
         formatter: raw
     root:
-      level: WARN
+      level: INFO
       handlers:
         - console
     disable_existing_loggers: false
