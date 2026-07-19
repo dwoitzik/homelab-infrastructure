@@ -30,6 +30,8 @@ spec:
         env:
         - name: SIGNUPS_ALLOWED
           value: "true"
+        - name: DOMAIN
+          value: "https://vault.woitzik.dev"
         # Reliability sweep (2026-07-08): no health probes at all -- a hang
         # (not a crash) would go undetected indefinitely, Kubernetes would
         # keep routing traffic to an unresponsive pod forever. TCP-only
