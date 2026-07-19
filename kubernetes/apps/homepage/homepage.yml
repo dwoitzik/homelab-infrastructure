@@ -71,15 +71,32 @@ data:
               url: http://10.0.20.3:3001
               username: dw
               password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
-    - Apps:
+    - Essentials:
+        - Nextcloud:
+            icon: nextcloud.png
+            href: https://nextcloud.woitzik.dev
+            description: Files · Calendar · Contacts
         - Immich:
             icon: immich.png
             href: https://photos.woitzik.dev
             description: Photo Library · ML face recognition
+        - Vaultwarden:
+            icon: vaultwarden.png
+            href: https://vault.woitzik.dev
+            description: Password Manager
         - Paperless-ngx:
             icon: paperless-ngx.png
             href: https://docs.woitzik.dev
             description: Document Management
+        - Home Assistant:
+            icon: home-assistant.png
+            href: https://ha.woitzik.dev
+            description: Smart Home Hub
+        - Matrix / Element:
+            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/matrix.svg
+            href: https://element.woitzik.dev
+            description: Encrypted Messenger · Matrix Federation
+    - AI & Search:
         - Open WebUI:
             icon: open-webui.png
             href: https://ai.woitzik.dev
@@ -88,34 +105,28 @@ data:
             icon: searxng.png
             href: https://search.woitzik.dev
             description: Private Search Engine
-        - Nextcloud:
-            icon: nextcloud.png
-            href: https://nextcloud.woitzik.dev
-            description: Files · Calendar · Contacts
-        - Mealie:
-            icon: mealie.png
-            href: https://mealie.woitzik.dev
-            description: Recipe Manager
-        - Home Assistant:
-            icon: home-assistant.png
-            href: https://ha.woitzik.dev
-            description: Smart Home Hub
-        - Gitea:
-            icon: gitea.png
-            href: https://git.woitzik.dev
-            description: Private Git · Azure Modules
-        - Vaultwarden:
-            icon: vaultwarden.png
-            href: https://vault.woitzik.dev
-            description: Password Manager
-        - Matrix / Element:
-            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/matrix.svg
-            href: https://element.woitzik.dev
-            description: Encrypted Messenger · Matrix Federation
         - n8n:
             icon: n8n.png
             href: https://n8n.woitzik.dev
             description: Workflow Automation · 400+ Integrations
+    - Dev & Create:
+        - Gitea:
+            icon: gitea.png
+            href: https://git.woitzik.dev
+            description: Private Git · Azure Modules
+        - Excalidraw:
+            icon: excalidraw.png
+            href: https://draw.woitzik.dev
+            description: Whiteboard · Collaborative Drawing
+        - Mealie:
+            icon: mealie.png
+            href: https://mealie.woitzik.dev
+            description: Recipe Manager
+        - LubeLogger:
+            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/lubelogger.svg
+            href: https://cars.woitzik.dev
+            description: Vehicle Maintenance Tracker
+    - Information:
         - FreshRSS:
             icon: freshrss.png
             href: https://rss.woitzik.dev
@@ -124,18 +135,11 @@ data:
             icon: linkding.png
             href: https://links.woitzik.dev
             description: Bookmark Manager
-        - Excalidraw:
-            icon: excalidraw.png
-            href: https://draw.woitzik.dev
-            description: Whiteboard · Collaborative Drawing
         - Gotify:
             icon: gotify.png
             href: https://gotify.woitzik.dev
             description: Push Notifications · Self-hosted
-        - LubeLogger:
-            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/lubelogger.svg
-            href: https://cars.woitzik.dev
-            description: Vehicle Maintenance Tracker
+    - Storage:
         - Garage S3:
             icon: minio.png
             href: https://s3.woitzik.dev
@@ -261,9 +265,21 @@ data:
     Security:
       style: grid
       columns: 3
-    Apps:
+    Essentials:
+      style: grid
+      columns: 3
+    AI & Search:
+      style: grid
+      columns: 3
+    Dev & Create:
       style: grid
       columns: 4
+    Information:
+      style: grid
+      columns: 3
+    Storage:
+      style: grid
+      columns: 1
     Media:
       style: grid
       columns: 6
