@@ -92,6 +92,30 @@ subjects:
     name: trivy-operator
     namespace: trivy-system
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: trivy-operator
+  namespace: trivy-system
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: trivy-operator
+  namespace: trivy-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: trivy-operator
+subjects:
+- kind: ServiceAccount
+  name: trivy-operator
+  namespace: trivy-system
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
