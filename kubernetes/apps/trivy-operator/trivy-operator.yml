@@ -94,7 +94,7 @@ spec:
       serviceAccountName: trivy-operator
       containers:
         - name: trivy-operator
-          image: ghcr.io/aquasecurity/trivy-operator:0.32.0
+          image: docker.io/aquasec/trivy-operator:0.32.0
           args:
             - --overwrite
           env:
