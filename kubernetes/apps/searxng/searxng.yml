@@ -122,6 +122,6 @@ spec:
   routes:
   - match: Host(`search.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: searxng, port: 8080}]
   tls: {secretName: wildcard-woitzik-dev-tls}

@@ -23,7 +23,7 @@ spec:
   routes:
   - match: Host(`home.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: homepage, port: 80}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -38,7 +38,7 @@ spec:
   routes:
   - match: Host(`docs.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: paperless, port: 8000}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -53,7 +53,7 @@ spec:
   routes:
   - match: Host(`ai.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: open-webui, port: 8080}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -90,7 +90,7 @@ spec:
   routes:
   - match: Host(`vault.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: vaultwarden, port: 80}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -128,7 +128,7 @@ spec:
   routes:
   - match: Host(`dns.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: external-dns, port: 3001}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -158,6 +158,7 @@ spec:
   - match: Host(`pve.woitzik.dev`)
     kind: Rule
     middlewares:
+      - name: crowdsec-bouncer
       - name: authelia
       - name: websockets
     services:
@@ -179,6 +180,7 @@ spec:
   - match: Host(`backup.woitzik.dev`)
     kind: Rule
     middlewares:
+      - name: crowdsec-bouncer
       - name: authelia
       - name: websockets
     services:
@@ -240,6 +242,7 @@ spec:
     kind: Rule
     priority: 1
     middlewares:
+      - name: crowdsec-bouncer
       - name: authelia
       - name: websockets
     services: [{name: external-atlantis, port: 4141}]
@@ -257,6 +260,8 @@ spec:
   - match: Host(`status.woitzik.dev`)
     kind: Rule
     middlewares:
+      - name: crowdsec-bouncer
+        namespace: apps
       - name: authelia
         namespace: apps
     services: [{name: uptime-kuma, port: 3001}]
@@ -288,7 +293,7 @@ spec:
   routes:
   - match: Host(`mealie.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: mealie, port: 9000}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -318,7 +323,7 @@ spec:
   routes:
   - match: Host(`git.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: gitea, port: 3000}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -334,7 +339,7 @@ spec:
   routes:
   - match: Host(`ha.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: home-assistant, port: 8123}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---

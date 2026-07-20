@@ -81,7 +81,7 @@ spec:
   routes:
   - match: Host(`sabnzbd.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia, namespace: apps}]
+    middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: sabnzbd, port: 8080}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -118,7 +118,7 @@ spec:
   routes:
   - match: Host(`sonarr.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia, namespace: apps}]
+    middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: sonarr, port: 8989}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -155,7 +155,7 @@ spec:
   routes:
   - match: Host(`radarr.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia, namespace: apps}]
+    middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: radarr, port: 7878}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -192,7 +192,7 @@ spec:
   routes:
   - match: Host(`bazarr.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia, namespace: apps}]
+    middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: bazarr, port: 6767}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -229,6 +229,6 @@ spec:
   routes:
   - match: Host(`hydra.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia, namespace: apps}]
+    middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: nzbhydra2, port: 5076}]
   tls: {secretName: wildcard-woitzik-dev-tls}

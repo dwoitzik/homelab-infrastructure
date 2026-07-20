@@ -108,6 +108,6 @@ spec:
   routes:
     - match: Host(`beszel.woitzik.dev`)
       kind: Rule
-      middlewares: [{name: authelia}]
+      middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
       services: [{name: beszel, port: 8090}]
   tls: {secretName: wildcard-woitzik-dev-tls}
