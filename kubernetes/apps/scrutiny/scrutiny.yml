@@ -48,7 +48,7 @@ spec:
             value: "1"
       containers:
         - name: influxdb
-          image: influxdb:2.8
+          image: influxdb:2.9@sha256:9f29465df7a15d427e046681cfc7b3da9753e75825c6864f8d3cf5b3aa3cca3d
           ports:
             - containerPort: 8086
           env:
