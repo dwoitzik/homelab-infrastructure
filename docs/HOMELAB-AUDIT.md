@@ -1,0 +1,87 @@
+# Homelab Audit — Gap Analysis & Deployment Tracker
+
+Generated: 2026-07-20. Based on Reddit r/homelab, r/selfhosted consensus (2025/2026)
+plus comparison against the 50+ essential self-hosted services lists.
+
+## Current Stack (verified working)
+
+| Category | Tool | Status |
+|---|---|---|
+| Hypervisor | Proxmox VE 9.2 | ✅ |
+| Kubernetes | k3s v1.31.12 (3 nodes) | ✅ |
+| GitOps | ArgoCD + Renovate | ✅ |
+| Ingress | Traefik + cert-manager | ✅ |
+| SSO | Authelia (CNPG + Redis) | ✅ |
+| Secrets | Vault + External Secrets Operator | ✅ |
+| Monitoring | Prometheus + Grafana + Loki + Tempo | ✅ |
+| Uptime | Uptime Kuma (25 monitors) | ✅ |
+| Host Monitor | Beszel | ✅ |
+| Security | CrowdSec + Trivy + kube-bench + Kyverno | ✅ |
+| Backups | Velero + Kopia + PBS | ✅ (offsite pending) |
+| DNS | AdGuard Home + Unbound (RPis) | ✅ |
+| VPN | Headscale (Tailscale) | ✅ |
+| S3 | Garage | ✅ |
+| DB | CloudNativePG (3 clusters) | ✅ |
+| Media | Jellyfin (LXC) | ✅ |
+| Photos | Immich | ✅ |
+| Chat | Matrix/Synapse | ✅ |
+| Files | Nextcloud | ✅ |
+| Passwords | Vaultwarden | ✅ |
+| Automation | n8n | ✅ |
+| Dashboard | Homepage | ✅ |
+| AI | Open-WebUI + Ollama | ✅ |
+| Git | Gitea | ✅ |
+| RSS | FreshRSS | ✅ |
+| Bookmarks | Linkding | ✅ |
+| Recipes | Mealie | ✅ |
+| Docs | Paperless | ✅ |
+| Whiteboard | Excalidraw | ✅ |
+| Speedtest | MySpeed | ✅ |
+| Notifications | Gotify | ✅ |
+| Search | SearXNG | ✅ |
+| Car Log | LubeLogger | ✅ |
+| Home Auto | Home Assistant | ✅ |
+
+## Pending Deployments
+
+| Priority | Tool | Category | Status |
+|---|---|---|---|
+| 🔴 P1 | Scrutiny | Disk Health (S.M.A.R.T.) | 🔄 Deploying |
+| 🔴 P1 | OnlyOffice | Document Editing | ⏳ Pending |
+| 🔴 P1 | Wazuh | SIEM | ⏳ Pending |
+| 🟡 P2 | Firefly III | Finance | ⏳ Pending |
+| 🟡 P2 | Overseerr | Media Requests | ⏳ Pending |
+| 🟡 P2 | Tautulli | Jellyfin Analytics | ⏳ Pending |
+
+## Known Infrastructure Gaps
+
+| ID | Gap | Impact | Status |
+|---|---|---|---|
+| REL-003 | Velero backs up into Garage (inside cluster) | Total cluster loss = no backups | Scaffolded R2 offsite, not active |
+| REL-012 | etcd apply latency under disk I/O | API Server outages | Monitoring in place |
+| REL-073 | Garage meta (local-path) + data (nfs) different backends | Torn-state risk | Documented |
+| — | No MikroTik remote syslog | Security events lost | Open |
+| — | Kyverno excludes monitoring namespace | No policy enforcement on monitoring | Workaround |
+| — | AUDIT.md referenced in code but missing | Stale references | Low priority |
+
+## Deployment Log
+
+### Scrutiny (S.M.A.R.T. disk monitoring)
+
+- **Date**: 2026-07-20
+- **Dir**: `kubernetes/apps/scrutiny/`
+- **Image**: `ghcr.io/analogj/scrutiny:latest-management` (Web UI) + `ghcr.io/analogj/scrutiny:latest-omnibus` (Collector)
+- **Storage**: nfs-client PVC 1Gi for Web DB
+- **IngressRoute**: scrutiny.woitzik.dev (apps-ingressroute.yml)
+- **Notes**: Collector runs as DaemonSet to access /dev/sda on each node. Needs hostPID + hostNetwork for S.M.A.R.T. access.
+
+### OnlyOffice (Document Server)
+
+- **Date**: Pending
+- **Image**: onlyoffice/documentserver:latest
+- **Notes**: Requires 2GB+ RAM. Integrates with Nextcloud via connector app.
+
+### Wazuh (SIEM)
+
+- **Date**: Pending
+- **Notes**: Multi-component (manager, indexer, dashboard). Consider Docker Compose on ct-srv-docker-01 instead of k8s due to complexity.
