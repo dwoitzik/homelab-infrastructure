@@ -46,7 +46,7 @@ plus comparison against the 50+ essential self-hosted services lists.
 
 | Priority | Tool | Category | Status |
 |---|---|---|---|
-| 🔴 P1 | Scrutiny | Disk Health (S.M.A.R.T.) | 🔄 Deploying |
+| ✅ | Scrutiny | Disk Health (S.M.A.R.T.) | ✅ Deployed |
 | 🔴 P1 | OnlyOffice | Document Editing | ⏳ Pending |
 | 🔴 P1 | Wazuh | SIEM | ⏳ Pending |
 | 🟡 P2 | Firefly III | Finance | ⏳ Pending |
@@ -70,10 +70,11 @@ plus comparison against the 50+ essential self-hosted services lists.
 
 - **Date**: 2026-07-20
 - **Dir**: `kubernetes/apps/scrutiny/`
-- **Image**: `ghcr.io/analogj/scrutiny:latest-management` (Web UI) + `ghcr.io/analogj/scrutiny:latest-omnibus` (Collector)
-- **Storage**: nfs-client PVC 1Gi for Web DB
-- **IngressRoute**: scrutiny.woitzik.dev (apps-ingressroute.yml)
-- **Notes**: Collector runs as DaemonSet to access /dev/sda on each node. Needs hostPID + hostNetwork for S.M.A.R.T. access.
+- **Image**: `ghcr.io/analogj/scrutiny:v0.9.2-web` (Web UI) + `ghcr.io/analogj/scrutiny:v0.9.2-collector` (Collector) + `influxdb:2.8`
+- **Layout**: Hub/Spoke — InfluxDB StatefulSet + Web Deployment + Collector DaemonSet (3 nodes)
+- **Storage**: nfs-client PVC (2Gi InfluxDB + 1Gi config)
+- **IngressRoute**: scrutiny.woitzik.dev (CrowdSec + Authelia)
+- **Notes**: Collector uses `hostPID: true` + `SYS_RAWIO` for smartctl. k3s containerd needs writable `/dev` mount + minimal securityContext (no seccompProfile, no drop ALL caps — collector image uses `su` internally). `system-manifests` stuck on resourceVersion conflicts for other IngressRoutes.
 
 ### OnlyOffice (Document Server)
 
