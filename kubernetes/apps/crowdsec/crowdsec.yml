@@ -137,7 +137,7 @@ spec:
               protocol: TCP
           env:
             - name: COLLECTIONS
-              value: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/base-scenarios"
+              value: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/base-http-scenarios"
             - name: PARSERS
               value: "crowdsecurity/cri-logs"
             - name: GID
