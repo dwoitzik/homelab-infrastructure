@@ -239,13 +239,7 @@ spec:
             - name: TZ
               value: Europe/Berlin
           securityContext:
-            privileged: false
-            allowPrivilegeEscalation: false
-            capabilities:
-              add: ["SYS_RAWIO"]
-              drop: ["ALL"]
-            seccompProfile:
-              type: RuntimeDefault
+            privileged: true
           resources:
             requests:
               cpu: 10m
