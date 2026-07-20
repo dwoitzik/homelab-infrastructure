@@ -34,7 +34,7 @@ metadata:
   name: trivy-operator
 rules:
 - apiGroups: [""]
-  resources: ["configmaps", "limitranges", "nodes", "persistentvolumeclaims", "persistentvolumes", "pods", "replicationcontrollers", "resourcequotas", "services"]
+  resources: ["configmaps", "limitranges", "nodes", "persistentvolumeclaims", "persistentvolumes", "pods", "replicationcontrollers", "resourcequotas", "services", "serviceaccounts"]
   verbs: ["get", "list", "watch"]
 - apiGroups: [""]
   resources: ["secrets"]
