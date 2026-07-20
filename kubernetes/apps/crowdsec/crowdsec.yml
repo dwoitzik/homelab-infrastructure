@@ -59,13 +59,21 @@ data:
       listen_addr: 0.0.0.0
       listen_port: 6060
   profiles.yaml: |
-    name: default/default
+    name: default_ip_remediation
     filters:
-      - Alert.RemainingCapacity > 0
-    onsuccess: accept
+      - Alert.Remediation == true && Alert.GetScope() == "Ip"
     decisions:
-      - duration: 1h
-        expression: Alert.GetRemainCount() > 3
+      - type: ban
+        duration: 4h
+    on_success: break
+    ---
+    name: default_range_remediation
+    filters:
+      - Alert.Remediation == true && Alert.GetScope() == "Range"
+    decisions:
+      - type: ban
+        duration: 4h
+    on_success: break
 ---
 apiVersion: v1
 kind: ServiceAccount
