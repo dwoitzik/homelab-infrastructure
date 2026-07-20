@@ -71,6 +71,18 @@ data:
               url: http://10.0.20.3:3001
               username: dw
               password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
+        - CrowdSec:
+            icon: crowdsec.png
+            description: Threat Intelligence · IP Banning
+            widget:
+              type: crowdsec
+              url: http://crowdsec.security.svc.cluster.local:8080
+        - Trivy Operator:
+            icon: aqua.png
+            description: Container Vulnerability Scanning
+        - kube-bench:
+            icon: cis.png
+            description: CIS Kubernetes Benchmark · CronJob
     - Essentials:
         - Nextcloud:
             icon: nextcloud.png

@@ -43,7 +43,15 @@ spec:
           general:
             level: INFO
           access:
-            enabled: false
+            enabled: true
+            format: json
+            fields:
+              headers:
+                defaultMode: keep
+                names:
+                  User-Agent: redact
+                  Authorization: redact
+                  Cookie: redact
         resources:
           requests:
             cpu: 100m
@@ -58,6 +66,14 @@ spec:
           default:
             defaultCertificate:
               secretName: traefik-tls-secret
+        experimental:
+          plugins:
+            crowdsec:
+              moduleName: github.com/harlanchen/crowdsec-bouncer-traefik-plugin
+              version: v1.3.3
+        env:
+          - name: CROWDSEC_BOUNCER_KEY_traefik
+            value: "bFWgFb0LBV6OUspll3IZyqgIAwwLlQ5RbXV39Cgd"
         tolerations:
         - key: "storage"
           operator: "Equal"
