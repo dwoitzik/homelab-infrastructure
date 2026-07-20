@@ -102,7 +102,7 @@ spec:
         - operator: Exists
       containers:
         - name: crowdsec
-          image: crowdsecurity/crowdsec:v1.6.7
+          image: crowdsecurity/crowdsec:latest
           args:
             - crowdsec
             - -config=/etc/crowdsec/config.yaml
