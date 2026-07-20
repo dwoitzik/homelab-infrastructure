@@ -1,0 +1,15 @@
+# CrowdSec Bouncer Middleware — queries CrowdSec LAPI for block/allow decisions.
+# Applied to IngressRoutes that should be CrowdSec-protected.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: crowdsec-bouncer
+  namespace: apps
+spec:
+  plugin:
+    crowdsec:
+      enabled: true
+      crowdsecLapiHost: crowdsec.security.svc.cluster.local:8080
+      crowdsecLapiScheme: http
+      crowdsecLapiTLSCACertPath: ""
+      crowdsecLapiTLSVerification: false

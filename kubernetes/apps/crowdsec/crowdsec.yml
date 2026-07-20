@@ -1,0 +1,192 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security
+  labels:
+    app.kubernetes.io/part-of: security
+---
+# CrowdSec reads Traefik access logs from /var/log/containers/ on each node.
+# DaemonSet ensures every node's logs are covered.
+# container_runtime: containerd (k3s), poll_without_inotify: true (log rotation).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crowdsec-config
+  namespace: security
+data:
+  acquis.yaml: |
+    ---
+    filenames:
+      - /var/log/containers/traefik-*_kube-system_*.log
+    force_inotify: true
+    labels:
+      type: containerd
+      program: traefik
+  config.yaml: |
+    config:
+      log_level: info
+      log_mode: stdout
+      daemon: false
+      db_config:
+        use_sqlite: true
+        sqlite_path: /var/lib/crowdsec/data/crowdsec.db
+        flush_interval: 10s
+      csconfig_path: /etc/crowdsec
+      prometheus:
+        enabled: true
+        listen_port: 6060
+    api:
+      server:
+        listen_uri: 0.0.0.0:8080
+      client:
+        insecure_skip_verify: false
+    online_client:
+      cs_lapi:
+        url: http://crowdsec:8080
+  profiles.yaml: |
+    name: default/default
+    filters:
+      - Alert.RemainingCapacity > 0
+    onsuccess: accept
+    decisions:
+      - duration: 1h
+        expression: Alert.GetRemainCount() > 3
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: crowdsec
+  namespace: security
+---
+# CrowdSec needs to read pod labels for metadata enrichment.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crowdsec
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: crowdsec
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: crowdsec
+subjects:
+  - kind: ServiceAccount
+    name: crowdsec
+    namespace: security
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: crowdsec
+  namespace: security
+  labels:
+    app.kubernetes.io/name: crowdsec
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: crowdsec
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: crowdsec
+    spec:
+      serviceAccountName: crowdsec
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: crowdsec
+          image: crowdsecurity/crowdsec:v1.6.7
+          args:
+            - crowdsec
+            - -config=/etc/crowdsec/config.yaml
+          ports:
+            - name: api
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 6060
+              protocol: TCP
+          env:
+            - name: COLLECTIONS
+              value: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/base-scenarios"
+            - name: PARSERS
+              value: "crowdsecurity/cri-logs"
+            - name: GID
+              value: "0"
+            - name: BOUNCER_KEY_traefik
+              value: "bFWgFb0LBV6OUspll3IZyqgIAwwLlQ5RbXV39Cgd"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/crowdsec/acquis.yaml
+              subPath: acquis.yaml
+            - name: config
+              mountPath: /etc/crowdsec/config.yaml
+              subPath: config.yaml
+            - name: config
+              mountPath: /etc/crowdsec/profiles.yaml
+              subPath: profiles.yaml
+            - name: data
+              mountPath: /var/lib/crowdsec/data
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: crowdsec-config
+        - name: data
+          emptyDir: {}
+        - name: varlog
+          hostPath:
+            path: /var/log
+            type: Directory
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crowdsec
+  namespace: security
+  labels:
+    app.kubernetes.io/name: crowdsec
+spec:
+  selector:
+    app.kubernetes.io/name: crowdsec
+  ports:
+    - name: api
+      port: 8080
+      targetPort: api
+      protocol: TCP
+    - name: metrics
+      port: 6060
+      targetPort: metrics
+      protocol: TCP
