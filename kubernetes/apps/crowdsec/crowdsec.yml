@@ -16,6 +16,7 @@ data:
     filenames:
       - /var/log/containers/traefik-*_kube-system_*.log
     force_inotify: true
+    poll_without_inotify: true
     labels:
       type: containerd
       program: traefik
