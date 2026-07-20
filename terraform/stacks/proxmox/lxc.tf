@@ -93,7 +93,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
   }
 
   memory {
-    dedicated = 4096
+    dedicated = 10240
     swap      = 4096
   }
 
