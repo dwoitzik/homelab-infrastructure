@@ -361,3 +361,18 @@ spec:
   tls: {secretName: wildcard-woitzik-dev-tls}
 # SABnzbd, Sonarr, Radarr, Bazarr — IngressRoutes consolidated into
 # kubernetes/apps/jellyfin/usenet.yml alongside their External service definitions.
+---
+# Scrutiny — S.M.A.R.T. disk health monitoring
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: scrutiny-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`scrutiny.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
+    services: [{name: scrutiny-web, port: 8080}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
