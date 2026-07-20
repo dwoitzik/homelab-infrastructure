@@ -102,6 +102,8 @@ spec:
               value: "/tmp/trivy-cache"
             - name: OPERATOR_LOG_LEVEL
               value: "info"
+            - name: OPERATOR_NAMESPACE
+              value: "trivy-system"
           ports:
             - name: metrics
               containerPort: 8080
