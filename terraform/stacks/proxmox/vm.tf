@@ -118,8 +118,9 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
 }
 
 resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
-  # memory capped at 8 GB (was 16 GB) — pure agent node, no etcd, no
-  # Longhorn replicas scheduled here. Host has 64 GB max (DDR4 ceiling).
+  # 12 GB dedicated + 8 GB floating — hosts Traefik, Vault, ArgoCD, CNPG,
+  # cert-manager, CrowdSec, Trivy Operator. Was 8/4 but hit 97% memory
+  # causing API server OOM crashes during security tooling rollout.
   vm_id     = 212
   name      = "vm-srv-k3s-12"
   node_name = local.target_node
@@ -156,8 +157,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   }
 
   memory {
-    dedicated = 8192
-    floating  = 4096
+    dedicated = 12288
+    floating  = 8192
   }
 
   # REL-012c: cache=none + aio=native (see k3s-11 comment).
