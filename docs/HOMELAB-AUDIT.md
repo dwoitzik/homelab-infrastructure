@@ -47,7 +47,7 @@ plus comparison against the 50+ essential self-hosted services lists.
 | Priority | Tool | Category | Status |
 |---|---|---|---|
 | ✅ | Scrutiny | Disk Health (S.M.A.R.T.) | ✅ Deployed |
-| 🔴 P1 | OnlyOffice | Document Editing | ⏳ Pending |
+| ✅ | OnlyOffice | Document Editing | ✅ Deployed |
 | 🔴 P1 | Wazuh | SIEM | ⏳ Pending |
 | 🟡 P2 | Firefly III | Finance | ⏳ Pending |
 | 🟡 P2 | Overseerr | Media Requests | ⏳ Pending |
@@ -78,9 +78,14 @@ plus comparison against the 50+ essential self-hosted services lists.
 
 ### OnlyOffice (Document Server)
 
-- **Date**: Pending
-- **Image**: onlyoffice/documentserver:latest
-- **Notes**: Requires 2GB+ RAM. Integrates with Nextcloud via connector app.
+- **Date**: 2026-07-20
+- **Dir**: `kubernetes/apps/onlyoffice/`
+- **Image**: `onlyoffice/documentserver:9.4` (bundled PG + Redis + Nginx)
+- **Storage**: nfs-client PVC 10Gi
+- **IngressRoute**: onlyoffice.woitzik.dev (CrowdSec + Authelia)
+- **Memory**: 2.5GB limit — scheduled on k3s-13 via nodeAffinity
+- **Integration**: Nextcloud connector requires JWT_SECRET + trusted domain config
+- **Notes**: Bundled image is heavy (~1.5GB pull). Causes etcd instability when pulling on control plane nodes. Both etcd members crashed during pull → 5+ min outage. Consider pre-pulling large images.
 
 ### Wazuh (SIEM)
 
