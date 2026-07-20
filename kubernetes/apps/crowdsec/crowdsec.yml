@@ -5,9 +5,6 @@ metadata:
   labels:
     app.kubernetes.io/part-of: security
 ---
-# CrowdSec reads Traefik access logs from /var/log/containers/ on each node.
-# DaemonSet ensures every node's logs are covered.
-# container_runtime: containerd (k3s), poll_without_inotify: true (log rotation).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -23,26 +20,18 @@ data:
       type: containerd
       program: traefik
   config.yaml: |
-    config:
-      log_level: info
-      log_mode: stdout
-      daemon: false
-      db_config:
-        use_sqlite: true
-        sqlite_path: /var/lib/crowdsec/data/crowdsec.db
-        flush_interval: 10s
-      csconfig_path: /etc/crowdsec
-      prometheus:
-        enabled: true
-        listen_port: 6060
+    db_config:
+      use_sqlite: true
+      sqlite_path: /var/lib/crowdsec/data/crowdsec.db
+      flush_interval: 10s
+    prometheus:
+      enabled: true
+      listen_port: 6060
     api:
       server:
         listen_uri: 0.0.0.0:8080
       client:
         insecure_skip_verify: false
-    online_client:
-      cs_lapi:
-        url: http://crowdsec:8080
   profiles.yaml: |
     name: default/default
     filters:
@@ -58,7 +47,6 @@ metadata:
   name: crowdsec
   namespace: security
 ---
-# CrowdSec needs to read pod labels for metadata enrichment.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
