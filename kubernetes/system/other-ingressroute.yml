@@ -9,7 +9,7 @@ spec:
   routes:
   - match: Host(`secrets.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia, namespace: apps}]
+    middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: vault, port: 8200}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -52,7 +52,7 @@ spec:
   routes:
   - match: Host(`router.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia, namespace: apps}]
+    middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: router-external, port: 80}]
   tls: {secretName: wildcard-woitzik-dev-tls}
 ---
@@ -96,7 +96,7 @@ spec:
     services: [{name: loki, port: 3100}]
   - match: Host(`loki.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: loki-to-grafana-redirect}, {name: authelia, namespace: apps}]
+    middlewares: [{name: loki-to-grafana-redirect}, {name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: loki, port: 3100}]
 ---
 # Traefik Dashboard (api@internal — Authelia-protected)
@@ -110,7 +110,7 @@ spec:
   routes:
   - match: Host(`traefik.woitzik.dev`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
     kind: Rule
-    middlewares: [{name: authelia, namespace: apps}]
+    middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services:
     - name: api@internal
       kind: TraefikService

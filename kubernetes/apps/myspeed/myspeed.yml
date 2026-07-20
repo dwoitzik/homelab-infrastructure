@@ -101,6 +101,6 @@ spec:
   routes:
   - match: Host(`speed.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: authelia}]
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: myspeed, port: 5216}]
   tls: {secretName: wildcard-woitzik-dev-tls}
