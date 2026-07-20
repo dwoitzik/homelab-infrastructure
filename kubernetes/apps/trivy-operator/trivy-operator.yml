@@ -34,10 +34,10 @@ metadata:
   name: trivy-operator
 rules:
   - apiGroups: [""]
-    resources: ["pods", "services", "configmaps", "serviceaccounts", "namespaces", "nodes", "replicationcontrollers", "limitranges", "resourcequotas"]
+    resources: ["pods", "services", "serviceaccounts", "namespaces", "nodes", "replicationcontrollers", "limitranges", "resourcequotas"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
-    resources: ["secrets"]
+    resources: ["secrets", "configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: ["apps"]
     resources: ["daemonsets", "deployments", "replicasets", "statefulsets"]
