@@ -239,7 +239,8 @@ spec:
             - name: TZ
               value: Europe/Berlin
           securityContext:
-            privileged: true
+            capabilities:
+              add: ["SYS_RAWIO"]
           resources:
             requests:
               cpu: 10m
@@ -250,7 +251,6 @@ spec:
           volumeMounts:
             - name: dev
               mountPath: /dev
-              readOnly: true
             - name: udev
               mountPath: /run/udev
               readOnly: true
