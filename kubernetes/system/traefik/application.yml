@@ -74,6 +74,11 @@ spec:
         env:
           - name: CROWDSEC_BOUNCER_KEY_traefik
             value: "bFWgFb0LBV6OUspll3IZyqgIAwwLlQ5RbXV39Cgd"
+        volumes:
+          - name: crowdsec-bouncer-key
+            mountPath: /etc/traefik/crowdsec
+            type: secret
+            secretName: crowdsec-bouncer-key
         tolerations:
         - key: "storage"
           operator: "Equal"

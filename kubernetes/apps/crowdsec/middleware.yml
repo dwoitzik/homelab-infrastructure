@@ -13,3 +13,4 @@ spec:
       crowdsecLapiScheme: http
       crowdsecLapiTLSCACertPath: ""
       crowdsecLapiTLSVerification: false
+      crowdsecLapiKeyFile: /etc/traefik/crowdsec/BOUNCER_KEY_traefik
