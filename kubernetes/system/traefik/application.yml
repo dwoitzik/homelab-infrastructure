@@ -69,8 +69,8 @@ spec:
         experimental:
           plugins:
             crowdsec:
-              moduleName: github.com/harlanchen/crowdsec-bouncer-traefik-plugin
-              version: v1.3.3
+              moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+              version: v1.6.0
         env:
           - name: CROWDSEC_BOUNCER_KEY_traefik
             value: "bFWgFb0LBV6OUspll3IZyqgIAwwLlQ5RbXV39Cgd"
