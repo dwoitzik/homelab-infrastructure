@@ -1,6 +1,16 @@
 # Loads CNPG Cluster and backup credentials from this directory.
 # Apply AFTER cloudnative-pg operator Application is synced and CRDs are installed.
 # Bootstrap command: kubectl apply -f kubernetes/system/postgres/postgres-cluster-application.yml
+#
+# REPLACE_ME (2026-08-01): user-n8n/user-synapse Secrets were previously part of
+# this App's sync set. They are CNPG *bootstrap* secrets -- CNPG reads them once
+# at initdb to set the initial DB role password, and ignores them afterwards.
+# ArgoCD selfHeal (enabled below) kept reverting the live passwords to the
+# REPLACE_ME placeholder from Git, breaking every app that reads the secret after
+# a pod restart (synapse, n8n -- see session 2026-08-01 crash loop). They are now
+# excluded from the sync set on purpose; keep the real values in Vault
+# (secret/synapse db-password, secret/n8n db-password) and patch the live Secrets
+# manually after any re-clone, matching the ALTER USER in the running DB.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -13,7 +23,7 @@ spec:
     targetRevision: HEAD
     path: kubernetes/system/postgres
     directory:
-      include: '{cluster,cluster-n8n,cluster-synapse,external-secret,scheduled-backup,backup-config,network-policies,postgres-monitoring,user-n8n,user-synapse}.yml'
+      include: '{cluster,cluster-n8n,cluster-synapse,external-secret,scheduled-backup,backup-config,network-policies,postgres-monitoring}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: database
