@@ -19,7 +19,7 @@ spec:
             value: "1"
       containers:
       - name: paperless
-        image: paperlessngx/paperless-ngx:2.20.15
+        image: paperlessngx/paperless-ngx:3.0.4@sha256:3838b9a4260d23acc5bb63aed407138435e70b56e5806f4baa350ca184e57582
         # SEC-012: image entrypoint runs init-folders as root to chown
         # /tmp/paperless and /usr/src/paperless/export -- confirmed live,
         # dropping all capabilities crash-loops it (same failure class as
