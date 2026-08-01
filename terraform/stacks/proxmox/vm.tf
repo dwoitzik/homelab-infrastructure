@@ -42,13 +42,13 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   # repeated REL-012c-style crash loops. This VM runs etcd -- it must win
   # that contention every time.
   cpu {
-    cores = 4
+    cores = 6
     type  = "host"
     units = 2048
   }
 
   memory {
-    dedicated = 12288
+    dedicated = 16384
     floating  = 8192
   }
 
@@ -62,6 +62,15 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   # zfs_txg_timeout=5s, zfs_arc_max=16GB bounds each txg commit to SLC capacity.
   # Applied manually via `qm set 211 ...`; disk is in ignore_changes so
   # Atlantis will not re-apply this block after initial VM creation.
+  # REL-012d (2026-08-01): 4→6 cores + 12→16GB dedicated. This node runs etcd +
+  # control plane + the bulk of app workloads. Cold start of ~60 pods (all at
+  # once after a host reboot, e.g. post-vacation power-on) starved etcd's
+  # ReadIndex/apply path on 4 cores → "apply request took too long" →
+  # leaderelection lost → k3s systemd restart loop (NRestarts=50 in 10h). 6
+  # cores leaves headroom for the boot storm; also see the k3s.service.d
+  # 30-restart-backoff.conf drop-in (RestartSec=90s) applied on 2026-08-01.
+  # REL-035 (2x vCPU oversubscription on this host) is unchanged -- this bumps
+  # one etcd node, not total allocation.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
