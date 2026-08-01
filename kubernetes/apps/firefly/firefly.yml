@@ -1,0 +1,207 @@
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: firefly-iii-secrets
+  namespace: apps
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault
+    kind: ClusterSecretStore
+  target:
+    name: firefly-iii-secrets
+    creationPolicy: Owner
+  data:
+    - remoteRef:
+        key: secret/firefly
+        property: app-key
+      secretKey: APP_KEY
+    - remoteRef:
+        key: secret/firefly
+        property: db-password
+      secretKey: DB_PASSWORD
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: firefly-data
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firefly-iii
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: firefly-iii
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: firefly-iii
+    spec:
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
+      containers:
+        - name: firefly-iii
+          image: fireflyiii/core:version-6.6.6
+          ports:
+            - containerPort: 8080
+          env:
+            - name: APP_ENV
+              value: local
+            - name: APP_DEBUG
+              value: "false"
+            - name: SITE_OWNER
+              value: "david@woitzik.dev"
+            - name: APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: firefly-iii-secrets
+                  key: APP_KEY
+            - name: DEFAULT_LANGUAGE
+              value: de_DE
+            - name: DEFAULT_LOCALE
+              value: de_DE.UTF-8
+            - name: TZ
+              value: Europe/Berlin
+            - name: TRUSTED_PROXIES
+              value: "**"
+            - name: DB_CONNECTION
+              value: pgsql
+            - name: DB_HOST
+              value: postgres-firefly.database.svc.cluster.local
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_DATABASE
+              value: firefly
+            - name: DB_USERNAME
+              value: firefly
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: firefly-iii-secrets
+                  key: DB_PASSWORD
+            - name: APP_URL
+              value: https://finance.woitzik.dev
+            - name: AUTHENTICATION_GUARD
+              value: web
+          volumeMounts:
+            - name: data
+              mountPath: /var/www/html/storage/upload
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            failureThreshold: 4
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: firefly-data
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: firefly-iii-cron
+  namespace: apps
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: firefly-iii-cron
+        spec:
+          restartPolicy: Never
+          dnsConfig:
+            options:
+              - name: ndots
+                value: "1"
+          containers:
+            - name: firefly-iii-cron
+              image: fireflyiii/core:version-6.6.6
+              command: ["php", "/var/www/html/artisan", "firefly-iii:cron"]
+              env:
+                - name: APP_ENV
+                  value: local
+                - name: APP_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: firefly-iii-secrets
+                      key: APP_KEY
+                - name: DB_CONNECTION
+                  value: pgsql
+                - name: DB_HOST
+                  value: postgres-firefly.database.svc.cluster.local
+                - name: DB_PORT
+                  value: "5432"
+                - name: DB_DATABASE
+                  value: firefly
+                - name: DB_USERNAME
+                  value: firefly
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: firefly-iii-secrets
+                      key: DB_PASSWORD
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: firefly-iii
+  namespace: apps
+spec:
+  ports:
+    - port: 8080
+  selector:
+    app: firefly-iii
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: firefly-iii-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`finance.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
+    services: [{name: firefly-iii, port: 8080}]
+  tls: {secretName: wildcard-woitzik-dev-tls}
