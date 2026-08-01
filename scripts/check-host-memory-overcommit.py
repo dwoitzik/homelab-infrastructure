@@ -63,7 +63,14 @@ VM_TF = REPO_ROOT / "terraform/stacks/proxmox/vm.tf"
 # printed for visibility, never counted.
 ZFS_ARC_MAX_GB = 4  # confirmed live via /sys/module/zfs/parameters/zfs_arc_max
 HOST_RESERVE_GB = 6  # kernel + hypervisor/qemu process overhead (non-ARC)
-HARD_GATE_CEILING_GB = 44
+# REL-012d (2026-08-01): raised 44→46 GB. vm-srv-k3s-11 grew to 16 GB
+# dedicated after the post-vacation cold-start crash loop (etcd read-index
+# timeouts under CPU exhaustion on 4 cores). Host `mini` has 62 GB physical;
+# 46 GB VM reservations + 4 GB ARC + 6 GB reserve leaves ~16 GB for LXC CT
+# bursts, and live usage was 41/62 GB on 2026-07-07. Still ~16 GB under
+# physical RAM; the REL-016 ZFS-stall blast-radius guard is preserved, just
+# with the headroom the crash loop demonstrated was needed.
+HARD_GATE_CEILING_GB = 46
 HARD_GATE_CEILING_MB = HARD_GATE_CEILING_GB * 1024
 
 # --- Soft check: LXC CT limits vs physical RAM, warn-only -----------------
