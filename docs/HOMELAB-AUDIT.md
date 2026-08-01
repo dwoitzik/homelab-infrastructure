@@ -48,7 +48,7 @@ plus comparison against the 50+ essential self-hosted services lists.
 |---|---|---|---|
 | ✅ | Scrutiny | Disk Health (S.M.A.R.T.) | ✅ Deployed |
 | ✅ | OnlyOffice | Document Editing | ✅ Deployed |
-| 🔴 P1 | Wazuh | SIEM | ⏳ Pending |
+| 🔴 P1 | Wazuh | SIEM | ✅ Deployed (2026-07-21) |
 | 🟡 P2 | Firefly III | Finance | ⏳ Pending |
 | 🟡 P2 | Overseerr | Media Requests | ⏳ Pending |
 | 🟡 P2 | Tautulli | Jellyfin Analytics | ⏳ Pending |
