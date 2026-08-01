@@ -1,0 +1,125 @@
+# Wazuh SIEM — Docker Compose for ct-srv-docker-01
+# Single-node deployment: Manager + Indexer + Dashboard
+# Docs: https://documentation.wazuh.com/current/installation-guide/docker/index.html
+#
+# Deployment:
+#   1. LXC RAM must be ≥ 8GB (PR #395)
+#   2. Copy this directory to ct-srv-docker-01:/opt/wazuh/
+#   3. docker compose up -d
+#   4. Access dashboard at https://wazuh.woitzik.dev (admin / admin / SecretPassword1!)
+#
+# Components:
+#   - wazuh.manager: Agent management, log analysis, alerting
+#   - wazuh.indexer: OpenSearch-based log storage (single-node)
+#   - wazuh.dashboard: Web UI (OpenSearch Dashboards fork)
+---
+version: '3.8'
+
+services:
+  wazuh.manager:
+    image: wazuh/wazuh-manager:4.12.0
+    container_name: wazuh.manager
+    hostname: wazuh-manager
+    restart: unless-stopped
+    ports:
+      - "1514:1514/udp"
+      - "1515:1515"
+      - "514:514/udp"
+      - "55000:55000"
+    volumes:
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_client_keys:/var/ossec/etc/client.keys
+      - wazuh_agent_evaluation:/var/ossec/agentless
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_upgrades:/var/ossec/upgrades
+      - wazuh_active_response:/var/ossec/active-response
+      - wazuh_wodles:/var/ossec/wodles
+      - ./wazuh_indexer/certs/wazuh-indexer.pem:/etc/filebeat/certs/wazuh-indexer.pem
+      - ./wazuh_indexer/certs/root-ca.pem:/etc/filebeat/certs/root-ca.pem
+      - ./wazuh_manager/config/wazuh_cluster.conf.yaml:/var/ossec/etc/wazuh_cluster.conf.yaml
+    environment:
+      - INDEXER_URL=https://wazuh.indexer:9200
+      - INDEXER_USER=admin
+      - INDEXER_PASSWORD=SecretPassword1!
+      - FILEBEAT_SSL_VERIFICATION_MODE=full
+      - SSL_CERTIFICATE_AUTHORITIES=/etc/filebeat/certs/root-ca.pem
+      - SSL_CERTIFICATE=/etc/filebeat/certs/wazuh-indexer.pem
+      - SSL_KEY=/etc/filebeat/certs/wazuh-indexer.pem
+    networks:
+      - wazuh
+    depends_on:
+      wazuh.indexer:
+        condition: service_healthy
+
+  wazuh.indexer:
+    image: wazuh/wazuh-indexer:4.12.0
+    container_name: wazuh.indexer
+    hostname: wazuh.indexer
+    restart: unless-stopped
+    ports:
+      - "9200:9200"
+    volumes:
+      - wazuh_indexer_data:/var/lib/wazuh-indexer
+      - ./wazuh_indexer/certs/wazuh-indexer.pem:/etc/wazuh-indexer/certs/wazuh-indexer.pem
+      - ./wazuh_indexer/certs/wazuh-indexer.key:/etc/wazuh-indexer/certs/wazuh-indexer.key
+      - ./wazuh_indexer/certs/root-ca.pem:/etc/wazuh-indexer/certs/root-ca.pem
+      - ./wazuh_indexer/wazuh-indexer.yml:/etc/wazuh-indexer/opensearch.yml
+    environment:
+      - discovery.type=single-node
+      - indexer.memory.lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    networks:
+      - wazuh
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sk https://localhost:9200 -u admin:SecretPassword1! | grep -q cluster_name"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  wazuh.dashboard:
+    image: wazuh/wazuh-dashboard:4.12.0
+    container_name: wazuh.dashboard
+    hostname: wazuh-dashboard
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    volumes:
+      - ./wazuh_dashboard/certs/wazuh-dashboard.pem:/etc/wazuh-dashboard/certs/wazuh-dashboard.pem
+      - ./wazuh_dashboard/certs/wazuh-dashboard.key:/etc/wazuh-dashboard/certs/wazuh-dashboard.key
+      - ./wazuh_dashboard/certs/root-ca.pem:/etc/wazuh-dashboard/certs/root-ca.pem
+      - ./wazuh_dashboard/opensearch_dashboards.yml:/usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
+    environment:
+      - INDEXER_URL=https://wazuh.indexer:9200
+      - INDEXER_USERNAME=admin
+      - INDEXER_PASSWORD=SecretPassword1!
+      - DASHBOARD_USERNAME=admin
+      - DASHBOARD_PASSWORD=SecretPassword1!
+    networks:
+      - wazuh
+    depends_on:
+      wazuh.indexer:
+        condition: service_healthy
+
+volumes:
+  wazuh_api_configuration:
+  wazuh_queue:
+  wazuh_client_keys:
+  wazuh_agent_evaluation:
+  wazuh_etc:
+  wazuh_logs:
+  wazuh_upgrades:
+  wazuh_active_response:
+  wazuh_wodles:
+  wazuh_indexer_data:
+
+networks:
+  wazuh:
+    driver: bridge
