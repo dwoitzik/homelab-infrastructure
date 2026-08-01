@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: usenet-searcher-script
+  namespace: apps
+data:
+  search.py: |
+    #!/usr/bin/env python3
+    """Self-healing usenet searcher: queries Sonarr/Radarr for wanted items and triggers searches."""
+    import json, os, sys, urllib.request, urllib.error
+    from datetime import datetime, timezone
+
+    def ts():
+        return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    def api(url, api_key, method='GET', body=None):
+        headers = {'X-Api-Key': api_key, 'Content-Type': 'application/json'}
+        data = json.dumps(body).encode() if body else None
+        req = urllib.request.Request(url, data=data, method=method, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read() or b'null')
+        except Exception as e:
+            print(f'{ts()} ERROR: {url} - {e}', file=sys.stderr)
+            return None
+
+    def search_wanted(base_url, api_key, command_name, id_key, name):
+        missing = api(f'{base_url}/api/v3/wanted/missing?pageSize=200', api_key)
+        if missing is None:
+            print(f'{ts()} [{name}] Could not reach API')
+            return
+
+        count = missing.get('totalRecords', 0)
+        print(f'{ts()} [{name}] Wanted/missing: {count}')
+
+        if count > 0:
+            ids = [r['id'] for r in missing.get('records', []) if 'id' in r]
+            if ids:
+                body = {'name': command_name}
+                if id_key:
+                    body[id_key] = ids
+                result = api(f'{base_url}/api/v3/command', api_key, 'POST', body)
+                if result:
+                    print(f'{ts()} [{name}] {command_name} triggered (id={result.get("id")})')
+                else:
+                    print(f'{ts()} [{name}] ERROR: Failed to trigger {command_name}')
+
+    print(f'{ts()} [usenet-searcher] Starting search sweep')
+
+    sonarr_key = os.environ.get('SONARR_API_KEY', '')
+    radarr_key = os.environ.get('RADARR_API_KEY', '')
+
+    if sonarr_key:
+        search_wanted('http://sonarr.apps.svc.cluster.local:8989', sonarr_key,
+                       'EpisodeSearch', 'episodeIds', 'sonarr')
+    else:
+        print(f'{ts()} [sonarr] No API key, skipping')
+
+    if radarr_key:
+        search_wanted('http://radarr.apps.svc.cluster.local:7878', radarr_key,
+                       'MissingMoviesSearch', None, 'radarr')
+    else:
+        print(f'{ts()} [radarr] No API key, skipping')
+
+    print(f'{ts()} [usenet-searcher] Search sweep complete')

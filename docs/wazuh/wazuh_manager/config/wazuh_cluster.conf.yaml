@@ -1,0 +1,9 @@
+disabled: no
+node_name: wazuh-manager-1
+node_type: master
+key: 'wazuh-cluster-key-2026'
+port: 1516
+bind_addr: 0.0.0.0
+nodes:
+    - wazuh-manager-1:
+        bind_addr: 0.0.0.0
