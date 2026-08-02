@@ -14,7 +14,7 @@ data:
   trivy.severity: "CRITICAL,HIGH"
   trivy.timeout: "5m0s"
   trivy.resources.limits.cpu: "500m"
-  trivy.resources.limits.memory: "500Mi"
+  trivy.resources.limits.memory: "1Gi"
   trivy.resources.requests.cpu: "100m"
   trivy.resources.requests.memory: "100Mi"
   scanJob.ttl: "1h"
