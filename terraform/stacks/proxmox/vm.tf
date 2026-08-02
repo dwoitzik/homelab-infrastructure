@@ -217,7 +217,7 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   # stalls → k3s-11 loses Raft quorum → control-plane crash loop. Matched to
   # k3s-11 (6 cores, 12 GB dedicated + 4 GB floating) so both etcd members
   # have equal headroom. Host has 64 GB DDR4; overcommit gate still passes
-  # (dedicated sum 36→40 GB, ceiling 46 GB).
+  # (dedicated sum 36→40 GB, ceiling 50 GB).
   vm_id     = 213
   name      = "vm-srv-k3s-13"
   node_name = local.target_node
