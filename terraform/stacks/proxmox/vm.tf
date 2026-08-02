@@ -211,7 +211,13 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
 }
 
 resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
-  # memory capped at 8 GB (was 16 GB) — pure agent node, same rationale as k3s-12.
+  # REL-012d: k3s-13 is a control-plane + etcd member (NOT a pure agent),
+  # but was sized at 4 cores / 8 GB while k3s-11 got 6 cores / 16 GB.
+  # Under cold-start + regular load it exhausts CPU/RAM → etcd apply/ReadIndex
+  # stalls → k3s-11 loses Raft quorum → control-plane crash loop. Matched to
+  # k3s-11 (6 cores, 12 GB dedicated + 4 GB floating) so both etcd members
+  # have equal headroom. Host has 64 GB DDR4; overcommit gate still passes
+  # (dedicated sum 36→40 GB, ceiling 46 GB).
   vm_id     = 213
   name      = "vm-srv-k3s-13"
   node_name = local.target_node
@@ -239,13 +245,13 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
 
   # REL-035: see vm-srv-k3s-11 comment.
   cpu {
-    cores = 4
+    cores = 6
     type  = "host"
     units = 2048
   }
 
   memory {
-    dedicated = 8192
+    dedicated = 12288
     floating  = 4096
   }
 
