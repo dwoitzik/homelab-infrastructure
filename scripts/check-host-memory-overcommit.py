@@ -70,7 +70,15 @@ HOST_RESERVE_GB = 6  # kernel + hypervisor/qemu process overhead (non-ARC)
 # bursts, and live usage was 41/62 GB on 2026-07-07. Still ~16 GB under
 # physical RAM; the REL-016 ZFS-stall blast-radius guard is preserved, just
 # with the headroom the crash loop demonstrated was needed.
-HARD_GATE_CEILING_GB = 46
+# REL-012d (2026-08-02): raised 46→50 GB. k3s-13 is ALSO a control-plane +
+# etcd member (comment previously claimed "pure agent node" — wrong), sized
+# at 4 cores / 8 GB while k3s-11 got 6/16 GB. It exhausted CPU/RAM under
+# cold-start + steady load, stalling etcd and making k3s-11 lose Raft
+# quorum → repeat crash loops (k3s-11 NRestarts 69, k3s-13 135). Both etcd
+# members now 12 GB dedicated (36→40 GB VM sum) so the control plane has
+# symmetric headroom. 50 GB total = 40 GB VMs + 4 GB ARC + 6 GB reserve,
+# still 12 GB under physical RAM; live usage remains ~41/62 GB.
+HARD_GATE_CEILING_GB = 50
 HARD_GATE_CEILING_MB = HARD_GATE_CEILING_GB * 1024
 
 # --- Soft check: LXC CT limits vs physical RAM, warn-only -----------------
