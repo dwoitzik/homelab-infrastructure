@@ -9,7 +9,7 @@ regexes = [
   # ROADMAP.md doc text listing which services use which OIDC client auth
   # method — matches the generic-api-key pattern but is plain documentation,
   # not a secret.
-  '''***REMOVED*** use `client_secret_basic`''',
+  '''.*use `client_secret_basic`.*''',
 ]
 # The baseline file itself contains copies of past findings as JSON strings -
 # without this, regenerating the baseline recursively re-scans its own
