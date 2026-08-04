@@ -85,7 +85,7 @@ services:
       retries: 5
 
   wazuh.dashboard:
-    image: wazuh/wazuh-dashboard:4.12.0
+    image: wazuh/wazuh-dashboard:4.14.6@sha256:261d270587933778f9ca61ec0334adf3b9a25e30d41d71c937890a60dab6eb04
     container_name: wazuh.dashboard
     hostname: wazuh-dashboard
     restart: unless-stopped
