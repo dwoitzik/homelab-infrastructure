@@ -78,7 +78,14 @@ HOST_RESERVE_GB = 6  # kernel + hypervisor/qemu process overhead (non-ARC)
 # members now 12 GB dedicated (36→40 GB VM sum) so the control plane has
 # symmetric headroom. 50 GB total = 40 GB VMs + 4 GB ARC + 6 GB reserve,
 # still 12 GB under physical RAM; live usage remains ~41/62 GB.
-HARD_GATE_CEILING_GB = 50
+# REL-036 (2026-08-05): raised 50→58 GB. Post-reset single-node recovery put
+# the full app workload on k3s-11 (vm-srv-k3s-12/13 not yet re-joined), which
+# pushed it to ~15.5/16 GB live → kswapd thrash (load 400+). Re-balanced:
+# k3s-11 16→28 GB dedicated, k3s-12 12→8 GB, k3s-13 unchanged at 12 GB (etcd
+# Raft symmetry preserved). 58 GB = 48 GB VMs + 4 GB ARC + 6 GB reserve,
+# still 4 GB under the 62 GB physical total — the REL-016 ZFS-stall
+# blast-radius guard stays intact, just with tighter headroom.
+HARD_GATE_CEILING_GB = 58
 HARD_GATE_CEILING_MB = HARD_GATE_CEILING_GB * 1024
 
 # --- Soft check: LXC CT limits vs physical RAM, warn-only -----------------

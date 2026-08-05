@@ -47,9 +47,14 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
     units = 2048
   }
 
+  # REL-036 (2026-08-05): 16→28 GB dedicated, 8→12 GB floating. Post-reset
+  # single-node recovery (vm-srv-k3s-12/13 not yet re-joined, all app
+  # workloads on this node) pushed live usage to ~15.5/16 GB → kswapd
+  # thrashing → kubelet/API timeouts (load 400+). +12 GB absorbs the spike;
+  # cost is -4 GB on k3s-12. See check-host-memory-overcommit.py REL-036.
   memory {
-    dedicated = 16384
-    floating  = 8192
+    dedicated = 28672
+    floating  = 12288
   }
 
   # REL-012c: cache=none + aio=native (O_DIRECT, no QEMU page cache).
@@ -127,9 +132,11 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
 }
 
 resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
-  # 12 GB dedicated + 8 GB floating — hosts Traefik, Vault, ArgoCD, CNPG,
-  # cert-manager, CrowdSec, Trivy Operator. Was 8/4 but hit 97% memory
-  # causing API server OOM crashes during security tooling rollout.
+  # 12→8 GB dedicated (REL-036: RAM re-balanced to k3s-11 after single-node
+  # reset recovery). Still hosts Traefik, Vault, ArgoCD, CNPG, cert-manager,
+  # CrowdSec, Trivy Operator; 8 GB is tight for a cold start but this node
+  # only resumes that role once re-joined. Was 8/4 (2026-07) and hit 97%
+  # memory during security tooling rollout.
   vm_id     = 212
   name      = "vm-srv-k3s-12"
   node_name = local.target_node
@@ -166,8 +173,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   }
 
   memory {
-    dedicated = 12288
-    floating  = 8192
+    dedicated = 8192
+    floating  = 4096
   }
 
   # REL-012c: cache=none + aio=native (see k3s-11 comment).
