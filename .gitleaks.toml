@@ -8,8 +8,10 @@ description = "Known false positives"
 regexes = [
   # ROADMAP.md doc text listing which services use which OIDC client auth
   # method — matches the generic-api-key pattern but is plain documentation,
-  # not a secret.
+  # not a secret. Restored as safe patterns after the SEC-015 history rewrite
+  # clobbered the original regex.
   '''.*use `client_secret_basic`.*''',
+  '''.*Proxmox/PBS/Grafana/Headscale.*''',
 ]
 # The baseline file itself contains copies of past findings as JSON strings -
 # without this, regenerating the baseline recursively re-scans its own
