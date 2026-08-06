@@ -32,7 +32,7 @@ spec:
             value: "1"
       containers:
         - name: uptime-kuma
-          image: louislam/uptime-kuma:2.4.0
+          image: louislam/uptime-kuma:2.5.0
           # SEC-012: image entrypoint starts as root then setpriv-drops to
           # its runtime user -- confirmed live, dropping all capabilities
           # crash-loops it ("setpriv: setgroups failed: Operation not
