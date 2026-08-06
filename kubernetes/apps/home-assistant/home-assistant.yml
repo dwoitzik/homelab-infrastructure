@@ -67,16 +67,19 @@ spec:
             httpGet:
               path: /manifest.json
               port: 8123
-            initialDelaySeconds: 45
+            # Home Assistant can take several minutes to come up after a
+            # restore (recorder sqlite recovery), so the liveness probe must
+            # not kill it during a slow first start.
+            initialDelaySeconds: 300
             periodSeconds: 30
-            failureThreshold: 4
+            failureThreshold: 6
           resources:
             requests:
               cpu: 200m
               memory: 512Mi
             limits:
               cpu: 1000m
-              memory: 1Gi
+              memory: 2Gi
       volumes:
         - name: config
           persistentVolumeClaim:
