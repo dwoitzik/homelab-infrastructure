@@ -4,6 +4,9 @@ metadata:
   name: postgres-n8n
   namespace: database
 spec:
+  # REL-xxx: stopped during cluster stabilization (I/O), re-enable by
+  # removing `stop: true`
+  stop: true
   instances: 1
 
   postgresql:
