@@ -131,6 +131,10 @@ metadata:
   namespace: apps
 spec:
   schedule: "*/5 * * * *"
+  # Suspended: the cron errors on every run (DB connection issue) and its
+  # recurring failed pods drive periodic I/O/load spikes after the cluster
+  # restart. Re-enable once the DB is healthy again.
+  suspend: true
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
