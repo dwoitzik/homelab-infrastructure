@@ -363,6 +363,11 @@ metadata:
   namespace: apps
 spec:
   schedule: "*/5 * * * *"
+  # REL-xxx: suspended during cluster stabilization -- the 5-min cron produced
+  # 22-min runs (cron.php background jobs) that saturated the host nvme (60%+
+  # iowait in the VM, D-state postgres/vault), driving load >300. Re-enable
+  # once the cluster is quiet and load stays <30.
+  suspend: true
   concurrencyPolicy: Forbid
   # REL-061: a single failed run from 2026-06-28/29 (root cause not
   # determinable -- pod logs already garbage-collected by the time this was
