@@ -16,7 +16,11 @@ metadata:
   name: mealie
   namespace: apps
 spec:
-  replicas: 1
+  # REL-xxx: scaled to 0 until cluster is quiet so the SQLite migration can
+  # run without being killed by I/O load. To migrate: set replicas 1 AND empty
+  # the mealie-data PV first (the partial migration leaves a corrupt alembic
+  # state, e.g. "index ix_api_extras_created_at already exists").
+  replicas: 0
   selector:
     matchLabels:
       app: mealie
