@@ -79,8 +79,9 @@ spec:
               path: /api/app/about
               port: 9000
             # First start runs alembic migrations + NLTK download, which can
-            # take minutes under load; do not kill it mid-migration.
-            initialDelaySeconds: 180
+            # take 10+ minutes under load; killing mid-migration corrupts the
+            # sqlite DB (tables created, no alembic_version marker).
+            initialDelaySeconds: 900
             periodSeconds: 30
             failureThreshold: 6
           resources:
