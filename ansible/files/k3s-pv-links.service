@@ -1,0 +1,15 @@
+[Unit]
+Description=Recreate k3s local-path PV symlinks
+# The local-path PVs live under /var/lib/rancher/k3s/storage, but the PV
+# manifests point at /tmp/k3s-old/storage (tmpfs). These symlinks must exist
+# before k3s mounts the PVs, hence run before k3s on boot.
+Before=k3s.service
+Wants=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/k3s-pv-links.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

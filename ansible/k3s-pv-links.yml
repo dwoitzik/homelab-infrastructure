@@ -1,0 +1,29 @@
+---
+# Deploys the k3s local-path PV symlink bridge on the k3s server node (vm-srv-k3s-11).
+# The PV manifests point at /tmp/k3s-old/storage (tmpfs, emptied on reboot) while
+# the real data lives in /var/lib/rancher/k3s/storage (NFS import). The symlinks
+# are recreated on every boot before k3s starts.
+# Run after node rebuild:
+#   ansible-playbook ansible/k3s-pv-links.yml
+- name: Provision k3s PV symlink bridge
+  hosts: k3s_nodes
+  become: true
+  tasks:
+    - name: Deploy PV symlink script
+      ansible.builtin.copy:
+        src: files/k3s-pv-links.sh
+        dest: /usr/local/bin/k3s-pv-links.sh
+        mode: "0755"
+
+    - name: Deploy systemd unit
+      ansible.builtin.copy:
+        src: files/k3s-pv-links.service
+        dest: /etc/systemd/system/k3s-pv-links.service
+        mode: "0644"
+
+    - name: Enable PV symlink unit
+      ansible.builtin.systemd:
+        name: k3s-pv-links
+        enabled: true
+        state: started
+        daemon_reload: true
