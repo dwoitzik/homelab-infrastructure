@@ -215,7 +215,7 @@ spec:
       # place. Flagged in the hardening report, not resolved in this PR.
       containers:
       - name: immich-server
-        image: ghcr.io/immich-app/immich-server:v3.0.1
+        image: ghcr.io/immich-app/immich-server:v3.1.0
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -334,14 +334,14 @@ spec:
       # restart.
       initContainers:
       - name: fix-cache-ownership
-        image: ghcr.io/immich-app/immich-machine-learning:v3.0.1
+        image: ghcr.io/immich-app/immich-machine-learning:v3.1.0
         command: ["chown", "-R", "65534:65534", "/cache"]
         volumeMounts:
         - name: cache
           mountPath: /cache
       containers:
       - name: immich-ml
-        image: ghcr.io/immich-app/immich-machine-learning:v3.0.1
+        image: ghcr.io/immich-app/immich-machine-learning:v3.1.0
         securityContext:
           runAsNonRoot: true
           runAsUser: 65534
