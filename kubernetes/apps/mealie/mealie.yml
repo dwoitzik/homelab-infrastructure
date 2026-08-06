@@ -78,16 +78,18 @@ spec:
             httpGet:
               path: /api/app/about
               port: 9000
-            initialDelaySeconds: 20
+            # First start runs alembic migrations + NLTK download, which can
+            # take minutes under load; do not kill it mid-migration.
+            initialDelaySeconds: 180
             periodSeconds: 30
-            failureThreshold: 4
+            failureThreshold: 6
           resources:
             requests:
               cpu: 100m
               memory: 256Mi
             limits:
               cpu: 500m
-              memory: 512Mi
+              memory: 1Gi
       volumes:
         - name: data
           persistentVolumeClaim:
