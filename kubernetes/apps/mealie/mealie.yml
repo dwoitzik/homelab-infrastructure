@@ -16,11 +16,11 @@ metadata:
   name: mealie
   namespace: apps
 spec:
-  # REL-xxx: scaled to 0 until cluster is quiet so the SQLite migration can
-  # run without being killed by I/O load. To migrate: set replicas 1 AND empty
-  # the mealie-data PV first (the partial migration leaves a corrupt alembic
-  # state, e.g. "index ix_api_extras_created_at already exists").
-  replicas: 0
+  # REL-xxx: back to 1 for a clean SQLite migration on an empty PV. The
+  # migration takes up to ~15min under load; the liveness probe allows 900s.
+  # If a kill leaves a partial alembic state ("index ... already exists"),
+  # scale to 0, empty the mealie-data PV, and scale back up.
+  replicas: 1
   selector:
     matchLabels:
       app: mealie
