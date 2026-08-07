@@ -83,11 +83,12 @@ spec:
               path: /api/app/about
               port: 9000
             # First start runs alembic migrations + NLTK download, which took
-            # 40+ min on the I/O-saturated nvme; killing mid-migration used to
-            # corrupt the sqlite DB (tables created, no alembic_version marker)
-            # and forced repeated PV wipes. 1800s gives one container run a full
-            # clean migration window; alembic resumes safely after any kill.
-            initialDelaySeconds: 1800
+            # 35+ min on the I/O-saturated nvme. A kill mid-migration leaves
+            # corrupt sqlite state (tables exist, no alembic_version marker ->
+            # "table ... already exists" CrashLoop) that forces a PV wipe. Give
+            # one container run a full window; alembic resumes safely after
+            # any kill only if the kill landed between version commits.
+            initialDelaySeconds: 3600
             periodSeconds: 30
             failureThreshold: 8
           resources:
