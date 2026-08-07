@@ -82,12 +82,14 @@ spec:
             httpGet:
               path: /api/app/about
               port: 9000
-            # First start runs alembic migrations + NLTK download, which can
-            # take 10+ minutes under load; killing mid-migration corrupts the
-            # sqlite DB (tables created, no alembic_version marker).
-            initialDelaySeconds: 900
+            # First start runs alembic migrations + NLTK download, which took
+            # 40+ min on the I/O-saturated nvme; killing mid-migration used to
+            # corrupt the sqlite DB (tables created, no alembic_version marker)
+            # and forced repeated PV wipes. 1800s gives one container run a full
+            # clean migration window; alembic resumes safely after any kill.
+            initialDelaySeconds: 1800
             periodSeconds: 30
-            failureThreshold: 6
+            failureThreshold: 8
           resources:
             requests:
               cpu: 100m
