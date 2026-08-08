@@ -1,4 +1,5 @@
-# PROPOSED, NOT YET APPLIED -- closes the orphaned-bootstrap-file trap class
+# LIVE since 2026-08-04 (kubectl apply), Application present in argocd ns and
+# healthy. Closes the orphaned-bootstrap-file trap class
 # hit 3 times now (gitops-tracking-application.yml, postgres-cluster's own
 # Application file, cloudnative-pg's own Application file -- all silently
 # had zero live effect from a git edit until manually kubectl apply'd).
@@ -37,6 +38,14 @@
 # Application's own recurse+glob include syntax hasn't been dry-run against
 # the live ArgoCD instance yet either. Needs an explicit go before applying,
 # same as any other change with cluster-wide reach.
+#
+# APPLIED and live 2026-08-08 extension: include pattern widened to also take
+# the top-level system manifest files apps-ingressroute.yml and
+# other-ingressroute.yml (the IngressRoute/Service/Endpoints layer that had
+# NO ArgoCD owner before -- those routes were re-applied manually after the
+# 2026-08-08 CRD-loss incident). These files use fully-qualified namespace:
+# fields, so destination.namespace (argocd) is overridden per-resource and
+# routes land in their real namespaces (apps, monitoring, vault, kube-system).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -50,7 +59,7 @@ spec:
     path: kubernetes/system
     directory:
       recurse: true
-      include: '{*/application.yml,*/manifests-application.yml,postgres/postgres-cluster-application.yml,monitoring/loki.yml}'
+      include: '{*/application.yml,*/manifests-application.yml,postgres/postgres-cluster-application.yml,monitoring/loki.yml,apps-ingressroute.yml,other-ingressroute.yml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
