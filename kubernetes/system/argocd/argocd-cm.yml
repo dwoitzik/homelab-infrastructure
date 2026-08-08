@@ -9,6 +9,10 @@ metadata:
 data:
   url: https://argo.woitzik.dev
   accounts.admin: apiKey, login
+  # Reconciliation interval — raised 2026-08-08 to reduce ArgoCD controller
+  # churn on the low-I/O nodes. Default is 180s of every 30s→3m polling loop.
+  timeout.reconciliation: 300s
+  timeout.hard.reconciliation: 3600s
   oidc.config: |
     name: Authelia
     issuer: https://auth.woitzik.dev
