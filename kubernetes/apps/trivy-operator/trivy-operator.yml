@@ -152,7 +152,7 @@ spec:
       serviceAccountName: trivy-operator
       containers:
         - name: trivy-operator
-          image: docker.io/aquasec/trivy-operator:0.32.0
+          image: docker.io/aquasec/trivy-operator:0.33.0@sha256:ce5e4d5eeaf211b4e2091ed3209ce9676fd6bd7fb2f22f782559574a01ac219e
           args:
             - --overwrite
           env:
