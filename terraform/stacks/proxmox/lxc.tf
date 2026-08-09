@@ -88,13 +88,18 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
     hostname = "ct-srv-docker-01"
   }
 
+  # REL-074: cut 4->2 cores, 10->6 GB dedicated (swap 4->2 GB). Live usage
+  # was ~1.2 GB RAM / ~10% CPU for the docker-host + its handful of
+  # sidecar containers -- this was one of the largest unused reservations on
+  # the host after ai-01. Frees 4 GB RAM + 2 vCPU for the gaming/media stack
+  # without touching anything that runs here in practice.
   cpu {
-    cores = 4
+    cores = 2
   }
 
   memory {
-    dedicated = 10240
-    swap      = 4096
+    dedicated = 6144
+    swap      = 2048
   }
 
   features {
@@ -168,14 +173,19 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   # effective CPU ceiling. Provider is now 0.111.0 and exposes `limit`
   # directly, so the cap is real and Terraform-tracked going forward instead
   # of depending on a manual step nobody re-runs after a recreate.
+  # REL-074: 6->4 cores/limit, 32->24 GB dedicated (swap 8->4 GB). Live usage
+  # was ~36 MB RAM / 0-4% CPU -- Ollama holds no model in RAM when idle, and
+  # this was the single largest reservation on the host (~91 GB allocated vs
+  # 62 GB physical). 24 GB still fits a gemma2:27b run (~18 GB) with headroom;
+  # any cold-start inference takes longer on 4 cores but the host stays up.
   cpu {
-    cores = 6
-    limit = 6
+    cores = 4
+    limit = 4
   }
 
   memory {
-    dedicated = 32768
-    swap      = 8192
+    dedicated = 24576
+    swap      = 4096
   }
 
   features {
@@ -370,13 +380,16 @@ resource "proxmox_virtual_environment_container" "ct_srv_jellyfin_01" {
     }
   }
 
+  # REL-074: 2->3 cores, 2->4 GB dedicated (swap 1->2 GB). Hardware
+  # transcode is VAAPI (GPU-side) but scan/jellyfin runtime + image
+  # extraction still hit CPU/RAM; 2 GB was at OOM risk during library scans.
   cpu {
-    cores = 2
+    cores = 3
   }
 
   memory {
-    dedicated = 2048
-    swap      = 1024
+    dedicated = 4096
+    swap      = 2048
   }
 
   features {
@@ -739,8 +752,16 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   # overcommit across all VMs/CTs). Cgroup CFS quota, not an exclusive
   # reservation -- doesn't guarantee 2 cores are always free, just caps this
   # container's ceiling so it can't monopolize more than 2 of 16 threads.
+  # REL-074: 2->4 cores (back to pre-REL-031 sizing) + cpuunits 1024->2048,
+  # now that the host is no longer ~2.5x vCPU overcommitted. This is the
+  # Minecraft server -- player-relevant latency under tick pressure, so it
+  # gets the same scheduling priority weight as the k3s VMs (units=2048,
+  # equal to vm-srv-k3s-*) instead of competing on equal footing with idle
+  # LXCs. CFS quota still caps it at 4 threads; units only wins the contention
+  # when the host is genuinely saturated.
   cpu {
-    cores = 2
+    cores = 4
+    units = 2048
   }
 
   # REL-035: dedicated memory was 16384 (16GB) but actual observed usage
@@ -748,8 +769,11 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   # the single largest unused memory reservation on the host after ai-01,
   # contributing to a ~91GB allocated vs 62GB physical overcommit ratio.
   # 8192 keeps ~70% headroom over observed peak.
+  # REL-074: 8->12 GB dedicated. 4.7 GB was a vanilla server; with mods +
+  # chunk generation + player count this runs out of heap headroom, GC
+  # stutters show up as player lag spikes. 12 GB absorbs it.
   memory {
-    dedicated = 8192
+    dedicated = 12288
     swap      = 2048
   }
 
