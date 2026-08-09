@@ -7,7 +7,6 @@
   loop:
     - /opt/minecraft
     - /opt/minecraft/data-3
-    - /opt/minecraft/data-cobblemon
 
 - name: Deploy Minecraft docker-compose.yml
   ansible.builtin.copy:
@@ -28,24 +27,6 @@
             - "25565:25565"
           volumes:
             - ./data-3:/data
-          restart: unless-stopped
-
-        cobblemon:
-          # Cobblemon 1.7.x requires Java 21 specifically - the "latest" tag ships Java 25
-          image: itzg/minecraft-server:java21
-          container_name: mc-server-cobblemon
-          environment:
-            EULA: "TRUE"
-            TYPE: "FABRIC"
-            VERSION: "1.21.1"
-            MODRINTH_PROJECTS: "cobblemon,fabric-api"
-            INIT_MEMORY: "2G"
-            MAX_MEMORY: "4G"
-            TZ: "Europe/Berlin"
-          ports:
-            - "25566:25565"
-          volumes:
-            - ./data-cobblemon:/data
           restart: unless-stopped
     mode: '0644'
 
