@@ -139,10 +139,16 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
 
 # REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
 resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
-  vm_id                 = 201
-  node_name             = local.target_node
-  tags                  = ["ai", "llm", "server"]
-  started               = true
+  vm_id     = 201
+  node_name = local.target_node
+  tags      = ["ai", "llm", "server"]
+  # REL-075: powered off -- reserved 24GB RAM + 4 vCPU against ~38MB live
+  # usage, one of the largest drivers of the host's chronic overcommit (swap
+  # active, 88-92C temps, freeze risk behind the recurring KubeAPIServerDown /
+  # CrashLoop alert storms). Power back on via `pct start 201` when the host
+  # has headroom again. onboot set to 0 manually (REL-016 provider gap) so it
+  # stays off across host reboots.
+  started               = false
   unprivileged          = true
   environment_variables = {}
 
