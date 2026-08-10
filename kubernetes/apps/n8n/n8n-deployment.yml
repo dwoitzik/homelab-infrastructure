@@ -6,9 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: n8n
 spec:
-  # REL-xxx: scaled to 0 during cluster stabilization (I/O), re-enable by
-  # restoring replicas: 1
-  replicas: 0
+  replicas: 1
   strategy:
     type: Recreate
   selector:
