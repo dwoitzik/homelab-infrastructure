@@ -36,9 +36,10 @@ metadata:
   namespace: apps
 spec:
   serviceName: postgres-nextcloud
-  # REL-xxx: scaled to 0 during cluster stabilization (I/O), re-enable by
-  # restoring replicas: 1
-  replicas: 0
+  # REL-012 stabilization: scaled to 0 during cluster stabilization (I/O).
+  # Re-enabled 2026-08-10 after ai-01 decommission + load dropped (host load
+  # ~4). Cluster stable.
+  replicas: 1
   selector:
     matchLabels:
       app: postgres-nextcloud
@@ -47,6 +48,8 @@ spec:
       labels:
         app: postgres-nextcloud
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: vm-srv-k3s-13
       dnsConfig:
         options:
           - name: ndots
@@ -134,9 +137,9 @@ metadata:
   name: redis-nextcloud
   namespace: apps
 spec:
-  # REL-xxx: scaled to 0 during cluster stabilization (I/O), re-enable by
-  # restoring replicas: 1
-  replicas: 0
+  # REL-012 stabilization: scaled to 0 during cluster stabilization (I/O).
+  # Re-enabled 2026-08-10. Redis runs without persistence (ephemeral cache).
+  replicas: 1
   selector:
     matchLabels:
       app: redis-nextcloud
@@ -145,6 +148,8 @@ spec:
       labels:
         app: redis-nextcloud
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: vm-srv-k3s-13
       dnsConfig:
         options:
           - name: ndots
@@ -220,9 +225,9 @@ metadata:
   name: nextcloud
   namespace: apps
 spec:
-  # REL-xxx: scaled to 0 during cluster stabilization (I/O), re-enable by
-  # restoring replicas: 1
-  replicas: 0
+  # REL-012 stabilization: scaled to 0 during cluster stabilization (I/O).
+  # Re-enabled 2026-08-10.
+  replicas: 1
   selector:
     matchLabels:
       app: nextcloud
@@ -237,6 +242,8 @@ spec:
       - key: node-role.kubernetes.io/control-plane
         operator: Exists
         effect: NoSchedule
+      nodeSelector:
+        kubernetes.io/hostname: vm-srv-k3s-13
       dnsConfig:
         options:
           - name: ndots

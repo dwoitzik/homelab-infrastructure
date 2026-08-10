@@ -135,7 +135,7 @@ data:
             href: https://mealie.woitzik.dev
             description: Recipe Manager
         - LubeLogger:
-            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/lubelogger.svg
+            icon: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@main/png/lubelogger.png
             href: https://cars.woitzik.dev
             description: Vehicle Maintenance Tracker
     - Information:
