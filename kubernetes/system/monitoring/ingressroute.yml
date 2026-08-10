@@ -10,4 +10,3 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: kube-prometheus-stack-grafana, port: 80}]
-  tls: {secretName: wildcard-woitzik-dev-tls}

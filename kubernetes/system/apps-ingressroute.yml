@@ -10,7 +10,6 @@ spec:
   - match: Host(`auth.woitzik.dev`)
     kind: Rule
     services: [{name: authelia, port: 9091}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Homepage
 apiVersion: traefik.io/v1alpha1
@@ -25,7 +24,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: homepage, port: 80}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Paperless
 apiVersion: traefik.io/v1alpha1
@@ -40,7 +38,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: paperless, port: 8000}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # AI
 apiVersion: traefik.io/v1alpha1
@@ -55,7 +52,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: open-webui, port: 8080}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Immich
 apiVersion: traefik.io/v1alpha1
@@ -75,7 +71,6 @@ spec:
     # apps/immich/middleware.yml for the limit rationale.
     middlewares: [{name: immich-ratelimit}]
     services: [{name: immich-server, port: 2283}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Vaultwarden — direct access, no Authelia in front (2026-08-08).
 # Vaultwarden's own 2FA is the only gate.
@@ -91,7 +86,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}]
     services: [{name: vaultwarden, port: 80}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # AdGuard Home external service (primary RPi at 10.0.20.2:3001)
 apiVersion: v1
@@ -129,7 +123,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: external-dns, port: 3001}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Garage API (S3)
 apiVersion: traefik.io/v1alpha1
@@ -143,7 +136,6 @@ spec:
   - match: Host(`s3.woitzik.dev`)
     kind: Rule
     services: [{name: garage, port: 3900}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Proxmox (PVE)
 apiVersion: traefik.io/v1alpha1
@@ -165,7 +157,6 @@ spec:
         port: 8006
         scheme: https
         serversTransport: insecure-transport
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Proxmox Backup (PBS)
 apiVersion: traefik.io/v1alpha1
@@ -188,7 +179,6 @@ spec:
         scheme: https
         serversTransport: insecure-transport
         passHostHeader: true
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # External services for pve-final / pbs-final — these are manual Services +
 # Endpoints pointing at host-ported apps (PVE mgmt on 10.0.10.10, PBS on
@@ -291,7 +281,6 @@ spec:
       - name: authelia
       - name: websockets
     services: [{name: external-atlantis, port: 4141}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Uptime Kuma
 apiVersion: traefik.io/v1alpha1
@@ -310,7 +299,6 @@ spec:
       - name: authelia
         namespace: apps
     services: [{name: uptime-kuma, port: 3001}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Headscale (Management VPN)
 apiVersion: traefik.io/v1alpha1
@@ -325,7 +313,6 @@ spec:
     kind: Rule
     middlewares: [{name: websockets}]
     services: [{name: headscale, port: 8080}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Mealie (Recipe Manager)
 apiVersion: traefik.io/v1alpha1
@@ -340,7 +327,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: mealie, port: 9000}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Nextcloud (no Authelia — CalDAV/CardDAV native clients need direct access)
 apiVersion: traefik.io/v1alpha1
@@ -354,7 +340,6 @@ spec:
   - match: Host(`nextcloud.woitzik.dev`)
     kind: Rule
     services: [{name: nextcloud, port: 80}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Gitea (private git) — Authelia added (2026-07-17); web UI now gated.
 # Git SSH and token-based API access are unaffected.
@@ -370,7 +355,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: gitea, port: 3000}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Home Assistant (Authelia guards web UI; Companion app should use Headscale VPN
 # for direct local access, same pattern as Jellyfin below)
@@ -386,7 +370,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: home-assistant, port: 8123}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Jellyfin — no Authelia; Jellyfin's own auth handles access control.
 # Cloudflare tunnel also bypasses Authelia (direct to Jellyfin login), so this
@@ -403,7 +386,6 @@ spec:
   - match: Host(`media.woitzik.dev`)
     kind: Rule
     services: [{name: jellyfin, port: 8096}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 # SABnzbd, Sonarr, Radarr, Bazarr — IngressRoutes consolidated into
 # kubernetes/apps/jellyfin/usenet.yml alongside their External service definitions.
 ---
@@ -420,7 +402,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: scrutiny-web, port: 8080}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Wazuh (SIEM on ct-srv-docker-01, 10.0.20.252:443) — own auth, no Authelia
 apiVersion: v1
@@ -461,4 +442,3 @@ spec:
         port: 443
         scheme: https
         serversTransport: insecure-transport
-  tls: {secretName: wildcard-woitzik-dev-tls}

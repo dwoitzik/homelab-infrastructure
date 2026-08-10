@@ -11,7 +11,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: vault, port: 8200}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # REL-033: ArgoCD IngressRoute moved to kubernetes/system/argocd/ingressroute.yml
 # (co-located with the app it fronts, now Authelia-gated there) -- this was a
@@ -54,7 +53,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: router-external, port: 80}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Traefik API — ClusterIP so homepage widget can reach port 9000
 apiVersion: v1
@@ -114,4 +112,3 @@ spec:
     services:
     - name: api@internal
       kind: TraefikService
-  tls: {secretName: wildcard-woitzik-dev-tls}

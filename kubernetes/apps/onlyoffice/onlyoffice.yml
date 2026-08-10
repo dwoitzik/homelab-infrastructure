@@ -125,7 +125,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: onlyoffice, port: 80}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application

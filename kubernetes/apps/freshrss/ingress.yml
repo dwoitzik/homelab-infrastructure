@@ -10,4 +10,3 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: freshrss, port: 80}]
-  tls: {secretName: wildcard-woitzik-dev-tls}

@@ -124,4 +124,3 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: searxng, port: 8080}]
-  tls: {secretName: wildcard-woitzik-dev-tls}

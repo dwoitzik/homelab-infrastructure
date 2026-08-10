@@ -19,7 +19,7 @@ spec:
     targetRevision: main
     path: kubernetes/system
     directory:
-      include: "{apps-ingressroute,other-ingressroute,pod-disruption-budgets}.yml"
+      include: "{apps-ingressroute,other-ingressroute,pod-disruption-budgets,certificates/*}.yml"
   destination:
     server: https://kubernetes.default.svc
     namespace: apps
