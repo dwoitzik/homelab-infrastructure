@@ -10,7 +10,7 @@ spec:
     targetRevision: main
     path: kubernetes/system/vault
     directory:
-      include: "{unseal,network-policies}.yml"
+      include: "{unseal,network-policies,certificate}.yml"
   destination:
     server: https://kubernetes.default.svc
     namespace: vault

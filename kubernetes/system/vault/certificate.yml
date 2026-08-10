@@ -1,0 +1,16 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-woitzik-dev-tls
+  namespace: vault
+spec:
+  secretName: wildcard-woitzik-dev-tls
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.woitzik.dev"
+    - "woitzik.dev"
