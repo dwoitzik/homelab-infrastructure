@@ -19,3 +19,22 @@ data:
     clientID: argocd
     clientSecret: $argocd-secret:oidc.clientSecret
     requestedScopes: ["openid", "profile", "email", "groups"]
+  # ExternalSecret/ClusterSecretStore/SecretStore drift: the ESO mutating
+  # webhook defaults fields (conversionStrategy, decodingStrategy,
+  # metadataPolicy, deletionPolicy) that the git manifests leave out. ArgoCD
+  # diffs them as changes → permanent OutOfSync → selfHeal auto-sync loop that
+  # churns the API server and keeps ~12 apps Degraded/OutOfSync. Ignore the
+  # defaulted fields + status cluster-wide (applies to every Application).
+  resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret: |
+    jqPathExpressions:
+      - .spec.data[].remoteRef.conversionStrategy
+      - .spec.data[].remoteRef.decodingStrategy
+      - .spec.data[].remoteRef.metadataPolicy
+      - .spec.target.deletionPolicy
+      - .status
+  resource.customizations.ignoreDifferences.external-secrets.io_ClusterSecretStore: |
+    jqPathExpressions:
+      - .status
+  resource.customizations.ignoreDifferences.external-secrets.io_SecretStore: |
+    jqPathExpressions:
+      - .status
