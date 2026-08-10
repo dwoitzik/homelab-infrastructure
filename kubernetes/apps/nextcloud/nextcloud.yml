@@ -49,7 +49,7 @@ spec:
         app: postgres-nextcloud
     spec:
       nodeSelector:
-        kubernetes.io/hostname: vm-srv-k3s-13
+        kubernetes.io/hostname: vm-srv-k3s-12
       dnsConfig:
         options:
           - name: ndots
@@ -149,7 +149,7 @@ spec:
         app: redis-nextcloud
     spec:
       nodeSelector:
-        kubernetes.io/hostname: vm-srv-k3s-13
+        kubernetes.io/hostname: vm-srv-k3s-12
       dnsConfig:
         options:
           - name: ndots
@@ -243,7 +243,7 @@ spec:
         operator: Exists
         effect: NoSchedule
       nodeSelector:
-        kubernetes.io/hostname: vm-srv-k3s-13
+        kubernetes.io/hostname: vm-srv-k3s-12
       dnsConfig:
         options:
           - name: ndots
