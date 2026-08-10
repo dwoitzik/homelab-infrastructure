@@ -38,7 +38,7 @@ spec:
           websecure:
             tls:
               enabled: true
-              secretName: traefik-tls-secret
+              secretName: wildcard-woitzik-dev-tls
         logs:
           general:
             level: INFO
@@ -65,7 +65,7 @@ spec:
         tlsStore:
           default:
             defaultCertificate:
-              secretName: traefik-tls-secret
+              secretName: wildcard-woitzik-dev-tls
         experimental:
           plugins:
             crowdsec:
