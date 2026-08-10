@@ -59,7 +59,7 @@ spec:
     path: kubernetes/system
     directory:
       recurse: true
-      include: '{*/application.yml,*/manifests-application.yml,postgres/postgres-cluster-application.yml,monitoring/loki.yml,apps-ingressroute.yml,other-ingressroute.yml,external-secrets/cluster-secret-store.yml}'
+      include: '{*/application.yml,*/manifests-application.yml,manifests-application.yml,postgres/postgres-cluster-application.yml,monitoring/loki.yml,apps-ingressroute.yml,other-ingressroute.yml,external-secrets/cluster-secret-store.yml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
