@@ -46,7 +46,6 @@ spec:
     # jellyfin.yml precedent (media.woitzik.dev): same user base, same trust
     # boundary, gate via the app's native per-user login alone.
     services: [{name: jellyseerr, port: 5055}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # SABnzbd
 apiVersion: v1
@@ -83,7 +82,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: sabnzbd, port: 8080}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Sonarr
 apiVersion: v1
@@ -120,7 +118,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: sonarr, port: 8989}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Radarr
 apiVersion: v1
@@ -157,7 +154,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: radarr, port: 7878}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # Bazarr
 apiVersion: v1
@@ -194,7 +190,6 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: bazarr, port: 6767}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
 ---
 # NZBHydra2
 apiVersion: v1
@@ -231,4 +226,3 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: nzbhydra2, port: 5076}]
-  tls: {secretName: wildcard-woitzik-dev-tls}

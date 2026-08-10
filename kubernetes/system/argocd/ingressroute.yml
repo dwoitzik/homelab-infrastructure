@@ -10,4 +10,3 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer, namespace: apps}, {name: authelia, namespace: apps}]
     services: [{name: argocd-server, port: 80}]
-  tls: {secretName: wildcard-woitzik-dev-tls}
