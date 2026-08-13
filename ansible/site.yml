@@ -8,6 +8,21 @@
     - watchtower
     - monitoring_agent
 
+# 2026-08-13: k3s_nodes was never in the `nodes` group, so these hosts never
+# received `common` (including its inotify limits sysctl, whose own comment
+# says it's "for k3s/container workloads" -- a gap that predates this
+# recovery, now closed) or node_exporter_native. docker/watchtower are
+# deliberately excluded here -- k3s uses containerd directly, and
+# Watchtower auto-updating k3s-managed containers out from under the
+# scheduler would fight GitOps/ArgoCD's own reconciliation.
+- name: Provision K3s Node Base OS
+  hosts: k3s_nodes
+  become: true
+  roles:
+    - common
+    - node_exporter_native
+    - k3s_node_tuning
+
 - name: Provision HA Core Services & Gateway
   hosts: rpi_nodes
   become: true

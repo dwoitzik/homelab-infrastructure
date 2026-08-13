@@ -1,0 +1,37 @@
+---
+# 2026-08-13 (ADR-015/ADR-019): k3s VM disks live on the host's DRAM-less
+# NVMe thin-pool. This role extends the same write-reduction measures
+# applied at the Proxmox host level (see /root/phase1/LEDGER.md Entry 21)
+# to each k3s guest, per ADR-019's explicit commitment to do so as part of
+# standard node provisioning rather than a one-off manual step.
+
+- name: Read current root filesystem mount options
+  ansible.builtin.set_fact:
+    k3s_node_tuning_root_mount: "{{ ansible_mounts | selectattr('mount', 'equalto', '/') | first }}"
+
+- name: Add noatime to the root filesystem mount options (fstab + live remount)
+  ansible.posix.mount:
+    path: /
+    src: "{{ k3s_node_tuning_root_mount.device }}"
+    fstype: "{{ k3s_node_tuning_root_mount.fstype }}"
+    opts: "noatime,{{ k3s_node_tuning_root_mount.options | regex_replace(',?noatime', '') }}"
+    state: mounted
+
+- name: Ensure journald drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: '0755'
+
+- name: Cap and persist journald storage
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/write-reduction.conf
+    mode: '0644'
+    content: |
+      [Journal]
+      Storage=persistent
+      Compress=yes
+      SystemMaxUse=150M
+      SystemMaxFileSize=15M
+      MaxRetentionSec=2week
+  notify: Restart journald
