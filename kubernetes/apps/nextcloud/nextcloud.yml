@@ -314,6 +314,12 @@ spec:
           # -- NEXTCLOUD_TRUSTED_DOMAINS only permits nextcloud.woitzik.dev,
           # kubelet's real Pod-IP Host header would otherwise 400 (same
           # failure class the homepage batch caught).
+          # 2026-08-13: first-ever boot runs Nextcloud's install/migration
+          # sequence before Apache serves anything - confirmed live this
+          # was taking longer than the previous grace window under load
+          # (30 apps deploying at once), causing a restart-before-it-
+          # finishes crash loop. Steady-state restarts (already installed)
+          # come up fast regardless - this only costs time on first boot.
           readinessProbe:
             httpGet:
               path: /status.php
@@ -323,6 +329,7 @@ spec:
                   value: "nextcloud.woitzik.dev"
             initialDelaySeconds: 20
             periodSeconds: 15
+            failureThreshold: 40
           livenessProbe:
             httpGet:
               path: /status.php
@@ -332,7 +339,7 @@ spec:
                   value: "nextcloud.woitzik.dev"
             initialDelaySeconds: 30
             periodSeconds: 30
-            failureThreshold: 4
+            failureThreshold: 20
           resources:
             requests:
               cpu: 200m
