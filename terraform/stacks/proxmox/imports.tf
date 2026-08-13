@@ -44,11 +44,6 @@ import {
 }
 
 import {
-  to = proxmox_storage_zfspool.local_zfs
-  id = "local-zfs"
-}
-
-import {
   to = proxmox_cluster_options.datacenter
   id = "cluster"
 }
