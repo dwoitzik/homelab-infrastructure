@@ -1,7 +1,12 @@
 locals {
   target_node = "pve-mgmt-01"
-  storage     = "local-zfs"
-  template    = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+  # 2026-08-13 disaster recovery: the host's boot/VM-image storage was
+  # migrated from ZFS ("local-zfs", zpool rpool) to LVM-thin ("local-lvm",
+  # VG pve / thin pool data) -- see /root/phase1/LEDGER.md Entries 18-21 and
+  # the ZFS+etcd+DRAM-less-SSD write-amplification postmortem in
+  # docs/compute-nodes.md. "local-zfs" no longer exists on this host.
+  storage  = "local-lvm"
+  template = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
 }
 
 # --- Management Stack ---
