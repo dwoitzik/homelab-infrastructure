@@ -25,3 +25,15 @@ k3s_cluster:
     extra_server_args: >-
       --disable servicelb
       --disable traefik
+    # 2026-08-13: see ansible/roles/k3s_node_tuning/tasks/main.yml for the
+    # full incident this closes (AdGuard's *.woitzik.dev wildcard rewrite +
+    # k8s default ndots:5 silently hijacking short-hostname DNS lookups from
+    # inside pods). That role writes /etc/rancher/k3s/resolv.conf on every
+    # node; this points k3s at it. Requires a k3s/k3s-agent service restart
+    # to take effect on already-running nodes - not automatic on every
+    # ansible run, matches the deliberate-restart caution used elsewhere in
+    # this repo for control-plane-affecting changes.
+    server_config_yaml: |
+      resolv-conf: /etc/rancher/k3s/resolv.conf
+    agent_config_yaml: |
+      resolv-conf: /etc/rancher/k3s/resolv.conf

@@ -35,3 +35,41 @@
       SystemMaxFileSize=15M
       MaxRetentionSec=2week
   notify: Restart journald
+
+# 2026-08-13: real bug found and fixed live during disaster recovery, closing
+# it here so it doesn't reappear on the next from-scratch node build. PVE's
+# node-level DNS search domain is "woitzik.dev" (matches the *.woitzik.dev
+# convention used throughout this homelab) -- fine for the VM's own OS
+# resolver (confirmed live: systemd-resolved's actual search list is empty,
+# "search .", cloud-init's `dns.domain = ""` in vm.tf is working as intended).
+# The problem is specific to k3s/kubelet: with the vendored k3s-ansible role's
+# default resolv-conf handling, every pod ends up with `woitzik.dev` in its
+# own /etc/resolv.conf search list regardless (root mechanism not fully
+# pinned down - not reproducible from the node's own live DNS config, so
+# likely a k3s-internal default/cache rather than genuine inheritance).
+# Combined with the k8s default `ndots:5` and AdGuard's own `*.woitzik.dev`
+# wildcard rewrite (needed for claude.woitzik.dev/headscale.woitzik.dev/etc),
+# this silently hijacks ANY DNS lookup under 5 labels made from inside a pod
+# - external domains (broke CrowdSec's registration call) and even proper
+# internal multi-label service names like postgres-synapse-rw.database.svc.
+# cluster.local (broke Synapse's DB connection outright, "No route to host").
+# Fix: give kubelet/containerd a clean, static resolv.conf with no search
+# domain, independent of whatever the node's own live resolver is doing.
+# `server_config_yaml`/`agent_config_yaml` in inventory.yml must set
+# `resolv-conf: /etc/rancher/k3s/resolv.conf` to point at this file - a k3s
+# service restart (`systemctl restart k3s` / `k3s-agent`) is required to pick
+# it up, not automated here since that's a control-plane-affecting action
+# that deserves the same deliberate-restart caution as any other node change.
+- name: Ensure /etc/rancher/k3s directory exists
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: '0755'
+
+- name: Write clean k3s-internal resolv.conf without the woitzik.dev search domain
+  ansible.builtin.copy:
+    dest: /etc/rancher/k3s/resolv.conf
+    mode: '0644'
+    content: |
+      nameserver 10.0.20.5
+      options ndots:5
