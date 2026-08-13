@@ -32,50 +32,42 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
     enabled = true
   }
 
-  # REL-035: units=2048 (default is 1024) gives these VMs 2x scheduling
+  # REL-035: units=2048 (default is 1024) gives this VM 2x scheduling
   # priority relative to every LXC on this host when physical CPU is
   # contended. Total allocated vCPU across all VMs/CTs is ~2x the host's 16
   # threads (documented, unavoidable without new hardware -- see
-  # docs/AUDIT.md REL-035), so contention *will* happen; without a priority
-  # weight, etcd's fdatasync calls compete on equal footing with e.g. a
-  # Minecraft server or an Ollama inference run and lose, causing the
-  # repeated REL-012c-style crash loops. This VM runs etcd -- it must win
-  # that contention every time.
+  # docs/AUDIT.md REL-035), so contention *will* happen; this is the sole
+  # k3s server (control plane + API server, ADR-015) and the node most of
+  # the app workloads schedule onto -- it should win contention over e.g. a
+  # Minecraft server or an Ollama inference run.
   cpu {
     cores = 6
     type  = "host"
     units = 2048
   }
 
-  # REL-036 (2026-08-05): 16→28 GB dedicated, 8→12 GB floating. Post-reset
-  # single-node recovery (vm-srv-k3s-12/13 not yet re-joined, all app
-  # workloads on this node) pushed live usage to ~15.5/16 GB → kswapd
-  # thrashing → kubelet/API timeouts (load 400+). +12 GB absorbs the spike;
-  # cost is -4 GB on k3s-12. See check-host-memory-overcommit.py REL-036.
+  # 2026-08-13 (ADR-015): right-sized down from the etcd-era 28GB
+  # dedicated/12GB floating (REL-036) now that this node no longer runs
+  # etcd. REL-036's actual trigger was etcd's ReadIndex/apply path starving
+  # under kswapd pressure during a single-node cold start with all app
+  # workloads concentrated here -- a real incident, but one whose root
+  # cause (etcd) ADR-015 removes. Restored to the pre-REL-036 baseline
+  # (16GB/8GB) rather than the inflated figure; if a future measured
+  # workload profile (Phase 4.7 monitoring) shows this is tight, re-bump
+  # with the same evidence bar REL-036 was held to, not preemptively.
   memory {
-    dedicated = 28672
-    floating  = 12288
+    dedicated = 16384
+    floating  = 8192
   }
 
-  # REL-012c: cache=none + aio=native (O_DIRECT, no QEMU page cache).
-  # With cache=writeback, large sequential writes (container image pulls) accumulate
-  # in the QEMU page cache; when etcd later calls fdatasync on the WAL, QEMU must
-  # flush ALL dirty pages to ZFS at once → 8–127s stalls → etcd lease timeout →
-  # k3s crash loop. cache=none eliminates this: every VM write goes directly to
-  # ZFS ARC in small increments, so fdatasync sees only etcd's own dirty data.
-  # ZFS tuning (/etc/modprobe.d/zfs.conf): zfs_dirty_data_max=256MB,
-  # zfs_txg_timeout=5s, zfs_arc_max=16GB bounds each txg commit to SLC capacity.
-  # Applied manually via `qm set 211 ...`; disk is in ignore_changes so
-  # Atlantis will not re-apply this block after initial VM creation.
-  # REL-012d (2026-08-01): 4→6 cores + 12→16GB dedicated. This node runs etcd +
-  # control plane + the bulk of app workloads. Cold start of ~60 pods (all at
-  # once after a host reboot, e.g. post-vacation power-on) starved etcd's
-  # ReadIndex/apply path on 4 cores → "apply request took too long" →
-  # leaderelection lost → k3s systemd restart loop (NRestarts=50 in 10h). 6
-  # cores leaves headroom for the boot storm; also see the k3s.service.d
-  # 30-restart-backoff.conf drop-in (RestartSec=90s) applied on 2026-08-01.
-  # REL-035 (2x vCPU oversubscription on this host) is unchanged -- this bumps
-  # one etcd node, not total allocation.
+  # cache=none + aio=native (O_DIRECT, no QEMU page cache). Originally
+  # justified by etcd's fdatasync-vs-QEMU-writeback-cache interaction
+  # (REL-012c); kept post-ADR-015 because the same class of risk exists at
+  # smaller scale for SQLite's own WAL fsync/checkpoint writes, and because
+  # this is now a cheap, no-downside default rather than a load-bearing fix
+  # for a specific incident. Underlying storage is local-lvm (LVM-thin),
+  # not the old ZFS rpool -- see locals.tf and host-config.tf for the
+  # 2026-08-13 ZFS-to-LVM-thin migration this comment used to reference.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
@@ -218,13 +210,15 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
 }
 
 resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
-  # REL-012d: k3s-13 is a control-plane + etcd member (NOT a pure agent),
-  # but was sized at 4 cores / 8 GB while k3s-11 got 6 cores / 16 GB.
-  # Under cold-start + regular load it exhausts CPU/RAM → etcd apply/ReadIndex
-  # stalls → k3s-11 loses Raft quorum → control-plane crash loop. Matched to
-  # k3s-11 (6 cores, 12 GB dedicated + 4 GB floating) so both etcd members
-  # have equal headroom. Host has 64 GB DDR4; overcommit gate still passes
-  # (dedicated sum 36→40 GB, ceiling 50 GB).
+  # 2026-08-13 (ADR-014 Option A, reinforced by ADR-015): k3s-13 previously
+  # drifted into running as a second etcd member outside of any tracked
+  # process (see ADR-014's full incident account -- a 2-member etcd cluster
+  # has *less* fault tolerance than 1-member, and directly caused a real
+  # outage). It was sized to match k3s-11 (6 cores/12GB) purely because of
+  # that etcd role. ADR-015 removes etcd entirely (single-server SQLite) --
+  # there is no longer any etcd-member role for k3s-13 to have drifted
+  # into, and no reason for it to carry control-plane-grade sizing. Reverted
+  # to plain worker sizing matching k3s-12.
   vm_id     = 213
   name      = "vm-srv-k3s-13"
   node_name = local.target_node
@@ -250,20 +244,20 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
     enabled = true
   }
 
-  # REL-035: see vm-srv-k3s-11 comment.
+  # REL-035: see vm-srv-k3s-11 comment -- same worker-starvation-avoidance
+  # reasoning as k3s-12, not etcd-specific.
   cpu {
-    cores = 6
+    cores = 4
     type  = "host"
     units = 2048
   }
 
   memory {
-    dedicated = 12288
+    dedicated = 8192
     floating  = 4096
   }
 
-  # REL-012c: cache=none + aio=native (see k3s-11 comment).
-  # Applied manually via `qm set 213 ...`; disk in ignore_changes.
+  # cache=none + aio=native (see k3s-11 comment).
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
