@@ -4,9 +4,15 @@ metadata:
   name: postgres-n8n
   namespace: database
 spec:
-  # REL-xxx: stopped during cluster stabilization (I/O), re-enable by
-  # removing `stop: true`
-  stop: true
+  # REL-xxx stabilization pause lifted 2026-08-13: this cluster (and
+  # cluster-synapse.yml alongside it) had never actually been applied to
+  # the rebuilt cluster at all -- both live under kubernetes/system/postgres/,
+  # outside the homelab-apps ApplicationSet's kubernetes/apps/* glob, so
+  # nothing was tracking them (same class of gap as the CNPG Authelia
+  # cluster before it was wired in). Applied fresh, hibernated, and swapped
+  # in the preserved pre-disaster PVC data (n8n: pvc-f1e0d4df..., verified
+  # via database contents matching the Phase 1 EVIDENCE.md record), then
+  # un-hibernated. Real recovered data, not a fresh-empty cluster.
   instances: 1
 
   postgresql:
