@@ -8,10 +8,12 @@
 # guessed from documentation.
 #
 # Covered here:
-# - local-zfs (storage.cfg's zfspool stanza) -- no credentials involved,
-#   safe, complete.
 # - datacenter.cfg's keyboard layout -- single low-stakes cluster-wide
 #   setting, no credentials involved.
+# - local-zfs (storage.cfg's zfspool stanza) USED to be covered here too, but
+#   that storage no longer exists post-2026-08-13 disaster recovery -- see
+#   the note further down in this file, right above where the resource used
+#   to be.
 #
 # Deliberately NOT covered here, with reasons:
 # - local-pbs (storage.cfg's pbs stanza): the provider's
@@ -44,21 +46,19 @@
 # authorization before applying.
 # =============================================================================
 
-# Short-form resource names (not the proxmox_virtual_environment_* prefix
-# used by the rest of this stack's VM/container resources) -- the provider
-# flags the _virtual_environment_ variants of these two specific resources
-# as deprecated, scheduled for removal in v1.0. Using the form the provider
-# itself recommends going forward, even though it's inconsistent with the
-# rest of this file.
-resource "proxmox_storage_zfspool" "local_zfs" {
-  id       = "local-zfs"
-  zfs_pool = "rpool/data"
-  content  = ["rootdir", "images"]
-  nodes    = [local.target_node]
-  # storage.cfg shows "sparse 1" -- thin_provision is this resource's
-  # equivalent field.
-  thin_provision = true
-}
+# 2026-08-13 disaster recovery: the proxmox_storage_zfspool.local_zfs resource
+# that used to live here modeled the host's old ZFS root pool ("local-zfs",
+# zpool rpool/data). That pool doesn't exist anymore -- the boot/VM-image
+# storage was migrated to LVM-thin ("local-lvm", VG pve / thin pool data) to
+# fix a documented write-amplification/host-freeze failure mode (ZFS + etcd +
+# a DRAM-less NVMe SSD; see docs/compute-nodes.md and
+# /root/phase1/LEDGER.md Entries 18-21). This resource was removed rather
+# than repointed at local-lvm: local-lvm is Proxmox's own default storage
+# (auto-created, not a custom pool the way rpool/data was), consistent with
+# how this file never modeled "local"/"media"/"local-pbs" either -- only
+# custom-provisioned storage gets a Terraform resource here. This block was
+# never actually applied (see the note above -- pending authorization before
+# this disaster), so removing it doesn't require any `terraform state rm`.
 
 resource "proxmox_cluster_options" "datacenter" {
   keyboard = "de"

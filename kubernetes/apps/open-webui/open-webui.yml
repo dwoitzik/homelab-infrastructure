@@ -100,6 +100,20 @@ spec:
           value: "Remote-Email"
         - name: WEBUI_AUTH_TRUSTED_NAME_HEADER
           value: "Remote-Name"
+        # 2026-08-13: with no HF_HOME override, huggingface_hub falls back to
+        # its default cache path, which isn't under the persisted `data`
+        # mount -- the embedding model (30 files) gets re-downloaded on
+        # every single pod restart instead of once. Confirmed live: this
+        # made first-boot startup slow enough to blow past the liveness
+        # probe's grace window every time, an unrecoverable crash loop (each
+        # restart re-triggers the same slow download, which gets killed
+        # again before it finishes). Pointing both at the data PVC makes the
+        # download happen once and persist across restarts like everything
+        # else the app stores there.
+        - name: HF_HOME
+          value: "/app/backend/data/.cache/huggingface"
+        - name: SENTENCE_TRANSFORMERS_HOME
+          value: "/app/backend/data/.cache/huggingface"
         # SEC-012: with readOnlyRootFilesystem, the entrypoint's fallback
         # (write a random key to ./.webui_secret_key in CWD) fails -- and
         # CWD (/app/backend) is the app code itself, not safe to overlay
@@ -119,19 +133,27 @@ spec:
         - name: static
           mountPath: /app/backend/open_webui/static
         # Live-tested: /health -> {"status":true}, no auth needed.
+        # 2026-08-13: first-ever boot downloads the embedding model (30
+        # files from HuggingFace) before the app starts listening at all -
+        # with the HF_HOME fix above this only happens once, but that one
+        # time needs real room. failureThreshold bumped so the initial
+        # grace window is ~10 minutes; steady-state restarts (model already
+        # cached) come up in seconds regardless, so this doesn't slow down
+        # a normal crash/restart.
         readinessProbe:
           httpGet:
             path: /health
             port: 8080
           initialDelaySeconds: 15
           periodSeconds: 15
+          failureThreshold: 40
         livenessProbe:
           httpGet:
             path: /health
             port: 8080
           initialDelaySeconds: 20
           periodSeconds: 30
-          failureThreshold: 4
+          failureThreshold: 20
       volumes:
       - name: data
         persistentVolumeClaim:
