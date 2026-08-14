@@ -26,6 +26,7 @@ own SMART check) and, at worst, host-level I/O stalls severe enough to cause app
 crash loops.
 
 **What this ruled out:**
+
 - **etcd as the k3s datastore.** etcd's own fsync-heavy write pattern (a `fdatasync` on
   every raft commit) is close to a worst-case workload for this drive. This is why the
   cluster runs a single k3s server with the embedded SQLite datastore instead — see
