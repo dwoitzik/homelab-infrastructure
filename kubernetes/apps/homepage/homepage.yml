@@ -482,6 +482,41 @@ spec:
         # initContainer seeds a writable copy first.
         - name: next-dir
           mountPath: /app/.next
+        # 2026-08-14: found the other half of the SEC-012 fix above was
+        # missing. copy-next fixed Next.js's *write* path (EROFS on the
+        # baked-in prerendered page), but the page's own build config sets
+        # initialRevalidateSeconds: false (checked live via
+        # .next/prerender-manifest.json) -- Next.js never automatically
+        # re-renders a page like that on its own; it only ever serves the
+        # exact HTML gethomepage's own upstream image baked in at their
+        # `next build` time (their own demo services.yaml, not this
+        # deployment's real config), forever, surviving every restart
+        # unchanged (confirmed: identical ETag across a full rollout
+        # restart). Fix: manually trigger Next.js's on-demand-revalidation
+        # feature once per pod start, using the previewModeId already baked
+        # into the image's own prerender-manifest.json (not a secret --
+        # it's specifically the credential this exact mechanism is meant to
+        # be used with, read from inside the pod, never sent anywhere
+        # external). Confirmed live: a single request with header
+        # `x-prerender-revalidate: <previewModeId>` to the page itself makes
+        # Next.js properly re-render from the live mounted config and write
+        # the result back to /app/.next (now writable thanks to copy-next),
+        # serving correctly from then on -- x-nextjs-cache flips from HIT
+        # (stale) to REVALIDATED, then HIT again on the corrected page.
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  id=$(sed -n 's/.*"previewModeId": *"\([^"]*\)".*/\1/p' /app/.next/prerender-manifest.json)
+                  i=0
+                  while [ "$i" -lt 15 ]; do
+                    wget -q -O /dev/null --header="Host: localhost:3000" --header="x-prerender-revalidate: $id" http://localhost:3000/ && exit 0
+                    i=$((i + 1))
+                    sleep 1
+                  done
         # Live-tested: /api/healthcheck returns "up". Host header override is
         # required -- HOMEPAGE_ALLOWED_HOSTS only permits home.woitzik.dev
         # (+ loopback), and kubelet's httpGet probe otherwise sends the Pod
