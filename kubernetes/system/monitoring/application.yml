@@ -42,6 +42,32 @@ spec:
         grafana:
           assertNoLeakedSecrets: false
           enabled: true
+          # 2026-08-14: found live while testing the dashboards.default_home_
+          # dashboard_path change below -- a fresh Grafana pod's own SQLite
+          # migration set (accumulated schema history, not something this repo
+          # controls) can take longer than the chart's default liveness
+          # window (60s initial delay + 10 x 10s = 160s total), causing a
+          # real crash-loop on any future pod replacement (node drain, image
+          # upgrade, this exact kind of config change) -- confirmed live:
+          # watched a fresh pod get SIGKILLed by the liveness probe mid-
+          # migration twice in a row before this fix, while the untouched
+          # pod that had already finished its migrations 26h earlier stayed
+          # healthy throughout (no user-facing outage from this, just a
+          # wasted restart cycle each time). Generous headroom here costs
+          # nothing once actually healthy -- the probe still fails fast on a
+          # genuinely broken container, it just gives a legitimate slow
+          # migration run enough time to finish once instead of getting
+          # killed and restarting from a partial state repeatedly.
+          livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 30
+            failureThreshold: 30
+          readinessProbe:
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           ingress:
             enabled: false
           admin:
@@ -153,6 +179,12 @@ spec:
             sessions:
               cookie_samesite: lax
               cookie_secure: false
+            dashboards:
+              # 2026-08-14: land on the one dashboard actually built for this
+              # homelab (slo-dashboard.yml) instead of Grafana's own generic
+              # default -- confirmed live via `kubectl exec` that the sidecar
+              # lands this specific ConfigMap at exactly this path.
+              default_home_dashboard_path: /tmp/dashboards/slo-error-budget.json
           dnsConfig:
             options:
               - name: ndots
