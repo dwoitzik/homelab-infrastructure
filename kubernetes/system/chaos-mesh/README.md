@@ -7,6 +7,7 @@ they do because they're declared.
 ## Schedules
 
 `schedules.yml`:
+
 - **Weekly pod-kill** (Sunday 03:00 UTC) — kills one pod in `apps` namespace matching
   label `chaos-kill: enabled`. Opt-in per-app, not blanket — not every app is safe to
   chaos-test unattended.
