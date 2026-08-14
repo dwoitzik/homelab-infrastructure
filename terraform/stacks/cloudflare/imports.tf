@@ -20,3 +20,24 @@ import {
 # public-exposure-allowlist decision (see main.tf), not imported/kept. No
 # import needed for a resource that's being removed from config, only for one
 # being newly brought under management.
+
+# 2026-08-14 23:09 UTC: this PR's own `atlantis apply -p cloudflare` partially
+# failed on this exact class of issue -- cloudflare_dns_record.tunnel_headscale
+# already existed live (created out-of-band, same as photos/mc_playit above)
+# and the plan tried to create it fresh instead of importing, hitting
+# Cloudflare's "record already exists" 400. Everything else in that apply
+# succeeded first (wildcard/atlantis/auth/home/media DNS records destroyed,
+# tunnel ingress config updated to the photos+headscale allowlist) -- confirmed
+# live via the Cloudflare API directly: headscale.woitzik.dev was already
+# serving 200 through the correct tunnel config the whole time, no outage,
+# just Terraform's own state not yet tracking this one resource.
+import {
+  to = cloudflare_dns_record.tunnel_headscale
+  id = "1f15ed0f3a8b497302ba339dcab3c060/6a324d0a219b681417f63b08503f87c1"
+}
+
+# The claude-agent dedicated tunnel (ADR-018, PR #437) was destroyed by that
+# same apply -- expected and correct, not a bug: claude.woitzik.dev was never
+# on the 2-host public allowlist this PR establishes, confirmed by the
+# operator directly (2026-08-15, Phase 8 brief). This agent remains reachable
+# via Tailscale/LAN, which was always the primary access path regardless.
