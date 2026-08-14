@@ -66,9 +66,11 @@ throughout.
 
 RPi SD cards are write-fragile — the same general class of concern as the boot NVMe, at
 smaller scale. They run DNS/edge only, never databases or heavy logging. David has
-ordered a USB-SATA adapter + SSD for `rpi-srv-02` to reduce this risk and potentially
-support running a service independently of the main Proxmox host (e.g. Vaultwarden or
-Headscale) — not yet arrived/actionable as of this writing.
+attached a USB-SATA adapter + SSD to `rpi-srv-02` (2026-08-14: confirmed live, `sda`,
+111.8G, `usb` transport, no partition table or filesystem yet — nothing built on it) to
+reduce this risk and potentially support running a service independently of the main
+Proxmox host (e.g. Vaultwarden or Headscale). See the §4.2 architecture review for
+whether/what to place on it — do not assume a filesystem exists without checking.
 
 ## What NOT to do to this hardware
 

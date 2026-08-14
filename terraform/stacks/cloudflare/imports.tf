@@ -20,20 +20,21 @@ import {
   id = "1f15ed0f3a8b497302ba339dcab3c060/0a20f0e459e5fb34169ff5d4dda9e8c2"
 }
 
-# auth.woitzik.dev -- created 2025-11-01 via the dashboard, live values
-# (content/proxied/ttl) already match what main.tf declares exactly, so
-# this import is expected to show zero diff.
+# 2026-08-14: verified live against the Cloudflare API directly (Phase 6 URL
+# audit) -- both of the following import IDs no longer exist (404 from the
+# API), most likely lost in the same Garage/Terraform-state wipe that hit
+# every other stack. Since #352's own comment already notes this project's
+# state was never actually picked up by a real apply, these two imports were
+# almost certainly dead well before this check. Removing rather than fixing
+# the ID: `auth` is recreated fresh in main.tf pointed at the tunnel instead
+# of the dead DDNS chain it used to import as, and `cobblemon_stale` is
+# dropped entirely -- its own resource comment already recommended deletion,
+# and it is now confirmed gone rather than merely stale.
+#
+# home.woitzik.dev *does* still exist live and is real dead weight (a CNAME
+# to a DDNS host that no longer answers) -- imported below and repointed at
+# the tunnel rather than left broken.
 import {
-  to = cloudflare_dns_record.auth
-  id = "1f15ed0f3a8b497302ba339dcab3c060/d1bdef517767720d53f186753f71c306"
-}
-
-# cobblemon.woitzik.dev -- stale, confirmed dead, see comment in main.tf.
-# Note: #352 merged this import block without an `atlantis apply` first
-# (process slip -- Atlantis refuses commands on closed PRs), so state never
-# actually picked it up. This comment line exists only to force a fresh
-# plan/apply cycle for the cloudflare project against unchanged code.
-import {
-  to = cloudflare_dns_record.cobblemon_stale
-  id = "1f15ed0f3a8b497302ba339dcab3c060/1c5c2580525de38556147349088ac0e8"
+  to = cloudflare_dns_record.tunnel_home
+  id = "1f15ed0f3a8b497302ba339dcab3c060/6f0da207423ee2f356c5a0655d5bf644"
 }
