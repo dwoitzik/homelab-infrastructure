@@ -46,6 +46,7 @@ Root causes, established with evidence (not assumed):
 | Nextcloud | Not in original Tier-1 list; checked as part of workload restore | Deployed fresh, empty | Checked exhaustively (k3s local-path, shared NFS pool, old Docker volumes, host filesystem, Velero/Garage backup layer) — nothing found anywhere. **Operator confirmed directly: never actually used.** | **Confirmed no real data ever existed here to lose.** |
 
 **Credentials handled during this recovery** (listed by name and location only, per the brief's own instruction — no values in this report or anywhere in agent output):
+
 - Vault unseal keys and root token — extracted from the old cluster's preserved datastore via a disposable, isolated recovery VM; never displayed.
 - Authelia's `storage-key` — recovered from Vault (`secret/authelia`), never displayed.
 - Headscale's Tailscale pre-auth key — regenerated fresh (old one had genuinely expired), wired in directly, never displayed.
@@ -63,6 +64,7 @@ Every service that was in use before the disaster is back, with its data, and ge
 **Workloads (30+ apps deployed via the `homelab-apps` ApplicationSet, Phase 4.9):** Immich (with recovered database), n8n and Matrix/Synapse (with recovered databases), Mealie, Home Assistant, Open WebUI, Uptime Kuma, Firefly III, FreshRSS, Homepage, Linkding, LubeLogger, MySpeed, OnlyOffice, Paperless-ngx (+ paperless-gpt), Scrutiny, SearXNG, Excalidraw, Gotify, CrowdSec, Keel, Trivy Operator, kube-bench — all healthy at time of writing.
 
 **Deployed fresh/empty by design, not a failure to restore:**
+
 - **Gitea** — confirmed no real data ever existed (see §2). Operator-acknowledged.
 - **Nextcloud** — confirmed never actually used (see §2). Operator-confirmed directly.
 
@@ -121,6 +123,7 @@ All also logged in `/root/phase1/QUESTIONS.md` (Q1–Q11) with more detail:
 ## 7. What the operator must do by hand vs. what now runs itself
 
 **Runs itself, no operator action needed:**
+
 - GitOps reconciliation and drift correction (ArgoCD selfHeal, demonstrated)
 - Certificate renewal (cert-manager, demonstrated)
 - Nightly VM/LXC backups (PBS — was completely missing, now scheduled)
