@@ -55,3 +55,4 @@ docs/IAC-GAPS.md
 docs/STATUS.md
 docs/secrets-inventory.md
 docs/runbooks/pending-major-upgrades.md
+.kube/

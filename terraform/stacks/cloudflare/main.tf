@@ -103,6 +103,37 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
           disable_chunked_encoding = false
         }
       },
+      {
+        # 2026-08-14 Phase 6 URL audit: every other *.woitzik.dev hostname
+        # (home, ha, status, gitea, nextcloud, auth, ~40 more) was declared in
+        # kubernetes/ IngressRoutes but had NO entry here at all -- cloudflared
+        # matches top-to-bottom and falls through to the 404 catch-all below
+        # for anything not explicitly listed, so those hosts were 404ing at
+        # the tunnel itself, before ever reaching Traefik. This wildcard is
+        # the general-case fix: route anything not already special-cased above
+        # (atlantis/photos/media, which need per-host origin tuning) through
+        # Traefik, which already does its own host-based routing plus
+        # CrowdSec/Authelia per IngressRoute -- same pattern the atlantis fix
+        # above uses, just generalized.
+        #
+        # Deliberately NOT setting http_host_header or origin_server_name here
+        # (unlike the atlantis rule above): those are fixed per-rule strings,
+        # which would rewrite every request to the same hostname and break
+        # host-based routing in Traefik. Left unset, cloudflared passes through
+        # the client's real requested hostname for both the Host header and
+        # the TLS SNI, which is what a wildcard rule needs -- verified this is
+        # cloudflared's documented default behavior for unset fields, not an
+        # assumption.
+        hostname = "*.woitzik.dev"
+        service  = "https://traefik.kube-system.svc.cluster.local:443"
+        origin_request = {
+          no_tls_verify            = false
+          connect_timeout          = 10
+          tcp_keep_alive           = 30
+          keep_alive_connections   = 10
+          disable_chunked_encoding = false
+        }
+      },
       # Catch-all: return 404 for any unmatched hostname
       { service = "http_status:404" }
     ]
@@ -145,25 +176,63 @@ resource "cloudflare_dns_record" "tunnel_media" {
 }
 
 # auth.woitzik.dev -- Authelia, gating almost every other exposed service.
-# docs/IAC-GAPS.md item 4: the highest-consequence record in the zone that
-# wasn't under Terraform (26 of ~30 records still aren't, imported one at a
-# time per that doc rather than in bulk, to keep each diff reviewable and
-# avoid a live DNS blip if a representation doesn't exactly match on first
-# plan). NOT a Cloudflare Tunnel CNAME like the others above -- rides
-# home.woitzik.dev's dynamic-DNS chain (direct WAN access), not proxied.
 #
-# Merged 2026-07-07 (PR #335) with the import{} block below already clean
-# (1 to import, 1 comment-only change) -- but the actual `terraform apply`
-# that performs the import hasn't run yet. Pending explicit per-project
-# authorization before applying.
+# 2026-08-14: this record was fully absent from live DNS (confirmed via the
+# Cloudflare API directly), not merely CNAMEd to the dead home.woitzik.dev
+# DDNS chain as the previous version of this comment/resource assumed -- the
+# import that was meant to bring it under Terraform referenced a record ID
+# that no longer exists (see imports.tf), so it was never actually applied.
+# Net effect either way was the same: Authelia itself was unreachable from
+# outside the LAN, which breaks every other CrowdSec+Authelia-protected
+# hostname's external access along with it. Declared here as a fresh proxied
+# tunnel CNAME (routed through Traefik -> auth-final IngressRoute, same as
+# everything else now that the wildcard ingress rule above exists) instead of
+# riding the DDNS chain.
 resource "cloudflare_dns_record" "auth" {
   zone_id = var.zone_id
   name    = "auth"
   type    = "CNAME"
-  content = "home.woitzik.dev"
-  proxied = false
+  content = local.tunnel_cname
+  proxied = true
   ttl     = 1
   comment = "Authelia SSO -- gates almost every other exposed service"
+}
+
+# home.woitzik.dev -- Homepage dashboard, the front door and the operator's
+# single loudest Phase 6 complaint ("services deployed but URLs don't work").
+#
+# 2026-08-14: this record was live but dead -- a non-proxied CNAME to a
+# dynamic-DNS hostname (ec190fe6b6ab.sn.mynetname.net) from before the
+# Cloudflare Tunnel existed, bypassing the tunnel/CrowdSec/Authelia entirely
+# and pointing at a WAN IP nothing currently answers on. Repointed at the
+# tunnel like everything else; Traefik's home-final IngressRoute (crowdsec-
+# bouncer + authelia -> homepage:80) now actually receives the traffic.
+resource "cloudflare_dns_record" "tunnel_home" {
+  zone_id = var.zone_id
+  name    = "home"
+  type    = "CNAME"
+  content = local.tunnel_cname
+  proxied = true
+  ttl     = 1
+  comment = "Homepage dashboard -- routed via Cloudflare tunnel"
+}
+
+# Wildcard catch-all for every other *.woitzik.dev hostname (home-assistant,
+# status, gitea, nextcloud, claude, ~40 more) that has an IngressRoute in the
+# cluster but never had its own DNS record. Pairs with the wildcard ingress
+# rule in the tunnel config above -- Traefik does the actual per-host routing
+# and auth from here. An exact-match record (auth/home/photos/atlantis/media
+# above, or any future one) always takes precedence over this wildcard, so
+# adding a hostname's own record later to give it different tunnel behavior
+# is non-breaking.
+resource "cloudflare_dns_record" "tunnel_wildcard" {
+  zone_id = var.zone_id
+  name    = "*"
+  type    = "CNAME"
+  content = local.tunnel_cname
+  proxied = true
+  ttl     = 1
+  comment = "Wildcard -- catches every woitzik.dev host not given its own record, routed to Traefik"
 }
 
 # mc.woitzik.dev -> playit.gg tunnel for Minecraft (port 25565, main server).
@@ -181,25 +250,9 @@ resource "cloudflare_dns_record" "mc_playit" {
   comment = "Minecraft server -- routed via playit.gg tunnel (not CF tunnel)"
 }
 
-# cobblemon.woitzik.dev -- exposed-service hardening pass (2026-07-08),
-# docs/IAC-GAPS.md-class finding: zero IaC trail, and stale. Both port
-# forwards for Minecraft (25565) and Cobblemon (25566) were removed
-# 2026-07-01 (see terraform/stacks/network/nat_portforward.tf) -- 25565 was
-# replaced by the playit.gg tunnel above, but 25566 was deliberately made
-# internal-only with no replacement external path. This A record predates
-# that removal and was never cleaned up: confirmed it's dead, not a live
-# exposure -- points at 178.202.47.0 while home.woitzik.dev's real current
-# DDNS IP is different (178.202.46.102, checked live), and the port itself
-# doesn't respond at the stale IP either. Bringing it under Terraform first
-# (this import) rather than deleting it directly outside IaC; recommend a
-# deliberate follow-up to actually remove it once reviewed, not bundled
-# here.
-resource "cloudflare_dns_record" "cobblemon_stale" {
-  zone_id = var.zone_id
-  name    = "cobblemon"
-  type    = "A"
-  content = "178.202.47.0"
-  proxied = false
-  ttl     = 300
-  comment = "STALE -- confirmed dead 2026-07-08, port-forward removed 2026-07-01, recommend deletion"
-}
+# cobblemon.woitzik.dev -- previously tracked here as a stale record pending
+# deletion (see git history for the original comment/import). 2026-08-14:
+# confirmed via the Cloudflare API that it no longer exists live -- already
+# deleted out-of-band since that note was written. Dropped from Terraform
+# entirely rather than recreating a record whose own history said to remove
+# it.

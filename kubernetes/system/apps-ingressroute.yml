@@ -442,3 +442,43 @@ spec:
         port: 443
         scheme: https
         serversTransport: insecure-transport
+---
+# Claude Code agent web terminal (ttyd on ct-srv-claude-agent, LXC 100,
+# 10.0.100.253:7681). Previously reachable only via an AdGuard split-horizon
+# rewrite (LAN/Tailscale only) -- added here so claude.woitzik.dev works from
+# outside the LAN too (Cloudflare Tunnel wildcard rule -> here), per the
+# operator's explicit ask. ttyd's own password auth stays as a second factor;
+# Authelia is the primary gate, same as every other admin-facing service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-claude-agent
+  namespace: apps
+spec:
+  ports:
+    - port: 7681
+      targetPort: 7681
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: external-claude-agent
+  namespace: apps
+subsets:
+  - addresses:
+      - ip: 10.0.100.253
+    ports:
+      - port: 7681
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: claude-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`claude.woitzik.dev`)
+    kind: Rule
+    middlewares: [{name: crowdsec-bouncer}, {name: authelia}, {name: websockets}]
+    services: [{name: external-claude-agent, port: 7681}]
