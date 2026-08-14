@@ -80,6 +80,17 @@ graph TB
     MK --> ATLLXC
 ```
 
+## Screenshots
+
+![Homepage dashboard](docs/images/homepage.png)
+
+The dashboard (self-hosted [Homepage](https://github.com/gethomepage/homepage)) — every
+service grouped by function, live status widgets where the service supports one. Public
+Grafana/ArgoCD screenshots aren't included here: both require an authenticated login
+(Authelia SSO) to view anything beyond the sign-in page, so there's nothing meaningful
+to capture without live operator credentials — see `docs/URL-INVENTORY.md` for what's
+actually reachable and how.
+
 ## Repository Layout
 
 ```text
