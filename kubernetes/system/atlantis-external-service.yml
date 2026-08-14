@@ -1,0 +1,32 @@
+# Atlantis runs on its own dedicated LXC (ct-srv-atlantis-01, 10.0.20.250, ADR-012 --
+# moved off k3s so it can no longer shut down its own node mid-apply), not as a
+# cluster pod. This Service+Endpoints pair lets the existing IngressRoute
+# (apps-ingressroute.yml's `atlantis-final`, which already referenced
+# `external-atlantis` as its backend) actually resolve to something -- that
+# manifest was never written, so the route 404'd both internally and through the
+# Cloudflare Tunnel despite the IngressRoute itself being correctly applied.
+#
+# Same headless Service+Endpoints pattern as Jellyfin/the Usenet stack
+# (kubernetes/apps/jellyfin/jellyfin.yml) -- Endpoints, not EndpointSlice: Traefik's
+# Kubernetes CRD provider resolves Service backends through the legacy v1
+# Endpoints API ("subsets"), confirmed live for that same reason in this repo.
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-atlantis
+  namespace: apps
+spec:
+  ports:
+    - port: 4141
+      targetPort: 4141
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: external-atlantis
+  namespace: apps
+subsets:
+  - addresses:
+      - ip: 10.0.20.250
+    ports:
+      - port: 4141
