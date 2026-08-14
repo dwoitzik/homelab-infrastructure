@@ -26,6 +26,70 @@ locals {
   tunnel_cname = "${var.tunnel_id}.cfargotunnel.com"
 }
 
+# =============================================================================
+# claude.woitzik.dev -- dedicated tunnel, deliberately NOT routed through the
+# shared cluster tunnel + Traefik above. See ADR-018 for the full reasoning:
+# this hostname fronts ct-srv-claude-agent, which sits on the Admin VLAN
+# (10.0.100.0/24, documented in docs/vlan-segmentation.md as "Trusted
+# Administrative Workstations"). Routing it through the shared tunnel would
+# require cloudflared/Traefik (both running in the k3s cluster, VLAN20) to
+# reach into VLAN100 -- exactly the direction the network's firewall rules
+# deliberately don't allow (rule 03 grants Admin -> everywhere, not the
+# reverse), and opening even a narrow hole the other way would give any
+# compromise among the ~45 internet-facing apps on VLAN20 a path toward the
+# same network segment as this agent's own credentials.
+#
+# This tunnel's own `cloudflared` connector runs directly on
+# ct-srv-claude-agent instead -- it only ever originates outbound connections
+# to Cloudflare's edge, which needs no new firewall rule at all (Admin already
+# has full outbound access). The connector process is configured on the host
+# directly, not via Ansible -- that host isn't Terraform/Ansible-managed like
+# the rest of the fleet (it's the agent's own control host), so this matches
+# its existing out-of-IaC status rather than introducing partial coverage.
+# =============================================================================
+resource "cloudflare_zero_trust_tunnel_cloudflared" "claude_agent" {
+  account_id = var.account_id
+  name       = "claude-agent"
+  config_src = "cloudflare"
+}
+
+resource "cloudflare_zero_trust_tunnel_cloudflared_config" "claude_agent" {
+  account_id = var.account_id
+  tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.claude_agent.id
+
+  config = {
+    ingress = [
+      {
+        hostname = "claude.woitzik.dev"
+        # No Traefik hop -- this connector runs on ct-srv-claude-agent itself,
+        # so localhost is genuinely correct here, not a placeholder.
+        service = "http://localhost:7681"
+        origin_request = {
+          connect_timeout          = 10
+          tcp_keep_alive           = 30
+          keep_alive_connections   = 10
+          disable_chunked_encoding = false
+        }
+      },
+      { service = "http_status:404" }
+    ]
+  }
+}
+
+# Exact-match record takes precedence over the wildcard from PR #436 by
+# design (see that record's own comment) -- this overrides it specifically
+# for "claude", pointing at the dedicated tunnel above instead of the shared
+# one.
+resource "cloudflare_dns_record" "tunnel_claude_agent" {
+  zone_id = var.zone_id
+  name    = "claude"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.claude_agent.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+  comment = "Claude Code agent web terminal -- dedicated tunnel, see ADR-018 (Admin VLAN isolation)"
+}
+
 # -----------------------------------------------------------------------------
 # Tunnel ingress configuration
 # v5 schema: config is an object attribute (config = {}) not a block (config {}).
