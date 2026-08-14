@@ -12,16 +12,28 @@ k3s_cluster:
     ansible_user: dw
     k3s_version: v1.31.12+k3s1
     api_endpoint: "10.0.20.11"
-    # REL-012: etcd heartbeat/election timeouts increased 5x (100ms->500ms,
-    # 1000ms->5000ms) to tolerate brief NVMe I/O stalls without triggering
-    # leader re-election. Default values assume sub-100ms disk latency; on
-    # a shared single-NVMe host under concurrent load (Velero backups, Immich
-    # ML indexing, Ollama inference) latencies spike to 2-14s, causing
-    # "apply request took too long" -> raft timeout -> k3s restart (REL-012).
-    # 5s election timeout absorbs most burst events while keeping failover
-    # detection fast enough for any eventual real hardware failure.
+    # 2026-08-13 (ADR-015): this cluster no longer runs etcd. The single
+    # entry under `server:` above means this role's own cluster-init logic
+    # (roles/k3s_server/tasks/main.yml, gated on `groups[server_group] |
+    # length > 1`) never fires, so the k3s server uses its default embedded
+    # SQLite datastore automatically -- no explicit datastore flag needed.
+    # REL-012's etcd heartbeat/election-timeout tuning (100ms->500ms,
+    # 1000ms->5000ms, to tolerate NVMe I/O stalls without spurious leader
+    # re-election) is removed as dead configuration: there's no etcd raft
+    # loop left for it to apply to. See ADR-015 for the full write-
+    # amplification reasoning behind dropping etcd.
     extra_server_args: >-
       --disable servicelb
       --disable traefik
-      --etcd-arg=heartbeat-interval=500
-      --etcd-arg=election-timeout=5000
+    # 2026-08-13: see ansible/roles/k3s_node_tuning/tasks/main.yml for the
+    # full incident this closes (AdGuard's *.woitzik.dev wildcard rewrite +
+    # k8s default ndots:5 silently hijacking short-hostname DNS lookups from
+    # inside pods). That role writes /etc/rancher/k3s/resolv.conf on every
+    # node; this points k3s at it. Requires a k3s/k3s-agent service restart
+    # to take effect on already-running nodes - not automatic on every
+    # ansible run, matches the deliberate-restart caution used elsewhere in
+    # this repo for control-plane-affecting changes.
+    server_config_yaml: |
+      resolv-conf: /etc/rancher/k3s/resolv.conf
+    agent_config_yaml: |
+      resolv-conf: /etc/rancher/k3s/resolv.conf
