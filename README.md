@@ -82,7 +82,7 @@ graph TB
 
 ## Screenshots
 
-<img src="docs/images/homepage.png" alt="Homepage dashboard" width="800">
+![Homepage dashboard](docs/images/homepage.png)
 
 The dashboard (self-hosted [Homepage](https://github.com/gethomepage/homepage)) — every
 service grouped by function, live status widgets where the service supports one. Public
