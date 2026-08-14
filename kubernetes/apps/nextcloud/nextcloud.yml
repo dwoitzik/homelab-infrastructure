@@ -10,6 +10,44 @@ spec:
     requests:
       storage: 20Gi
 ---
+# 2026-08-14: found live -- the entrypoint's `rsync -rlDog --delete
+# /usr/src/nextcloud/ /var/www/html/` (the app's own code, tens of thousands
+# of small files, re-synced on every single container start by design of
+# this image) was writing straight to the NFS-backed nextcloud-data PVC
+# above, mounted at the whole /var/www/html root. NFS's per-file write
+# latency times tens of thousands of files made this take longer than even
+# a 10+ minute liveness grace period -- confirmed live via `ps aux` showing
+# the rsync process stuck in D-state (uninterruptible disk wait) and
+# `kubectl top` showing ~25m CPU / near-idle the whole time (I/O-bound, not
+# CPU-bound work) -- SIGKilled mid-copy, every restart, for the full 10h
+# this pod had been up. This is a different, deeper root cause than the
+# probe-timing fix already applied below (REL-012-class fix for a real but
+# separate problem: contention during a 30-app simultaneous deploy) -- that
+# fix was correct for its own scenario but didn't address this one, since
+# steady-state restarts here never actually reach a steady state to begin
+# with.
+#
+# Fix: give the disposable, always-freshly-rsynced application code its own
+# fast local-path volume instead of NFS -- it's reproducible from the image
+# on every start regardless, nothing here needs to survive a pod restart
+# except what's subPath-mounted from nextcloud-data below (data/, config/,
+# custom_apps/ -- the actual persistent, user-relevant state). Confirmed
+# safe to restructure: Nextcloud has never actually been used (no real user
+# data at risk either way), and the Deployment is already hard node-pinned
+# (nodeSelector: vm-srv-k3s-12), so a node-local PV introduces no new
+# scheduling constraint that wasn't already there.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nextcloud-html
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+---
 # REL-028: Postgres 16->18 major bump needs dump/restore, not a bare image
 # swap -- PG18 refuses to start against a PG16 data directory. Fresh PVC so
 # the new instance can never accidentally touch the old on-disk format. Old
@@ -299,8 +337,23 @@ spec:
             - name: TZ
               value: Europe/Berlin
           volumeMounts:
-            - name: data
+            # Application code -- local-path (fast, node-local), rebuilt
+            # fresh from the image on every start regardless. See the
+            # nextcloud-html PVC comment above for why this moved off NFS.
+            - name: html
               mountPath: /var/www/html
+            # The only parts that actually need to persist across restarts,
+            # subPath-mounted from the NFS-backed data PVC into their normal
+            # locations inside the code tree above.
+            - name: data
+              mountPath: /var/www/html/data
+              subPath: data
+            - name: data
+              mountPath: /var/www/html/config
+              subPath: config
+            - name: data
+              mountPath: /var/www/html/custom_apps
+              subPath: custom_apps
             - name: tmp
               mountPath: /tmp
             # entrypoint writes redis-session.ini etc. here on every start --
@@ -320,6 +373,24 @@ spec:
           # (30 apps deploying at once), causing a restart-before-it-
           # finishes crash loop. Steady-state restarts (already installed)
           # come up fast regardless - this only costs time on first boot.
+          # 2026-08-14: even after moving the codebase off NFS (nextcloud-html
+          # PVC above), the first-ever rsync of the app's ~40k small files
+          # still took well past the previous 620s readiness grace -- watched
+          # it live via `ps aux` (the rsync stayed I/O-bound the whole time,
+          # not CPU-bound: single-digit CPU-seconds accumulated over several
+          # minutes of wall time) and confirmed a SECOND attempt (after the
+          # first got killed) progressed at essentially the same slow pace,
+          # not the much-faster delta-sync speed a mostly-already-synced
+          # retry should show -- this genuinely appears to be this specific
+          # hardware's I/O ceiling for a bursty many-small-file write (the
+          # same DRAM-less-NVMe write-amplification pattern docs/HARDWARE.md
+          # already documents for other workloads), not an NFS-specific or
+          # probe-timing-specific problem on its own. Not chasing this
+          # further live (anti-loop) -- generous grace here is the accepted,
+          # pragmatic accommodation: this cost is paid once (first boot only,
+          # steady-state restarts against an already-populated local-path PVC
+          # should be fast), and Nextcloud has no real users yet, so a slow
+          # first start is a real but low-stakes trade-off.
           readinessProbe:
             httpGet:
               path: /status.php
@@ -329,7 +400,7 @@ spec:
                   value: "nextcloud.woitzik.dev"
             initialDelaySeconds: 20
             periodSeconds: 15
-            failureThreshold: 40
+            failureThreshold: 120
           livenessProbe:
             httpGet:
               path: /status.php
@@ -339,7 +410,7 @@ spec:
                   value: "nextcloud.woitzik.dev"
             initialDelaySeconds: 30
             periodSeconds: 30
-            failureThreshold: 20
+            failureThreshold: 60
           resources:
             requests:
               cpu: 200m
@@ -355,6 +426,9 @@ spec:
             - name: php-conf
               mountPath: /writable-conf
       volumes:
+        - name: html
+          persistentVolumeClaim:
+            claimName: nextcloud-html
         - name: data
           persistentVolumeClaim:
             claimName: nextcloud-data
