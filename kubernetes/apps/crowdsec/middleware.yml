@@ -13,4 +13,21 @@ spec:
       crowdsecLapiScheme: http
       crowdsecLapiTLSCACertPath: ""
       crowdsecLapiTLSVerification: false
-      crowdsecLapiKeyFile: /etc/traefik/crowdsec/BOUNCER_KEY_traefik
+      # 2026-08-14: this must match the *key name* inside the crowdsec-bouncer-key
+      # Secret (kube-system), not an arbitrary filename -- a Secret volume mount
+      # creates one file per key, named after the key. The Secret's key is
+      # "crowdsec-bouncer-key" (matching the Secret's own name), so that's the
+      # file that actually exists at runtime. This was previously set to
+      # "BOUNCER_KEY_traefik", which doesn't exist -- Traefik's CrowdSec plugin
+      # failed validateParams for every route using this middleware, and Traefik
+      # correctly failed those routes closed (returning 404, not routing to a
+      # backend) rather than serving them unprotected. Confirmed live via
+      # Traefik's own logs: "CrowdsecLapiKey:/etc/traefik/crowdsec/
+      # BOUNCER_KEY_traefik invalid path stat ... no such file or directory" on
+      # every crowdsec-bouncer-protected router. This silently took home.woitzik.dev,
+      # ha.woitzik.dev, atlantis.woitzik.dev, git.woitzik.dev, status.woitzik.dev,
+      # and others fully unreachable via their hostnames the whole time, despite
+      # the backend pods themselves being healthy - not caught until this specific
+      # investigation, since prior checks confirmed pod health but never the
+      # actual external route.
+      crowdsecLapiKeyFile: /etc/traefik/crowdsec/crowdsec-bouncer-key
