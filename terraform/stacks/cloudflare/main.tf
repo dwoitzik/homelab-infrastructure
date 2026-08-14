@@ -116,14 +116,26 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
         # CrowdSec/Authelia per IngressRoute -- same pattern the atlantis fix
         # above uses, just generalized.
         #
-        # Deliberately NOT setting http_host_header or origin_server_name here
-        # (unlike the atlantis rule above): those are fixed per-rule strings,
-        # which would rewrite every request to the same hostname and break
-        # host-based routing in Traefik. Left unset, cloudflared passes through
-        # the client's real requested hostname for both the Host header and
-        # the TLS SNI, which is what a wildcard rule needs -- verified this is
-        # cloudflared's documented default behavior for unset fields, not an
-        # assumption.
+        # 2026-08-14 correction: the original version of this rule left
+        # origin_server_name unset on the assumption that cloudflared would
+        # auto-fill TLS SNI to match each request's real hostname for a
+        # wildcard rule. That assumption was wrong -- confirmed live via
+        # `kubectl logs` on the cloudflared pod: every request through this
+        # rule failed with "certificate is valid for *.woitzik.dev,
+        # woitzik.dev, not traefik.kube-system.svc.cluster.local" (a 502 for
+        # all ~44 hosts behind this rule). cloudflared verifies the origin's
+        # TLS cert against the origin's *service* hostname by default when
+        # origin_server_name is unset, same as the atlantis rule above needed
+        # explicitly -- there's no dynamic-per-request SNI behavior for
+        # wildcard rules. Fix: a static origin_server_name works fine here
+        # precisely because it doesn't need to match the request -- Traefik's
+        # wildcard cert's SAN list is `*.woitzik.dev, woitzik.dev` (checked via
+        # openssl), so verifying against the bare apex "woitzik.dev" succeeds
+        # for every subdomain uniformly. http_host_header stays unset
+        # deliberately (confirmed working correctly via the same logs --
+        # `dest=https://status.woitzik.dev/` etc. showed the real per-request
+        # hostname reaching the origin) -- only the TLS verification target
+        # needed to be fixed, not the routing.
         hostname = "*.woitzik.dev"
         service  = "https://traefik.kube-system.svc.cluster.local:443"
         origin_request = {
@@ -131,6 +143,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
           connect_timeout          = 10
           tcp_keep_alive           = 30
           keep_alive_connections   = 10
+          origin_server_name       = "woitzik.dev"
           disable_chunked_encoding = false
         }
       },
