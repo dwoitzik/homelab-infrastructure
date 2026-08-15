@@ -11,6 +11,40 @@ data:
             href: https://pve.woitzik.dev
             description: Hypervisor · 3 VMs, 5 LXC
             siteMonitor: https://pve.woitzik.dev
+            # 2026-08-15: investigated the "Proxmox shows an error" report as a
+            # possible Authelia-gate gap first, since that would be the more
+            # serious of the two possible causes. Checked apps-ingressroute.yml's
+            # `pve-final` IngressRoute -- it already carries
+            # [crowdsec-bouncer, authelia, websockets], the exact same middleware
+            # chain every other Authelia-gated route in that file uses. The gate
+            # is fine; this is NOT a security gap. Root cause is purely cosmetic:
+            # this entry never had a `widget:` block at all (and the dedicated
+            # proxmox.yaml config file is intentionally an empty stub, see SEC-012
+            # comment below in the Deployment), so Homepage had no way to show
+            # live VM/LXC stats. Added the widget block using the widget's own
+            # separate Proxmox API token (per gethomepage docs, auth is
+            # username: "<user>@pam!<tokenid>" / password: <token secret> --
+            # unrelated to any login/session on pve.woitzik.dev itself). Points
+            # at the host directly (10.0.10.10:8006), not the public
+            # Authelia-gated hostname, matching how the AdGuard widgets below
+            # already hit their hosts directly rather than through their own
+            # public routes -- a server-side widget request through
+            # pve.woitzik.dev would just get redirected to the Authelia login
+            # page and fail the same way.
+            # TODO: secret/homepage in Vault needs `proxmox-token-id` /
+            # `proxmox-token` properties (a real Proxmox API token, e.g. via
+            # `pveum user token add homepage@pve homepage --privsep 1` scoped
+            # read-only) before this widget will actually render. This agent has
+            # no Vault write access in this session (no VAULT_TOKEN available,
+            # and minting one is out of scope for a dashboard-config PR) -- the
+            # ExternalSecret/widget plumbing below is ready, only the Vault-side
+            # value is missing. Until then this widget shows an API error;
+            # Proxmox's own login is unaffected either way.
+            widget:
+              type: proxmox
+              url: https://10.0.10.10:8006
+              username: "{{HOMEPAGE_VAR_PROXMOX_TOKEN_ID}}"
+              password: "{{HOMEPAGE_VAR_PROXMOX_TOKEN}}"
         - PBS:
             icon: proxmox.png
             href: https://backup.woitzik.dev
@@ -29,6 +63,25 @@ data:
             icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/argo-cd.svg
             href: https://argo.woitzik.dev
             description: GitOps · homelab-infrastructure
+            # 2026-08-15: root-caused the "API error". URL and secretKey name are
+            # both correct -- argocd-server runs with server.insecure: true (see
+            # argocd-cmd-params-cm), so plain http:// on the default port is
+            # right, and HOMEPAGE_VAR_ARGOCD_TOKEN exists in homepage-secrets
+            # with a plausible JWT length. Live-tested from inside the running
+            # homepage pod (using its own mounted env var, value never printed):
+            # a GET to /api/v1/applications with this token returns a clean
+            # `401 Unauthorized` -- the token itself is stale/invalid, not a
+            # wiring bug. Separately: argocd-cm only has `accounts.admin: apiKey,
+            # login` -- there is no dedicated read-only local account, so
+            # whatever token was issued here was almost certainly a full-admin
+            # API key, which is more privilege than a dashboard widget should
+            # ever hold. Recommend, as follow-up (not done here -- editing
+            # ArgoCD's own RBAC is out of scope for a Homepage config fix):
+            # create a dedicated account with `accounts.readonly: apiKey` +
+            # `policy.csv: g, readonly, role:readonly` in argocd-rbac-cm.yml,
+            # issue a token from that account instead, and rotate
+            # secret/homepage's argocd-token property to it. Could not do the
+            # Vault write myself (no VAULT_TOKEN in this session).
             widget:
               type: argocd
               url: http://argocd-server.argocd.svc.cluster.local
@@ -74,15 +127,48 @@ data:
         - CrowdSec:
             icon: crowdsec.png
             description: Threat Intelligence · IP Banning
+            # 2026-08-15: root-caused the "API error", two separate bugs found:
+            # 1) Blocking bug: the `security` namespace's default-deny
+            #    NetworkPolicy (kubernetes/apps/crowdsec/network-policies.yml)
+            #    only allowed port 8080 ingress from kube-system's Traefik pods
+            #    -- `apps` (where this Homepage pod lives) was never added, so
+            #    every request from this widget was refused at the network layer
+            #    regardless of auth. Live-tested (before the fix below) from
+            #    inside the homepage pod: `connection refused` against both the
+            #    Service and a crowdsec pod IP directly, while Traefik's own
+            #    bouncer traffic worked fine. Same exact failure mode ADR-008
+            #    already documents happening once before with Homepage ->
+            #    Uptime Kuma. Fixed by adding `allow-from-homepage` to that
+            #    NetworkPolicy file, scoped to just the homepage pod on 8080.
+            # 2) Config bug: this widget had no credentials at all. Checked
+            #    gethomepage's actual widget source
+            #    (src/widgets/crowdsec/widget.js) rather than going by name --
+            #    it posts to `/v1/watchers/login`, i.e. it authenticates as a
+            #    registered CrowdSec *machine* (watcher) via username+password,
+            #    not as a bouncer via an X-Api-Key header the way Traefik's
+            #    crowdsec-bouncer middleware does (see crowdsec/middleware.yml).
+            #    Those are two different CrowdSec credential types; the machine
+            #    this widget needs doesn't exist yet in the LAPI (no `cscli
+            #    machines add` has been run for it -- only a bouncer key,
+            #    BOUNCER_KEY_traefik, is registered, and it isn't reusable here).
+            # TODO: run `cscli machines add homepage-widget --auto` inside a
+            # crowdsec pod, then store the resulting login/password in Vault at
+            # secret/homepage (`crowdsec-username` / `crowdsec-password`). Not
+            # done here -- this agent has no Vault write access this session.
+            # Fixing (1) alone won't make the widget work; both are required.
             widget:
               type: crowdsec
               url: http://crowdsec.security.svc.cluster.local:8080
-        - Trivy Operator:
-            icon: aqua.png
-            description: Container Vulnerability Scanning
-        - kube-bench:
-            icon: cis.png
-            description: CIS Kubernetes Benchmark · CronJob
+              username: "{{HOMEPAGE_VAR_CROWDSEC_USERNAME}}"
+              password: "{{HOMEPAGE_VAR_CROWDSEC_PASSWORD}}"
+    # 2026-08-15: Trivy Operator and kube-bench removed per operator review --
+    # both were bare scan-result entries with no real web UI to click into
+    # (no href at all; Trivy's vulnerability reports and kube-bench's CIS
+    # results only exist as Kubernetes CRDs / CronJob logs, viewable via
+    # `kubectl get vulnerabilityreports` / `kubectl logs`, not a page this
+    # dashboard could ever link to). Per the same "does this earn its spot"
+    # bar, the icon-only fix originally scoped for these two (task #3) is
+    # superseded by removal -- no icon was added.
     - Essentials:
         - Nextcloud:
             icon: nextcloud.png
@@ -151,16 +237,28 @@ data:
             icon: gotify.png
             href: https://gotify.woitzik.dev
             description: Push Notifications · Self-hosted
-    - Storage:
-        - Garage S3:
-            icon: minio.png
-            href: https://s3.woitzik.dev
-            description: S3 Object Storage · Velero / TF State
+    # 2026-08-15: Storage category (previously just "Garage S3") removed per
+    # operator review -- Garage has no web console in this deployment; the
+    # href pointed at s3.woitzik.dev, which is the raw S3 API port (3900,
+    # see apps-ingressroute.yml `garage-s3-final`), not a browsable UI. Same
+    # "does this earn its spot" bar as Trivy/kube-bench above.
     - Media:
         - Jellyfin:
             icon: jellyfin.png
             href: https://media.woitzik.dev
             description: Media Server
+            # 2026-08-15: root-caused the "API error". The widget config itself
+            # is correct -- service name, namespace, port, and API key all check
+            # out; jellyfin.apps.svc.cluster.local:8096 is the intentional
+            # headless Service+Endpoints pattern this repo uses for LXC-hosted
+            # apps (see ADR-017), pointing at ct-srv-jellyfin-01's real IP
+            # (10.0.20.254). The actual cause is that LXC 203
+            # (ct-srv-jellyfin-01) is currently stopped at the Proxmox level --
+            # confirmed via `pct list` on pve, and this is documented as
+            # expected/pre-existing in phase1/LEDGER.md, not a new regression.
+            # No YAML change needed here; starting LXC 203 is an infra/ops
+            # decision outside a dashboard-config PR's scope, left to the
+            # operator.
             widget:
               type: jellyfin
               url: http://jellyfin.apps.svc.cluster.local:8096
@@ -187,6 +285,16 @@ data:
             icon: sonarr.png
             href: https://sonarr.woitzik.dev
             description: TV Shows Automation
+            # 2026-08-15: root-caused the "API error" -- widget config (service
+            # name/port/API key) was already correct. The sonarr Docker
+            # container on ct-srv-media-acq-01 (10.0.20.253) had exited 4 days
+            # earlier (exit code 137) and never restarted -- its sibling
+            # containers on the same host (radarr, bazarr, sabnzbd, jellyseerr)
+            # were all healthy, so this wasn't a host-wide issue. Restarted it
+            # (`docker start sonarr` on the LXC) and live-verified the existing
+            # HOMEPAGE_VAR_SONARR_API_KEY now gets a clean 200 from
+            # /api/v3/system/status through this exact Service DNS name -- no
+            # YAML change was actually needed, the config was already right.
             widget:
               type: sonarr
               url: http://sonarr.apps.svc.cluster.local:8989
@@ -289,9 +397,6 @@ data:
     Information:
       style: grid
       columns: 3
-    Storage:
-      style: grid
-      columns: 1
     Media:
       style: grid
       columns: 6
