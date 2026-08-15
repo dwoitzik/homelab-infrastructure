@@ -196,16 +196,48 @@ already-blocked scanning. This is a reasonably thorough check, not an exhaustive
 forensic one; if something surfaces later that contradicts this, treat this section as
 superseded, not authoritative.
 
+## Update (2026-08-15, later same day): 1.4 hardening in progress
+
+- **Headscale ACLs**: written. `kubernetes/apps/headscale/config.yml` now carries an
+  explicit least-privilege `policy.hujson` (branch `fix/headscale-least-privilege-acl`,
+  pushed, no PR yet — see the mechanical gaps note below) — previously there was no ACL
+  policy at all (`acl policy not found`, an undocumented fallback rather than an actual
+  access decision). Default-deny for everyone except `group:admin` (the one real user,
+  `dw`); route auto-approval scoped to exactly the subnet-router's existing
+  `10.0.20.0/24` advertisement, gated behind a tag only `group:admin` can assign.
+- **Immich NetworkPolicy**: written, all four components (`immich-server`/`ml`/
+  `postgres`/`redis`) scoped individually (branch `fix/immich-network-policy`, pushed).
+  `apps` namespace itself still has zero NetworkPolicy coverage otherwise — these four
+  are deliberately self-contained (podSelector-scoped, no effect on any other workload)
+  rather than waiting on the much larger namespace-wide default-deny rollout (Phase 8
+  DONE item #4).
+- **Minecraft egress**: DMZ→WAN is currently "internet, any destination" (rule 11 in
+  `firewall_deterministic.tf`) — correct for isolation-from-other-VLANs but not
+  minimized. The DMZ LXC needs outbound to playit.gg's relay specifically (that's how
+  it's reachable at all, see the table above) — genuinely restricting egress to just
+  that would need RouterOS FQDN-based address-lists (playit.gg's endpoint isn't a fixed
+  IP) and is real design work, not done this pass. Recommendation, not yet actioned.
+- **Immich, still open**: Cloudflare Access (email OTP), rate limiting, registration
+  disabled, admin path not public, patch cadence — none of these done yet.
+- **Found in passing, not part of this audit's scope**: `immich-server` had restarted
+  17 times as of this check, most recently ~11 minutes prior, logs showing a Postgres
+  "crash of another server process / possibly corrupted shared memory" event.
+  `immich-postgres` itself showed 0 restarts at check time (likely pod-recreated rather
+  than container-restarted, which would explain the discrepancy) and both pods are
+  currently stable/`Running`. Not chased further — stability issue, not a security
+  finding, noted here so it isn't silently lost.
+
 ## Open items (not yet done)
 
 - Cloudflare Access (email OTP) in front of `photos.woitzik.dev` — not yet configured.
-- Atlantis itself coming off the public internet permanently (it's currently closed at
-  the DNS layer, but the underlying direction problem — GitHub needs inbound webhook
-  delivery — isn't solved yet; a self-hosted GitHub Actions runner or Cloudflare Access
-  + IP allowlisting is still to be built, per Phase 1.1).
-- Headscale ACLs (least-privilege within the tailnet, not just "on the tailnet or not").
+- Atlantis itself coming off the public internet permanently: **decision made** —
+  ADR-021 picks a self-hosted GitHub Actions runner over Cloudflare Access + IP
+  allowlisting, matching the brief's own stated preference. Implementation (the actual
+  runner + migrated workflows) is a follow-up project, not done yet.
 - Live MikroTik firewall/IPv6/UPnP state confirmation (declared-vs-applied, this
   recovery's recurring gap class) — needs router credentials this agent doesn't
   currently hold.
 - `Reverse_Proxy_Targets` address-list brought under Terraform.
-- Credential rotation and log review (both above).
+- Minecraft egress restriction (playit.gg-specific, needs FQDN address-lists).
+- Credential rotation: plan written (Tier 1/2/3 above); execution blocked this pass —
+  see `phase8/STATE.md` and `phase8/LEDGER.md` for the current status of that blocker.
