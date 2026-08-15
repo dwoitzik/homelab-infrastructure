@@ -33,6 +33,38 @@ spec:
         - port: 8080
           protocol: TCP
 ---
+# Allow Homepage (apps) to reach CrowdSec LAPI for the CrowdSec dashboard
+# widget. 2026-08-15: this was the actual root cause of that widget's "API
+# error" -- default-deny-ingress in this namespace never had an `apps`
+# exception for port 8080, only kube-system's Traefik bouncer traffic was
+# allowed. Same failure mode ADR-008 already documents happening once before
+# with Homepage -> Uptime Kuma (monitoring); this is that same gap, just in
+# `security` instead. Scoped to the homepage pod specifically, not all of
+# `apps`, matching the principle (not the exact shape) of allow-from-traefik
+# above.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-homepage
+  namespace: security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: crowdsec
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: apps
+          podSelector:
+            matchLabels:
+              app: homepage
+      ports:
+        - port: 8080
+          protocol: TCP
+---
 # Allow Prometheus (monitoring) to scrape CrowdSec metrics.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
