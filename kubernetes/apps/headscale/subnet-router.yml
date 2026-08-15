@@ -59,7 +59,10 @@ spec:
             - name: TS_KUBE_SECRET
               value: ""
             - name: TS_EXTRA_ARGS
-              value: "--login-server=https://headscale.woitzik.dev"
+              # --advertise-tags requires tag:subnet-router to already exist in the
+              # ACL's tagOwners with dw (this authkey's owning user) as an owner --
+              # see kubernetes/apps/headscale/config.yml's policy.hujson (Phase 1.4).
+              value: "--login-server=https://headscale.woitzik.dev --advertise-tags=tag:subnet-router"
           securityContext:
             allowPrivilegeEscalation: true
             capabilities:
