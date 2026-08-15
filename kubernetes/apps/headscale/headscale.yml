@@ -58,6 +58,10 @@ spec:
               mountPath: /etc/headscale/config.yaml
               subPath: config.yaml
               readOnly: true
+            - name: config
+              mountPath: /etc/headscale/policy.hujson
+              subPath: policy.hujson
+              readOnly: true
             - name: data
               mountPath: /var/lib/headscale
             - name: tmp
