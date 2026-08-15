@@ -111,11 +111,43 @@ held in front of the wildcard-exposed hosts) is in scope.
 
 ## Log review for signs of prior probing/compromise
 
-Not yet performed as of this writing — next action after this document's initial cut.
-Will check CrowdSec decisions, Authelia's authentication log, Traefik access logs, and
-container logs for the period this exposure was live, specifically for successful
-authentications that can't be accounted for, unexpected user/API-key creation, and
-unusual outbound connections.
+Performed 2026-08-15. **No evidence of compromise found.**
+
+- **CrowdSec** (`cscli metrics`): the Traefik bouncer has dropped 46 requests since
+  2026-08-14 14:37 — all CAPI (community-blocklist) hits against known-bad IPs already
+  in the global feed (`http:scan`, `http:bruteforce`, `http:crawl`, `ssh:bruteforce`,
+  etc.), i.e. generic internet background noise being correctly blocked, not something
+  that got through. **Zero locally-detected attack scenarios** (no local-origin
+  decisions at all) — nothing this deployment's own traffic pattern triggered a
+  CrowdSec scenario on. `cscli alerts list` / `cscli decisions list`: no active alerts,
+  no active decisions.
+- **Authelia** authentication log, 72h window: zero successful-authentication log
+  lines, and **zero non-RFC1918 (external) source IPs** appear anywhere in the log at
+  all. The only traffic is internal 401 redirect-loop noise from an internal health
+  monitor polling `argo.woitzik.dev` before Authelia's own session redirect resolves —
+  not an external actor.
+- **Traefik access log** (24h retained — pod restarted 2026-08-14T09:46Z, doesn't cover
+  further back): `ClientAddr` in this log is always the internal `cloudflared`
+  connector's pod IP (traffic is tunneled, not a direct TCP connection to Traefik), so
+  this log alone cannot distinguish real external client IPs — that limitation is
+  called out explicitly rather than glossed over. All logged host traffic is internal
+  polling (an internal monitor hitting every ingress host on a fixed ~60s interval,
+  200/302/401 depending on the app's own auth requirement) — no anomalous paths, no
+  unexpected 2xx on an admin/sensitive path.
+- **ArgoCD** (`kubectl get applications -n argocd`): 3 apps (`firefly`, `onlyoffice`,
+  `scrutiny`) are `OutOfSync` but `Healthy` — ordinary GitOps drift (unreconciled
+  Renovate-driven image bumps), not evidence of an out-of-band change. No apps in a
+  `Degraded`/`Unknown` state.
+- **cloudflared** connector: single pod, `Running`, zero restarts in 44h — no evidence
+  of the connector itself being killed/replaced/tampered with.
+
+**Caveat, stated plainly**: the Traefik-`ClientAddr` limitation above means this check
+leans on CrowdSec's own ingestion (which does parse the real client IP from the raw
+container log, not just `ClientAddr`) as the actual source of truth for "was any real
+external attacker traffic seen" — and that source shows nothing beyond generic
+already-blocked scanning. This is a reasonably thorough check, not an exhaustive
+forensic one; if something surfaces later that contradicts this, treat this section as
+superseded, not authoritative.
 
 ## Open items (not yet done)
 
