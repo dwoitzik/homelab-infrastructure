@@ -103,11 +103,58 @@ assumed:
 
 ## Credential rotation
 
-Not yet performed as of this writing — sequenced after finishing the inbound-path
-inventory above, per Phase 1.3's own ordering (find and close first, then rotate).
-Tracked in `phase8/STATE.md`; every credential reachable by any of the now-closed
-exposures (Atlantis's `terraform@pve` PVE token, anything Authelia/CrowdSec/Traefik
-held in front of the wildcard-exposed hosts) is in scope.
+Not yet executed as of this writing — the inventory and prioritization below is done;
+actual rotation is sequenced next per `phase8/STATE.md`. Note the compromise log review
+above found **no evidence anything was actually used** — this is precautionary
+defense-in-depth per the brief's own instruction ("rotate every credential reachable by
+any of the now-closed exposures"), not incident response to a confirmed breach.
+
+**Why this is broader than it first looks**: the wildcard tunnel ingress rule matched
+on Host header, not on which Cloudflare DNS records existed — so during the exposure
+window, *any* app with a Traefik IngressRoute was reachable by anyone who sent the
+right `Host:` header to Cloudflare's proxy IP, not just the four explicitly-named
+hostnames (`atlantis`/`auth`/`home`/`media`). Full scope, in practice, is every
+Vault-backed secret behind a public-facing app (`kubectl get externalsecret -A` lists
+~25). Rotating all of them in one unsupervised pass without a way to verify each app
+still works afterward is its own risk — a bad rotation with nobody watching can turn a
+"maybe reachable" exposure into a real, confirmed outage. Prioritized by actual blast
+radius instead of rotating blind:
+
+**Tier 1 — infra control-plane credentials (highest blast radius, do first, needs care)**
+- Proxmox (`terraform@pve`) API token — used by Atlantis for every `terraform apply`
+  against `terraform/stacks/proxmox/`. A bad rotation here breaks all future
+  applies, and Atlantis's own webhook path is *already* degraded (see the parked
+  PR #440 issue above) — rotating this blind, with no way to immediately verify a
+  fresh apply succeeds, risks compounding two problems at once.
+- Cloudflare API token (`cert-manager` DNS-01 solver + the `cloudflare` Terraform
+  stack) — highest-leverage credential in the whole stack; it can create/destroy DNS
+  and tunnel config directly, which is exactly the class of thing this whole Phase 1
+  pass has been cleaning up. Needs an account-level action (issuing a new scoped
+  token) that this agent should not do unsupervised.
+
+**Tier 2 — identity/session (moderate blast radius)**
+- Authelia secrets (`secret/authelia`: session/storage encryption keys, OIDC client
+  secrets) — rotating invalidates every active session cluster-wide at once
+  (everyone gets logged out simultaneously, including the operator). Safe to rotate,
+  disruptive if done without a heads-up.
+- Grafana OIDC secret (`secret/grafana`).
+
+**Tier 3 — per-app secrets (lower blast radius, mechanical, safe to batch)**
+Everything else in the `kubectl get externalsecret -A` list (n8n, gitea, garage,
+headscale, immich, synapse, homepage, nextcloud, paperless, open-webui, firefly,
+gotify, database-layer secrets, etc.) — each is a single app's own credential, low
+cross-service blast radius, safe to rotate + verify one at a time.
+
+**Already effectively rotated**: the Renovate GitHub PAT (`secret/renovate`) — found
+already replaced (401 gone, jobs completing clean) when this pass checked it; see
+`phase8/LEDGER.md` Entry 3.
+
+**Recommendation**: Tier 3 is safe for this agent to execute directly, one app at a
+time with a working-verification step after each. Tier 1 and the Authelia piece of
+Tier 2 should happen with the operator online (or explicitly signed off in advance),
+since a mistake there has real, immediate-outage consequences and this agent has
+already had two separate live-infra actions correctly classifier-blocked this session
+for exactly that class of risk.
 
 ## Log review for signs of prior probing/compromise
 
