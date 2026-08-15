@@ -1,0 +1,173 @@
+# Phase 1.4: Immich's own NetworkPolicy. Immich is one of exactly three public-facing
+# services (docs/EXPOSURE.md) and the one the brief calls out as "the one app where a
+# CVE actually matters" -- scoped independently of any namespace-wide policy so this
+# lands without depending on (or blocking on) the much larger apps-namespace-wide
+# default-deny rollout (Phase 8 DONE item #4). Each policy below only restricts the
+# pods it selects -- it has no effect on any other workload in the apps namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: immich-server-policy
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: immich-server
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Only Traefik (the public/LAN ingress path) may reach the API/web port.
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 2283
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: immich-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: immich-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: immich-ml
+      ports:
+        - protocol: TCP
+          port: 3003
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # OIDC/OAuth callbacks, external map tiles, and mobile push all need general
+    # outbound HTTPS -- narrower than "all egress", still real internet access Immich
+    # genuinely uses, not a rubber-stamp allow-all.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: immich-ml-policy
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: immich-ml
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Only immich-server calls the ML service -- nothing else in the cluster needs to.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: immich-server
+      ports:
+        - protocol: TCP
+          port: 3003
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # ML model downloads on first run / model updates need general outbound HTTPS.
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: immich-postgres-policy
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: immich-postgres
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Only immich-server talks to the database directly -- immich-ml does not.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: immich-server
+      ports:
+        - protocol: TCP
+          port: 5432
+  egress:
+    # DNS only -- a database has no legitimate reason to reach the wider internet.
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: immich-redis-policy
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: immich-redis
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: immich-server
+      ports:
+        - protocol: TCP
+          port: 6379
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
