@@ -167,13 +167,23 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+          # 2026-08-16: requests/limits doubled after all 3 pods hit "database is
+          # locked"/"context canceled" on their emptyDir sqlite (crowdsec.db) during
+          # the local-lvm thin-pool exhaustion incident that crashed the host that
+          # day -- the original 200m/128Mi ceiling left no headroom for SQLite
+          # transactions to complete promptly once the node was under I/O pressure,
+          # so locks were held longer and readiness/liveness probes started failing
+          # (broke the Homepage bouncer-auth widget). Storage crisis itself is
+          # resolved (see phase8/LEDGER.md Entries 6-8); this is a smaller, cheap,
+          # separate hardening step so the same probe-flap doesn't recur under any
+          # future I/O-pressure event, not a claim that today's root cause repeats.
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
+              cpu: 100m
               memory: 128Mi
+            limits:
+              cpu: 400m
+              memory: 256Mi
           livenessProbe:
             httpGet:
               path: /health
