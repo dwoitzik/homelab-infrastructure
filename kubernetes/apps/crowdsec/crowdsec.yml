@@ -215,7 +215,21 @@ spec:
             - -c
             - |
               until cscli lapi status > /dev/null 2>&1; do sleep 2; done
-              cscli machines add homepage-dashboard --password "$DASHBOARD_MACHINE_PASSWORD" || true
+              # 2026-08-16: first version of this had no config volume mount --
+              # overriding `command` skips the image's entrypoint, which is what
+              # actually generates /etc/crowdsec/config.yaml from env vars at
+              # startup. cscli had nothing to read and failed every single time
+              # ("open /etc/crowdsec/config.yaml: no such file or directory"),
+              # silently, because of the `|| true` below -- confirmed live via
+              # `cscli machines list` never showing homepage-dashboard despite
+              # this sidecar reporting healthy. Fixed by mounting config.yaml
+              # directly (see volumeMounts) instead of relying on the entrypoint.
+              # Logging the outcome explicitly now instead of swallowing it.
+              if cscli machines add homepage-dashboard --password "$DASHBOARD_MACHINE_PASSWORD" 2>&1; then
+                echo "registered homepage-dashboard"
+              else
+                echo "registration failed or machine already exists (see error above)"
+              fi
               sleep infinity
           env:
             - name: DASHBOARD_MACHINE_PASSWORD
@@ -223,6 +237,10 @@ spec:
                 secretKeyRef:
                   name: crowdsec-dashboard-machine
                   key: password
+          volumeMounts:
+            - name: config
+              mountPath: /etc/crowdsec/config.yaml
+              subPath: config.yaml
           resources:
             requests:
               cpu: 10m
