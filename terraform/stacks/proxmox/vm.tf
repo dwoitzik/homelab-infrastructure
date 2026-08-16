@@ -68,6 +68,13 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   # for a specific incident. Underlying storage is local-lvm (LVM-thin),
   # not the old ZFS rpool -- see locals.tf and host-config.tf for the
   # 2026-08-13 ZFS-to-LVM-thin migration this comment used to reference.
+  # 2026-08-16: `discard=on` + `mbps_wr=50,mbps_wr_max=75` applied live
+  # (`qm set 211 ...`) during the local-lvm thin-pool exhaustion incident that
+  # crashed the host that day -- not reflected below since `disk` is in
+  # `lifecycle.ignore_changes`, so this block's values were never the live
+  # source of truth to begin with. No drift risk: Atlantis cannot revert
+  # live disk attributes regardless of what's declared here. Control-plane
+  # VM, so the ceiling is a bit higher than the workers' (etcd headroom).
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
@@ -171,6 +178,12 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
 
   # REL-012c: cache=none + aio=native (see k3s-11 comment).
   # Applied manually via `qm set 212 ...`; disk in ignore_changes.
+  # 2026-08-16: `discard=on` + `mbps_wr=100,mbps_wr_max=150` applied live
+  # (`qm set 212 ...`) during the local-lvm thin-pool exhaustion incident that
+  # crashed the host that day -- raised from an initial 40/60 after that
+  # tighter cap was found to starve containerd's own sandbox-creation I/O
+  # (see phase8/LEDGER.md Entries 8-9 for the full incident). Same
+  # ignore_changes/no-drift-risk note as k3s-11 applies.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
@@ -258,6 +271,12 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   }
 
   # cache=none + aio=native (see k3s-11 comment).
+  # 2026-08-16: `discard=on` + `mbps_wr=100,mbps_wr_max=150` applied live
+  # (`qm set 213 ...`) during the local-lvm thin-pool exhaustion incident that
+  # crashed the host that day -- raised from an initial 40/60 after that
+  # tighter cap was found to starve containerd's own sandbox-creation I/O
+  # (see phase8/LEDGER.md Entries 8-9 for the full incident). Same
+  # ignore_changes/no-drift-risk note as k3s-11 applies.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
