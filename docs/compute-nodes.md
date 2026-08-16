@@ -9,8 +9,8 @@
 | **CPU** | AMD Ryzen 7 5825U (8C/16T, up to 4.5 GHz) |
 | **RAM** | 64 GB DDR4 3200 MT/s (2x 32 GB) |
 | **GPU** | AMD Radeon Vega iGPU (PCIe passthrough, IOMMU active) |
-| **Storage A** | 512 GB NVMe — ZFS root (`rpool`), container & VM disks |
-| **Storage B** | 2 TB External HDD (USB 3.0) — PBS backup datastore |
+| **Storage A** | 512 GB NVMe — LVM-thin (`local-lvm`, VG `pve`), container & VM disks. Migrated off ZFS (`rpool`) 2026-08-13 disaster recovery; `rpool` no longer exists on this host. |
+| **Storage B** | 2 TB External HDD (USB 3.0) — ZFS pool `archive` (single vdev). PBS backup datastore plus bulk/archive storage generally (Jellyfin cache, media staging) — no longer PBS-only. |
 | **OS** | Proxmox VE — Debian Trixie (13), Kernel `7.0.0-3-pve` |
 
 ### VMs & Containers (`onboot`)
@@ -25,7 +25,7 @@ defined, and 3 LXCs added since the initial pass (`ct-srv-media-acq-01`,
 | `ct-mgmt-pbs-01` | LXC | 2 | 2 GB | Proxmox Backup Server |
 | `ct-srv-docker-01` | LXC | 4 | 4 GB | Legacy Docker workloads |
 | `ct-srv-ai-01` | LXC | 6 | 32 GB | Ollama / LLM inference (GPU Passthrough) -- cores cut from 8 after host CPU overcommit |
-| `ct-srv-nfs-01` | LXC | 2 | 2 GB | NFS storage server (ZFS-backed, `nfs-client` StorageClass for all k3s PVCs) |
+| `ct-srv-nfs-01` | LXC | 2 | 2 GB | NFS storage server (`/nfs-data` bind-mount, backed by the host's `local-lvm` root disk — not ZFS; the container's own root disk is on `local-lvm` too. `nfs-client` StorageClass for all k3s PVCs) |
 | `ct-srv-media-acq-01` | LXC | 2 | 4 GB | Media acquisition stack (Mullvad-wrapped, ADR-010) |
 | `ct-srv-jellyfin-01` | LXC | 2 | 2 GB | Jellyfin (GPU-passthrough hardware transcode) |
 | `ct-srv-atlantis-01` | LXC | 2 | 2 GB | Atlantis GitOps runner (moved off k3s, ADR-012) |
@@ -37,9 +37,10 @@ defined, and 3 LXCs added since the initial pass (`ct-srv-media-acq-01`,
 
 `vm-srv-k3s-11` is the sole control-plane + etcd server; `vm-srv-k3s-12` and `-13` are
 agent (worker) nodes only. A 3-node embedded-etcd HA setup was tried and reverted — all
-three VMs share the same physical host and ZFS pool, so a 3-writer etcd quorum produced
-enough concurrent I/O to freeze the host (the same failure mode as the ZFS tuning above,
-just from a different source). Single-etcd plus agent workers gives the compute capacity
+three VMs share the same physical host and disk (originally the ZFS boot pool, now
+`local-lvm` post-migration — the contention is about the single physical NVMe either
+way), so a 3-writer etcd quorum produced enough concurrent I/O to freeze the host (the
+same failure mode as the ZFS tuning above, just from a different source). Single-etcd plus agent workers gives the compute capacity
 of 3 VMs without the multi-writer etcd I/O storm. This is not HA for the control plane —
 `mini` remains a single point of failure either way — so the only real mitigation is fast
 recovery from Git + backups, not uptime. RPis are intentionally excluded from k3s entirely
@@ -55,11 +56,11 @@ backed by `ct-srv-nfs-01`.
 | CPU C-States | Hardware default | Tried `max_cstate=1 idle=nomwait` as a guess at fixing repeated host freezes, made idle temps worse (96°C), reverted. Not the cause. |
 | PCIe ASPM | `performance` (forced via `pcie_aspm=off` + live policy switch) | Power-saving PCIe link states were a candidate cause of NVMe stalls under load, given the marginal PSU |
 | IOMMU | Active (`amd_iommu=on`, `iommu=pt`) | GPU passthrough to LXC |
-| Swap | 8 GB ZFS zvol (`rpool/swap`) | Safety net for LLM inference |
-| ZFS version | 2.4.2-pve1 (upgraded from 2.4.1-pve1, 2026-06-22) | 2.4.1 has a known unfixed deadlock under ARC memory pressure + concurrent I/O (`openzfs/zfs#18426`) matching every freeze symptom seen here exactly: ARC pinned at max, I/O worker threads idle-waiting, no kernel panic trace |
-| ZFS ARC | Capped at 4 GB (`zfs_arc_max`, down from 8 GB) | Tightened further after the freezes continued even at 8 GB |
-| ZFS dirty data | Capped at 1 GB (`zfs_dirty_data_max`, down from the 4 GB default) | Forces smaller, more frequent flushes instead of large write-behind batches |
-| ZFS txg timeout | 5s (`zfs_txg_timeout`, down from 15s default) | Same goal — shorter sync intervals, smaller worst-case throttle stalls under write pressure |
+| Swap | 8 GB LVM logical volume (`pve/swap`) | Safety net for LLM inference. No longer a ZFS zvol — moved with the rest of boot/VM storage off `rpool` in the 2026-08-13 migration. |
+| ZFS version | 2.4.2-pve1 (upgraded from 2.4.1-pve1, 2026-06-22) | 2.4.1 has a known unfixed deadlock under ARC memory pressure + concurrent I/O (`openzfs/zfs#18426`) matching every freeze symptom seen here exactly: ARC pinned at max, I/O worker threads idle-waiting, no kernel panic trace. Still relevant — the `archive` pool below is still ZFS. |
+| ZFS ARC | `zfs_arc_min=4GB` / `zfs_arc_max=16GB` (`/etc/modprobe.d/zfs.conf`, live-verified) | **Loosened, not tightened, post-migration.** The aggressive 4 GB cap below was defensive tuning for ZFS sharing the DRAM-less boot NVMe with etcd; ZFS now only backs the slower, latency-tolerant `archive` HDD pool, so a larger cache is a straightforward win with none of the original contention risk. Historical value for reference: was capped at 4 GB (down from an 8 GB default) while `rpool` was still the boot pool. |
+| ZFS dirty data | `zfs_dirty_data_max` at the OpenZFS default (4 GB, live-verified) — no longer overridden | Was capped at 1 GB while ZFS backed the boot NVMe (forced smaller, more frequent flushes to avoid write-behind stalls). That override isn't present in `/etc/modprobe.d/` anymore; the HDD-backed `archive` pool doesn't have the same DRAM-less-NVMe latency sensitivity, so the default is fine. |
+| ZFS txg timeout | 5s (`zfs_txg_timeout`, live-verified) — same value as before, but now just the OpenZFS default rather than a deliberate override | Originally tuned down from 15s for the same NVMe-latency reasons as the dirty-data cap; happens to already equal the current default, so no functional change either way. |
 | USB Storage | `nofail, device-timeout=5s` | USB dropout must not block boot/crash host |
 | VM/LXC `onboot` | **Enabled (`onboot=1`) for every VM/LXC** (re-verified live via `pvesh get .../config`) | Originally disabled for isolated debugging during a host-freeze investigation, then reversed once that need passed -- control-plane VMs, PBS, and several LXCs had failed to auto-recover after a real host freeze while this was off. `bpg/proxmox`'s LXC resource doesn't reliably manage this attribute (`terraform plan` always shows "No changes" regardless of live value), so it's applied manually (`pct set <id> -onboot 1`) and needs reapplying if a container is ever recreated. |
 

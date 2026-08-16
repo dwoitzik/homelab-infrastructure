@@ -47,9 +47,11 @@ If the router needs to be rebuilt from scratch:
 
 ## Tier 1 — Proxmox Host
 
-1. Reinstall Proxmox VE on `mini` (fresh ISO install). Recreate the `rpool` ZFS layout —
-   see `docs/compute-nodes.md` for the disk layout this depends on (512GB SSD only for
-   anything stateful; never the USB HDD or scratch stick).
+1. Reinstall Proxmox VE on `mini` (fresh ISO install). Recreate the `local-lvm` (LVM-thin,
+   VG `pve`) layout on the 512GB NVMe — see `docs/compute-nodes.md` for the disk layout
+   this depends on (512GB SSD only for anything stateful; never the USB HDD or scratch
+   stick). This was `rpool` (ZFS) before the 2026-08-13 migration; ZFS is no longer used
+   for boot/VM-image storage on this host, only for the `archive` pool on the USB HDD.
 2. Restore the OIDC realm config (Authelia SSO for the Proxmox web UI) — this is
    API-automatable, not a manual click-through:
 
