@@ -81,6 +81,22 @@ spec:
           - matchType: "=~"
             name: alertname
             value: "KubePodCrashLooping|KubeJobFailed|KubeNodeNotReady|CertManagerCertExpirySoon|VeleroBackupPartialFailure"
+      # 2026-08-16: ProxmoxStorageCapacityHigh (severity: warning, 85% threshold,
+      # storage-capacity-alerts.yml) was NOT reaching Discord at all -- only the
+      # 93% Critical variant was, via the generic severity=critical route above.
+      # The pool hit 91.66% and crashed the host with zero notification the whole
+      # way up (see phase8/LEDGER.md Entries 6-8) specifically because of this gap
+      # -- a dashboard row nobody was watching, not a page. Named explicitly here
+      # (both High and Critical, not just relying on severity=critical) so the
+      # earlier warning threshold pages too, not just the later critical one.
+      - receiver: discord
+        groupWait: 30s
+        groupInterval: 4h
+        repeatInterval: 4h
+        matchers:
+          - matchType: "=~"
+            name: alertname
+            value: "ProxmoxStorageCapacityHigh|ProxmoxStorageCapacityCritical"
   receivers:
     - name: "null"
     - name: discord
