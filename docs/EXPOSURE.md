@@ -120,7 +120,8 @@ still works afterward is its own risk — a bad rotation with nobody watching ca
 "maybe reachable" exposure into a real, confirmed outage. Prioritized by actual blast
 radius instead of rotating blind:
 
-**Tier 1 — infra control-plane credentials (highest blast radius, do first, needs care)**
+### Tier 1 — infra control-plane credentials (highest blast radius, do first, needs care)
+
 - Proxmox (`terraform@pve`) API token — used by Atlantis for every `terraform apply`
   against `terraform/stacks/proxmox/`. A bad rotation here breaks all future
   applies, and Atlantis's own webhook path is *already* degraded (see the parked
@@ -132,7 +133,8 @@ radius instead of rotating blind:
   pass has been cleaning up. Needs an account-level action (issuing a new scoped
   token) that this agent should not do unsupervised.
 
-**Tier 2 — identity/session (moderate blast radius)**
+### Tier 2 — identity/session (moderate blast radius)
+
 - Authelia secrets (`secret/authelia`: session/storage encryption keys, OIDC client
   secrets) — rotating invalidates every active session cluster-wide at once
   (everyone gets logged out simultaneously, including the operator). Safe to rotate,
