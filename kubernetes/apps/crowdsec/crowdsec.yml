@@ -231,6 +231,11 @@ spec:
                 echo "registration failed or machine already exists (see error above)"
               fi
               sleep infinity
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: DASHBOARD_MACHINE_PASSWORD
               valueFrom:
@@ -241,6 +246,16 @@ spec:
             - name: config
               mountPath: /etc/crowdsec/config.yaml
               subPath: config.yaml
+            - name: registrar-tmp
+              mountPath: /tmp
+            # cscli itself (not just the crowdsec daemon) writes a trace dir
+            # under here -- confirmed live: "while setting up trace
+            # directory: mkdir /var/lib/crowdsec/data/trace: read-only file
+            # system". Shares the same volume as the main container; cscli
+            # here only ever reads/writes its own trace scratch space, no
+            # conflict with the daemon's actual DB in the same dir.
+            - name: data
+              mountPath: /var/lib/crowdsec/data
           resources:
             requests:
               cpu: 10m
@@ -259,6 +274,8 @@ spec:
             path: /var/log
             type: Directory
         - name: tmp
+          emptyDir: {}
+        - name: registrar-tmp
           emptyDir: {}
 ---
 apiVersion: external-secrets.io/v1beta1

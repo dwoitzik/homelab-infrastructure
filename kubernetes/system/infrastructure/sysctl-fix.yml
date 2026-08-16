@@ -29,6 +29,7 @@ spec:
               echo done && sleep infinity
           securityContext:
             privileged: true
+            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: 1m
