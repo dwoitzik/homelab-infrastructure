@@ -71,7 +71,7 @@ data:
       // (the in-cluster tailscale-subnet-router pod, subnet-router.yml, advertising only
       // 10.0.20.0/24 per REL-033 -- already scoped off every other VLAN).
       "groups": {
-        "group:admin": ["dw"]
+        "group:admin": ["dw@"]
       },
       "tagOwners": {
         // Only group:admin (dw) can tag a node as the subnet router -- prevents any
