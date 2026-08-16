@@ -42,12 +42,19 @@ spec:
             secretKeyRef:
               name: synapse-secrets
               key: SYNAPSE_DB_PASSWORD
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
         volumeMounts:
         - name: data
           mountPath: /data
         - name: source
           mountPath: /source
           readOnly: true
+        - name: tmp
+          mountPath: /tmp
         resources:
           requests:
             cpu: 50m
@@ -62,6 +69,11 @@ spec:
         args:
           - "--config-path"
           - "/data/homeserver.yaml"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
         ports:
         - containerPort: 8008
           name: http
@@ -90,6 +102,8 @@ spec:
           mountPath: /data
         - name: media
           mountPath: /media
+        - name: tmp
+          mountPath: /tmp
       securityContext:
         fsGroup: 991
         runAsUser: 991
@@ -104,3 +118,5 @@ spec:
       - name: source
         configMap:
           name: synapse-config
+      - name: tmp
+        emptyDir: {}
