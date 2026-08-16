@@ -58,13 +58,17 @@ spec:
           value: "--data-checksums"
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
+        # 2026-08-16: memory limit raised 1Gi->1.5Gi alongside the new /dev/shm
+        # mount below -- tmpfs usage counts against the container's own memory
+        # cgroup, and 1Gi was already tight for a 512MB shared_buffers instance
+        # before adding shm headroom on top of it.
         resources:
           requests:
             cpu: 100m
             memory: 256Mi
           limits:
             cpu: 1000m
-            memory: 1Gi
+            memory: 1536Mi
         # Live-tested: `pg_isready -U immich` -> "accepting connections".
         readinessProbe:
           exec:
@@ -82,12 +86,27 @@ spec:
           mountPath: /var/lib/postgresql/data
         - name: tmp
           mountPath: /tmp
+        - name: dshm
+          mountPath: /dev/shm
       volumes:
       - name: db
         persistentVolumeClaim:
           claimName: immich-db-pg16
       - name: tmp
         emptyDir: {}
+      # 2026-08-16: no /dev/shm volume existed here at all -- the container ran on
+      # the containerd default (64Mi), while shared_buffers is 512MB. Root-caused
+      # as the likely cause of the "crash of another server process / possibly
+      # corrupted shared memory" restarts recorded in docs/EXPOSURE.md (17 restarts
+      # before this pass) -- not real data corruption; a full VACUUM (VERBOSE,
+      # ANALYZE) completed with zero errors across every page, and 24,721 real
+      # assets are present. 1Gi gives headroom above shared_buffers for parallel
+      # query workers' dynamic shared memory segments, which is what actually needs
+      # /dev/shm space beyond shared_buffers itself.
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 512Mi
 ---
 apiVersion: v1
 kind: Service
