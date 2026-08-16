@@ -50,9 +50,10 @@ backed by `ct-srv-nfs-01`.
 
 | Setting | Value | Note |
 | :--- | :--- | :--- |
-| CPU TDP | 25W (BIOS, down from 54W default) | BMAX ships an undersized PSU for this chip's rated TDP — repeated freezes traced to power delivery, not the CPU die itself |
+| CPU TDP | 25W (BIOS) — **does not reach the SMU** | BMAX ships an undersized PSU for this chip's rated TDP. Verified 2026-08-16 via `ryzenadj -i`: with the BIOS set to 25W, actual STAPM LIMIT read back as 35.000W — the BIOS slider isn't enforced at the SMU level on this board. Do not trust the BIOS number; check `ryzenadj -i` for ground truth. |
+| CPU power limits | `ryzenadj --stapm-limit=20000 --fast-limit=30000 --slow-limit=22000 --tctl-temp=88`, applied at boot via `ryzenadj-limits.service` (systemd, `/etc/systemd/system/ryzenadj-limits.service`) | Root cause of recurring 95-96°C host temp (2026-08-15/16 incident): `THM LIMIT CORE` (Tctl throttle target) is fixed at 95°C, and this board exposes **no fan PWM/tach to Linux** (`hwmon1`/`k10temp` only has `temp1_input`, no `pwm*`; no ACPI thermal zones with real values; no `nct6775`/`it87` driver applies — fan speed is entirely EC-firmware-controlled, invisible and uncontrollable from the OS). The CPU was running flat against its throttle ceiling continuously rather than actually failing — but sustained throttle-riding is bad for longevity and tanks throughput. Fix is to cap power below the point where the (uncontrollable) stock fan curve can't keep up, rather than trying to control the fan. See benchmark below for why 20W was chosen. `ryzenadj` built from source (`FlyGoat/RyzenAdj`, not packaged for Debian) — binary at `/usr/local/bin/ryzenadj`. |
 | CPU Governor | `powersave` | Reduces idle consumption |
-| CPU C-States | Hardware default | Tried `max_cstate=1 idle=nomwait` as a guess at fixing repeated host freezes, made idle temps worse (96°C), reverted. Not the cause. |
+| CPU C-States | Hardware default | Tried `max_cstate=1 idle=nomwait` as a guess at fixing repeated host freezes, made idle temps worse (96°C), reverted. Not the cause — the actual cause (found 2026-08-16) is the fixed 95°C Tctl throttle target combined with the uncontrollable fan curve, see `ryzenadj` row above. |
 | PCIe ASPM | `performance` (forced via `pcie_aspm=off` + live policy switch) | Power-saving PCIe link states were a candidate cause of NVMe stalls under load, given the marginal PSU |
 | IOMMU | Active (`amd_iommu=on`, `iommu=pt`) | GPU passthrough to LXC |
 | Swap | 8 GB ZFS zvol (`rpool/swap`) | Safety net for LLM inference |
@@ -62,6 +63,29 @@ backed by `ct-srv-nfs-01`.
 | ZFS txg timeout | 5s (`zfs_txg_timeout`, down from 15s default) | Same goal — shorter sync intervals, smaller worst-case throttle stalls under write pressure |
 | USB Storage | `nofail, device-timeout=5s` | USB dropout must not block boot/crash host |
 | VM/LXC `onboot` | **Enabled (`onboot=1`) for every VM/LXC** (re-verified live via `pvesh get .../config`) | Originally disabled for isolated debugging during a host-freeze investigation, then reversed once that need passed -- control-plane VMs, PBS, and several LXCs had failed to auto-recover after a real host freeze while this was off. `bpg/proxmox`'s LXC resource doesn't reliably manage this attribute (`terraform plan` always shows "No changes" regardless of live value), so it's applied manually (`pct set <id> -onboot 1`) and needs reapplying if a container is ever recreated. |
+
+### RyzenAdj Power Limit Benchmark (2026-08-16)
+
+`stress-ng --cpu 16 --timeout 75s` (all cores) at each STAPM limit, `fast-limit`/`slow-limit`
+scaled proportionally, `tctl-temp=88` held constant as a hard backstop throughout. Temp
+sampled at end of the stress run and again after 60s cooldown (idle, but real cluster
+traffic still running in the background — not a lab-clean idle).
+
+| STAPM limit | Fast/Slow limit | Bogo-ops (75s, 16 cores) | Temp @ end of stress | Temp @ 60s cooldown |
+| :--- | :--- | :--- | :--- | :--- |
+| 15W | 25W / 17W | 598,207 | 65°C | 66°C |
+| **20W (chosen)** | **30W / 22W** | 797,930 | 72°C | 77°C |
+| 25W | 35W / 27W | 882,262 | 78°C | 85°C |
+| 30W | 40W / 32W | 970,330 | 85°C | 89°C |
+
+15W→20W buys +33% throughput for +33% power (linear, worth it). 20W→25W buys only +11%
+throughput for +25% more power, and cooldown temp is already at 85°C — 5°C of margin left
+before the watchdog's 90°C alert threshold, on a host with an uncontrollable fan curve and
+no thermal governor to fall back on. 30W erases that margin entirely. **20W is the chosen
+steady-state limit** — best throughput-per-degree before the curve bends against you, with
+real headroom left under sustained multi-VM load. Re-run this benchmark if the workload mix
+changes significantly (e.g. AI inference load added) or if the physical fan/cooling is ever
+replaced — the whole tradeoff shifts if the fan constraint goes away.
 
 ---
 
