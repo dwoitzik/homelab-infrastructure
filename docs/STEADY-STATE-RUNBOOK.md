@@ -62,6 +62,48 @@ If the namespace is `apps` and the job name starts with `renovate-`, check
 `renovate.json` syntax error from a recent edit. Not urgent (it retries next 2h cycle),
 but repeated failures mean Renovate has been silently not-updating anything.
 
+**`github.com token 401 unauthorized` / `Authentication failure`**: the `renovate-token`
+Secret is populated from Vault via the `renovate-token` ExternalSecret (`refreshInterval:
+1h`) — this error means the PAT *value stored in Vault* has expired or been revoked on
+GitHub's side, not a sync problem. ExternalSecret will faithfully keep syncing an expired
+token until the Vault value itself is replaced.
+
+1. On GitHub, generate a replacement fine-grained PAT for the `dwoitzik` account scoped to
+   `homelab-infrastructure` (contents + pull-requests + workflows: read/write), matching
+   whatever expiry the previous one had.
+2. Update the value in Vault at the path the `renovate-token` ExternalSecret reads from
+   (check `kubectl get externalsecret renovate-token -n apps -o yaml` for the exact
+   `remoteRef.key` if unsure).
+3. Either wait for the next `refreshInterval` (≤1h) or force it:
+   `kubectl annotate externalsecret renovate-token -n apps force-sync=$(date +%s) --overwrite`.
+4. Confirm: `kubectl get secret renovate-token -n apps -o jsonpath='{.metadata.resourceVersion}'`
+   changes, then wait for the next CronJob fire (`*/2h`) or trigger one manually
+   (`kubectl create job -n apps renovate-manual-$(date +%s) --from=cronjob/renovate`) and
+   check its log for a clean run (no `401`/`Authentication failure`).
+
+**Zombie Failed Job/pod cleanup** (applies to *any* recurring CronJob, not just Renovate):
+`failedJobsHistoryLimit` keeps old Failed Job objects around by design so they stay
+visible for triage — but `kube_job_status_failed` stays `>0` for each one until deleted,
+so `KubeJobFailed` keeps re-firing on every alert evaluation even after the underlying
+cause (e.g. the 401 above) is long fixed. Once the root cause is confirmed resolved
+(latest 1-2 runs `Complete`), clear the backlog:
+
+```bash
+# List failed Jobs for the CronJob in question
+kubectl get jobs -n apps --sort-by=.metadata.creationTimestamp | grep '<cronjob-name>-' | grep -v Complete
+
+# Delete them (cascades to their pods)
+kubectl delete job -n apps <job-name> [<job-name> ...]
+
+# Some pods can outlive their Job object (e.g. TTL/GC timing) — sweep stragglers directly
+kubectl get pods -n apps | grep '<cronjob-name>-' | grep -v Completed
+kubectl delete pod -n apps <pod-name> [<pod-name> ...]
+```
+
+Alert clears once `kube_job_status_failed` has no remaining series for that job name
+(check against Alertmanager's `repeat_interval` for `KubeJobFailed` — allow one cycle
+before assuming cleanup didn't take).
+
 ### `KubeNodeNotReady`
 
 Check `kubectl get nodes` and `kubectl describe node <name>` for the reason (kubelet
