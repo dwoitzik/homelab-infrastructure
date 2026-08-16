@@ -1,7 +1,22 @@
 # ADR-022: Headscale migrated off k3s onto rpi-srv-02
 
 **Date:** 2026-08-17
-**Status:** Accepted
+**Status:** Partially implemented — infra ready, cutover reverted
+
+**2026-08-17 update:** Infra (SSD partition/mount, Docker Compose deployment, migrated
+SQLite DB + noise key, headless Service+Endpoints) was deployed and the cutover was
+attempted by repointing `headscale-final`'s IngressRoute at `external-headscale-rpi`.
+The plain `/health` endpoint passed through the new backend, but the real client control
+channel (`POST /machine/map`, an HTTP-upgrade "noise" protocol connection) returned
+`502 Bad Gateway` when a real client (`tailscale-subnet-router`) tried to reconnect through
+it — confirmed via that Deployment's logs. Reverted `headscale-final` back to the original
+k3s `headscale` Service same-day; confirmed working via a real client reconnect (not just
+`/health`). Root cause of the 502 is not yet diagnosed (candidates: Traefik's `websockets`
+middleware not correctly proxying Headscale's noise-protocol upgrade to a raw Docker host
+backend vs. an in-cluster Service; missing headers/timeouts for that connection type).
+The rpi-side deployment and `external-headscale-rpi` Service/Endpoints are left in place,
+inert, for the next attempt once root-caused. Do not repoint `headscale-final` at
+`external-headscale-rpi` again until the `/machine/map` failure is understood and fixed.
 
 ## Context
 

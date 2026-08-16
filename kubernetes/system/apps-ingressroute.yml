@@ -314,12 +314,14 @@ spec:
     middlewares: [{name: websockets}]
     services: [{name: headscale, port: 8080}]
 ---
-# 2026-08-17: Headscale migrated off k3s onto rpi-srv-02 (native Docker, real SSD
-# instead of the shared thin-pool -- see docs/decisions/ADR-020-headscale-on-rpi.md).
-# This headless Service+Endpoints pair is the cutover target: same pattern as
-# external-dns/external-pve below. Not yet referenced by headscale-final above --
-# added first, deliberately inert, so it can be connectivity-tested before anything
-# live points at it.
+# 2026-08-17: Headscale infra prepared on rpi-srv-02 (native Docker, real SSD
+# instead of the shared thin-pool -- see docs/decisions/ADR-022-headscale-on-rpi.md).
+# Cutover was ATTEMPTED and REVERTED same day: /health passed through this backend
+# but the real client control channel (POST /machine/map, noise-protocol upgrade)
+# returned 502 Bad Gateway -- root cause not yet diagnosed. headscale-final below
+# still points at the k3s Service (confirmed working). This Service+Endpoints pair
+# is left in place, inert, for the next cutover attempt once root-caused -- do not
+# repoint headscale-final at it without diagnosing the 502 first.
 apiVersion: v1
 kind: Service
 metadata:
