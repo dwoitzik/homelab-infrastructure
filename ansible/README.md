@@ -52,9 +52,13 @@ cd ansible/k3s-cluster
 ansible-playbook playbooks/site.yml -i inventory.yml
 ```
 
-The cluster is HA (3 server nodes, embedded etcd) as of 2026-06-19. `inventory-ha.yml` in
-that directory documents the HA target state/migration steps if a node ever needs to be
-rebuilt from scratch — see `docs/k3s-architecture.md` for the full picture.
+**Stale as of 2026-08-16 — corrected**: the cluster is single-server (`vm-srv-k3s-11`
+only), not HA, and its datastore is SQLite via kine, not etcd — see
+`docs/decisions/ADR-015-k3s-datastore-sqlite.md` and `docs/k3s-architecture.md` for the
+full picture and why. `inventory-ha.yml` in that directory documents a 3-server/embedded-etcd
+target that was tried, reverted (repeated host freezes — 3 VMs sharing one physical host/
+storage pool couldn't sustain 3 concurrent etcd writers), and is **not** the current or
+intended target. Do not use it for a real rebuild.
 
 ## Standalone playbooks (top-level `ansible/*.yml`)
 
