@@ -64,6 +64,12 @@ All notable changes to this infrastructure are documented here.
 ### Added
 
 - k3s HA: all 3 nodes run control-plane + embedded etcd (migrated from single-node SQLite, no rebuild)
+  **[Corrected 2026-08-16]: this was tried and reverted — 3 concurrent etcd writers on
+  VMs sharing one physical host/storage pool caused repeated host freezes. The cluster
+  has been back to single-server SQLite (via kine) since, and docs describing it as
+  running etcd were stale for a long time after — see
+  `docs/decisions/ADR-015-k3s-datastore-sqlite.md`. Leaving this original entry as
+  written for the historical record, not rewriting it.**
 - k3s API VIP (`10.0.20.10`) via Keepalived
 - Vault auto-unseal sidecar — no more manual unseal after a restart
 - Independent DNS health check on both RPis (Discord alert, no dependency on k3s/Prometheus)

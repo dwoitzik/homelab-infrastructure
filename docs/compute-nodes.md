@@ -29,7 +29,7 @@ defined, and 3 LXCs added since the initial pass (`ct-srv-media-acq-01`,
 | `ct-srv-media-acq-01` | LXC | 2 | 4 GB | Media acquisition stack (Mullvad-wrapped, ADR-010) |
 | `ct-srv-jellyfin-01` | LXC | 2 | 2 GB | Jellyfin (GPU-passthrough hardware transcode) |
 | `ct-srv-atlantis-01` | LXC | 2 | 2 GB | Atlantis GitOps runner (moved off k3s, ADR-012) |
-| `vm-srv-k3s-11` | VM | 4 | 12 GB | k3s control-plane + embedded etcd (sole server) |
+| `vm-srv-k3s-11` | VM | 4 | 12 GB | k3s control-plane + SQLite/kine datastore (sole server, not etcd — see ADR-015) |
 | `vm-srv-k3s-12` | VM | 4 | 8 GB | k3s agent (worker only, no etcd) |
 | `vm-srv-k3s-13` | VM | 4 | 8 GB | k3s agent (worker only, no etcd) |
 | `ct-dmz-proxy-01` | LXC | 2 | 1 GB | DMZ reverse proxy (Public Facing) |
