@@ -171,6 +171,20 @@ spec:
               value: "trivy-system"
             - name: OPERATOR_CONCURRENT_SCAN_JOBS_LIMIT
               value: "3"
+            # 2026-08-16: root-caused KubeAPIServerHighLatency (p99 apiserver latency,
+            # matches the REL-012 etcd precursor pattern) to this, NOT node memory
+            # pressure on vm-srv-k3s-11 as first suspected -- live evidence ruled that
+            # out (zero swap, ~20% CPU, ~2% iowait, all fine). Real cause: SbomReport
+            # objects are enormous (127KB-1.2MB each, sampled directly), one persists
+            # permanently per distinct workload (~180 of them, ~200MB total -- almost
+            # exactly the whole etcd DB's size), and LIST calls on this CRD type alone
+            # were measured at p99 4.98s. Nothing in this cluster actually consumes SBOM
+            # data (Trivy Operator itself has no UI, and was already removed from
+            # Homepage for exactly that reason -- see kubernetes/apps/homepage/
+            # homepage.yml). vulnerabilityReports are a separate, independently
+            # generated report type and are unaffected by this.
+            - name: OPERATOR_SBOM_GENERATION_ENABLED
+              value: "false"
           ports:
             - name: metrics
               containerPort: 8080
