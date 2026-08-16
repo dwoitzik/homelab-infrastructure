@@ -422,6 +422,11 @@ spec:
         - name: copy-php-conf
           image: nextcloud:34.0.1-apache
           command: ["sh", "-c", "cp -a /usr/local/etc/php/conf.d/. /writable-conf/"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
           volumeMounts:
             - name: php-conf
               mountPath: /writable-conf

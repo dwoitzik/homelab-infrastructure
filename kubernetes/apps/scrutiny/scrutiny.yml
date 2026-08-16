@@ -90,11 +90,18 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 30
             failureThreshold: 4
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
           volumeMounts:
             - name: data
               mountPath: /var/lib/influxdb2
             - name: config
               mountPath: /etc/influxdb2
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -102,6 +109,8 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: scrutiny-config
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -170,8 +179,25 @@ spec:
               value: Europe/Berlin
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            # Pre-existing gap surfaced by this change, not introduced by it:
+            # this app was already writing its sqlite db to /opt/scrutiny/config
+            # with no PVC/volume mounted there at all -- confirmed live
+            # ("panic: failed to connect to database! ... out of memory (14)",
+            # sqlite's error when it can't create/lock a file on a read-only
+            # fs) -- it was silently relying on the writable root filesystem,
+            # meaning this db never actually persisted across pod
+            # reschedules/restarts on a different node either. Scratch
+            # emptyDir here keeps behavior equivalent to before (not worse);
+            # making it a real PVC is a separate improvement, out of scope
+            # for this KSV-0014 pass.
+            - name: config
+              mountPath: /opt/scrutiny/config
           resources:
             requests:
               cpu: 50m
@@ -194,6 +220,8 @@ spec:
             failureThreshold: 4
       volumes:
         - name: tmp
+          emptyDir: {}
+        - name: config
           emptyDir: {}
 ---
 apiVersion: v1
@@ -238,6 +266,14 @@ spec:
               value: "*/30 * * * *"
             - name: TZ
               value: Europe/Berlin
+          # NOT readOnlyRootFilesystem: the entrypoint writes /env.sh at the
+          # filesystem root (not under /tmp or any mountable subpath), rewrites
+          # /etc/cron.d in place via sed, and cron itself needs /var/run
+          # writable for its pidfile -- confirmed live ("/entrypoint-
+          # collector.sh: line 6: /env.sh: Read-only file system", "cron:
+          # can't open or create /var/run/crond.pid: Read-only file system").
+          # Too many baked-in root-level write paths to cleanly mount around;
+          # same class of genuine incompatibility as myspeed. Not forcing it.
           securityContext:
             capabilities:
               add: ["SYS_RAWIO"]
