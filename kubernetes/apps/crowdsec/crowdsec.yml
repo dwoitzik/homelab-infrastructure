@@ -196,6 +196,40 @@ spec:
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
+        # 2026-08-16: idempotent LAPI machine re-registration for the Homepage
+        # dashboard widget. `local_api_credentials.yaml` (the pod's own self-auth)
+        # lives on the container's ephemeral root filesystem -- NOT on any mounted
+        # volume -- and `data` above (the local machine/decision DB) is an emptyDir.
+        # Both reset on every pod restart, so a one-off `cscli machines add ... --force`
+        # (what fixed this live earlier today) is wiped on the next restart and also
+        # overwrites the pod's own default self-registration while it's active. This
+        # sidecar re-registers a *separate*, stably-named machine with a fixed
+        # password (same value Homepage's widget already has via Vault, see
+        # kubernetes/apps/homepage/external-secret.yml) on every boot, entirely over
+        # the LAPI's own HTTP API -- it never touches local_api_credentials.yaml or
+        # the pod's default identity, so both survive independently of each other.
+        - name: dashboard-machine-registrar
+          image: crowdsecurity/crowdsec:latest
+          command:
+            - sh
+            - -c
+            - |
+              until cscli lapi status > /dev/null 2>&1; do sleep 2; done
+              cscli machines add homepage-dashboard --password "$DASHBOARD_MACHINE_PASSWORD" || true
+              sleep infinity
+          env:
+            - name: DASHBOARD_MACHINE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: crowdsec-dashboard-machine
+                  key: password
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
       volumes:
         - name: config
           configMap:
@@ -208,6 +242,25 @@ spec:
             type: Directory
         - name: tmp
           emptyDir: {}
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: crowdsec-dashboard-machine
+  namespace: security
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: vault
+  target:
+    name: crowdsec-dashboard-machine
+    creationPolicy: Owner
+  data:
+    - secretKey: password
+      remoteRef:
+        key: secret/homepage
+        property: crowdsec-password
 ---
 apiVersion: v1
 kind: Service
