@@ -61,6 +61,7 @@ spec:
         image: searxng/searxng:2026.7.1-c5d8d05f0
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -73,6 +74,10 @@ spec:
           mountPath: /etc/searxng/settings.yml
           subPath: settings.yml
           readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /var/cache/searxng
         # Live-tested via Pod IP: "/" returns 200 with the search page HTML,
         # no host-validation issue (unlike homepage's Next.js middleware).
         readinessProbe:
@@ -99,6 +104,10 @@ spec:
       - name: config
         configMap:
           name: searxng-config
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

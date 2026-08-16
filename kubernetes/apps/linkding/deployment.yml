@@ -55,11 +55,26 @@ spec:
           limits:
             cpu: 200m
             memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+            # uwsgi's entrypoint runs as root and setgid()/setuid()s down to
+            # www-data (33) itself -- confirmed live, dropping all caps
+            # crash-loops it ("setgid(): Operation not permitted").
+            add: ["SETGID", "SETUID"]
         volumeMounts:
         - name: data
           mountPath: /etc/linkding/data
+        - name: tmp
+          mountPath: /tmp
 
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: linkding-data
+      - name: tmp
+        emptyDir: {}
