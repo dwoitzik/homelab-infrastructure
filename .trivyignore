@@ -44,3 +44,21 @@ KSV-0001 path:kubernetes/system/infrastructure/sysctl-fix.yml
 KSV-01010 path:kubernetes/apps/authelia/configmap.yml
 KSV-01010 path:kubernetes/apps/headscale/config.yml
 KSV-01010 path:kubernetes/apps/homepage/homepage.yml
+
+# 2026-08-16: garage/main.tf's aws_s3_bucket resources talk to Garage's own
+# S3-compatible endpoint (see providers.tf), not real AWS -- these checks are for
+# AWS-specific APIs/features Garage doesn't implement, not oversights:
+#   - AWS-0086/0087/0091/0093 (S3 public-access-block): Garage doesn't implement
+#     AWS's PutPublicAccessBlock API at all (it's outside Garage's documented S3
+#     compatibility scope), so an aws_s3_bucket_public_access_block resource here
+#     would fail to apply. Also moot in practice regardless -- these buckets are
+#     ClusterIP-only (garage.apps.svc.cluster.local), never on any public-exposure
+#     allowlist (see docs/EXPOSURE.md), so there is no public-internet path to
+#     "accidentally public" in the first place.
+#   - AWS-0132 (Customer Managed Keys / AWS KMS): Garage has no KMS integration:
+#     setting kms_master_key_id would either be silently ignored or fail the apply.
+AWS-0086 path:terraform/stacks/garage/main.tf
+AWS-0087 path:terraform/stacks/garage/main.tf
+AWS-0091 path:terraform/stacks/garage/main.tf
+AWS-0093 path:terraform/stacks/garage/main.tf
+AWS-0132 path:terraform/stacks/garage/main.tf

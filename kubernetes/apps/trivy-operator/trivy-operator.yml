@@ -52,9 +52,16 @@ rules:
 - apiGroups: [""]
   resources: ["configmaps", "limitranges", "nodes", "persistentvolumeclaims", "persistentvolumes", "pods", "replicationcontrollers", "resourcequotas", "services", "serviceaccounts"]
   verbs: ["get", "list", "watch"]
+  # 2026-08-16 (KSV-0041, trivy config-scan finding): dropped create/update/patch
+  # here -- cluster-wide write access to every Secret in every namespace, flagged
+  # during today's credential rotation work. The namespace-scoped `Role` below
+  # (trivy-system only) already grants write access to secrets where the operator
+  # actually needs it (its own registry-credential-cache secrets); this ClusterRole
+  # only needs read access for the actual scanning work, which is genuinely
+  # cluster-wide.
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["get", "list", "watch", "create", "update", "patch"]
+  verbs: ["get", "list", "watch"]
 - apiGroups: [""]
   resources: ["namespaces"]
   verbs: ["get"]
