@@ -45,10 +45,11 @@ shell, no package manager, entire system managed declaratively. Its appeal for t
 specific failure history is real: it structurally prevents the kind of undocumented manual
 drift that caused ADR-014's whole incident (a node quietly becoming an etcd server outside
 of any tracked process). But two things weigh against adopting it now:
-  - It solves *configuration drift*, not the *write-amplification* problem this Phase 3
-    section is actually about — that problem is already addressed at its root by ADR-015.
-    Talos would be solving a different, real, but separate problem.
-  - The migration cost is high and falls specifically on the parts of this recovery that are
+
+- It solves *configuration drift*, not the *write-amplification* problem this Phase 3
+  section is actually about — that problem is already addressed at its root by ADR-015.
+  Talos would be solving a different, real, but separate problem.
+- The migration cost is high and falls specifically on the parts of this recovery that are
     already stable: the entire Ansible-based host/VM management layer (`ansible/site.yml`,
     `k3s-cluster/`, vault-backed secrets applied via Ansible) assumes a normal Linux guest
     with SSH access. Talos would require rebuilding that whole operational model
