@@ -27,17 +27,16 @@ spec:
         # `kubectl exec ... id`) with no securityContext at all. pgdata is
         # already owned 999:0 on disk (the image's own entrypoint already
         # chowns it on first init) so runAsUser:999 needs no extra chown
-        # step, unlike immich-server/immich-ml below. readOnlyRootFilesystem
-        # deliberately NOT added here yet -- postgres needs a writable
-        # /var/run/postgresql for its unix socket, not currently mounted as
-        # a separate volume, and getting that wrong breaks DB connectivity
-        # outright. Deferred as a follow-up requiring dedicated testing, not
-        # rushed into this pass.
+        # step, unlike immich-server/immich-ml below.
+        # 2026-08-17 (KSV-0014 dedicated pass): readOnlyRootFilesystem added,
+        # with the /var/run/postgresql socket dir this comment previously
+        # flagged as the blocker -- verified live, DB connectivity intact.
         securityContext:
           runAsNonRoot: true
           runAsUser: 999
           runAsGroup: 999
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -88,11 +87,15 @@ spec:
           mountPath: /tmp
         - name: dshm
           mountPath: /dev/shm
+        - name: run
+          mountPath: /var/run/postgresql
       volumes:
       - name: db
         persistentVolumeClaim:
           claimName: immich-db-pg16
       - name: tmp
+        emptyDir: {}
+      - name: run
         emptyDir: {}
       # 2026-08-16: no /dev/shm volume existed here at all -- the container ran on
       # the containerd default (64Mi), while shared_buffers is 512MB. Root-caused
@@ -355,6 +358,11 @@ spec:
       - name: fix-cache-ownership
         image: ghcr.io/immich-app/immich-machine-learning:v3.1.0
         command: ["chown", "-R", "65534:65534", "/cache"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
         volumeMounts:
         - name: cache
           mountPath: /cache

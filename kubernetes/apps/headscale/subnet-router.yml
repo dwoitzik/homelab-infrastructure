@@ -65,6 +65,7 @@ spec:
               value: "--login-server=https://headscale.woitzik.dev --advertise-tags=tag:subnet-router"
           securityContext:
             allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: true
             capabilities:
               add:
                 - NET_ADMIN
@@ -74,6 +75,10 @@ spec:
               mountPath: /var/lib/tailscale
             - name: dev-tun
               mountPath: /dev/net/tun
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /var/run
           resources:
             requests:
               cpu: 50m
@@ -89,3 +94,7 @@ spec:
           hostPath:
             path: /dev/net/tun
             type: CharDevice
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
