@@ -78,8 +78,16 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /home/node/.n8n
+        - name: tmp
+          mountPath: /tmp
+        # Separate from .n8n (the PVC) -- n8n's static-asset compile step
+        # also writes to $HOME/.cache, confirmed live: "ENOENT: no such file
+        # or directory, mkdir '/home/node/.cache'".
+        - name: home-cache
+          mountPath: /home/node/.cache
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -88,3 +96,7 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: n8n-data
+      - name: tmp
+        emptyDir: {}
+      - name: home-cache
+        emptyDir: {}
