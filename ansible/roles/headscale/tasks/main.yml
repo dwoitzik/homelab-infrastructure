@@ -1,0 +1,98 @@
+---
+- name: Create Headscale directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/headscale/conf
+
+- name: Partition the SSD, if not already partitioned
+  community.general.parted:
+    device: /dev/sda
+    number: 1
+    state: present
+    fs_type: ext4
+    label: gpt
+  register: headscale_ssd_partition
+
+- name: Format the SSD partition, if freshly created
+  ansible.builtin.filesystem:
+    fstype: ext4
+    dev: /dev/sda1
+  when: headscale_ssd_partition.changed
+
+- name: Get SSD partition UUID
+  ansible.builtin.command: blkid -s UUID -o value /dev/sda1
+  register: headscale_ssd_uuid
+  changed_when: false
+
+- name: Mount the SSD via fstab
+  ansible.posix.mount:
+    path: /mnt/ssd
+    src: "UUID={{ headscale_ssd_uuid.stdout }}"
+    fstype: ext4
+    opts: defaults,noatime,nofail
+    state: mounted
+
+- name: Create Headscale data directory on the SSD
+  ansible.builtin.file:
+    path: /mnt/ssd/headscale
+    state: directory
+    mode: '0755'
+
+- name: Deploy Headscale config.yaml
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /opt/headscale/conf/config.yaml
+    mode: '0644'
+  notify: Restart Headscale
+
+- name: Deploy Headscale ACL policy
+  ansible.builtin.copy:
+    src: policy.hujson
+    dest: /opt/headscale/conf/policy.hujson
+    mode: '0644'
+  notify: Restart Headscale
+
+- name: Deploy Headscale OIDC client secret env file
+  ansible.builtin.template:
+    src: headscale.env.j2
+    dest: /opt/headscale/headscale.env
+    mode: '0600'
+  notify: Restart Headscale
+
+- name: Deploy Headscale Docker Compose stack
+  ansible.builtin.copy:
+    dest: /opt/headscale/docker-compose.yml
+    mode: '0644'
+    content: |
+      services:
+        headscale:
+          image: ghcr.io/juanfont/headscale:v0.29.2
+          container_name: headscale
+          restart: unless-stopped
+          mem_limit: 256m
+          command: serve
+          ports:
+            - "8080:8080"
+            - "9090:9090"
+          env_file:
+            - /opt/headscale/headscale.env
+          healthcheck:
+            test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+          labels:
+            - "autoheal=true"
+          volumes:
+            - /opt/headscale/conf/config.yaml:/etc/headscale/config.yaml:ro
+            - /opt/headscale/conf/policy.hujson:/etc/headscale/policy.hujson:ro
+            - /mnt/ssd/headscale:/var/lib/headscale
+  notify: Restart Headscale
+
+- name: Start Headscale
+  community.docker.docker_compose_v2:
+    project_src: /opt/headscale
+    state: present

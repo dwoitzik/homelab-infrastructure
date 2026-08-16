@@ -1,0 +1,33 @@
+{
+  // Least-privilege tailnet ACL (Phase 1.4). Previously no policy existed at all
+  // ("acl policy not found") -- Headscale's behavior with no policy is undocumented
+  // enough not to rely on, and "on the tailnet or not" isn't least-privilege. This
+  // is a single-operator homelab tailnet: one real user (dw), one subnet router
+  // (the in-cluster tailscale-subnet-router pod, subnet-router.yml, advertising only
+  // 10.0.20.0/24 per REL-033 -- already scoped off every other VLAN).
+  "groups": {
+    "group:admin": ["dw@"]
+  },
+  "tagOwners": {
+    // Only group:admin (dw) can tag a node as the subnet router -- prevents any
+    // future/rogue node from self-tagging to get route-auto-approval.
+    "tag:subnet-router": ["group:admin"]
+  },
+  "acls": [
+    {
+      // dw's own devices: full access to the whole tailnet (including the
+      // advertised 10.0.20.0/24 LAN route). This is the only principal that
+      // exists on this tailnet today -- default-deny for everything else.
+      "action": "accept",
+      "src": ["group:admin"],
+      "dst": ["*:*"]
+    }
+  ],
+  "autoApprovers": {
+    "routes": {
+      // Matches subnet-router.yml's TS_ROUTES exactly -- only this specific
+      // route auto-approves, and only from a node carrying tag:subnet-router.
+      "10.0.20.0/24": ["tag:subnet-router"]
+    }
+  }
+}
