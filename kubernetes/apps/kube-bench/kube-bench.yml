@@ -28,6 +28,8 @@ spec:
             - name: kube-bench
               image: docker.io/aquasec/kube-bench:v0.16.0@sha256:75506f222d1eb6ce2a751a5533bdc0a3b54c898e2e49e7751d0ee22cfb862679
               command: ["kube-bench", "--json"]
+              securityContext:
+                readOnlyRootFilesystem: true
               volumeMounts:
                 - name: var-lib-kubelet
                   mountPath: /var/lib/kubelet
@@ -38,6 +40,8 @@ spec:
                 - name: proc
                   mountPath: /host/proc
                   readOnly: true
+                - name: tmp
+                  mountPath: /tmp
               env:
                 - name: KUBEBENCH_NODE
                   value: ""
@@ -62,3 +66,5 @@ spec:
               hostPath:
                 path: /proc
                 type: Directory
+            - name: tmp
+              emptyDir: {}

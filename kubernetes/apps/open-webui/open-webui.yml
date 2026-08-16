@@ -57,6 +57,7 @@ spec:
         command: ["sh", "-c", "cp -a /app/backend/open_webui/static/. /static-init/"]
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:

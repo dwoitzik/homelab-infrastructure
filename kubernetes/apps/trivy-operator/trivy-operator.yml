@@ -162,6 +162,13 @@ spec:
           image: docker.io/aquasec/trivy-operator:0.33.0@sha256:ce5e4d5eeaf211b4e2091ed3209ce9676fd6bd7fb2f22f782559574a01ac219e
           args:
             - --overwrite
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: TRIVY_CACHE_DIR
               value: "/tmp/trivy-cache"
@@ -190,8 +197,12 @@ spec:
               containerPort: 8080
               protocol: TCP
           volumeMounts:
+            # Mounted at /tmp itself, not just /tmp/trivy-cache -- the policy
+            # bundle downloader creates its own /tmp/trivy-<random> temp dirs
+            # directly under /tmp (confirmed live: "mkdir /tmp/trivy-580419700:
+            # read-only file system" when only the cache subpath was writable).
             - name: cache
-              mountPath: /tmp/trivy-cache
+              mountPath: /tmp
           resources:
             requests:
               cpu: 50m

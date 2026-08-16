@@ -130,6 +130,13 @@ spec:
       initContainers:
       - name: seed-prompts
         image: icereed/paperless-gpt:v0.25.1
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
         command:
         - sh
         - -c

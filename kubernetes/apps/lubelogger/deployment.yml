@@ -53,8 +53,17 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+        # Separate from the /data PVC (used for the SQLite DB via the env var
+        # above) -- the app's own StaticHelper.InitMessage also writes to
+        # /App/data (relative to its own working dir), confirmed live:
+        # "System.IO.IOException: Read-only file system : '/App/data'".
+        - name: app-data
+          mountPath: /App/data
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
           seccompProfile:
             type: RuntimeDefault
           capabilities:
@@ -63,3 +72,7 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: lubelogger-data
+      - name: tmp
+        emptyDir: {}
+      - name: app-data
+        emptyDir: {}
