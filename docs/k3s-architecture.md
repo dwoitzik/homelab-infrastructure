@@ -6,8 +6,12 @@
 deliberate design (corrected 2026-06-23):** a prior attempt at 3-way embedded-etcd HA
 caused repeated host freezes — all three VMs share one physical host (`mini`) and one ZFS
 pool, so 3 concurrent etcd writers produced enough I/O contention to lock up the host.
-`vm-srv-k3s-11` is the sole control-plane + etcd server; `-12`/`-13` are agent (worker)
-nodes only, providing compute capacity without adding etcd writers. **Do not re-introduce
+`vm-srv-k3s-11` is the sole control-plane server; `-12`/`-13` are agent (worker)
+nodes only. Its datastore is **SQLite via kine (k3s's default for single-server mode),
+not etcd** — this cluster's docs called it "etcd" for a long time after it had already
+silently stopped being true; see `docs/decisions/ADR-015-k3s-datastore-sqlite.md`
+(verified live 2026-08-13: `state.db` actively written, the `etcd/` directory empty
+except a stub `name` file, port 2379 not listening). **Do not re-introduce
 multi-server etcd on this hardware** — see `docs/compute-nodes.md` for the full incident
 writeup. Target is fast *recovery*, not zero-downtime HA: `mini` is a single point of
 failure either way.
