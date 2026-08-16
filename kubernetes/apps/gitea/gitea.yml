@@ -128,12 +128,22 @@ spec:
         - name: copy-s6
           image: gitea/gitea:1.26.4
           command: ["sh", "-c", "cp -a /etc/s6/. /writable-s6/"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
           volumeMounts:
             - name: s6
               mountPath: /writable-s6
         - name: copy-ssh
           image: gitea/gitea:1.26.4
           command: ["sh", "-c", "cp -a /etc/ssh/. /writable-ssh/"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
           volumeMounts:
             - name: ssh-etc
               mountPath: /writable-ssh

@@ -54,6 +54,15 @@ spec:
         options:
           - name: ndots
             value: "1"
+      # NOT readOnlyRootFilesystem: this image bundles nginx (needs to render
+      # nginx.conf on every start) AND uses s6-overlay as its process
+      # supervisor, which removes/recreates /run/s6 on every start. Confirmed
+      # live across several attempts: /etc/nginx and /run/s6 writable mounts
+      # fixed the nginx.conf error, but the s6-overlay preinit step remained
+      # racy under a read-only root -- 2 restarts before even reaching a
+      # stable state (not a one-time fluke), which is not an acceptable
+      # "verified working" bar per this session's own standing discipline.
+      # Not forcing it; same call as myspeed/scrutiny-collector.
       containers:
         - name: firefly-iii
           image: fireflyiii/core:version-6.6.6
@@ -150,10 +159,38 @@ spec:
             options:
               - name: ndots
                 value: "1"
+          initContainers:
+            - name: seed-storage
+              image: fireflyiii/core:version-6.6.6
+              command: ["sh", "-c", "cp -a /var/www/html/storage/. /writable-storage/ 2>/dev/null; cp -a /var/www/html/bootstrap/cache/. /writable-bootstrap-cache/ 2>/dev/null; true"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - name: storage
+                  mountPath: /writable-storage
+                - name: bootstrap-cache
+                  mountPath: /writable-bootstrap-cache
           containers:
             - name: firefly-iii-cron
               image: fireflyiii/core:version-6.6.6
               command: ["php", "/var/www/html/artisan", "firefly-iii:cron"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - name: storage
+                  mountPath: /var/www/html/storage
+                - name: data
+                  mountPath: /var/www/html/storage/upload
+                - name: bootstrap-cache
+                  mountPath: /var/www/html/bootstrap/cache
+                - name: tmp
+                  mountPath: /tmp
               env:
                 - name: APP_ENV
                   value: local
@@ -184,6 +221,16 @@ spec:
                 limits:
                   cpu: 200m
                   memory: 256Mi
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: firefly-data
+            - name: storage
+              emptyDir: {}
+            - name: bootstrap-cache
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
