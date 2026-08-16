@@ -48,6 +48,7 @@ spec:
               value: https://beszel.woitzik.dev
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
             capabilities:
@@ -57,6 +58,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /beszel_data
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /api/health
@@ -81,6 +84,8 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: beszel-data
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
