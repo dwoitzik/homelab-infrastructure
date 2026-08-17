@@ -1,5 +1,82 @@
 # Homelab Roadmap
 
+> **2026-08-17: moved to `docs/ROADMAP.md`** (was at repo root — BRIEFING-V4.md
+> references `docs/ROADMAP.md` throughout, this file's actual location didn't match).
+> **Most of the content below predates the 2026-08-13 disaster-recovery rebuild** (the
+> LMDB/Terraform-state wipe, the full cluster rebuild that followed — see
+> `DISASTER-RECOVERY.md` and `phase8/LEDGER.md`) and describes the *pre-rebuild*
+> architecture: Longhorn (removed, migrated to `nfs-client`/`local-path` well before the
+> rebuild too, per this file's own "In Progress" table below — still stale either way),
+> Chaos Mesh, a since-abandoned Cilium plan, and dated entries from June 2026. Kept as
+> historical record rather than deleted (same discipline as `CHANGELOG.md`'s dated
+> entries), but **do not treat anything below this notice as current architecture**
+> without checking it against `docs/compute-nodes.md`, `docs/k3s-architecture.md`, and
+> the live cluster first. A full rewrite against current reality is a real, separate
+> piece of work (BRIEFING-V4.md Section H, "clean the tree") — not done as a side
+> effect of adding the offsite-backup section below, which is genuinely current.
+
+## Offsite backup provider (2026-08-17, BRIEFING-V4.md Phase 3)
+
+**Decision needed from the operator — this is the one item in the whole backup plan
+that needs a card.** Everything else (Vault snapshots, Proxmox host config backup,
+automated restore verification) is being built regardless of this choice, so it's
+ready to point at whichever provider gets picked.
+
+**Real current volume** (checked live, not estimated): Garage's total object storage
+is **51.9 GiB** across 5 buckets (`velero`, `cnpg-backups`, `loki-data`,
+`terraform-state`, `pve-host-config` — the last one new as of this same pass). This is
+what actually needs an offsite mirror. Immich's real photo library is **76 GiB**
+(`du -sh` on the live PVC, matching this brief's own cited figure almost exactly) but
+is *deliberately excluded* from Velero backup already (`kubernetes/apps/immich/
+immich.yml`'s `backup.velero.io/backup-volumes-excludes: library` annotation, reasoning
+given inline: "large cold storage, not worth backing up as a filesystem blob (re-upload
+source from phone)") — a real, prior, deliberate trade-off, not an oversight this
+roadmap item is meant to silently reopen. Sizing below assumes **~150 GiB** as a
+reasonable multi-year growth allowance over the current 52 GiB, not the raw current
+number.
+
+| Provider | Storage cost (150GB) | Egress | Object Lock (WORM) | S3-compatible | Notes |
+|---|---|---|---|---|---|
+| **Backblaze B2** (recommended) | ~$1.04/mo (\$0.00695/GB) | Free up to 3x stored data/mo, then \$0.01/GB | **Confirmed GA, free, no extra cost** | Yes | First 10GB always free. 3x-stored-data free egress easily covers a monthly restore-verification pull of the whole dataset. |
+| Cloudflare R2 | ~$2.25/mo (\$0.015/GB) | Free, unlimited | Not confirmed available at time of this research (couldn't find current docs confirming GA status) | Yes | 2x B2's storage cost; egress advantage doesn't matter much at this volume since B2's free-egress allowance already covers it. Would need Object Lock support confirmed with Cloudflare directly before committing. |
+| Hetzner Storage Box | Smallest tier (BX11, 1TB) — real price not confirmed in this research pass, historically ~€4/mo | Not S3-compatible — SFTP/SCP/RSYNC/WebDAV only | **Not supported** (Storage Box has snapshots, not true immutability; Hetzner's *separate* S3-compatible Object Storage product wasn't evaluated for this) | No (Storage Box specifically) | Ruled out primarily on the missing Object Lock requirement — this brief is explicit that "the host must not hold credentials capable of destroying the remote copy," which Object Lock satisfies directly and snapshots alone don't (a credential with delete rights can still delete the snapshots). |
+| rsync.net | 800GB **minimum order** — ~$12/mo even though only ~150GB would be used | Free (no egress charges) | ZFS snapshots + restricted-shell/append-only configurations (well-regarded in the backup community), not confirmed as a formal S3 Object Lock equivalent | Not natively (SFTP/rsync; some accounts offer S3 gateway) | Excellent reputation for ransomware-resistant backups, but the 800GB minimum means paying for ~5x the actual need at this scale — worth reconsidering if this dataset grows past a few hundred GB. |
+
+**Recommendation: Backblaze B2.** Confirmed, free, GA Object Lock is the deciding
+factor — it's the one requirement (`BRIEFING-V4.md`: "a runaway agent with root here
+must not be able to reach it") none of the alternatives clearly satisfy at this price
+point. S3-compatible, so `rclone`/Velero's existing S3 tooling (already used for
+Garage) needs no new integration work. Real monthly cost at current+growth volume:
+**roughly $1-2/month**, plus $0 practical egress cost given the free-tier allowance
+comfortably covers a monthly full-dataset restore-verification pull.
+
+**Trigger condition**: revisit if the real dataset grows past ~500GB (at which point
+rsync.net's per-GB rate advantage starts to outweigh its minimum-order overhead) or if
+Cloudflare R2's Object Lock status gets confirmed GA and its free unlimited egress
+becomes more valuable than it currently is at this volume.
+
+**What's needed to activate**: a Backblaze account + a B2 Application Key scoped to a
+new bucket, Object Lock enabled at bucket creation (cannot be added after the fact per
+B2's own docs) with a governance-mode retention period (recommend 35 days — covers the
+existing 30-day local retention pattern already used for `pve-host-config` plus a
+margin). Once the operator provisions the account, this agent can build the actual
+sync job (same `rclone`-based pattern already proven for `pve-host-config`) without
+further input.
+
+**Note on existing R2 scaffolding**: `kubernetes/system/velero/r2-backuplocation.yml`
+and `offsite-schedule.yml` already exist in the repo from a prior, incomplete attempt —
+checked live, they are **not** half-built infra ready to flip on. `velero-manifests`'
+ArgoCD Application explicitly excludes both (`include: '{secrets,schedule}.yml'`, with
+an inline comment dated 2026-06-25, WRK-008: "scaffolded but incomplete, literal
+ACCOUNT_ID placeholder, credential secret doesn't exist anywhere... confirmed live that
+including them creates an Unavailable BackupStorageLocation and a Schedule that would
+fail daily at 4am"). Confirmed still true right now: only the `default` BSL exists
+live, no `r2-offsite` BSL, no `velero-r2-credentials` Secret. If B2 gets picked per the
+recommendation above, these two R2 files should be deleted (not adapted — Velero's AWS
+plugin works fine against B2's S3-compatible endpoint too, but reusing R2-named files
+for a different provider is more confusing than starting clean) as part of building the
+real schedule.
+
 ## Planned Services
 
 ### Deployed
