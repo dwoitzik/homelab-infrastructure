@@ -143,8 +143,20 @@ spec:
               value: "crowdsecurity/cri-logs"
             - name: GID
               value: "0"
+            # 2026-08-17 (Section C, secrets hygiene): was a hardcoded plaintext
+            # value committed to git -- gitleaks' ruleset doesn't pattern-match
+            # this specific string as a secret, so it went unnoticed by CI.
+            # Rotated (old value invalidated by this same change -- CrowdSec's
+            # entrypoint re-registers the "traefik" bouncer with whatever key
+            # this env var holds on every container start) and moved to a real
+            # k8s Secret. Not yet Vault/ESO-backed (this agent has no live
+            # Vault write token this session) -- that migration is a real,
+            # tracked follow-up, not silently dropped; see phase8/STATE.md.
             - name: BOUNCER_KEY_traefik
-              value: "bFWgFb0LBV6OUspll3IZyqgIAwwLlQ5RbXV39Cgd"
+              valueFrom:
+                secretKeyRef:
+                  name: crowdsec-bouncer-key-traefik
+                  key: key
             - name: CROWDSEC_API_SERVER_LISTEN_URI
               value: "0.0.0.0:8080"
             - name: CROWDSEC_PROMETHEUS_LISTEN_ADDR

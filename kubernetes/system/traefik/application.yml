@@ -71,9 +71,26 @@ spec:
             crowdsec:
               moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
               version: v1.6.0
+        # 2026-08-17 (Section C, secrets hygiene): was a hardcoded plaintext
+        # value committed to git -- this is the actual leak the brief named
+        # ("the plaintext key in traefik/application.yml are known"). The
+        # crowdsec-bouncer-traefik-plugin reads the key from this env var
+        # directly; the volume-mounted Secret below it was likely a dead,
+        # never-consumed leftover from an earlier config attempt (the plugin
+        # has no documented mechanism to read a key from a mounted file path).
+        # Rotated (CrowdSec's own bouncer registry updated via the matching
+        # BOUNCER_KEY_traefik env var in kubernetes/apps/crowdsec/crowdsec.yml,
+        # confirmed live: cscli bouncers list shows the "traefik" bouncer
+        # valid, real external traffic through Traefik confirmed working
+        # afterward) and moved to the same real k8s Secret the volume mount
+        # below already referenced -- so this now actually uses it, instead
+        # of duplicating the value in plaintext next to an unused mount.
         env:
           - name: CROWDSEC_BOUNCER_KEY_traefik
-            value: "bFWgFb0LBV6OUspll3IZyqgIAwwLlQ5RbXV39Cgd"
+            valueFrom:
+              secretKeyRef:
+                name: crowdsec-bouncer-key
+                key: crowdsec-bouncer-key
         volumes:
           - name: crowdsec-bouncer-key
             mountPath: /etc/traefik/crowdsec
