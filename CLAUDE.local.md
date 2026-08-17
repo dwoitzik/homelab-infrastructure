@@ -13,36 +13,53 @@ fast recovery, never clever one-offs. If a change cannot be expressed as code an
 committed, it does not belong here.
 
 ## Hardware inventory — physical constraints (never design around hardware that doesn't exist)
-| Node      | Spec                                                   | Role                                  |
-|-----------|--------------------------------------------------------|---------------------------------------|
-| `mini`    | Ryzen 7 5825U (8C/16T, VCN HW-transcode), 64 GB, 512 GB SSD | Proxmox host / primary workloads + storage |
-| `rpi1`    | RPi 4B, 8 GB RAM, 128 GB SD                             | lightweight node                      |
-| `rpi2`    | RPi 4B, 8 GB RAM, 128 GB SD                             | lightweight node                      |
-| network   | MikroTik RB5009                                         | router / L3                           |
-| bulk      | 2 TB HDD via USB (on `mini`)                            | backup (Garage) + Jellyfin media      |
-| usb-immich | SanDisk 3.2Gen1, 460 GB USB stick                     | Immich photo library (NFS via LXC 220) |
+**2026-08-17 correction**: this section previously described a single-host
+`mini`/`rpi1`/`rpi2` topology that predates the current cluster entirely. The real
+current topology (see `docs/compute-nodes.md` for the full authoritative breakdown):
+one Proxmox host (`pve-mgmt-01`, SSH alias `pve`) runs both direct LXC workloads AND a
+3-VM k3s cluster (`vm-srv-k3s-11/12/13`) on top of itself -- "primary workloads" mostly
+means "k3s pods" now, not host-level Docker containers. Two Raspberry Pis run DNS
+(AdGuard Home + Unbound, primary+replica) plus, as of 2026-08-17 (ADR-022),
+`rpi-srv-02` also runs Headscale natively via Docker on its own attached SSD.
+
+| Node | Spec | Role |
+|---|---|---|
+| `pve-mgmt-01` (`pve`) | Ryzen 7 5825U (8C/16T, VCN HW-transcode), 64 GB, 512 GB NVMe | Proxmox host -- LXCs + 3-VM k3s cluster |
+| `rpi-srv-01` | RPi 4B, 8 GB RAM, SD card (10.0.20.2) | AdGuard Home + Unbound (primary DNS) |
+| `rpi-srv-02` | RPi 4B, 8 GB RAM, SD card + 111.8GB USB SSD (10.0.20.3) | AdGuard Home + Unbound (replica) + Headscale (native Docker, on the SSD) |
+| network | MikroTik RB5009 | router / L3 |
+| bulk | 2 TB HDD via USB (on `pve-mgmt-01`, ZFS pool `archive`) | backup (Garage/PBS) + Jellyfin media |
 
 ### Hard storage rules (this caused real host freezes — do not regress)
-- The **only reliable disk is the 512 GB SSD** on `mini`. All critical persistent state
-  (Longhorn replicas, Immich Postgres, Vaultwarden DB) lives there.
-- **Never** place stateful PVs, etcd, or databases on USB-attached storage or SD cards.
-  USB IO contention previously froze the host — do not reintroduce that failure mode.
-- The 2 TB USB HDD is for **backup (Garage) and Jellyfin media** (large sequential data, slow is fine).
-- The SanDisk 3.2Gen1 USB stick (460 GB) is for **Immich photo library** — write-once/read-many workload suits USB flash; benchmarked at ~149 MB/s read / ~73 MB/s write, no errors detected. Databases must NOT go here.
-- RPi SD cards are write-fragile. Keep etcd/SQLite and heavy logging off them; prefer
-  USB-SSD boot where possible. Treat RPi nodes as disposable.
+- The **only reliable disk is the 512 GB NVMe** (`local-lvm` thin pool) on
+  `pve-mgmt-01`. All critical persistent state lives there or on the `nfs-client`
+  StorageClass backed by it. This cluster does NOT run Longhorn -- the two
+  StorageClasses actually in use are `local-path` (node-local, default) and
+  `nfs-client` (via `ct-srv-nfs-01`); do not write playbooks/docs assuming Longhorn
+  exists.
+- **Never** place stateful PVs or databases on USB-attached storage or SD cards. USB IO
+  contention previously froze the host -- do not reintroduce that failure mode. The
+  `local-lvm` thin pool has also independently caused host crashes from `discard=off`
+  block accumulation (see `phase8/LEDGER.md` Entries 6-8) -- a distinct, already-
+  documented failure mode from the USB-contention one.
+- The 2 TB USB HDD (ZFS `archive` pool) is for **backup (Garage/PBS) and Jellyfin
+  media** (large sequential data, slow is fine).
+- RPi SD cards are write-fragile. Keep databases and heavy logging off them; prefer
+  attached-SSD storage where available (as done for Headscale on `rpi-srv-02`).
 
 ### Topology reality
-- `mini` is a **single point of failure**. Zero-downtime HA is NOT achievable with this
-  hardware — do not pretend otherwise or build configs that imply it.
+- `pve-mgmt-01` is a **single point of failure** for everything, including all 3 k3s
+  VMs (they're all guests on this one host). Zero-downtime HA is NOT achievable with
+  this hardware -- do not pretend otherwise or build configs that imply it.
 - Target **recovery, not HA**: define and document RTO/RPO and make every component
   restorable from Git + backups. A full rebuild from a bare host must be a documented,
   tested procedure.
-- HW transcoding (Jellyfin) and ML (Immich) run on `mini` (the APU). Never schedule them
-  on RPi nodes.
+- HW transcoding (Jellyfin) and ML (Immich) run on `pve-mgmt-01` (the APU, via LXC/k3s
+  GPU passthrough). Never schedule them on RPi nodes.
 
 ## Stack (confirmed — do NOT "correct" these)
-K3s · ArgoCD (app-of-apps GitOps) · Longhorn (storage) · Traefik (ingress) · MetalLB (LB) ·
+K3s (SQLite/kine datastore, not etcd -- see ADR-015) · ArgoCD (app-of-apps GitOps) ·
+`local-path`/`nfs-client` storage (NOT Longhorn) · Traefik (ingress) · MetalLB (LB) ·
 cert-manager · Authelia (auth) · Vaultwarden. Terraform via **Atlantis** (PR-driven
 plan/apply). Object storage via **Garage** (NOT MinIO). Secrets via **Ansible Vault** +
 Kubernetes Secrets.
@@ -53,7 +70,9 @@ Real daily usefulness is a first-class goal, not just demo cleanliness.
 
 ## Guardrails (non-negotiable)
 1. **Snapshot before any change that can affect running state.** Proxmox VM/CT snapshot
-   (or Longhorn snapshot for PV-level changes) *before* apply. If you can't snapshot, stop and ask.
+   (or a manual PVC data copy for PV-level changes -- this cluster has no snapshot-
+   capable CSI driver, see the Hardware inventory section above) *before* apply. If
+   you can't snapshot, stop and ask.
 2. **Never push secrets.** `gitleaks` must pass. Secrets only via the existing Ansible Vault
    mechanism. If you find a leaked secret in history, flag it — do not silently rewrite history.
 3. **Branch + PR workflow.** Never commit directly to `main`. One concern per branch/PR.
@@ -62,7 +81,7 @@ Real daily usefulness is a first-class goal, not just demo cleanliness.
    Manifests: `kubeconform` / `kubectl --dry-run`. Playbooks: `ansible-lint`.
    Plus `yamllint` + `markdownlint`. A change that fails linting is not done.
 5. **ArgoCD safety.** Assume auto-sync may be on — a merged manifest deploys itself, so
-   treat merge as deploy. For stateful apps (Vaultwarden, Immich Postgres, Longhorn) take a
+   treat merge as deploy. For stateful apps (Vaultwarden, Immich Postgres, Garage) take a
    **data backup** before changing anything that touches their volumes or schema.
 6. **Reversibility.** Never perform an action you cannot undo from snapshot/backup/Git.
    Destructive ops (PV delete, namespace delete, `terraform destroy`) require explicit human

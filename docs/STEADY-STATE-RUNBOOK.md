@@ -37,8 +37,10 @@ wrong."
    restore, dependencies. Add a Mermaid diagram entry if it changes the architecture
    picture.
 6. **Snapshot first**: before applying anything that touches running state (not a
-   brand-new empty namespace), take a Proxmox VM/CT snapshot or Longhorn/PV snapshot.
-   If you can't snapshot, stop and ask — this is a hard guardrail, not a suggestion.
+   brand-new empty namespace), take a Proxmox VM/CT snapshot (or a manual PVC data
+   copy for PV-level changes -- this cluster runs `local-path`/`nfs-client` storage,
+   not Longhorn, so there's no CSI-level snapshot capability). If you can't snapshot,
+   stop and ask — this is a hard guardrail, not a suggestion.
 
 ## Responding to each alert type
 
@@ -107,10 +109,15 @@ before assuming cleanup didn't take).
 ### `KubeNodeNotReady`
 
 Check `kubectl get nodes` and `kubectl describe node <name>` for the reason (kubelet
-down, network partition, resource exhaustion). If it's `mini`-hosted (all 3 k3s VMs
-are), also check the host directly (`qm status`, `ssh` to `mini`) — this hardware has a
-documented history of ZFS I/O stalls under RAM pressure, which manifests exactly as
-nodes going NotReady under load.
+down, network partition, resource exhaustion). All 3 k3s VMs are guests on the single
+Proxmox host (`pve-mgmt-01`, SSH alias `pve`) — also check the host directly
+(`qm status`, `ssh pve`). This hardware has a documented history of `local-lvm`
+thin-pool exhaustion causing host-level crashes (NVMe write timeouts under I/O
+pressure, not ZFS -- the boot/VM disk moved off ZFS to LVM-thin in the 2026-08-13
+disaster-recovery rebuild; ZFS now only backs the USB `archive` pool), which can
+manifest as nodes going NotReady under load. See `phase8/LEDGER.md` Entries 6-8 for a
+real incident and its resolution (fstrim + write-ceiling throttling + reclaiming
+orphaned VMs).
 
 ### `CertManagerCertNotReady` / `CertManagerCertExpirySoon`
 
