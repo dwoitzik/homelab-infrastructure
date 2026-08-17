@@ -1,0 +1,91 @@
+---
+# ADR-021: self-hosted GitHub Actions runner. Everything in this file up to
+# and including "Extract runner archive" / "Install runner dependencies" is
+# safe to run with zero token -- pure software staging. Registration and
+# the systemd service are explicitly gated on
+# github_actions_runner_registration_token being set, since that value is
+# short-lived, single-use, and only obtainable via the GitHub web UI.
+
+- name: Create dedicated runner user
+  ansible.builtin.user:
+    name: "{{ github_actions_runner_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ github_actions_runner_dir }}"
+    create_home: false
+    groups: docker
+    append: true
+
+- name: Create runner install directory
+  ansible.builtin.file:
+    path: "{{ github_actions_runner_dir }}"
+    state: directory
+    owner: "{{ github_actions_runner_user }}"
+    group: "{{ github_actions_runner_user }}"
+    mode: '0755'
+
+- name: Check if runner is already extracted
+  ansible.builtin.stat:
+    path: "{{ github_actions_runner_dir }}/run.sh"
+  register: github_actions_runner_installed
+
+- name: Download runner archive
+  ansible.builtin.get_url:
+    url: "{{ github_actions_runner_checksum_url }}"
+    dest: "/tmp/actions-runner-{{ github_actions_runner_version }}.tar.gz"
+    mode: '0644'
+  when: not github_actions_runner_installed.stat.exists
+
+- name: Extract runner archive
+  ansible.builtin.unarchive:
+    src: "/tmp/actions-runner-{{ github_actions_runner_version }}.tar.gz"
+    dest: "{{ github_actions_runner_dir }}"
+    remote_src: true
+    owner: "{{ github_actions_runner_user }}"
+    group: "{{ github_actions_runner_user }}"
+  when: not github_actions_runner_installed.stat.exists
+
+- name: Install runner OS dependencies
+  ansible.builtin.command: ./bin/installdependencies.sh
+  args:
+    chdir: "{{ github_actions_runner_dir }}"
+  when: not github_actions_runner_installed.stat.exists
+  changed_when: true
+
+# --- Everything below here needs a real, unexpired registration token. ---
+
+- name: Check current registration state
+  ansible.builtin.stat:
+    path: "{{ github_actions_runner_dir }}/.runner"
+  register: github_actions_runner_configured
+  when: github_actions_runner_registration_token != ""
+
+- name: Register runner with GitHub
+  ansible.builtin.command: >
+    ./config.sh --url {{ github_actions_runner_repo_url }}
+    --token {{ github_actions_runner_registration_token }}
+    --name {{ github_actions_runner_name }}
+    --labels {{ github_actions_runner_labels }}
+    --unattended --replace
+  args:
+    chdir: "{{ github_actions_runner_dir }}"
+  become: true
+  become_user: "{{ github_actions_runner_user }}"
+  when:
+    - github_actions_runner_registration_token != ""
+    - not github_actions_runner_configured.stat.exists
+  no_log: true # the command line itself contains the token
+
+- name: Install the runner as a systemd service
+  ansible.builtin.command: ./svc.sh install {{ github_actions_runner_user }}
+  args:
+    chdir: "{{ github_actions_runner_dir }}"
+    creates: /etc/systemd/system/actions.runner.*.service
+  when: github_actions_runner_registration_token != ""
+
+- name: Start and enable the runner service
+  ansible.builtin.command: ./svc.sh start
+  args:
+    chdir: "{{ github_actions_runner_dir }}"
+  when: github_actions_runner_registration_token != ""
+  changed_when: true

@@ -1,0 +1,116 @@
+name: Terraform Apply (ADR-021)
+
+# Replaces Atlantis's webhook-driven `atlantis apply` PR comment, same
+# rationale as terraform-plan.yml (see that file's header comment).
+#
+# The manual-approval gate that Atlantis's own "someone types `atlantis
+# apply`" convention provided is reproduced via `environment:
+# terraform-apply` below -- GitHub Environments with required reviewers
+# configured pause the job here until a reviewer approves it in the
+# Actions UI, a direct substitute for Atlantis's apply-comment gate (see
+# ADR-021's Decision section). The comment still triggers the *run*;
+# the Environment gate is what actually blocks the apply step itself.
+#
+# One-time bootstrap needed before this can approve anything: the
+# `terraform-apply` Environment must exist with required reviewers set
+# (repo Settings -> Environments -- see phase8/STATE.md for whether this
+# agent's PAT can do this via API or needs the operator).
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  apply:
+    if: |
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, 'atlantis apply')
+    runs-on: self-hosted
+    environment: terraform-apply
+    steps:
+      - name: Acknowledge the comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes',
+            });
+
+      - name: Resolve PR head ref
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            core.setOutput('sha', pr.data.head.sha);
+
+      - name: Parse stack name from comment
+        id: parse
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          STACK=$(echo "$COMMENT_BODY" | grep -oE -- '-d[[:space:]]+[a-zA-Z0-9_/-]+' | head -1 | awk '{print $2}')
+          if [ -z "$STACK" ]; then
+            echo "No -d <stack> found in comment (expected: atlantis apply -d <network|proxmox|cloudflare|garage>)" >&2
+            exit 1
+          fi
+          if [ ! -d "terraform/stacks/$STACK" ]; then
+            echo "terraform/stacks/$STACK does not exist" >&2
+            exit 1
+          fi
+          echo "stack=$STACK" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+
+      - name: Terraform init + apply
+        id: tfapply
+        run: |
+          set -o pipefail
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w "/workspace/terraform/stacks/${{ steps.parse.outputs.stack }}" \
+            --env-file /opt/atlantis/terraform-runner.env \
+            --entrypoint sh \
+            atlantis-custom:v0.46.0 \
+            -c "terraform init -input=false -no-color && terraform apply -input=false -auto-approve -no-color" \
+            2>&1 | tee /tmp/tfapply-${{ github.run_id }}.txt
+        continue-on-error: true
+
+      - name: Post apply output to the PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '/tmp/tfapply-${{ github.run_id }}.txt';
+            let output = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : '(no output captured)';
+            if (output.length > 60000) {
+              output = '... (truncated, showing last 60000 chars) ...\n' + output.slice(-60000);
+            }
+            const outcome = '${{ steps.tfapply.outcome }}';
+            const icon = outcome === 'success' ? '✅' : '❌';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `${icon} **Terraform Apply: \`${{ steps.parse.outputs.stack }}\`** (approved via the \`terraform-apply\` Environment)\n\n\`\`\`\n${output}\n\`\`\``,
+            });
+
+      - name: Fail the job if apply failed
+        if: steps.tfapply.outcome == 'failure'
+        run: exit 1
