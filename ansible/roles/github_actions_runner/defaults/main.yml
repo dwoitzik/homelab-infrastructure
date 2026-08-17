@@ -1,0 +1,26 @@
+---
+# ADR-021: self-hosted GitHub Actions runner, replacing Atlantis's public
+# webhook. Runs on ct-srv-atlantis-01 alongside the existing Atlantis
+# container (which stays as the terraform/CA-trust execution environment for
+# workflow steps -- see roles/atlantis/files/Dockerfile -- rather than being
+# replaced outright, per the ADR's own "reuse or remove" framing).
+
+github_actions_runner_version: "2.336.0"
+github_actions_runner_arch: linux-x64
+github_actions_runner_checksum_url: "https://github.com/actions/runner/releases/download/v{{ github_actions_runner_version }}/actions-runner-{{ github_actions_runner_arch }}-{{ github_actions_runner_version }}.tar.gz"
+github_actions_runner_dir: /opt/actions-runner
+github_actions_runner_user: actions-runner
+
+github_actions_runner_repo_url: "https://github.com/dwoitzik/homelab-infrastructure"
+github_actions_runner_name: "ct-srv-atlantis-01"
+github_actions_runner_labels: "self-hosted,linux,x64,homelab"
+
+# Deliberately empty by default -- registration tokens are short-lived
+# (~1h, single-use) and can only be minted via the GitHub web UI (repo
+# Settings -> Actions -> Runners -> New self-hosted runner); neither this
+# agent's nor the operator's PAT can generate one via the API (403, needs
+# administration:write). Staging (download/extract/install deps) runs
+# unconditionally; registration + the systemd service only run once this
+# is passed transiently via --extra-vars at the moment of use -- never
+# committed to git or written to Vault, it expires within the hour anyway.
+github_actions_runner_registration_token: ""
