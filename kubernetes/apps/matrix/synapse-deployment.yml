@@ -25,13 +25,20 @@ spec:
           - sh
           - -c
           - |
-            set -ex
+            # 2026-08-17: was `set -ex` + `grep password /data/homeserver.yaml` --
+            # both echoed the real DB password to pod logs on every startup (`-x`
+            # traces the sed command line containing it verbatim; the grep printed
+            # the matching config line). Anyone with `kubectl logs` access to this
+            # namespace could read it in plaintext. `-e` alone still fails the
+            # container on any error; the line-count check still verifies the
+            # substitution succeeded without printing the secret value.
+            set -e
             mkdir -p /data/keys
             rm -f /data/homeserver.yaml /data/log.config
             cp /source/homeserver.yaml /data/homeserver.yaml
             cp /source/log.config /data/log.config
             sed -i "s|\${SYNAPSE_DB_PASSWORD}|$SYNAPSE_DB_PASSWORD|g" /data/homeserver.yaml
-            grep password /data/homeserver.yaml
+            grep -c "^\s*password:" /data/homeserver.yaml
             python3 -m synapse.app.homeserver \
               --config-path /data/homeserver.yaml \
               --generate-keys \
