@@ -27,3 +27,15 @@ variable "mc_playit_hostname" {
   description = "playit.gg tunnel hostname for mc.woitzik.dev CNAME."
   default     = "doing-sigma.gl.joinmc.link"
 }
+
+variable "immich_access_family_emails" {
+  type        = list(string)
+  description = <<-EOT
+    Email addresses allowed through the Cloudflare Access One-time-PIN gate in
+    front of photos.woitzik.dev. Defaults to just the operator's own address
+    (already public elsewhere in this repo, e.g. Firefly III's SITE_OWNER) --
+    add the rest of the family's addresses via terraform.tfvars (not
+    committed) rather than hardcoding other people's emails into a public repo.
+  EOT
+  default     = ["david@woitzik.dev"]
+}
