@@ -73,3 +73,33 @@
     content: |
       nameserver 10.0.20.5
       options ndots:5
+
+# 2026-08-17: closes the storage loop this repo's own history left open.
+# discard=on was already set on all three VMs' scsi0 disks at the hypervisor
+# level (see phase8/LEDGER.md Entries 6-8), but that alone does nothing --
+# discard only reclaims blocks the *guest* actually TRIMs. None of the three
+# VMs ever had qemu-guest-agent installed, so `qm guest exec`/fstrim was never
+# actually run inside any of them (confirmed live: `qm agent <vmid> ping` ->
+# "QEMU guest agent is not running" on all three, despite `agent: enabled=1`
+# already being set on the QEMU side -- that flag only exposes the
+# virtio-serial channel, it does nothing without the matching guest daemon).
+# Installing the agent + a weekly fstrim.timer here means a rebuilt node
+# inherits both automatically, closing the gap permanently rather than as a
+# one-off manual fstrim.
+- name: Install qemu-guest-agent
+  ansible.builtin.apt:
+    name: qemu-guest-agent
+    state: present
+    update_cache: true
+
+- name: Enable and start qemu-guest-agent
+  ansible.builtin.systemd:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+
+- name: Enable weekly fstrim.timer (ships with util-linux, present by default on Debian)
+  ansible.builtin.systemd:
+    name: fstrim.timer
+    enabled: true
+    state: started
