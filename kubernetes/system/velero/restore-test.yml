@@ -1,0 +1,234 @@
+# BRIEFING-V4.md Section D: automated monthly restore-test. Proves the real,
+# working daily Velero backup (kubernetes/system/velero/schedule.yml) actually
+# restores, not just that it completes -- restores the `vault` namespace into
+# a scratch namespace and confirms the restored Vault storage starts cleanly
+# and reports itself Initialized (i.e. the raft data genuinely came back
+# intact), rather than trusting the backup job's own exit code alone.
+#
+# Scoped to `vault` deliberately, not `database` (CNPG-managed Postgres):
+# investigated restoring `database` too and found a real blocker -- CNPG's
+# Postgres StatefulSets/Secrets carry controller ownerReferences to a
+# `Cluster` custom resource, and that Cluster's own backup config points at a
+# specific S3 destination path. A namespace-mapped restore that also revives
+# the Cluster CR risks the CNPG operator reconciling a second, independent
+# instance that archives WAL to the SAME destination path the live cluster
+# uses -- a real corruption risk, not something to improvise inside a
+# CronJob script. `vault`'s StatefulSet has no such external operator/shared-
+# destination chain (plain apps/v1 StatefulSet, self-contained), so it's the
+# safe, real, working test for now. A dedicated CNPG-native restore test
+# (via `.spec.bootstrap.recovery`, CNPG's own supported recovery path) is a
+# reasonable follow-up, not built here -- see phase8/LEDGER.md Entry 37/38.
+#
+# Deliberate split: the ServiceAccount/ConfigMap/CronJob all live in `velero`
+# (stable, persistent), NOT in `velero-restore-test`. That namespace is pure
+# ephemeral restore-target space -- the script blanket-deletes everything in
+# it at the start and end of every run, and putting any of its own
+# long-lived objects there caused exactly the bug you'd expect the first
+# time this was tried live: the cleanup step deleted its own running pod.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: velero-restore-test
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: restore-test-runner
+  namespace: velero
+---
+# Scoped to only what's needed to create+watch a Restore -- the actual
+# object creation in the target namespace is performed by velero-server
+# itself (already cluster-admin), not by this ServiceAccount.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: restore-test-velero-access
+  namespace: velero
+rules:
+  - apiGroups: ["velero.io"]
+    resources: ["backups", "restores"]
+    verbs: ["get", "list", "watch", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: restore-test-velero-access
+  namespace: velero
+subjects:
+  - kind: ServiceAccount
+    name: restore-test-runner
+    namespace: velero
+roleRef:
+  kind: Role
+  name: restore-test-velero-access
+  apiGroup: rbac.authorization.k8s.io
+---
+# Read/exec/cleanup only, scoped to the scratch namespace -- no "create" on
+# workload resources since Velero's own restore process creates those.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: restore-test-scratch-access
+  namespace: velero-restore-test
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "persistentvolumeclaims", "services", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: restore-test-scratch-access
+  namespace: velero-restore-test
+subjects:
+  - kind: ServiceAccount
+    name: restore-test-runner
+    namespace: velero
+roleRef:
+  kind: Role
+  name: restore-test-scratch-access
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: restore-test-script
+  namespace: velero
+data:
+  restore-test.sh: |
+    #!/bin/sh
+    set -eu
+
+    NS=velero-restore-test
+    SRC_NS=vault
+    NTFY_URL="https://ntfy.sh/dw-homelab-a12a7b540943"
+    VELERO_VERSION=v1.14.1
+
+    log() { echo "[restore-test] $(date -u +%FT%TZ) $*"; }
+
+    fail() {
+      log "FAIL: $*"
+      curl -fsS -H "Title: Monthly restore test FAILED" -H "Priority: high" \
+        -H "Tags: warning,floppy_disk" \
+        -d "Monthly Velero restore-test failed: $*" "$NTFY_URL" || true
+      exit 1
+    }
+
+    log "installing tools"
+    apk add --no-cache curl bash jq >/dev/null
+
+    log "fetching kubectl"
+    KVER=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+    curl -fsSL -o /usr/local/bin/kubectl \
+      "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"
+    chmod +x /usr/local/bin/kubectl
+
+    log "fetching velero CLI ${VELERO_VERSION}"
+    curl -fsSL -o /tmp/velero.tar.gz \
+      "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz"
+    tar -xzf /tmp/velero.tar.gz -C /tmp
+    mv "/tmp/velero-${VELERO_VERSION}-linux-amd64/velero" /usr/local/bin/velero
+    chmod +x /usr/local/bin/velero
+
+    log "clearing any leftovers from a previous run in $NS (pure scratch space, safe to blanket-clear)"
+    kubectl delete pods,statefulsets,pvc,services,configmaps,secrets \
+      --all -n "$NS" --ignore-not-found --wait=true --timeout=120s || true
+
+    log "finding latest completed backup"
+    LATEST=$(velero backup get -o json \
+      | jq -r '[.items[] | select(.status.phase=="Completed")] | sort_by(.metadata.creationTimestamp) | last | .metadata.name')
+    if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+      fail "no completed Velero backup found"
+    fi
+    log "using backup: $LATEST"
+
+    RESTORE_NAME="restore-test-$(date -u +%Y%m%d%H%M)"
+    log "creating restore $RESTORE_NAME from $LATEST (namespace-mapping ${SRC_NS}:${NS})"
+    velero restore create "$RESTORE_NAME" \
+      --from-backup "$LATEST" \
+      --include-namespaces "$SRC_NS" \
+      --namespace-mappings "${SRC_NS}:${NS}" \
+      --wait
+
+    PHASE=$(velero restore get "$RESTORE_NAME" -o json | jq -r '.status.phase')
+    ERRORS=$(velero restore get "$RESTORE_NAME" -o json | jq -r '.status.errors // 0')
+    log "restore phase=$PHASE errors=$ERRORS"
+    if [ "$PHASE" != "Completed" ]; then
+      fail "restore phase was $PHASE (expected Completed)"
+    fi
+    if [ "$ERRORS" != "0" ]; then
+      fail "restore reported $ERRORS errors"
+    fi
+
+    log "waiting for restored vault-0 pod to be Ready"
+    if ! kubectl wait --for=condition=Ready pod/vault-0 -n "$NS" --timeout=180s; then
+      fail "restored vault-0 pod never became Ready"
+    fi
+
+    log "checking restored Vault's storage integrity"
+    STATUS_OUT=$(kubectl exec -n "$NS" vault-0 -- vault status 2>&1 || true)
+    echo "$STATUS_OUT"
+    if ! echo "$STATUS_OUT" | grep -Eq "Initialized[[:space:]]+true"; then
+      fail "restored Vault did not report Initialized: true -- raft storage may not have restored correctly"
+    fi
+    if ! echo "$STATUS_OUT" | grep -qi "Sealed"; then
+      fail "restored Vault status output missing Sealed line -- unexpected/corrupt output"
+    fi
+
+    log "PASS: restored Vault storage is intact (Initialized: true), pod started cleanly from backup $LATEST"
+
+    log "cleaning up"
+    velero restore delete "$RESTORE_NAME" --confirm || true
+    kubectl delete pods,statefulsets,pvc,services,configmaps,secrets \
+      --all -n "$NS" --ignore-not-found --wait=false || true
+
+    log "done"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: monthly-restore-test
+  namespace: velero
+spec:
+  # 1st of the month, 06:00 -- after the 04:00 pve-host-backup and 05:00
+  # daily Velero backup have both had a chance to complete.
+  schedule: "0 6 1 * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 6
+  failedJobsHistoryLimit: 6
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 1800
+      backoffLimit: 0
+      template:
+        spec:
+          serviceAccountName: restore-test-runner
+          restartPolicy: Never
+          containers:
+            - name: restore-test
+              image: alpine:3.20
+              command: ["/bin/sh", "/scripts/restore-test.sh"]
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+          volumes:
+            - name: script
+              configMap:
+                name: restore-test-script
+                defaultMode: 0755

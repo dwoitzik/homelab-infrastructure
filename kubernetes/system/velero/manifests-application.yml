@@ -17,7 +17,12 @@ spec:
       # here until real R2 credentials exist -- confirmed live that including
       # them creates an Unavailable BackupStorageLocation and a Schedule that
       # would fail daily at 4am.
-      include: '{secrets,schedule}.yml'
+      #
+      # restore-test.yml (BRIEFING-V4.md Section D) added 2026-08-17: declares
+      # its own namespaces (velero-restore-test, plus Role/RoleBinding in
+      # velero) explicitly on every resource, so it's safe to sync from this
+      # Application even though its destination.namespace default is velero.
+      include: '{secrets,schedule,restore-test}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: velero
