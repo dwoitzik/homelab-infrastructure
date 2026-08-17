@@ -104,6 +104,14 @@
     - docker
     - node_exporter_native
     - atlantis
+    # ADR-021: self-hosted GitHub Actions runner on the same host, replacing
+    # Atlantis's public webhook. Software staging (download/extract/deps)
+    # runs unconditionally; registration + the systemd service are gated on
+    # github_actions_runner_registration_token being supplied at run time
+    # (--extra-vars only -- never committed, never vaulted, expires within
+    # the hour). Atlantis's own container is retained as the terraform/CA-
+    # trust execution environment workflow steps run inside, not replaced.
+    - github_actions_runner
 
 - name: Proxmox Host — Power Management
   hosts: pve_hosts

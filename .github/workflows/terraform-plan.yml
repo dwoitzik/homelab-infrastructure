@@ -1,0 +1,123 @@
+name: Terraform Plan (ADR-021)
+
+# Replaces Atlantis's webhook-driven `atlantis plan` PR comment. Atlantis's
+# own webhook has no working inbound path since ADR-019 removed
+# atlantis.woitzik.dev's public DNS/tunnel entry (see ADR-021's Context) --
+# this reproduces the same comment-triggered UX using a self-hosted runner
+# that polls GitHub outbound, so no inbound path is needed at all.
+#
+# Comment syntax matches Atlantis's own: `atlantis plan -d <stack>`, where
+# <stack> is one of network/proxmox/cloudflare/garage (terraform/stacks/*).
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  plan:
+    if: |
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, 'atlantis plan')
+    runs-on: self-hosted
+    steps:
+      - name: Acknowledge the comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes',
+            });
+
+      - name: Resolve PR head ref
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            core.setOutput('sha', pr.data.head.sha);
+
+      - name: Parse stack name from comment
+        id: parse
+        env:
+          # Passed via env, never interpolated directly into the script --
+          # a PR comment is untrusted input; direct ${{ }} interpolation
+          # into a run: block is a known GitHub Actions script-injection
+          # pattern (the comment body becomes part of the shell script
+          # itself). Referencing $COMMENT_BODY avoids that entirely.
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          STACK=$(echo "$COMMENT_BODY" | grep -oE -- '-d[[:space:]]+[a-zA-Z0-9_/-]+' | head -1 | awk '{print $2}')
+          if [ -z "$STACK" ]; then
+            echo "No -d <stack> found in comment (expected: atlantis plan -d <network|proxmox|cloudflare|garage>)" >&2
+            exit 1
+          fi
+          if [ ! -d "terraform/stacks/$STACK" ]; then
+            echo "terraform/stacks/$STACK does not exist" >&2
+            exit 1
+          fi
+          echo "stack=$STACK" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+
+      # Runs inside Atlantis's own custom image (base atlantis image +
+      # trusted Proxmox CA, see ansible/roles/atlantis/files/Dockerfile) so
+      # the pinned Terraform version and CA trust match exactly what the
+      # repo has used all along -- not a second, drifting toolchain.
+      # --env-file references a host-local file (ansible/roles/atlantis's
+      # terraform-runner.env.j2), the same Vault-sourced credentials
+      # Atlantis's own container already runs with -- never duplicated into
+      # GitHub Secrets.
+      - name: Terraform init + plan
+        id: tfplan
+        run: |
+          set -o pipefail
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w "/workspace/terraform/stacks/${{ steps.parse.outputs.stack }}" \
+            --env-file /opt/atlantis/terraform-runner.env \
+            --entrypoint sh \
+            atlantis-custom:v0.46.0 \
+            -c "terraform init -input=false -no-color && terraform plan -input=false -no-color" \
+            2>&1 | tee /tmp/tfplan-${{ github.run_id }}.txt
+        continue-on-error: true
+
+      - name: Post plan output to the PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '/tmp/tfplan-${{ github.run_id }}.txt';
+            let output = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : '(no output captured)';
+            // GitHub comment body limit is ~65536 chars; keep the tail, plans
+            // usually have the useful summary at the end.
+            if (output.length > 60000) {
+              output = '... (truncated, showing last 60000 chars) ...\n' + output.slice(-60000);
+            }
+            const outcome = '${{ steps.tfplan.outcome }}';
+            const icon = outcome === 'success' ? '✅' : '❌';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `${icon} **Terraform Plan: \`${{ steps.parse.outputs.stack }}\`**\n\n\`\`\`\n${output}\n\`\`\``,
+            });
+
+      - name: Fail the job if plan failed
+        if: steps.tfplan.outcome == 'failure'
+        run: exit 1

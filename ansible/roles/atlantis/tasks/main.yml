@@ -58,3 +58,18 @@
   community.docker.docker_compose_v2:
     project_src: "{{ atlantis_base_dir }}"
     state: present
+
+# ADR-021: the GitHub Actions runner's terraform steps need the same
+# provider credentials the Atlantis container already gets via its own
+# docker-compose environment block -- rather than duplicating these into
+# GitHub Secrets (a worse posture: two credential stores to keep in sync,
+# one of them outside this repo's normal Vault->Ansible flow), write them
+# to a host-local env file the runner's `docker run --env-file` can
+# reference directly. Root-only readable; never leaves this host.
+- name: Deploy terraform-runner env file (same credentials as Atlantis's own container)
+  ansible.builtin.template:
+    src: terraform-runner.env.j2
+    dest: "{{ atlantis_base_dir }}/terraform-runner.env"
+    owner: root
+    group: root
+    mode: '0600'
