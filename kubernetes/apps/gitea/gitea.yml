@@ -33,7 +33,7 @@ spec:
             value: "1"
       containers:
         - name: gitea
-          image: gitea/gitea:1.26.4
+          image: gitea/gitea:1.27.2@sha256:d20286ca2b2e170fdf628e7231b8a31a3220ade39ff462b55041d43d1fc757dd
           # SEC-012: the official image's entrypoint runs as root and needs
           # CAP_CHOWN/CAP_SETGID/CAP_SETUID etc. to chown/chmod its data dirs
           # and su-exec into the git user -- confirmed live, dropping all
@@ -126,7 +126,7 @@ spec:
               memory: 512Mi
       initContainers:
         - name: copy-s6
-          image: gitea/gitea:1.26.4
+          image: gitea/gitea:1.27.2@sha256:d20286ca2b2e170fdf628e7231b8a31a3220ade39ff462b55041d43d1fc757dd
           command: ["sh", "-c", "cp -a /etc/s6/. /writable-s6/"]
           securityContext:
             allowPrivilegeEscalation: false
@@ -137,7 +137,7 @@ spec:
             - name: s6
               mountPath: /writable-s6
         - name: copy-ssh
-          image: gitea/gitea:1.26.4
+          image: gitea/gitea:1.27.2@sha256:d20286ca2b2e170fdf628e7231b8a31a3220ade39ff462b55041d43d1fc757dd
           command: ["sh", "-c", "cp -a /etc/ssh/. /writable-ssh/"]
           securityContext:
             allowPrivilegeEscalation: false
