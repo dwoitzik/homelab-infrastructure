@@ -226,3 +226,57 @@ resource "cloudflare_dns_record" "mc_playit" {
 # deleted out-of-band since that note was written. Dropped from Terraform
 # entirely rather than recreating a record whose own history said to remove
 # it.
+
+# =============================================================================
+# Cloudflare Access (Zero Trust) in front of photos.woitzik.dev.
+# 2026-08-17: BRIEFING-V4.md Section 1.4 / Section B. Immich has no external
+# auth of its own in front of it (the rate limit in kubernetes/apps/immich/
+# middleware.yml is abuse mitigation, not authentication) -- this puts a real
+# identity gate at Cloudflare's edge, before any request reaches the tunnel
+# at all. One-time PIN (email OTP) is Cloudflare's built-in identity method,
+# no separate IdP needed.
+#
+# Known, accepted trade-off (documented, not silently worked around): this
+# gates the ENTIRE app, including the API paths the Immich mobile app calls
+# directly with its own bearer-token auth, not a browser session Access can
+# recognize. The brief's own instruction ("Immich itself is invisible to
+# everyone else") does not carve out an exception for the mobile app, so this
+# implements it literally. Practical effect: family members can still use the
+# mobile app freely from inside the LAN or over Tailscale (this Access
+# Application only ever sees traffic that comes in through the public
+# Cloudflare Tunnel, not LAN/VPN traffic, which never touches Cloudflare at
+# all -- see the tunnel-scoping comment at the top of this file). External
+# mobile-app access (cellular data, off the family WiFi and off Tailscale)
+# will need either a one-time browser-based Access login first (session
+# persists) or the family member on Tailscale. If this proves too disruptive
+# in practice, the fix is a second, path-scoped Access Application or a
+# Service Token for the app specifically -- a deliberate follow-up, not
+# implemented blind here.
+resource "cloudflare_zero_trust_access_application" "immich" {
+  account_id                = var.account_id
+  name                      = "Immich (photos.woitzik.dev)"
+  domain                    = "photos.woitzik.dev"
+  type                      = "self_hosted"
+  session_duration          = "24h"
+  auto_redirect_to_identity = true
+  allowed_idps              = [] # empty = all IdPs enabled on the account, incl. One-time PIN
+
+  # v5 schema: policies are defined inline on the application (a nested list
+  # attribute), not as a separate resource linked by an application_id --
+  # confirmed against the actual provider schema (`terraform providers
+  # schema -json`), not guessed; there is no `application_id` argument on
+  # cloudflare_zero_trust_access_policy in this provider version.
+  policies = [
+    {
+      name     = "Family email OTP"
+      decision = "allow"
+      # Each `include` entry is OR'd; an `email` rule takes exactly one
+      # address -- one entry per family member, not a list inside one rule.
+      include = [
+        for addr in var.immich_access_family_emails : {
+          email = { email = addr }
+        }
+      ]
+    }
+  ]
+}
