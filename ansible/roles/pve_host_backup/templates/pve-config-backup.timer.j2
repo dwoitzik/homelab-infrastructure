@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily Proxmox host config backup
+
+[Timer]
+# 04:00, staggered an hour after PBS's own nightly-backup job (03:00) --
+# BRIEFING-V4.md 5.3 flags simultaneous scheduled I/O as a real, already-
+# observed problem on this hardware (initdb failures during concurrent
+# backup/scrub jobs), not a theoretical concern.
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

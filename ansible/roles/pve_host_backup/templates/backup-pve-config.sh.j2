@@ -1,0 +1,38 @@
+#!/bin/sh
+# Managed by Ansible (pve_host_backup role) -- do not edit directly.
+# Backs up the Proxmox host's own config (never covered by PBS's VM/CT
+# backup job) to Garage S3, and prunes backups older than
+# {{ pve_host_backup_retention_days }} days.
+set -eu
+
+TS="$(date -u +%Y%m%dT%H%M%SZ)"
+ARCHIVE="/tmp/pve-host-config-${TS}.tar.gz"
+
+# Paths that may not exist on every install (e.g. interfaces.d can be
+# empty/absent) -- filter to what's actually present rather than failing
+# the whole backup over one optional path.
+PATHS=""
+for p in {{ pve_host_backup_paths | join(' ') }}; do
+  if [ -e "$p" ]; then
+    PATHS="$PATHS $p"
+  fi
+done
+
+tar -czf "$ARCHIVE" $PATHS
+
+# set -e would abort the script mid-command on a real rclone failure,
+# before this script ever got a chance to log/clean up -- checked
+# explicitly instead so a failure is reported, not silently swallowed by
+# an early exit.
+if rclone copyto "$ARCHIVE" "garage:{{ pve_host_backup_bucket }}/pve-host-config-${TS}.tar.gz"; then
+  rm -f "$ARCHIVE"
+  # Prune anything older than the retention window -- only on a
+  # successful upload, so a failed run never deletes older good backups.
+  rclone delete --min-age {{ pve_host_backup_retention_days }}d "garage:{{ pve_host_backup_bucket }}/"
+  echo "pve-host-config backup OK: pve-host-config-${TS}.tar.gz"
+else
+  RESULT=$?
+  rm -f "$ARCHIVE"
+  echo "pve-host-config backup FAILED (rclone exit $RESULT)" >&2
+  exit "$RESULT"
+fi

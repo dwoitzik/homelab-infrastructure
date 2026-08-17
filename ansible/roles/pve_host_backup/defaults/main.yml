@@ -1,0 +1,27 @@
+---
+# BRIEFING-V4.md Phase 3: "Back up the Proxmox host's own config (/etc/pve,
+# storage config, firewall rules) -- the recovery found it was never
+# covered." PBS's own nightly-backup job (pvesh get /cluster/backup)
+# backs up VMs/CTs, never the hypervisor's own config -- confirmed live,
+# a real gap, not assumed.
+
+pve_host_backup_garage_key_id: "{{ vault_pve_host_backup_garage_key_id }}"
+pve_host_backup_garage_secret: "{{ vault_pve_host_backup_garage_secret }}"
+pve_host_backup_garage_endpoint: https://s3.woitzik.dev
+pve_host_backup_garage_region: homelab
+pve_host_backup_bucket: pve-host-config
+
+# /etc/pve is Proxmox's own clustered config filesystem (pmxcfs) -- storage.cfg,
+# firewall/, datacenter.cfg, and everything else Proxmox itself manages
+# already lives under here. /etc/network/interfaces is the host's own Debian
+# network config, not part of pmxcfs, backed up separately for the same
+# reason ADR-context docs already call out (a full host rebuild needs it).
+pve_host_backup_paths:
+  - /etc/pve
+  - /etc/network/interfaces
+  - /etc/network/interfaces.d
+  - /etc/hosts
+  - /etc/hostname
+  - /etc/fstab
+
+pve_host_backup_retention_days: 30
