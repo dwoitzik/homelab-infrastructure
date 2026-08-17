@@ -75,13 +75,26 @@
     - github_actions_runner_registration_token != ""
     - not github_actions_runner_configured.stat.exists
   no_log: true # the command line itself contains the token
+  changed_when: true
+
+- name: Check if the runner systemd service is already installed
+  ansible.builtin.stat:
+    # svc.sh names the unit from the repo URL + runner name, not a fixed
+    # name -- `creates:` on the command module below doesn't support glob
+    # patterns (it checks for a literal path), so this task does the real
+    # existence check instead of a creates: glob that would never match.
+    path: "/etc/systemd/system/actions.runner.{{ github_actions_runner_repo_url | regex_replace('^https://github.com/', '') | regex_replace('/', '-') }}.{{ github_actions_runner_name }}.service"
+  register: github_actions_runner_service_file
+  when: github_actions_runner_registration_token != ""
 
 - name: Install the runner as a systemd service
   ansible.builtin.command: ./svc.sh install {{ github_actions_runner_user }}
   args:
     chdir: "{{ github_actions_runner_dir }}"
-    creates: /etc/systemd/system/actions.runner.*.service
-  when: github_actions_runner_registration_token != ""
+  when:
+    - github_actions_runner_registration_token != ""
+    - not github_actions_runner_service_file.stat.exists
+  changed_when: true
 
 - name: Start and enable the runner service
   ansible.builtin.command: ./svc.sh start
