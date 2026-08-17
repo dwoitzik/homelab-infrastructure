@@ -5,16 +5,24 @@
   roles:
     - common
     - docker
-    - watchtower
     - monitoring_agent
+
+# 2026-08-17 (BRIEFING-V4.md Section C / Phase 2): watchtower removed.
+# Auto-pulling :latest on live containers directly contradicts having
+# Renovate (which already handles version bumps via reviewed PRs) and
+# GitOps generally -- two different systems racing to change the same
+# running state, one of them with no review step and no record of what
+# changed or when. Updates come through the repo (Renovate PR -> merge ->
+# redeploy) or not at all now. Confirmed live before writing this: only 3
+# hosts in the `nodes` group actually had it running (ct-srv-docker-01,
+# ct-dmz-proxy-01, ct-dmz-games-01) -- media-acq/ai/jellyfin/nfs/atlantis
+# were never in this group and never ran it.
 
 # 2026-08-13: k3s_nodes was never in the `nodes` group, so these hosts never
 # received `common` (including its inotify limits sysctl, whose own comment
 # says it's "for k3s/container workloads" -- a gap that predates this
-# recovery, now closed) or node_exporter_native. docker/watchtower are
-# deliberately excluded here -- k3s uses containerd directly, and
-# Watchtower auto-updating k3s-managed containers out from under the
-# scheduler would fight GitOps/ArgoCD's own reconciliation.
+# recovery, now closed) or node_exporter_native. docker is
+# deliberately excluded here -- k3s uses containerd directly.
 - name: Provision K3s Node Base OS
   hosts: k3s_nodes
   become: true
