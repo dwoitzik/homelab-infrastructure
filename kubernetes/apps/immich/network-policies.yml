@@ -26,6 +26,24 @@ spec:
       ports:
         - protocol: TCP
           port: 2283
+    # 2026-08-17: photos.woitzik.dev's Cloudflare Tunnel ingress rule (terraform/
+    # stacks/cloudflare/main.tf) routes directly to this Service, bypassing
+    # Traefik entirely (Immich has no external auth in front of it, so a Traefik
+    # hop adds nothing) -- this policy only allowed the Traefik selector above,
+    # silently blocking cloudflared's own traffic. Confirmed live via a real
+    # external check (public DNS + direct Cloudflare edge IP, not the LAN's own
+    # DNS rewrite which would have hidden this): photos.woitzik.dev returned a
+    # genuine Cloudflare-origin 502, and cloudflared's own logs showed
+    # "connection refused" dialing immich-server directly -- this NetworkPolicy
+    # was the actual cause, not a real service outage (kubelet's own readiness
+    # probe against the same pod was passing the whole time).
+    - from:
+        - podSelector:
+            matchLabels:
+              app: cloudflared
+      ports:
+        - protocol: TCP
+          port: 2283
   egress:
     - to:
         - podSelector:
