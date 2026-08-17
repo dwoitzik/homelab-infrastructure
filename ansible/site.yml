@@ -119,3 +119,8 @@
   roles:
     - pve_power
     - node_exporter_native
+    # BRIEFING-V4.md Phase 3: PBS's own nightly-backup job covers VMs/CTs,
+    # never the hypervisor's own config (/etc/pve, network config) --
+    # confirmed live, a real gap. Daily to Garage S3, staggered an hour
+    # after PBS's own 03:00 job.
+    - pve_host_backup

@@ -1,0 +1,52 @@
+---
+- name: Install rclone
+  ansible.builtin.apt:
+    name: rclone
+    state: present
+    update_cache: true
+
+- name: Ensure rclone config directory exists
+  ansible.builtin.file:
+    path: /root/.config/rclone
+    state: directory
+    mode: '0700'
+
+- name: Deploy rclone config (Garage S3 credentials, Vault-sourced)
+  ansible.builtin.template:
+    src: rclone.conf.j2
+    dest: /root/.config/rclone/rclone.conf
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Deploy backup script
+  ansible.builtin.template:
+    src: backup-pve-config.sh.j2
+    dest: /usr/local/bin/backup-pve-config.sh
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Deploy systemd service
+  ansible.builtin.template:
+    src: pve-config-backup.service.j2
+    dest: /etc/systemd/system/pve-config-backup.service
+    mode: '0644'
+
+- name: Deploy systemd timer
+  ansible.builtin.template:
+    src: pve-config-backup.timer.j2
+    dest: /etc/systemd/system/pve-config-backup.timer
+    mode: '0644'
+
+# daemon_reload here (rather than a notified handler flushed at the end of
+# the play) keeps this self-contained -- a meta: flush_handlers call was
+# tried first and rejected: it flushes *every* pending handler in the
+# whole play, not just this role's, and on a real run that meant an
+# unrelated pve_power handler (GRUB regen) fired earlier than intended.
+- name: Enable and start the backup timer
+  ansible.builtin.systemd:
+    name: pve-config-backup.timer
+    daemon_reload: true
+    enabled: true
+    state: started

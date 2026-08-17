@@ -26,7 +26,14 @@
 
       [Service]
       Type=oneshot
-      ExecStart=/usr/sbin/cpupower frequency-set -g {{ pve_power_cpu_governor }}
+      # 2026-08-17: was a hardcoded /usr/sbin/cpupower -- on this Debian
+      # trixie install, the linux-cpupower package puts the binary at
+      # /usr/bin/cpupower instead (confirmed live via `dpkg -L
+      # linux-cpupower`), so the service failed every time it actually ran
+      # ("203/EXEC ... No such file or directory"). Resolving via PATH
+      # instead of a hardcoded path avoids re-hardcoding a location that's
+      # apparently not stable across package versions/distros.
+      ExecStart=/usr/bin/env cpupower frequency-set -g {{ pve_power_cpu_governor }}
       ExecStartPost=/bin/sh -c 'echo {{ pve_power_energy_perf_pref }} | tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 2>/dev/null || true'
       RemainAfterExit=yes
 
