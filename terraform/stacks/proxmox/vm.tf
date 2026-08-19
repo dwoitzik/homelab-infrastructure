@@ -70,10 +70,14 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   # 2026-08-13 ZFS-to-LVM-thin migration this comment used to reference.
   # 2026-08-16: `discard=on` + `mbps_wr=50,mbps_wr_max=75` applied live
   # (`qm set 211 ...`) during the local-lvm thin-pool exhaustion incident that
-  # crashed the host that day -- not reflected below since `disk` is in
-  # `lifecycle.ignore_changes`, so this block's values were never the live
-  # source of truth to begin with. No drift risk: Atlantis cannot revert
-  # live disk attributes regardless of what's declared here. Control-plane
+  # crashed the host that day. `disk` is in `lifecycle.ignore_changes`, so
+  # this block was never the live source of truth and adding these values
+  # here has zero effect on the already-provisioned VM (Atlantis cannot
+  # revert or reapply live disk attributes regardless of what's declared).
+  # Codified anyway (2026-08-19, phase8/LEDGER.md Entry 40) purely for
+  # reproducibility: a future full rebuild/re-import must not silently lose
+  # this throttle again -- it's now what a fresh `terraform apply` would
+  # actually create, not just a comment describing live drift. Control-plane
   # VM, so the ceiling is a bit higher than the workers' (etcd headroom).
   disk {
     datastore_id = local.storage
@@ -82,6 +86,11 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
     file_format  = "raw"
     cache        = "none"
     aio          = "native"
+    discard      = "on"
+    speed {
+      write           = 50
+      write_burstable = 75
+    }
   }
 
   network_device {
@@ -183,7 +192,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   # crashed the host that day -- raised from an initial 40/60 after that
   # tighter cap was found to starve containerd's own sandbox-creation I/O
   # (see phase8/LEDGER.md Entries 8-9 for the full incident). Same
-  # ignore_changes/no-drift-risk note as k3s-11 applies.
+  # ignore_changes/no-drift-risk note as k3s-11 applies; codified here
+  # 2026-08-19 (LEDGER Entry 40) for reproducibility, same reasoning.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
@@ -191,6 +201,11 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
     file_format  = "raw"
     cache        = "none"
     aio          = "native"
+    discard      = "on"
+    speed {
+      write           = 100
+      write_burstable = 150
+    }
   }
 
   network_device {
@@ -276,7 +291,8 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   # crashed the host that day -- raised from an initial 40/60 after that
   # tighter cap was found to starve containerd's own sandbox-creation I/O
   # (see phase8/LEDGER.md Entries 8-9 for the full incident). Same
-  # ignore_changes/no-drift-risk note as k3s-11 applies.
+  # ignore_changes/no-drift-risk note as k3s-11 applies; codified here
+  # 2026-08-19 (LEDGER Entry 40) for reproducibility, same reasoning.
   disk {
     datastore_id = local.storage
     interface    = "scsi0"
@@ -284,6 +300,11 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
     file_format  = "raw"
     cache        = "none"
     aio          = "native"
+    discard      = "on"
+    speed {
+      write           = 100
+      write_burstable = 150
+    }
   }
 
   network_device {

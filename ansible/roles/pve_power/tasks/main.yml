@@ -78,3 +78,19 @@
   ansible.builtin.shell:
     cmd: echo {{ pve_power_zfs_vdev_async_write_max_active }} > /sys/module/zfs/parameters/zfs_vdev_async_write_max_active
   changed_when: false
+
+# 2026-08-19: bring vzdump's global throttle under IaC (see defaults/main.yml
+# comment) -- surgical, only touches these two lines, leaves the rest of
+# Proxmox's own stock /etc/vzdump.conf template (all commented examples)
+# alone rather than replacing the whole file.
+- name: Ensure vzdump bwlimit throttle is set
+  ansible.builtin.lineinfile:
+    path: /etc/vzdump.conf
+    regexp: '^#?bwlimit:'
+    line: "bwlimit: {{ pve_power_vzdump_bwlimit_kbps }}"
+
+- name: Ensure vzdump ionice throttle is set
+  ansible.builtin.lineinfile:
+    path: /etc/vzdump.conf
+    regexp: '^#?ionice:'
+    line: "ionice: {{ pve_power_vzdump_ionice }}"

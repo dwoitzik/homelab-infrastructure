@@ -20,3 +20,16 @@ pve_power_zfs_prefetch_disable: 1
 pve_power_zfs_dirty_data_max_bytes: 268435456
 pve_power_zfs_txg_timeout: 5
 pve_power_zfs_vdev_async_write_max_active: 3
+
+# 2026-08-16/19: vzdump global throttle. Applied manually (`vim
+# /etc/vzdump.conf`) during the local-lvm thin-pool exhaustion incident
+# that crashed the host that day, never brought under IaC -- exactly the
+# regression risk this role already exists to close for the ZFS tuning
+# above. bwlimit is KB/s (51200 = 50MB/s); ionice=7 is the lowest priority
+# best-effort class, so vzdump's own reads/writes yield to everything else
+# on the shared NVMe. Doesn't cover every bulk-I/O source on this host (see
+# phase8/LEDGER.md Entry 40 for the 2026-08-19 Garage block-resync incident,
+# a different job entirely that this setting can't throttle), but closes
+# the specific vzdump gap this value was originally added for.
+pve_power_vzdump_bwlimit_kbps: 51200
+pve_power_vzdump_ionice: 7
