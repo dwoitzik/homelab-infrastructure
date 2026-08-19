@@ -1,3 +1,15 @@
+# 2026-08-19: ha.woitzik.dev was returning 400 Bad Request via Traefik.
+# Root-caused live: "A request from a reverse proxy was received... but
+# your HTTP integration is not set-up for reverse proxies" in HA's own
+# logs -- a standard, well-known HA requirement when it sits behind a
+# reverse proxy. Fixed by appending an `http:` block (use_x_forwarded_for +
+# trusted_proxies: 10.42.0.0/16, the whole k3s pod CIDR since Traefik's
+# pod IP changes on every restart) directly to the live
+# /config/configuration.yaml on the home-assistant-config PVC. Not
+# reflected in this manifest because HA's own configuration.yaml isn't
+# GitOps-managed at all (lives entirely on the PVC, normally edited via
+# HA's own UI/file editor, not this repo) -- documented here so the reason
+# behind the live fix is discoverable, per phase8/LEDGER.md Entry 45.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
