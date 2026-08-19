@@ -11,6 +11,15 @@ data:
 
     replication_factor = 1
 
+    # 2026-08-19 (ADR-023): capped down from Garage's own default (16) after a
+    # `garage repair blocks` run drove NVMe write latency to ~5s and host load
+    # to 25+ -- this node's data directory shares one physical NVMe with the
+    # k3s control-plane VM and everything else on this host (docs/HARDWARE.md),
+    # so Garage's own read/write concurrency needs to stay conservative
+    # regardless of what a standalone Garage deployment on dedicated disks
+    # would tune it to. See phase8/LEDGER.md Entry 40 for the incident.
+    block_max_concurrent_reads = 8
+
     rpc_bind_addr = "[::]:3901"
     rpc_public_addr = "127.0.0.1:3901"
     rpc_secret_file = "/etc/garage/secrets/rpc_secret"
