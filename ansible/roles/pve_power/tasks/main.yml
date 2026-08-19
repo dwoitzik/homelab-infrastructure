@@ -100,7 +100,7 @@
 - name: Check whether the vzdump throttle block already exists
   ansible.builtin.command:
     cmd: grep -q "BEGIN ANSIBLE MANAGED THROTTLE (pve_power role, ADR-023)" /etc/vzdump.conf
-  register: vzdump_throttle_block_present
+  register: pve_power_vzdump_throttle_block_present
   changed_when: false
   failed_when: false
 
@@ -112,7 +112,7 @@
   loop:
     - '^bwlimit:\s*\d+\s*$'
     - '^ionice:\s*\d+\s*$'
-  when: vzdump_throttle_block_present.rc != 0
+  when: pve_power_vzdump_throttle_block_present.rc != 0
 
 - name: Ensure vzdump throttle block is set (bwlimit + ionice)
   ansible.builtin.blockinfile:
