@@ -80,17 +80,44 @@
   changed_when: false
 
 # 2026-08-19: bring vzdump's global throttle under IaC (see defaults/main.yml
-# comment) -- surgical, only touches these two lines, leaves the rest of
-# Proxmox's own stock /etc/vzdump.conf template (all commented examples)
-# alone rather than replacing the whole file.
-- name: Ensure vzdump bwlimit throttle is set
-  ansible.builtin.lineinfile:
-    path: /etc/vzdump.conf
-    regexp: '^#?bwlimit:'
-    line: "bwlimit: {{ pve_power_vzdump_bwlimit_kbps }}"
+# comment) -- surgical, leaves the rest of Proxmox's own stock
+# /etc/vzdump.conf template (all commented examples) alone rather than
+# replacing the whole file. Two steps, in this order:
+#   1. One-time-only: strip any bare (unmanaged) bwlimit:/ionice: lines.
+#      Live-caught bug on the real host, twice: the file already had TWO
+#      pre-existing `ionice:` lines (real prior drift, predates this role)
+#      -- a first-draft version used two separate `lineinfile` calls, whose
+#      regexp match only updates the LAST matching line when there are
+#      duplicates, silently leaving the other in place. Fixed by removing
+#      bare lines outright before inserting a managed block instead. But an
+#      UNGATED removal task reran on every play and matched the managed
+#      block's own content lines too (they're still bare `bwlimit:
+#      NNN`/`ionice: N` text, marker comments don't change that) --
+#      confirmed live: `changed=2` on a second consecutive run even though
+#      nothing should differ. Gated on the marker not existing yet fixes
+#      this for real: once the managed block is in place, this task is
+#      permanently skipped, so it can never eat the block's own lines.
+- name: Check whether the vzdump throttle block already exists
+  ansible.builtin.command:
+    cmd: grep -q "BEGIN ANSIBLE MANAGED THROTTLE (pve_power role, ADR-023)" /etc/vzdump.conf
+  register: pve_power_vzdump_throttle_block_present
+  changed_when: false
+  failed_when: false
 
-- name: Ensure vzdump ionice throttle is set
+- name: Remove any unmanaged vzdump bwlimit/ionice lines (one-time, pre-block only)
   ansible.builtin.lineinfile:
     path: /etc/vzdump.conf
-    regexp: '^#?ionice:'
-    line: "ionice: {{ pve_power_vzdump_ionice }}"
+    regexp: "{{ item }}"
+    state: absent
+  loop:
+    - '^bwlimit:\s*\d+\s*$'
+    - '^ionice:\s*\d+\s*$'
+  when: pve_power_vzdump_throttle_block_present.rc != 0
+
+- name: Ensure vzdump throttle block is set (bwlimit + ionice)
+  ansible.builtin.blockinfile:
+    path: /etc/vzdump.conf
+    marker: "# {mark} ANSIBLE MANAGED THROTTLE (pve_power role, ADR-023)"
+    block: |
+      bwlimit: {{ pve_power_vzdump_bwlimit_kbps }}
+      ionice: {{ pve_power_vzdump_ionice }}
