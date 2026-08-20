@@ -23,3 +23,34 @@ resource "routeros_system_scheduler" "disable_unused_ports" {
   EOF
   comment    = "Power: disable unused ethernet ports at boot"
 }
+
+###############################################################################
+# LED scheduling — cosmetic, off 22:00-06:00 local
+###############################################################################
+#
+# RouterOS exposes board LED control via `/system leds settings` (the
+# terraform-routeros provider ships both a typed `routeros_system_led_settings`
+# resource and the raw `/system/leds` API path), specifically the
+# `all-leds-off` property. Using the same raw-script `routeros_system_scheduler`
+# pattern as disable_unused_ports above instead of the typed resource, since
+# this repo's existing usage of that pattern is already proven live and this
+# avoids depending on the typed resource's exact accepted enum values, which
+# weren't independently verified against this specific RouterOS version this
+# pass.
+###############################################################################
+
+resource "routeros_system_scheduler" "led_off_night" {
+  name       = "power_led_off_night"
+  start_time = "22:00:00"
+  interval   = "1d"
+  on_event   = "/system leds settings set all-leds-off=immediate"
+  comment    = "Cosmetic: turn off board LEDs 22:00-06:00"
+}
+
+resource "routeros_system_scheduler" "led_on_day" {
+  name       = "power_led_on_day"
+  start_time = "06:00:00"
+  interval   = "1d"
+  on_event   = "/system leds settings set all-leds-off=no"
+  comment    = "Cosmetic: restore board LEDs at 06:00"
+}
