@@ -88,6 +88,26 @@ Real daily usefulness is a first-class goal, not just demo cleanliness.
    confirmation in the PR.
 7. **Conventional Commits** + meaningful PR descriptions (what, why, blast radius, rollback steps).
 
+## Comment style (2026-08-20: stop doing this)
+Recent commits piled dated, narrated investigation-diary comments into code
+("2026-08-20: root-caused X, confirmed via Y, checked Z, here's the whole
+story") -- multiple per file, sometimes 20%+ of a file's lines. Reads as
+agent narration dumped into code, not engineering context a human would
+leave. For a portfolio repo this is a liability, not a flex.
+
+- Inline comments: one to three lines, WHY only (a non-obvious constraint,
+  a workaround, a real gotcha). No dates, no "confirmed via", no step-by-
+  step investigation replay.
+- The investigation itself (what was tried, what was ruled out, evidence)
+  belongs in `phase8/LEDGER.md` (already the append-only record) or, for
+  anything that's a real decision future readers need, a proper ADR in
+  `docs/decisions/`.
+- PR descriptions carry the blast radius / rationale / rollback -- per
+  guardrail 7 below. Don't duplicate that into the diff as a comment block.
+- Before adding a comment, ask: would a human engineer, mid-incident, have
+  written this exact thing in the code? If it reads like a changelog entry,
+  it goes in the PR/ADR/LEDGER instead.
+
 ## Quality bar (portfolio repo)
 - Every component has a README/runbook: what it is, how to deploy, how to restore, dependencies.
 - Architecture documented with a Mermaid diagram kept in sync with reality.
