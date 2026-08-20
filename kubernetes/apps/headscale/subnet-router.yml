@@ -62,7 +62,11 @@ spec:
               # --advertise-tags requires tag:subnet-router to already exist in the
               # ACL's tagOwners with dw (this authkey's owning user) as an owner --
               # see kubernetes/apps/headscale/config.yml's policy.hujson (Phase 1.4).
-              value: "--login-server=https://headscale.woitzik.dev --advertise-tags=tag:subnet-router"
+              # --advertise-exit-node: operator wants mobile-data traffic routed
+              # through the homelab's own WAN uplink, not just the internal LAN
+              # route. Gated by the same tag:subnet-router autoApprover as the LAN
+              # route, so only this node can ever become an exit node.
+              value: "--login-server=https://headscale.woitzik.dev --advertise-tags=tag:subnet-router --advertise-exit-node"
           securityContext:
             allowPrivilegeEscalation: true
             readOnlyRootFilesystem: true
