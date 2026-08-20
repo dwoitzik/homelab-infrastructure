@@ -181,9 +181,15 @@ spec:
         passHostHeader: true
 ---
 # External services for pve-final / pbs-final — these are manual Services +
-# Endpoints pointing at host-ported apps (PVE mgmt on 10.0.10.10, PBS on
-# 10.0.10.110). Were NOT git-tracked until 2026-08-08 (the PVE/PBS outage was
-# partly caused by them living only as untracked live objects).
+# Endpoints pointing at host-ported apps. PVE and PBS both run natively on
+# the same pve-mgmt-01 host (proxmox-backup-server co-installed alongside
+# Proxmox VE, not a separate guest) - both reachable at 10.0.10.10, just
+# different ports. Were NOT git-tracked until 2026-08-08 (the PVE/PBS
+# outage was partly caused by them living only as untracked live objects).
+# 2026-08-20: PBS's Endpoints IP was wrong (10.0.10.110, which doesn't
+# exist anywhere on this host - `ip addr` confirms only 10.0.10.10) -
+# real, live root cause of backup.woitzik.dev's Bad Gateway. Fixed to
+# match PVE's entry above.
 apiVersion: v1
 kind: Service
 metadata:
@@ -222,7 +228,7 @@ metadata:
   namespace: apps
 subsets:
 - addresses:
-  - ip: 10.0.10.110
+  - ip: 10.0.10.10
   ports:
   - port: 8007
 ---
