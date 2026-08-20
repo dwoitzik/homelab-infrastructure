@@ -114,7 +114,10 @@ data:
             client_name: 'Headscale'
             client_secret: '$argon2id$v=19$m=65536,t=3,p=4$4SL81I6B3rAJT/YAqQoNxQ$fe0Cco+vMQ4lKnyEATtg3xkuvuoI9R7Sp04qooQacJA'
             public: false
-            authorization_policy: one_factor
+            # Was one_factor -- the only OIDC client on this domain not requiring
+            # 2FA, despite gating VPN registration for the whole tailnet (more
+            # sensitive than ArgoCD/Grafana below, both two_factor).
+            authorization_policy: two_factor
             redirect_uris:
               - 'https://headscale.woitzik.dev/oidc/callback'
             scopes: [openid, profile, email]

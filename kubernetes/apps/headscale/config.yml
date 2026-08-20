@@ -54,6 +54,13 @@ data:
       # client_secret injected via HEADSCALE_OIDC_CLIENT_SECRET env var from
       # headscale-oidc Secret (ExternalSecret → Vault secret/headscale)
       scope: ["openid", "profile", "email"]
+      # Defense-in-depth: Authelia currently has exactly one account
+      # (david@woitzik.dev), so this is redundant today, but it stops any
+      # future Authelia account from silently getting tailnet-registration
+      # rights the moment it exists -- registration would otherwise need no
+      # second step beyond "has an Authelia login".
+      allowed_users:
+        - "david@woitzik.dev"
 
     log:
       format: text
