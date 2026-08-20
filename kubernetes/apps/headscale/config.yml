@@ -70,8 +70,15 @@ data:
       // is a single-operator homelab tailnet: one real user (dw), one subnet router
       // (the in-cluster tailscale-subnet-router pod, subnet-router.yml, advertising only
       // 10.0.20.0/24 per REL-033 -- already scoped off every other VLAN).
+      // 2026-08-20: OIDC login (Authelia, david@woitzik.dev) created a SECOND
+      // headscale user "david" distinct from the pre-existing manually-created
+      // "dw" -- the OIDC claim's username didn't match. Default-deny then
+      // silently blocked that device from everything (the subnet route, DERP-
+      // relayed peer traffic, all of it), even though it's the same operator.
+      // Adding david@ here rather than chasing OIDC username-claim mapping is
+      // the minimal fix that matches this policy's own single-operator intent.
       "groups": {
-        "group:admin": ["dw@"]
+        "group:admin": ["dw@", "david@"]
       },
       "tagOwners": {
         // Only group:admin (dw) can tag a node as the subnet router -- prevents any
