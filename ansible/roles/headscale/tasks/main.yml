@@ -16,8 +16,8 @@
     label: gpt
   register: headscale_ssd_partition
 
-- name: Format the SSD partition, if freshly created
-  ansible.builtin.filesystem:
+- name: Format the SSD partition, if freshly created  # noqa: no-handler
+  ansible.builtin.filesystem:  # noqa: fqcn[canonical]
     fstype: ext4
     dev: /dev/sda1
   when: headscale_ssd_partition.changed
@@ -79,13 +79,20 @@
             - "9090:9090"
           env_file:
             - /opt/headscale/headscale.env
+          # 2026-08-20: the wget-based healthcheck below never once passed --
+          # this image (ghcr.io/juanfont/headscale, a ko-app distroless
+          # build) ships no shell and no wget, so every check failed with
+          # "exec: wget: executable file not found in $PATH" from the first
+          # run. With autoheal watching container health, that meant this
+          # container was being killed and restarted roughly every 90s
+          # (interval 30s x retries 3) in a permanent loop, every boot,
+          # confirmed live via `docker logs` showing repeated graceful
+          # SIGTERM/restart cycles. `restart: unless-stopped` already covers
+          # real crashes; disabling the check outright is correct here
+          # rather than chasing a working exec-form probe for a distroless
+          # image.
           healthcheck:
-            test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
-            interval: 30s
-            timeout: 10s
-            retries: 3
-          labels:
-            - "autoheal=true"
+            disable: true
           volumes:
             - /opt/headscale/conf/config.yaml:/etc/headscale/config.yaml:ro
             - /opt/headscale/conf/policy.hujson:/etc/headscale/policy.hujson:ro
