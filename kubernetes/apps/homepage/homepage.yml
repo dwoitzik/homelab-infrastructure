@@ -648,13 +648,22 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 30
           failureThreshold: 4
+        # 2026-08-20: bumped from 50m/128Mi request, 500m/512Mi limit after
+        # finding a real, ongoing crash pattern -- exitCode 143 (SIGTERM)
+        # restarts landing almost exactly at initialDelaySeconds(15) +
+        # failureThreshold(4) x periodSeconds(30) = 135s runtime, repeatedly
+        # (53 restarts/33h observed live). This SSR app polls ~16 widgets
+        # per page load; under the old limits it's plausible the healthcheck
+        # endpoint itself was getting starved during that polling burst.
+        # Node (vm-srv-k3s-11) had ample headroom (48% memory allocated of
+        # 16GB) to support this increase.
         resources:
           requests:
-            cpu: 50m
-            memory: 128Mi
+            cpu: 100m
+            memory: 256Mi
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 1000m
+            memory: 1Gi
       volumes:
       - name: config
         configMap:
