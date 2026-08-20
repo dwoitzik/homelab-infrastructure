@@ -3,6 +3,42 @@ title = "homelab-infrastructure gitleaks config"
 [extend]
 useDefault = true
 
+# 2026-08-20: the default ruleset is built for structured secrets (API keys,
+# tokens) and doesn't flag a plain literal password like PASSWORD=Foo123! --
+# that's exactly the shape a hardcoded Wazuh default credential took (6
+# occurrences, one live) and it sat undetected through every CI run since.
+# This targets that specific gap: a *_PASSWORD/*_SECRET-shaped assignment
+# with a literal quoted or bare value, excluding the legitimate patterns
+# already used throughout this repo -- ${VAR}/$${VAR} interpolation,
+# secretKeyRef indirection, argon2/bcrypt/crypt hashes (which start with a
+# $ scheme prefix and are meant to be committed), and explicit placeholders.
+[[rules]]
+id = "hardcoded-password-assignment"
+description = "Literal (non-variable, non-hash) password assignment"
+# SECRET deliberately excluded from the keyword match - Kubernetes overloads
+# that word constantly for non-value references (secretName, existingSecret,
+# secretKeyRef) that aren't credentials at all and drowned this rule in
+# false positives during testing.
+regex = '''(?i)\b\w*(PASSWORD|PASSWD)\w*\s*[:=]\s*["']?[A-Za-z0-9!@#$%^&*()_+=\-]{8,}["']?'''
+tags = ["password", "custom"]
+# RE2 (gitleaks' regex engine) has no negative lookahead, so the safe
+# patterns already used throughout this repo -- ${VAR}/$${VAR}
+# interpolation, secretKeyRef indirection, argon2/bcrypt/crypt hashes, and
+# explicit placeholders -- are excluded here instead of in the main regex.
+[rules.allowlist]
+regexes = [
+  '''\$\{.*\}''',
+  '''\$\$\{.*\}''',
+  '''\$argon2''',
+  '''\$2[aby]\$''',
+  '''\$6\$''',
+  '''__[A-Z_]+__''',
+  '''<[^>]*>''',
+  '''(?i)changeme''',
+  '''(?i)replace_?me''',
+  '''xxx+''',
+]
+
 [allowlist]
 description = "Known false positives"
 regexes = [
