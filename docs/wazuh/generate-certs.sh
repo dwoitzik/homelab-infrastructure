@@ -5,7 +5,6 @@ set -euo pipefail
 
 CERT_DIR="wazuh_indexer/certs"
 DASH_CERT_DIR="wazuh_dashboard/certs"
-PASSWORD="SecretPassword1!"
 
 mkdir -p "$CERT_DIR" "$DASH_CERT_DIR"
 

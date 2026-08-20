@@ -2,7 +2,7 @@ server.host: "0.0.0.0"
 server.port: 443
 opensearch.hosts: ["https://wazuh.indexer:9200"]
 opensearch.username: "admin"
-opensearch.password: "SecretPassword1!"
+opensearch.password: "__WAZUH_INDEXER_PASSWORD__"
 opensearch.ssl.verificationMode: full
 opensearch.pemcertFilepath: /etc/wazuh-dashboard/certs/root-ca.pem
 opensearch.pinnedCredentials: null
