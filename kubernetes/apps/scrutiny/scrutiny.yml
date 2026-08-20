@@ -125,15 +125,11 @@ spec:
   selector:
     app: scrutiny-influxdb
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: scrutiny-secrets
-  namespace: apps
-type: Opaque
-stringData:
-  influxdb-password: "scrutiny-homelab-2026"
-  influxdb-token: "scrutiny-homelab-token-2026"
+# 2026-08-20: was a raw Secret with plaintext stringData - hardcoded,
+# guessable password/token, live and public. Replaced with the same
+# ExternalSecret+Vault pattern used everywhere else in this repo (see
+# external-secret.yml) - target Secret name/keys are unchanged so nothing
+# below this needs updating.
 ---
 apiVersion: apps/v1
 kind: Deployment
