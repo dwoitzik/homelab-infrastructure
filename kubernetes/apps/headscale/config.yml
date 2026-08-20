@@ -100,6 +100,10 @@ data:
           // Matches subnet-router.yml's TS_ROUTES exactly -- only this specific
           // route auto-approves, and only from a node carrying tag:subnet-router.
           "10.0.20.0/24": ["tag:subnet-router"]
-        }
+        },
+        // Operator wants mobile-data traffic routed through the homelab's WAN.
+        // Same tag restriction as the LAN route above -- only this one node can
+        // ever become an exit node.
+        "exitNode": ["tag:subnet-router"]
       }
     }
