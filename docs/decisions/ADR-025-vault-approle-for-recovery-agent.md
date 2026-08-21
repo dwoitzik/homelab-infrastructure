@@ -93,7 +93,7 @@ value into this agent's own tool output/conversation transcript, exactly the
 exposure pattern this whole ADR exists to stop. Flagged immediately when it
 happened, not discovered later. Every subsequent credential-handling step in
 this pass (the AppRole `secret_id`, the four Garage key secrets) used
-`VAULT_TOKEN=<from-a-file, never `vault login`>` env-var invocation per
+`VAULT_TOKEN=<from-a-file>` env-var invocation (never `vault login`) per
 command instead, specifically to not repeat this. **`vault login`'s stdout
 echoes the token — never use it for handling a credential that must stay
 out of tool output; use `VAULT_TOKEN=$(cat ...)` per-command instead.**
