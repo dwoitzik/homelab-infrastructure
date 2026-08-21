@@ -121,3 +121,29 @@
     block: |
       bwlimit: {{ pve_power_vzdump_bwlimit_kbps }}
       ionice: {{ pve_power_vzdump_ionice }}
+
+# 2026-08-21: see defaults/main.yml comment -- this host's thin pool can
+# never autoextend (VG has zero free space), so the default 80% threshold
+# only ever blocked backups, never actually protected anything.
+- name: Raise LVM thin-pool autoextend threshold (see phase8/LEDGER.md Entry 68)
+  ansible.builtin.lineinfile:
+    path: /etc/lvm/lvm.conf
+    regexp: '^(\s*)thin_pool_autoextend_threshold\s*=\s*\d+\s*$'
+    line: '\1thin_pool_autoextend_threshold = {{ pve_power_lvm_thin_autoextend_threshold }}'
+    backrefs: true
+
+- name: Deploy PBS backup health-check hook script
+  ansible.builtin.template:
+    src: pbs-backup-healthcheck.sh.j2
+    dest: /usr/local/bin/pbs-backup-healthcheck.sh
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Register the health-check script as vzdump's job-end hook
+  ansible.builtin.blockinfile:
+    path: /etc/vzdump.conf
+    marker: "# {mark} ANSIBLE MANAGED HOOK SCRIPT (pve_power role, phase8 Entry 68)"
+    insertafter: "END ANSIBLE MANAGED THROTTLE"
+    block: |
+      script: /usr/local/bin/pbs-backup-healthcheck.sh
