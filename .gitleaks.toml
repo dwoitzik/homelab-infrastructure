@@ -4,7 +4,7 @@ title = "homelab-infrastructure gitleaks config"
 useDefault = true
 
 # 2026-08-20: the default ruleset is built for structured secrets (API keys,
-# tokens) and doesn't flag a plain literal password like PASSWORD=Foo123! --
+# tokens) and doesn't flag a plain literal password like PASSWORD=<literal-value> --
 # that's exactly the shape a hardcoded Wazuh default credential took (6
 # occurrences, one live) and it sat undetected through every CI run since.
 # This targets that specific gap: a *_PASSWORD/*_SECRET-shaped assignment
@@ -25,7 +25,12 @@ tags = ["password", "custom"]
 # patterns already used throughout this repo -- ${VAR}/$${VAR}
 # interpolation, secretKeyRef indirection, argon2/bcrypt/crypt hashes, and
 # explicit placeholders -- are excluded here instead of in the main regex.
+# regexTarget=match is required: this rule has no capture group, so
+# gitleaks' default Secret extraction collapses to just the keyword
+# ("password"), not the value -- allowlist regexes checked against that
+# never see the placeholder/hash/interpolation text they're meant to match.
 [rules.allowlist]
+regexTarget = "match"
 regexes = [
   '''\$\{.*\}''',
   '''\$\$\{.*\}''',
