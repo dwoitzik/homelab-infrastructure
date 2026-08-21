@@ -39,7 +39,7 @@ spec:
           # Pinned, not :latest -- Kyverno's disallow-latest-tag policy
           # rejects unpinned tags (caught live: the first deploy attempt was
           # blocked by the admission webhook before any pod was created).
-          image: henrygd/beszel:0.18.7
+          image: henrygd/beszel:0.18.8@sha256:4c51486968efa0b0a702c1b0967966a2e06fb250b7418f3072d2488faea27c51
           env:
             # Internal-only -- no Cloudflare DNS record for this host (see
             # the IngressRoute below), so this is only ever reached via the
