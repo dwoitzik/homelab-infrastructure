@@ -89,6 +89,15 @@ spec:
           mountPath: /dev/shm
         - name: run
           mountPath: /var/run/postgresql
+        # 2026-08-20: the image's entrypoint does `cp .../postgresql.conf
+        # /etc/postgresql/postgresql.conf` on every start -- missed by the
+        # 2026-08-17 KSV-0014 pass, which added readOnlyRootFilesystem here
+        # without this mount. Confirmed live as the actual crash cause ("cp:
+        # cannot create regular file '/etc/postgresql/postgresql.conf':
+        # Read-only file system"), not data corruption -- see
+        # phase8/LEDGER.md for the full investigation.
+        - name: etc-postgresql
+          mountPath: /etc/postgresql
       volumes:
       - name: db
         persistentVolumeClaim:
@@ -96,6 +105,8 @@ spec:
       - name: tmp
         emptyDir: {}
       - name: run
+        emptyDir: {}
+      - name: etc-postgresql
         emptyDir: {}
       # 2026-08-16: no /dev/shm volume existed here at all -- the container ran on
       # the containerd default (64Mi), while shared_buffers is 512MB. Root-caused
