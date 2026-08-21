@@ -1,0 +1,72 @@
+#!/bin/bash
+# PBS backup health check - runs as a vzdump job-end hook (see /etc/vzdump.conf
+# 'script:' directive, and `man vzdump` HOOK SCRIPTS / vzdump-hook-script.pl for
+# the phase contract this relies on).
+#
+# Exists to catch two real failure modes seen on pve-mgmt-01 2026-08-18/21:
+#   1. A job that reports success but produces a suspiciously small archive
+#      (VM211/213 sat at 1-byte "successful" backups for two nights before
+#      failing outright - a naive job-exit-status check would have missed it).
+#   2. A job/guest that fails outright, or simply goes silently missing from
+#      the schedule (e.g. a stale 'exclude' entry nobody noticed).
+#
+# Deliberately storage-side and PBS-manifest-based rather than parsing vzdump's
+# own log text: pvesm list reports what was actually committed to the
+# datastore, which is the thing that matters for restorability.
+
+set -uo pipefail
+
+PHASE="${1:-}"
+[ "$PHASE" = "job-end" ] || exit 0
+
+STOREID="${STOREID:-{{ pve_power_pbs_healthcheck_storeid }}}"
+NTFY_URL="https://ntfy.sh/{{ pve_power_pbs_healthcheck_ntfy_topic }}"
+MIN_SIZE_BYTES=$(({{ pve_power_pbs_healthcheck_min_size_mib }} * 1024 * 1024))
+MAX_AGE_SECONDS=$(({{ pve_power_pbs_healthcheck_max_age_hours }} * 3600))
+
+alert() {
+	curl -s -H "Title: $1" -H "Priority: high" --data-binary "$2" "$NTFY_URL" >/dev/null || true
+}
+
+# VMIDs deliberately excluded from the nightly job (parsed live from jobs.cfg
+# so this stays in sync automatically if the exclude list ever changes).
+EXCLUDED=$(grep -oP '(?<=exclude )[0-9,]+' /etc/pve/jobs.cfg 2>/dev/null | tr ',' '\n')
+is_excluded() {
+	local id="$1"
+	echo "$EXCLUDED" | grep -qx "$id"
+}
+
+FAILURES=""
+NOW=$(date +%s)
+
+# All VMIDs that have ANY backup history in this datastore - the real,
+# current fleet, not a hardcoded list that would drift.
+ALL_VMIDS=$(pvesm list "$STOREID" 2>/dev/null | awk 'NR>1{print $5}' | sort -u)
+
+for VMID in $ALL_VMIDS; do
+	is_excluded "$VMID" && continue
+
+	LATEST=$(pvesm list "$STOREID" 2>/dev/null | awk -v id="$VMID" '$5==id')
+	[ -z "$LATEST" ] && continue
+	LATEST=$(echo "$LATEST" | tail -1)
+
+	SIZE=$(echo "$LATEST" | awk '{print $4}')
+	VOLID=$(echo "$LATEST" | awk '{print $1}')
+	TSTR=$(echo "$VOLID" | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
+	TS=$(date -d "$TSTR" +%s 2>/dev/null || echo 0)
+	AGE=$((NOW - TS))
+
+	if [ "$TS" -eq 0 ]; then
+		FAILURES="${FAILURES}VMID ${VMID}: could not parse timestamp from ${VOLID}\n"
+	elif [ "$AGE" -gt "$MAX_AGE_SECONDS" ]; then
+		FAILURES="${FAILURES}VMID ${VMID}: latest backup is $((AGE / 3600))h old - missing or failed\n"
+	elif [ "$SIZE" -lt "$MIN_SIZE_BYTES" ]; then
+		FAILURES="${FAILURES}VMID ${VMID}: latest backup only $((SIZE / 1024 / 1024))MiB - suspiciously small, likely broken\n"
+	fi
+done
+
+if [ -n "$FAILURES" ]; then
+	alert "PBS backup healthcheck FAILED" "$(printf '%b' "$FAILURES")"
+fi
+
+exit 0
