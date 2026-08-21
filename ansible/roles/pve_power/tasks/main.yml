@@ -140,6 +140,25 @@
     group: root
     mode: '0700'
 
+# 2026-08-21: pve-watchdog.sh predates this role (found live-only, no IaC
+# ownership -- same drift pattern the vzdump throttle above was in before
+# ADR-023). Brought under IaC here rather than left as tribal knowledge, and
+# fixed in the same pass: its old flat 15min rate-limit re-alerted on every
+# check (every 5min via cron) for a condition that stayed true for hours --
+# exactly what happened during the real disk-latency incident the night of
+# 2026-08-20/21 (phase8/LEDGER.md Entries 63-64), generating dozens of
+# redundant pushes for one already-known, ongoing condition. Now uses an
+# escalating backoff (15/30/60/120/240min, resets the moment the condition
+# actually clears) instead of a blanket quiet-hours window, so a genuinely
+# new problem starting overnight still alerts promptly.
+- name: Deploy pve-watchdog.sh (load/pool/temp health alerts)
+  ansible.builtin.template:
+    src: pve-watchdog.sh.j2
+    dest: /usr/local/bin/pve-watchdog.sh
+    owner: root
+    group: root
+    mode: '0700'
+
 - name: Register the health-check script as vzdump's job-end hook
   ansible.builtin.blockinfile:
     path: /etc/vzdump.conf
@@ -147,3 +166,9 @@
     insertafter: "END ANSIBLE MANAGED THROTTLE"
     block: |
       script: /usr/local/bin/pbs-backup-healthcheck.sh
+
+- name: Schedule pve-watchdog.sh via cron (every 5 minutes)
+  ansible.builtin.cron:
+    name: pve-watchdog
+    minute: "*/5"
+    job: /usr/local/bin/pve-watchdog.sh
