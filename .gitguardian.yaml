@@ -1,0 +1,12 @@
+version: 2
+
+secret:
+  # False positives on ${VAR:?...} shell-interpolation syntax -- these are
+  # not literal secrets, they're env-var references with a required-value
+  # error message (see docs/wazuh/DEPLOY.md). GitGuardian's generic
+  # detector confuses the `:?` default-error syntax for a key:value pair.
+  ignored_matches:
+    - name: wazuh docker-compose INDEXER_PASSWORD interpolation
+      match: ${WAZUH_INDEXER_PASSWORD:?set in .env, see DEPLOY.md}
+    - name: wazuh docker-compose DASHBOARD_PASSWORD interpolation
+      match: ${WAZUH_DASHBOARD_PASSWORD:?set in .env, see DEPLOY.md}
