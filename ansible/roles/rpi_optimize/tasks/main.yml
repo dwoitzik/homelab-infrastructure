@@ -388,7 +388,15 @@
 
       [Service]
       Type=oneshot
-      ExecStart=/bin/sh -c 'cat /sys/class/leds/ACT/max_brightness > /sys/class/leds/ACT/brightness; cat /sys/class/leds/PWR/max_brightness > /sys/class/leds/PWR/brightness'
+      # 2026-08-21: writing brightness directly (the previous version of this
+      # file) implicitly sets trigger=none as a kernel side effect, same as
+      # the off service - fine for turning LEDs off, but it meant "on" never
+      # actually restored ACT's mmc0 (activity-blink) trigger, leaving it
+      # stuck solid instead of blinking on writes. Restoring the real
+      # triggers (confirmed live: `cat /sys/class/leds/ACT/trigger` showed
+      # `[none]` with mmc0/default-on available) lets the kernel drive
+      # brightness again instead of forcing it.
+      ExecStart=/bin/sh -c 'echo mmc0 > /sys/class/leds/ACT/trigger; echo default-on > /sys/class/leds/PWR/trigger'
     mode: '0644'
   notify: Reload systemd daemon
 
