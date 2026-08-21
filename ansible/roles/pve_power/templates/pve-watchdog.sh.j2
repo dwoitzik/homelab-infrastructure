@@ -1,0 +1,44 @@
+#!/bin/bash
+# Read-only health watchdog. Alerts via ntfy, takes no action.
+NTFY=https://ntfy.sh/{{ pve_power_watchdog_ntfy_topic }}
+POOL=$(lvs pve/data -o data_percent --noheadings 2>/dev/null | tr -d ' %' | head -1)
+TEMP=$(($(cat /sys/class/hwmon/hwmon1/temp1_input) / 1000))
+LOAD1=$(awk '{print $1}' /proc/loadavg)
+LOAD1_INT=${LOAD1%.*}
+STATE=/tmp/pve-watchdog.state
+MAX_BACKOFF_MIN=240
+ALERT=""
+[ "${POOL%.*}" -ge 92 ] 2>/dev/null && ALERT="${ALERT}Pool ${POOL}% (>=92). "
+[ "$TEMP" -ge 90 ] && ALERT="${ALERT}CPU temp ${TEMP}C (>=90). "
+[ "$LOAD1_INT" -ge 25 ] && ALERT="${ALERT}Load ${LOAD1} (>=25). "
+
+# 2026-08-21: escalating backoff instead of a flat 15min rate limit -- a
+# condition that stays true for hours (e.g. an overnight load spike) used to
+# re-alert every 15min all night (~4/hr), which is exactly what generated the
+# ntfy spam complaint. State now tracks <last_alert_epoch> <next_backoff_min>;
+# each repeat alert for the SAME ongoing condition doubles the wait (15 -> 30
+# -> 60 -> 120 -> 240, capped), so a long-sustained issue still gets you
+# notified promptly at first and periodically thereafter, but tapers off
+# instead of spamming. The backoff resets to 15min the moment the condition
+# actually clears, so a fresh/different problem right after a quiet period
+# still alerts promptly -- deliberately not a blanket "quiet hours" window,
+# which would also silence a genuinely new problem that happens to start
+# overnight.
+read -r LAST BACKOFF < "$STATE" 2>/dev/null
+LAST=${LAST:-0}
+BACKOFF=${BACKOFF:-15}
+NOW=$(date +%s)
+
+if [ -n "$ALERT" ]; then
+  ELAPSED_MIN=$(((NOW - LAST) / 60))
+  if [ "$ELAPSED_MIN" -ge "$BACKOFF" ]; then
+    curl -s -d "pve host: ${ALERT}Check before it crashes again. (next repeat in ${BACKOFF}m if still ongoing)" \
+      -H "Title: pve watchdog" -H "Priority: urgent" -H "Tags: warning" "$NTFY" >/dev/null
+    NEXT_BACKOFF=$((BACKOFF * 2))
+    [ "$NEXT_BACKOFF" -gt "$MAX_BACKOFF_MIN" ] && NEXT_BACKOFF=$MAX_BACKOFF_MIN
+    echo "$NOW $NEXT_BACKOFF" >"$STATE"
+  fi
+else
+  # condition cleared - drop state so the next occurrence alerts immediately
+  rm -f "$STATE"
+fi

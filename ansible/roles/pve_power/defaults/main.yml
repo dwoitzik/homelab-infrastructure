@@ -61,3 +61,8 @@ pve_power_pbs_healthcheck_storeid: local-pbs
 pve_power_pbs_healthcheck_ntfy_topic: dw-homelab-a12a7b540943
 pve_power_pbs_healthcheck_min_size_mib: 100
 pve_power_pbs_healthcheck_max_age_hours: 26
+
+# 2026-08-21: pve-watchdog.sh -- see tasks/main.yml comment for the incident
+# (repeated ntfy spam overnight from a flat rate-limit) that motivated
+# bringing this under IaC with an escalating backoff.
+pve_power_watchdog_ntfy_topic: dw-homelab-a12a7b540943
