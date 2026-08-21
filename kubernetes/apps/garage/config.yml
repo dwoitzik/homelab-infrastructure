@@ -7,7 +7,16 @@ data:
   config.toml: |
     metadata_dir = "/var/lib/garage/meta"
     data_dir = "/var/lib/garage/data"
-    db_engine = "sqlite"
+    db_engine = "lmdb"
+
+    # 2026-08-21 (phase8/LEDGER.md item 3): migrated from sqlite to lmdb (the
+    # actual Garage-recommended default since v0.9.0; sqlite was the historical
+    # choice here, not a deliberate pick). LMDB's own docs warn it's "prone to
+    # database corruption after an unclean shutdown" -- the documented
+    # mitigation is replication_factor>=2 or metadata_auto_snapshot_interval.
+    # replication_factor is fixed at 1 by this cluster's single-node hardware
+    # (see below), so this is the mitigation actually available here.
+    metadata_auto_snapshot_interval = "6h"
 
     replication_factor = 1
 

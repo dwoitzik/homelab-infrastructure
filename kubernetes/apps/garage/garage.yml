@@ -44,18 +44,25 @@ spec:
     requests:
       storage: 150Gi
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: garage-meta
-  namespace: apps
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: local-path
-  resources:
-    requests:
-      storage: 2Gi
+# 2026-08-21 (phase8/LEDGER.md item 3): garage-meta moved off the local-path
+# StorageClass onto a dedicated hostPath. local-path placed this PVC's data
+# under the node's generic, shared local-lvm-backed directory tree -- sharing
+# discard/capacity fate with every other local-path consumer on whichever
+# node it happened to land on (unpinned; this Deployment carried no explicit
+# node affinity, so which node held it varied across recreations). A
+# dedicated virtio-scsi disk (`vm-211-disk-1`, 8G, discard=on) attached
+# directly to vm-srv-k3s-11 and mounted at /mnt/garage-meta-dedicated gives
+# this metadata store isolated capacity accounting and its own discard
+# behavior, independent of what else is running on that node. Still the same
+# physical NVMe thin pool (no second fast disk exists on this hardware, see
+# docs/HARDWARE.md) and NOT NFS/USB (both are databases-on-network/USB-storage,
+# explicitly ruled out by CLAUDE.local.md's hard storage rules, and the
+# 07-12 SQLite-on-NFS corruption incident documented in
+# docs/garage-velero-design-2026-07-17.md already proved NFS locking isn't
+# safe for a metadata DB -- LMDB's mmap-based storage would be at least as
+# exposed to that risk, likely more). Node pinning below is now load-bearing
+# (previously implicit via local-path's own PV nodeAffinity) since the
+# hostPath only exists on vm-srv-k3s-11.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -84,6 +91,11 @@ spec:
       labels:
         app: garage
     spec:
+      # 2026-08-21: load-bearing now that garage-meta is a hostPath on
+      # vm-srv-k3s-11's own dedicated disk -- see the comment above the old
+      # garage-meta PVC block for why.
+      nodeSelector:
+        kubernetes.io/hostname: vm-srv-k3s-11
       dnsConfig:
         options:
           - name: ndots
@@ -165,8 +177,9 @@ spec:
           persistentVolumeClaim:
             claimName: garage-data
         - name: meta
-          persistentVolumeClaim:
-            claimName: garage-meta
+          hostPath:
+            path: /mnt/garage-meta-dedicated
+            type: Directory
         - name: tmp
           emptyDir: {}
 ---
