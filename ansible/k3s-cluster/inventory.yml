@@ -33,7 +33,30 @@ k3s_cluster:
     # to take effect on already-running nodes - not automatic on every
     # ansible run, matches the deliberate-restart caution used elsewhere in
     # this repo for control-plane-affecting changes.
+    # 2026-08-20: root-caused the long-standing "proxy error from 127.0.0.1:6443
+    # while dialing <node-ip>:10250, code 502" failures on kubectl logs/exec
+    # against pods on vm-srv-k3s-12/13 (see phase8/LEDGER.md for the full
+    # investigation). k3s's apiserver defaults to egress-selector-mode: agent,
+    # meaning kubelet-proxy traffic is NOT dialed directly over the real
+    # network -- it's tunneled through each agent's own persistent reverse
+    # connection back to the server, which the server-side proxy exposes
+    # internally as a loopback connection. Confirmed live via
+    # `journalctl -u k3s`: "Tunnel server egress proxy mode: agent" at every
+    # boot, plus repeated "Proxy error: write failed: write tcp
+    # 127.0.0.1:PORT->127.0.0.1:10250: connection reset by peer / broken
+    # pipe" -- the tunnel itself is what's failing, not the underlying
+    # network (confirmed separately: a direct, untunneled HTTPS request from
+    # vm-srv-k3s-11 to vm-srv-k3s-13:10250 succeeds in ~7ms, and a live
+    # packet capture during a real failing kubectl logs call showed zero
+    # packets ever leaving vm-srv-k3s-11 for the target node -- the dial
+    # never reaches the wire, consistent with a tunnel-internal failure
+    # rather than a network path problem). `egress-selector-mode: disabled`
+    # makes the apiserver dial kubelets directly over the real network
+    # instead, matching the already-proven-working direct path. See
+    # https://github.com/k3s-io/k3s/issues/11418 for another report of the
+    # same underlying tunnel-proxy failure class.
     server_config_yaml: |
       resolv-conf: /etc/rancher/k3s/resolv.conf
+      egress-selector-mode: disabled
     agent_config_yaml: |
       resolv-conf: /etc/rancher/k3s/resolv.conf
