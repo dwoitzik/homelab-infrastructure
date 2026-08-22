@@ -40,6 +40,12 @@ spec:
           value: "true"
         - name: DOMAIN
           value: "https://vault.woitzik.dev"
+        # Default icon fetching relays every visited domain through
+        # Vaultwarden's own bundled service, which itself proxies to the
+        # site directly but still centralizes that traffic pattern -- set
+        # to fetch icons straight from each site with no relay in between.
+        - name: ICON_SERVICE
+          value: "internal"
         # Reliability sweep (2026-07-08): no health probes at all -- a hang
         # (not a crash) would go undetected indefinitely, Kubernetes would
         # keep routing traffic to an unresponsive pod forever. TCP-only
