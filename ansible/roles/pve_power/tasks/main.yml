@@ -198,6 +198,31 @@
     cmd: chmod -R a+r /sys/class/powercap/intel-rapl:0/ 2>/dev/null || true
   changed_when: false
 
+# 2026-08-22 (SSD write-rate reduction, operator decision not to replace
+# the wearing drive -- see docs/HARDWARE.md's wear projection): found
+# live that vm.swappiness=10 was already set on this host but from
+# somewhere outside this repo's IaC (present in /etc/sysctl.d/, no
+# matching source anywhere in ansible/) -- brought under IaC here rather
+# than left as untracked drift. Host had 6.6GiB of 8GiB swap in active
+# use (confirmed via `free -h`/`vmstat` si/so columns showing ongoing
+# swap-in/out, not just historically-allocated-and-idle) -- every page
+# swapped is a write to the same NVMe this whole effort is trying to
+# slow wear on. Halved to 5 rather than dropping to the common "1" floor
+# some tuning guides suggest: this host has a real, documented history of
+# genuine memory pressure under load (see phase8/LEDGER.md), and an
+# overly aggressive swappiness reduction trades "less swap I/O" for
+# "more OOM-kill risk" when real memory pressure hits -- a worse trade on
+# a host that's already shown fragility under load this same day. Doesn't
+# evict what's already in swap (stays until actively reclaimed), only
+# reduces the rate of new pages being proactively pushed out from here.
+- name: Reduce swappiness to cut ongoing swap-driven NVMe writes
+  ansible.posix.sysctl:
+    name: vm.swappiness
+    value: "5"
+    state: present
+    sysctl_file: /etc/sysctl.d/99-pve-power-swappiness.conf
+    reload: true
+
 - name: Create node_exporter textfile-collector directory
   ansible.builtin.file:
     path: "{{ pve_power_node_exporter_textfile_dir }}"

@@ -102,6 +102,83 @@ within weeks, not months, especially once real historical Prometheus data (rathe
 than two manual snapshots) makes the actual current rate visible instead of having
 to bound it between two very different estimates.
 
+### Write-rate reduction (operator decision: not replacing the drive)
+
+Given the projection above, the operator decided to keep this drive rather than
+replace it, and asked for every reasonable lever to reduce the ongoing *write rate*
+to stretch the timeline. `percentage_used` cannot be reduced (it's a lifetime
+counter), so this section is entirely about slowing how fast it climbs.
+
+**Applied:**
+
+- **`vm.swappiness` lowered from 10 to 5** (`ansible/roles/pve_power`). Found live
+  6.6GiB of the host's 8GiB swap in active use (`vmstat` si/so columns showing
+  ongoing swap-in/out, not just historically-allocated-and-idle) -- every swapped
+  page is a write to this same NVMe. Not dropped to the more aggressive "1" some
+  tuning guides suggest: this host has real, documented history of memory pressure
+  under load, and over-tuning swappiness trades swap I/O for OOM-kill risk, a worse
+  trade on a host that showed real fragility earlier the same day this change was
+  made. Doesn't evict what's already in swap, only slows the rate of new pages being
+  pushed out — the reduction shows up gradually, not immediately.
+- **`trivy-operator` concurrency lowered from 3 to 1** (`OPERATOR_CONCURRENT_
+  SCAN_JOBS_LIMIT`), applied while the operator is already paused (see ADR-023's
+  2026-08-22 update). Researched whether trivy-operator supports batched/scheduled
+  scanning instead of its default event-triggered model — it doesn't; periodic
+  rescanning is an open, unimplemented upstream feature request
+  ([aquasecurity/trivy-operator#1696](https://github.com/aquasecurity/trivy-operator/issues/1696),
+  [#744](https://github.com/aquasecurity/trivy-operator/issues/744)), not a config
+  option in the deployed version. Concurrency is the lever actually available:
+  serializing scan jobs doesn't reduce total bytes written, but spreads the same
+  work over more wall-clock time instead of bursting several concurrent image-layer
+  extractions at once — which is specifically what pegged NVMe queue depth during
+  the 2026-08-22 incident.
+
+**Investigated, found not to apply (corrected an assumption rather than acting on
+it):** Loki's and Prometheus's TSDB/chunk storage are both already on the
+`nfs-client` storage class (CT220's disk), not this NVMe — confirmed by reading
+their actual `storageClassName` values, not assumed. Shortening their retention
+periods (both currently 30d) would reduce load on the NFS server, but has no effect
+on this drive's wear. Not changed, since the reasoning behind investigating them no
+longer applies.
+
+**Investigated, deliberately not changed:**
+
+- **Container log rotation** (kubelet `--container-log-max-size`/`--container-log-
+  max-files`): using k3s/containerd defaults (10Mi/5 files), no override found, no
+  obviously-misconfigured verbose logging found across the repo's manifests either.
+  Tuning this further needs a kubelet restart on the control-plane node — the same
+  risk class as the still-blocked egress-selector-mode restart (real bugs already
+  documented in the vendored k3s-ansible role for incremental changes to a running
+  host). Not worth that risk for a marginal gain on already-reasonable defaults.
+- **ArgoCD reconciliation interval** (`timeout.reconciliation: 300s`): reviewed —
+  this drives apiserver LIST/diff overhead (CPU/network), not NVMe writes directly;
+  only *actually correcting* drift generates a write, and that write comes from
+  whatever's being corrected, not from the reconciliation check itself. Low expected
+  payoff for this specific goal against a real loss of drift-detection responsiveness
+  — not changed.
+- **vzdump (nightly backup) frequency**: backups write to `local-pbs`
+  (PBS, on the separate HDD `archive` pool per this doc's Inventory table above),
+  not this NVMe — the wear-relevant cost is read I/O plus LVM-thin snapshot
+  copy-on-write amplification for any VM writes that happen *during* the backup
+  window, not the backup's own write destination. Reducing backup frequency would
+  reduce that COW-amplification window, but at a direct RPO cost — and this entire
+  recovery mission has been built around proving the backup chain trustworthy.
+  Deliberately not touched without the operator's own explicit sign-off; flagging
+  the tradeoff here rather than either making the call unilaterally or silently
+  skipping it.
+- **ZFS ARC/dirty-data tuning**: already extensively tuned from a prior incident
+  (`arc_max`, `prefetch_disable`, `dirty_data_max`, `txg_timeout`,
+  `zfs_vdev_async_write_max_active` — see `ansible/roles/pve_power/defaults/
+  main.yml`). No further headroom identified without diminishing returns.
+
+**Honesty note on the earlier Section G right-sizing pass**: that work
+(`feat/section-g-right-sizing`) bumped four Kubernetes pod memory *requests* --
+a scheduling hint inside the k3s guests, not a change to actual memory consumption,
+and entirely unrelated to the Proxmox host's own swap (a different memory domain).
+It does not reduce host swap and was never going to; the swappiness change above is
+the real lever for that specific problem. Correcting this here since the operator's
+original request assumed a connection between the two that doesn't actually hold.
+
 ## Topology reality — this is not an HA cluster
 
 `pve-mgmt-01` is a single point of failure for compute. There is no way to make this
