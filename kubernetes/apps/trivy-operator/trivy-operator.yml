@@ -188,8 +188,23 @@ spec:
               value: "info"
             - name: OPERATOR_NAMESPACE
               value: "trivy-system"
+            # 2026-08-22 (SSD write-rate reduction, operator decision not to
+            # replace the wearing drive -- docs/HARDWARE.md): researched
+            # whether trivy-operator supports batched/periodic scanning
+            # instead of its default event-triggered model (rescans on
+            # every resource create/update) -- it doesn't; scheduled
+            # rescanning is an open, unimplemented upstream feature request
+            # (aquasecurity/trivy-operator#1696, #744), not a config option
+            # in this version. Concurrency is the lever actually available:
+            # lowered from 3 to 1 so scan jobs run serially instead of
+            # racing for I/O bandwidth simultaneously -- doesn't reduce
+            # total bytes written, but spreads the same work over more
+            # time instead of bursting it, which is what actually pegged
+            # NVMe queue depth during today's incident. Applied while
+            # still paused (replicas: 0 above) so it's already tuned by
+            # the time this gets re-enabled.
             - name: OPERATOR_CONCURRENT_SCAN_JOBS_LIMIT
-              value: "3"
+              value: "1"
             # 2026-08-16: root-caused KubeAPIServerHighLatency (p99 apiserver latency,
             # matches the REL-012 etcd precursor pattern) to this, NOT node memory
             # pressure on vm-srv-k3s-11 as first suspected -- live evidence ruled that
