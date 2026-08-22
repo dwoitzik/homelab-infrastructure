@@ -10,19 +10,20 @@ spec:
     targetRevision: main
     path: kubernetes/system/velero
     directory:
-      # WRK-008: offsite-schedule.yml/r2-backuplocation.yml are deliberately
-      # excluded -- scaffolded but incomplete (literal ACCOUNT_ID placeholder,
-      # credential secret doesn't exist anywhere), user decided to leave
-      # deferred rather than complete or remove (2026-06-25). Don't add them
-      # here until real R2 credentials exist -- confirmed live that including
-      # them creates an Unavailable BackupStorageLocation and a Schedule that
-      # would fail daily at 4am.
+      # WRK-008 (2026-06-25 - 2026-08-22): offsite-schedule.yml/
+      # r2-backuplocation.yml/r2-usage-guard.yml were excluded here because
+      # the ACCOUNT_ID placeholder was literal and no credential secret
+      # existed -- syncing them would have created an Unavailable
+      # BackupStorageLocation and a Schedule failing daily at 4am. Real R2
+      # bucket + Account ID + API token now exist (velero-r2-credentials
+      # Secret applied, endpoint filled in both files), so the deferral no
+      # longer applies -- including them now.
       #
       # restore-test.yml (BRIEFING-V4.md Section D) added 2026-08-17: declares
       # its own namespaces (velero-restore-test, plus Role/RoleBinding in
       # velero) explicitly on every resource, so it's safe to sync from this
       # Application even though its destination.namespace default is velero.
-      include: '{secrets,schedule,restore-test}.yml'
+      include: '{secrets,schedule,restore-test,offsite-schedule,r2-backuplocation,r2-usage-guard}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: velero
