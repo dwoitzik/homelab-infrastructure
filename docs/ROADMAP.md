@@ -15,6 +15,26 @@
 > piece of work (BRIEFING-V4.md Section H, "clean the tree") — not done as a side
 > effect of adding the offsite-backup section below, which is genuinely current.
 
+> **2026-08-22 update**: Sections E-H of the post-rebuild recovery effort landed today
+> (see `phase8/LEDGER.md` Entries 84-92 for full detail, `docs/decisions/ADR-026-
+> three-vm-topology-overhead.md` for the newest ADR). Real state, not reflected
+> anywhere below since this table predates it: external blackbox monitoring (44
+> hostnames) + weekly Discord report + dead man's switch built; a 37h+ Prometheus
+> outage found and fixed; NVMe SMART wear tracking built, with a genuinely urgent
+> finding — the boot drive is at 56% rated wear and climbing (`docs/HARDWARE.md`,
+> "SSD wear tracking"), with a documented write-rate-reduction pass in response
+> (swappiness, trivy-operator concurrency) since the operator chose not to replace it;
+> RAPL CPU power metrics wired up, with a found-but-not-yet-applied `amd_pstate=active`
+> fix pending an operator-approved reboot; Kyverno redeployed and re-enforced
+> (namespace-by-namespace, after a real load incident mid-rollout — see ADR-023's
+> 2026-08-22 update); Pod Security Standards + NetworkPolicy egress + default-SA
+> automount hardening added; a real fix for metallb's FRR sidecar, which had been
+> crash-looping ~1000+ times per pod for a completely unused BGP mode. Grafana
+> curated with one real landing dashboard. Several of these landed via direct
+> `kubectl`/`ansible-playbook` application and are pushed as open PRs awaiting
+> merge — check `git log --all --oneline` and open PRs for what's merged vs. still
+> pending, don't assume this file or even the live cluster fully reflects git yet.
+
 ## Offsite backup provider (2026-08-17, BRIEFING-V4.md Phase 3)
 
 **Decision needed from the operator — this is the one item in the whole backup plan
