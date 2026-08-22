@@ -37,6 +37,15 @@ spec:
             - name: ping
               image: curlimages/curl:8.11.1
               command: ["sh", "-c", "curl -fsS -m 20 --retry 2 \"$PING_URL\""]
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 65534
+                seccompProfile:
+                  type: RuntimeDefault
+                capabilities:
+                  drop: ["ALL"]
               env:
                 - name: PING_URL
                   valueFrom:
