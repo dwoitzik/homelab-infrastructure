@@ -68,6 +68,13 @@ spec:
               # route, so only this node can ever become an exit node.
               value: "--login-server=https://headscale.woitzik.dev --advertise-tags=tag:subnet-router --advertise-exit-node"
           securityContext:
+            # privileged required, not just NET_ADMIN/NET_RAW: containerd masks
+            # /proc/sys/net/ipv4/conf/*/src_valid_mark read-only for unprivileged
+            # pods. Without it tailscaled can't set the sysctl, forwarded
+            # exit-node/subnet-router traffic fails the reverse-path filter and
+            # gets silently dropped ("subnet routing enabled but IP forwarding
+            # is disabled" health warning is the visible symptom).
+            privileged: true
             allowPrivilegeEscalation: true
             readOnlyRootFilesystem: true
             capabilities:
