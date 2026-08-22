@@ -123,29 +123,41 @@ data:
       exit 1
     }
 
+    # Every step that can block on the network or on another controller's
+    # reconcile loop gets its own timeout -- a single slow/stuck step used to
+    # be able to silently burn the whole activeDeadlineSeconds budget with no
+    # indication of which step it was (phase8/LEDGER.md Entry 82: a real run
+    # hit exactly this, killed by the Job deadline with no logs left behind).
+    # `timeout` exits 124 on expiry; each step maps that to a clear fail().
+
     log "installing tools"
-    apk add --no-cache curl bash jq >/dev/null
+    timeout 60 apk add --no-cache curl bash jq >/dev/null \
+      || fail "installing tools (apk add) timed out or failed"
 
     log "fetching kubectl"
-    KVER=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
-    curl -fsSL -o /usr/local/bin/kubectl \
-      "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"
+    KVER=$(timeout 30 curl -fsSL https://dl.k8s.io/release/stable.txt) \
+      || fail "fetching kubectl version timed out or failed"
+    timeout 60 curl -fsSL -o /usr/local/bin/kubectl \
+      "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl" \
+      || fail "downloading kubectl timed out or failed"
     chmod +x /usr/local/bin/kubectl
 
     log "fetching velero CLI ${VELERO_VERSION}"
-    curl -fsSL -o /tmp/velero.tar.gz \
-      "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz"
+    timeout 60 curl -fsSL -o /tmp/velero.tar.gz \
+      "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz" \
+      || fail "downloading velero CLI timed out or failed"
     tar -xzf /tmp/velero.tar.gz -C /tmp
     mv "/tmp/velero-${VELERO_VERSION}-linux-amd64/velero" /usr/local/bin/velero
     chmod +x /usr/local/bin/velero
 
     log "clearing any leftovers from a previous run in $NS (pure scratch space, safe to blanket-clear)"
-    kubectl delete pods,statefulsets,pvc,services,configmaps,secrets \
+    timeout 130 kubectl delete pods,statefulsets,pvc,services,configmaps,secrets \
       --all -n "$NS" --ignore-not-found --wait=true --timeout=120s || true
 
     log "finding latest completed backup"
-    LATEST=$(velero backup get -o json \
-      | jq -r '[.items[] | select(.status.phase=="Completed")] | sort_by(.metadata.creationTimestamp) | last | .metadata.name')
+    LATEST=$(timeout 30 velero backup get -o json \
+      | jq -r '[.items[] | select(.status.phase=="Completed")] | sort_by(.metadata.creationTimestamp) | last | .metadata.name') \
+      || fail "listing Velero backups timed out or failed"
     if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
       fail "no completed Velero backup found"
     fi
@@ -153,11 +165,16 @@ data:
 
     RESTORE_NAME="restore-test-$(date -u +%Y%m%d%H%M)"
     log "creating restore $RESTORE_NAME from $LATEST (namespace-mapping ${SRC_NS}:${NS})"
-    velero restore create "$RESTORE_NAME" \
+    # `velero restore create --wait` has no timeout of its own -- it blocks
+    # until the Restore reaches a terminal phase, however long that takes.
+    # 900s leaves comfortable room in the 1800s Job deadline for every other
+    # step, while still being long enough for a real, healthy restore.
+    timeout 900 velero restore create "$RESTORE_NAME" \
       --from-backup "$LATEST" \
       --include-namespaces "$SRC_NS" \
       --namespace-mappings "${SRC_NS}:${NS}" \
-      --wait
+      --wait \
+      || fail "restore create --wait timed out after 900s (restore $RESTORE_NAME may still be in progress -- check 'velero restore describe $RESTORE_NAME')"
 
     PHASE=$(velero restore get "$RESTORE_NAME" -o json | jq -r '.status.phase')
     ERRORS=$(velero restore get "$RESTORE_NAME" -o json | jq -r '.status.errors // 0')
@@ -175,7 +192,7 @@ data:
     fi
 
     log "checking restored Vault's storage integrity"
-    STATUS_OUT=$(kubectl exec -n "$NS" vault-0 -- vault status 2>&1 || true)
+    STATUS_OUT=$(timeout 30 kubectl exec -n "$NS" vault-0 -- vault status 2>&1 || true)
     echo "$STATUS_OUT"
     if ! echo "$STATUS_OUT" | grep -Eq "Initialized[[:space:]]+true"; then
       fail "restored Vault did not report Initialized: true -- raft storage may not have restored correctly"
@@ -187,8 +204,8 @@ data:
     log "PASS: restored Vault storage is intact (Initialized: true), pod started cleanly from backup $LATEST"
 
     log "cleaning up"
-    velero restore delete "$RESTORE_NAME" --confirm || true
-    kubectl delete pods,statefulsets,pvc,services,configmaps,secrets \
+    timeout 30 velero restore delete "$RESTORE_NAME" --confirm || true
+    timeout 30 kubectl delete pods,statefulsets,pvc,services,configmaps,secrets \
       --all -n "$NS" --ignore-not-found --wait=false || true
 
     log "done"
