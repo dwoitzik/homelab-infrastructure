@@ -8,15 +8,26 @@
 # -- apiserver egress needs an explicit ipBlock at the control-plane node's
 # IP. Scoped to vm-srv-k3s-11 (10.0.20.11), the only control-plane node.
 #
-# apps, argocd, cert-manager, cnpg-system, database, external-secrets,
-# nfs-provisioner, trivy-system, velero, and default were deliberately NOT
-# included in this pass -- see phase8/LEDGER.md for the per-namespace
-# reasoning (apps has 40 workloads with no traffic map yet; velero is the
-# exact backup chain this mission spent this whole session proving works
-# and isn't being touched without dedicated verification time; cert-manager
-# has a well-known webhook/apiserver NetworkPolicy interaction that needs
-# care; the rest need the same apiserver-ipBlock + real-traffic-check pass
-# this file establishes the pattern for).
+# 2026-08-22 (night): cert-manager, cnpg-system, argocd, and velero added
+# below, each after actually checking its real traffic (ClusterIssuer spec,
+# BackupStorageLocation configs, ArgoCD Application repoURLs, argocd-cm's
+# OIDC issuer) rather than guessing. cert-manager's webhook/apiserver
+# interaction (the reason it was deferred) is an INGRESS concern -- the
+# apiserver calls into cert-manager-webhook for CRD conversion/validation --
+# and every policy in this file is Egress-only, so that footgun doesn't
+# apply here; ingress for these namespaces is untouched.
+#
+# database, external-secrets, nfs-provisioner, and trivy-system still need
+# the same apiserver-ipBlock + real-traffic-check pass this file establishes
+# the pattern for -- not done this round, no new reasoning to add.
+#
+# apps (40 workloads) is still deliberately excluded, now with sharper
+# reasoning than "no traffic map yet": a naive blanket 443-egress-only
+# rule (the pattern used below for cert-manager/argocd) would break real,
+# named things in this specific namespace -- `tailscale-subnet-router`
+# needs outbound WireGuard UDP, `synapse` needs Matrix federation on 8448
+# (not 443), `headscale` needs its DERP relay traffic. A correct policy
+# here needs a real per-workload pass, not a copy of the pattern below.
 
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -135,6 +146,396 @@ kind: NetworkPolicy
 metadata:
   name: allow-egress-crowdsec-capi
   namespace: security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# cert-manager: ClusterIssuer `letsencrypt-production` uses DNS-01 via
+# Cloudflare (checked live: `kubectl get clusterissuer -o yaml`), so this
+# needs outbound 443 to both acme-v02.api.letsencrypt.org and
+# api.cloudflare.com -- neither has a pinnable IP, same class of allow as
+# CrowdSec's CAPI rule above. Plus apiserver (watches Certificate/Issuer
+# CRDs, writes the resulting TLS Secrets) and DNS. Egress-only: the
+# webhook/apiserver interaction this namespace was originally deferred for
+# is an ingress concern (apiserver calling INTO cert-manager-webhook),
+# untouched by any of this.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: cert-manager
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: cert-manager
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-intra-namespace
+  namespace: cert-manager
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cert-manager
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-apiserver
+  namespace: cert-manager
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.11/32
+      ports:
+        - protocol: TCP
+          port: 6443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-acme-cloudflare
+  namespace: cert-manager
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# cnpg-system: checked live, no ScheduledBackup CRs exist at all (this
+# cluster's Postgres backup path is entirely Velero+Kopia PVC snapshots,
+# ADR-007 -- CNPG itself never talks to S3 directly). The operator pod's
+# only real job is watching Cluster CRDs and reconciling against the
+# apiserver -- no external egress needed at all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: cnpg-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: cnpg-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-intra-namespace
+  namespace: cnpg-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-apiserver
+  namespace: cnpg-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.11/32
+      ports:
+        - protocol: TCP
+          port: 6443
+---
+# argocd: repo-server clones charts/manifests from ~13 distinct external
+# hosts (checked live via every Application's repoURL -- GitHub, jetstack,
+# grafana, hashicorp, metallb, kyverno, prometheus-community, vmware-tanzu,
+# chaos-mesh, external-secrets, cloudnative-pg, nfs-subdir-external-
+# provisioner, traefik's own chart repo), none with pinnable IPs -- same
+# broad-443 class as cert-manager/CrowdSec above. argocd-server ALSO makes
+# a server-to-server OIDC call to Authelia at its public hostname
+# (auth.woitzik.dev, checked live via `argocd-cm`'s oidc.config), which
+# resolves via the LAN AdGuard rewrite to Traefik's ClusterIP LB
+# (10.0.20.200) -- inside the 10.0.0.0/8 range the broad rule excludes, so
+# it needs its own explicit allow or OIDC login breaks. Plus apiserver
+# (argocd's core job -- gets this wrong and the whole cluster's GitOps
+# stops reconciling) and DNS.
+#
+# The Traefik allow below targets Traefik's own pod (namespace kube-system,
+# port 8443/websecure) rather than an ipBlock on 10.0.20.200 -- tried the
+# ipBlock first and it silently failed ("connection refused", confirmed via
+# a throwaway pod in argocd vs. the same request from an unrestricted
+# namespace). k3s's built-in NetworkPolicy controller (kube-router)
+# evaluates egress rules AFTER kube-proxy's DNAT for a Service's
+# LoadBalancer IP, so by the time the policy runs, the packet's real
+# destination is already the backing pod's IP/port (8443), not 10.0.20.200
+# -- an ipBlock on the LB IP can never match. This is a real, general
+# gotcha for any future "allow egress to a Service by its LB/ClusterIP"
+# rule in this cluster, not specific to Authelia.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-intra-namespace
+  namespace: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: argocd
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-apiserver
+  namespace: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.11/32
+      ports:
+        - protocol: TCP
+          port: 6443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-chart-repos
+  namespace: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-traefik-lb-oidc
+  namespace: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8443
+---
+# velero: BackupStorageLocation `default` is Garage, in-cluster
+# (garage.apps.svc.cluster.local:3900, apps namespace) -- checked live.
+# `r2-offsite` is Cloudflare R2, external 443. node-agent (the DaemonSet
+# doing PVC file-level backup/restore) and the various per-namespace Kopia
+# maintenance Jobs all run as pods in THIS namespace and share the same
+# podSelector: {} -- same egress needs apply to all of them. Plus apiserver
+# (velero's own Backup/Restore CR reconciliation) and DNS.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: velero
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: velero
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-intra-namespace
+  namespace: velero
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: velero
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-apiserver
+  namespace: velero
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.11/32
+      ports:
+        - protocol: TCP
+          port: 6443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-garage
+  namespace: velero
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: apps
+      ports:
+        - protocol: TCP
+          port: 3900
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-r2-offsite
+  namespace: velero
 spec:
   podSelector: {}
   policyTypes:
