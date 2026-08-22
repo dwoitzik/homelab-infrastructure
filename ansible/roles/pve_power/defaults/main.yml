@@ -66,3 +66,12 @@ pve_power_pbs_healthcheck_max_age_hours: 26
 # (repeated ntfy spam overnight from a flat rate-limit) that motivated
 # bringing this under IaC with an escalating backoff.
 pve_power_watchdog_ntfy_topic: dw-homelab-a12a7b540943
+
+# 2026-08-22 (BRIEFING-V4 Section E/G): SSD wear had no Prometheus-queryable
+# metric at all -- node_exporter had no --collector.textfile.directory flag,
+# and Scrutiny (the app meant to track this) has its own InfluxDB PVC
+# broken (pre-existing, unrelated). A small textfile-collector cron closes
+# this with real NVMe SMART data, serving both the weekly report and
+# Section G's wear-projection work.
+pve_power_smart_device: /dev/nvme0n1
+pve_power_node_exporter_textfile_dir: /var/lib/node_exporter/textfile_collector

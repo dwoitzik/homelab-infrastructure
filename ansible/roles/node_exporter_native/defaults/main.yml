@@ -1,2 +1,7 @@
 ---
 node_exporter_native_version: "1.11.1"
+
+# 2026-08-22 (BRIEFING-V4 Section E/G): enables SSD SMART wear metrics via
+# the textfile collector -- see pve_power role's smart-metrics.sh.j2 for
+# what writes into this directory.
+node_exporter_native_textfile_dir: /var/lib/node_exporter/textfile_collector

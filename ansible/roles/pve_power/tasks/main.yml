@@ -172,3 +172,31 @@
     name: pve-watchdog
     minute: "*/5"
     job: /usr/local/bin/pve-watchdog.sh
+
+- name: Create node_exporter textfile-collector directory
+  ansible.builtin.file:
+    path: "{{ pve_power_node_exporter_textfile_dir }}"
+    state: directory
+    owner: node_exporter
+    group: node_exporter
+    mode: '0755'
+
+- name: Deploy the NVMe SMART -> Prometheus textfile script
+  ansible.builtin.template:
+    src: smart-metrics.sh.j2
+    dest: /usr/local/bin/smart-metrics.sh
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Schedule the SMART metrics script via cron (every 15 minutes)
+  ansible.builtin.cron:
+    name: smart-metrics
+    minute: "*/15"
+    job: /usr/local/bin/smart-metrics.sh
+
+# node_exporter's own systemd unit and --collector.textfile.directory flag
+# are managed by the node_exporter_native role (templated, runs after this
+# one in site.yml's pve_hosts play) -- not duplicated here. A lineinfile
+# edit against a file another role fully templates just gets clobbered on
+# the next run; confirmed live the first time this was tried.

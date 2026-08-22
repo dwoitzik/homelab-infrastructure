@@ -1,0 +1,64 @@
+#!/bin/bash
+# Writes NVMe SMART data in Prometheus textfile-collector format so
+# node_exporter can expose it. smartctl -j gives structured NVMe health
+# fields directly (percentage_used is the vendor's own wear indicator,
+# 0-100 -- unlike SATA's opaque attribute IDs, NVMe's SMART/Health log page
+# is a real standard, no per-vendor attribute-number guessing needed).
+set -euo pipefail
+
+DEVICE="{{ pve_power_smart_device }}"
+OUT="{{ pve_power_node_exporter_textfile_dir }}/smart_nvme.prom.$$"
+FINAL="{{ pve_power_node_exporter_textfile_dir }}/smart_nvme.prom"
+
+JSON=$(smartctl -a -j "$DEVICE" 2>/dev/null || echo '{}')
+
+get() { echo "$JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d$1)" 2>/dev/null || echo ""; }
+
+HEALTHY=$(get "['smart_status']['passed']")
+[ "$HEALTHY" = "True" ] && HEALTHY_VAL=1 || HEALTHY_VAL=0
+
+PCT_USED=$(get "['nvme_smart_health_information_log']['percentage_used']")
+AVAIL_SPARE=$(get "['nvme_smart_health_information_log']['available_spare']")
+TEMP=$(get "['nvme_smart_health_information_log']['temperature']")
+POWER_ON_HOURS=$(get "['nvme_smart_health_information_log']['power_on_hours']")
+DATA_UNITS_WRITTEN=$(get "['nvme_smart_health_information_log']['data_units_written']")
+DATA_UNITS_READ=$(get "['nvme_smart_health_information_log']['data_units_read']")
+
+{
+  echo "# HELP smart_device_healthy 1 if the device's own SMART overall-health self-assessment passed"
+  echo "# TYPE smart_device_healthy gauge"
+  echo "smart_device_healthy{device=\"${DEVICE}\"} ${HEALTHY_VAL}"
+
+  [ -n "$PCT_USED" ] && {
+    echo "# HELP smart_nvme_percentage_used NVMe vendor wear indicator, 0-100 (100 does not mean failure, just past the manufacturer's rated endurance)"
+    echo "# TYPE smart_nvme_percentage_used gauge"
+    echo "smart_nvme_percentage_used{device=\"${DEVICE}\"} ${PCT_USED}"
+  }
+  [ -n "$AVAIL_SPARE" ] && {
+    echo "# HELP smart_nvme_available_spare_percent Remaining spare capacity percentage"
+    echo "# TYPE smart_nvme_available_spare_percent gauge"
+    echo "smart_nvme_available_spare_percent{device=\"${DEVICE}\"} ${AVAIL_SPARE}"
+  }
+  [ -n "$TEMP" ] && {
+    echo "# HELP smart_nvme_temperature_celsius Composite temperature"
+    echo "# TYPE smart_nvme_temperature_celsius gauge"
+    echo "smart_nvme_temperature_celsius{device=\"${DEVICE}\"} ${TEMP}"
+  }
+  [ -n "$POWER_ON_HOURS" ] && {
+    echo "# HELP smart_power_on_hours Total power-on hours"
+    echo "# TYPE smart_power_on_hours counter"
+    echo "smart_power_on_hours{device=\"${DEVICE}\"} ${POWER_ON_HOURS}"
+  }
+  [ -n "$DATA_UNITS_WRITTEN" ] && {
+    echo "# HELP smart_nvme_data_units_written_total NVMe data units written (1 unit = 512000 bytes per spec)"
+    echo "# TYPE smart_nvme_data_units_written_total counter"
+    echo "smart_nvme_data_units_written_total{device=\"${DEVICE}\"} ${DATA_UNITS_WRITTEN}"
+  }
+  [ -n "$DATA_UNITS_READ" ] && {
+    echo "# HELP smart_nvme_data_units_read_total NVMe data units read (1 unit = 512000 bytes per spec)"
+    echo "# TYPE smart_nvme_data_units_read_total counter"
+    echo "smart_nvme_data_units_read_total{device=\"${DEVICE}\"} ${DATA_UNITS_READ}"
+  }
+} > "$OUT"
+
+mv "$OUT" "$FINAL"

@@ -6,6 +6,7 @@ After=network.target
 User=node_exporter
 ExecStart=/usr/local/bin/node_exporter \
   --collector.filesystem.mount-points-exclude='^/(sys|proc|dev|host|etc)($$|/)' \
+  --collector.textfile.directory={{ node_exporter_native_textfile_dir }} \
   --web.listen-address=:9100
 Restart=always
 
