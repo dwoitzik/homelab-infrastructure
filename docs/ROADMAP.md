@@ -14,7 +14,7 @@
 > the live cluster first. A full rewrite against current reality is a real, separate
 > piece of work (BRIEFING-V4.md Section H, "clean the tree") — not done as a side
 > effect of adding the offsite-backup section below, which is genuinely current.
-
+>
 > **2026-08-22 update**: Sections E-H of the post-rebuild recovery effort landed today
 > (see `phase8/LEDGER.md` Entries 84-92 for full detail, `docs/decisions/ADR-026-
 > three-vm-topology-overhead.md` for the newest ADR). Real state, not reflected
