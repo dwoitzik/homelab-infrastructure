@@ -102,12 +102,18 @@ spec:
         backend:
           replicas: 0
         chunksCache:
+          # 2026-08-22 right-sizing: allocatedMemory below is memcached's own
+          # -m cache-size flag (512MB) -- the old 256Mi k8s request was
+          # already smaller than what memcached is configured to use, so
+          # observed usage (338Mi) exceeding it was expected, not a leak.
+          # Requesting closer to the configured allocation instead of an
+          # arbitrary smaller number.
           allocatedMemory: 512
           maxItemSize: 5m
           resources:
             requests:
               cpu: 50m
-              memory: 256Mi
+              memory: 448Mi
             limits:
               cpu: 500m
               memory: 768Mi
