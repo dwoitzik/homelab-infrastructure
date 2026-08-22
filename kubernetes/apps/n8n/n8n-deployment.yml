@@ -52,6 +52,10 @@ spec:
           value: "true"
         - name: EXECUTIONS_DATA_MAX_AGE
           value: "168"
+        - name: N8N_DIAGNOSTICS_ENABLED
+          value: "false"
+        - name: N8N_VERSION_NOTIFICATIONS_ENABLED
+          value: "false"
         ports:
         - containerPort: 5678
           name: http
