@@ -1,0 +1,62 @@
+---
+- name: Create Tailscale router directory
+  ansible.builtin.file:
+    path: /opt/tailscale-router
+    state: directory
+    mode: '0755'
+
+- name: Create Tailscale router state directory
+  ansible.builtin.file:
+    path: /opt/tailscale-router/state
+    state: directory
+    mode: '0700'
+
+- name: Deploy Tailscale router env file
+  ansible.builtin.template:
+    src: tailscale.env.j2
+    dest: /opt/tailscale-router/tailscale.env
+    mode: '0600'
+  notify: Restart Tailscale router
+
+- name: Deploy Tailscale router Docker Compose stack
+  ansible.builtin.copy:
+    dest: /opt/tailscale-router/docker-compose.yml
+    mode: '0644'
+    content: |
+      services:
+        tailscale-router:
+          image: {{ tailscale_router_rpi_image }}
+          container_name: tailscale-router
+          restart: unless-stopped
+          env_file:
+            - /opt/tailscale-router/tailscale.env
+          environment:
+            TS_STATE_DIR: /var/lib/tailscale
+            TS_USERSPACE: "false"
+            TS_ACCEPT_DNS: "false"
+            TS_HOSTNAME: "{{ tailscale_router_rpi_hostname }}"
+            TS_EXTRA_ARGS: >-
+              --login-server={{ tailscale_router_rpi_login_server }}
+              --advertise-tags=tag:subnet-router
+              --advertise-exit-node
+              --advertise-routes={{ tailscale_router_rpi_routes }}
+          cap_add:
+            - NET_ADMIN
+            - NET_RAW
+          # Same real bug this role's k3s counterpart hit (kubernetes/apps/
+          # headscale/subnet-router.yml): without src_valid_mark, forwarded
+          # exit-node/subnet-router traffic fails the reverse-path filter and
+          # is silently dropped. Plain Docker (unlike containerd) lets an
+          # explicit sysctls: entry set it directly -- no privileged needed.
+          sysctls:
+            - net.ipv4.conf.all.src_valid_mark=1
+          devices:
+            - /dev/net/tun:/dev/net/tun
+          volumes:
+            - /opt/tailscale-router/state:/var/lib/tailscale
+  notify: Restart Tailscale router
+
+- name: Start Tailscale router
+  community.docker.docker_compose_v2:
+    project_src: /opt/tailscale-router
+    state: present

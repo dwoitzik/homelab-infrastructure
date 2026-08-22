@@ -1,0 +1,15 @@
+---
+# HA subnet router (docs/decisions/ADR-016-headscale-off-cluster-to-rpi.md
+# migrated Headscale's control plane here; this role gives the exit-node/
+# subnet-router function the same independence, by *adding* a second router
+# advertising the same route rather than moving the existing one). Tailscale
+# natively supports multiple nodes advertising an identical route and
+# fails over between them automatically -- no client-side config, no
+# downtime for the existing k3s-hosted router while this deploys.
+tailscale_router_rpi_image: "tailscale/tailscale:stable"
+tailscale_router_rpi_login_server: "https://headscale.woitzik.dev"
+tailscale_router_rpi_hostname: "homelab-router-rpi"
+# Must match kubernetes/apps/headscale/subnet-router.yml's TS_ROUTES exactly
+# -- both routers advertise the identical route so Tailscale can treat them
+# as an HA pair for the same destination.
+tailscale_router_rpi_routes: "10.0.20.0/24"

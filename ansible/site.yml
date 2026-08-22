@@ -48,6 +48,18 @@
     - unbound
     - haproxy
 
+# ADR-016 moved Headscale's control plane to rpi-srv-02 so it survives
+# pve-mgmt-01 going down. The subnet-router/exit-node function (the part
+# that actually matters while away from the LAN) stayed k3s-hosted, which
+# left that same single Proxmox host as the real point of failure. This
+# play adds a second router on rpi-srv-02 advertising the identical route
+# -- Tailscale's native HA-subnet-router failover, not a migration.
+- name: Provision HA Tailscale Subnet Router
+  hosts: rpi-srv-02
+  become: true
+  roles:
+    - tailscale_router_rpi
+
 - name: Provision Management Services
   hosts: mgmt_nodes
   become: true
