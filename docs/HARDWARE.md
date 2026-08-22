@@ -179,6 +179,73 @@ It does not reduce host swap and was never going to; the swappiness change above
 the real lever for that specific problem. Correcting this here since the operator's
 original request assumed a connection between the two that doesn't actually hold.
 
+## Power and thermal efficiency
+
+Reviewed for real headroom (lower power/heat without hurting performance), using
+the RAPL power metrics built for Section G's power dashboard to actually measure
+rather than guess.
+
+**Current state (2026-08-22), measured live:**
+
+- Governor: `schedutil` on all cores (dynamic, appropriate for a host mixing
+  latency-sensitive services — Authelia, Traefik, ArgoCD — with idle periods;
+  neither `performance` (wastes power sitting at max clocks) nor `powersave`
+  (would hurt those latency-sensitive paths) would be a better default).
+- CPU temp (Tctl): 62°C. NVMe temp: 54.85°C. Both comfortably below their
+  respective throttle thresholds (this repo's own `ProxmoxHostHighTemp` alert
+  fires at 85°C) — no thermal problem exists to fix, confirmed via `dmesg`
+  showing zero throttle events.
+- CPU package power draw (RAPL, measured directly): **10.15W average** over a
+  10-second window at the host's current everyday load. For reference, this
+  Ryzen 5825U's typical mobile/embedded TDP range is roughly 15-28W depending on
+  cTDP configuration — 10W at ordinary load is already a reasonably efficient
+  operating point, not an obviously wasteful one.
+
+**Real finding: `amd_pstate=active` has never actually taken effect.**
+`ansible/roles/pve_power` has deployed a GRUB drop-in
+(`/etc/default/grub.d/amd_pstate.cfg`, created 2026-08-17) intending to switch
+from software-driven `passive` mode to hardware-managed `active` mode (which
+also enables EPP — Energy Performance Preference — a more responsive,
+generally more power-efficient scheduling hint than passive mode's `schedutil`
+alone). Checked live: the running kernel's `amd_pstate/status` is still
+`passive`, and `/proc/cmdline` confirms it. Traced why: the host's last boot
+was 2026-08-15, two days *before* the drop-in was even created — `update-grub`
+has run since then (confirmed: `/boot/grub/grub.cfg` already contains
+`amd_pstate=active` from the drop-in, correctly layered after the base
+`amd_pstate=passive` default), but the host itself hasn't rebooted to actually
+load that config. The fix has been fully ready and waiting for 5 days.
+
+One silent consequence of this: `pve-cpu-power.service` (the unit that sets
+EPP to `balance_power` on every boot) has been reporting `SUCCESS` this whole
+time, but that's misleading — its `ExecStartPost` line swallows failures
+(`|| true`) by design, and the EPP sysfs path
+(`.../cpufreq/energy_performance_preference`) doesn't exist at all under
+`passive` mode. The EPP setting has never once actually applied since this
+role was written; it's been silently writing to a path that isn't there.
+
+**Not applied — flagged for the operator, not decided unilaterally.** Loading
+the pending `active` mode requires a host reboot, which takes down all 3 k3s
+VMs and everything they run, however briefly. That's a real, if likely small
+(minutes), user-facing outage, and per the operator's own standing instruction
+this isn't a call to make without a green light. Expected payoff: AMD's own
+guidance and general community benchmarking suggest `active` mode with EPP
+typically yields modest additional efficiency over `passive` mode +
+`schedutil` — real, but not transformative; this host is not currently in an
+obviously wasteful state to begin with (see the 10.15W baseline above). The
+10.15W figure is recorded specifically so a real before/after comparison is
+possible whenever the reboot happens, rather than a vague "should be better."
+
+**Investigated, not enough data yet**: whether PBS/vzdump's 03:00 nightly
+schedule overlaps meaningfully with any lower-draw window worth aligning to.
+No historical RAPL data exists yet to check this against (metrics collection
+was only just built — see Section E/G — and is still blocked from reaching
+Prometheus by the same unapplied `fwd_04a_srv_monitoring` Terraform firewall
+rule as the rest of this host's metrics). 03:00 is already a reasonable choice
+on general principle (low interactive-use hours for a single-operator
+homelab) and there's no concrete evidence it's wrong — not changed without
+real data to justify a change either way. Revisit once RAPL history actually
+accumulates in Prometheus.
+
 ## Topology reality — this is not an HA cluster
 
 `pve-mgmt-01` is a single point of failure for compute. There is no way to make this
