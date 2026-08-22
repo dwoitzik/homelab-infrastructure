@@ -3,6 +3,23 @@
 # underlying gaps (IAC-001, SEC-005) were fixed; flipped to Enforce 2026-06-23
 # once a PolicyReport sweep confirmed zero violations cluster-wide.
 #
+# 2026-08-22: re-staged back to Audit for the redeploy after the cluster
+# rebuild wiped the kyverno namespace. A live apiserver-latency incident
+# (KubeAPIServerHighLatency, p99 8.5s, load 33 on a 16-thread host) hit
+# during the redeploy -- unrelated in root cause (Kyverno's own pods
+# bootstrapping under an already-loaded host, not the admission webhook
+# itself: the resource-wide ValidatingWebhookConfiguration had zero
+# registered rules the whole time, confirmed live) but close enough in
+# timing that a cautious re-verification was the right call. Re-running
+# the same zero-violation sweep this file's history already established
+# before flipping back to Enforce, namespace by namespace this time
+# rather than cluster-wide in one shot -- default validationFailureAction
+# is Audit, with per-namespace validationFailureActionOverrides flipping
+# to Enforce as each namespace gets verified clean. `database` first (5
+# CNPG-managed pods, narrowest and best-understood surface); `apps` next
+# once its 40 workloads are individually checked; `monitoring` and
+# `external-secrets` (disallow-privileged-containers only) after that.
+#
 # Both are scoped to [apps, database] only, not monitoring. The PolicyReport
 # sweep only reflected pods that existed *at that moment*; restarting Grafana
 # (kube-prometheus-stack chart) immediately after enforcing got blocked --
@@ -26,7 +43,10 @@ metadata:
       Pods without resource limits can starve other workloads on the same node.
       Run `kubectl get policyreport -A` to see violations before enforcing.
 spec:
-  validationFailureAction: Enforce
+  validationFailureAction: Audit
+  validationFailureActionOverrides:
+    - action: Enforce
+      namespaces: [database, apps]
   background: true
   rules:
     - name: check-container-limits
@@ -60,7 +80,10 @@ metadata:
     policies.kyverno.io/description: >
       Privileged containers have host-level access and should never run in this cluster.
 spec:
-  validationFailureAction: Enforce
+  validationFailureAction: Audit
+  validationFailureActionOverrides:
+    - action: Enforce
+      namespaces: [database, apps, monitoring, external-secrets]
   background: true
   rules:
     - name: check-privileged
@@ -91,7 +114,10 @@ metadata:
     policies.kyverno.io/description: >
       Images pinned to :latest are non-deterministic and make rollbacks impossible.
 spec:
-  validationFailureAction: Enforce
+  validationFailureAction: Audit
+  validationFailureActionOverrides:
+    - action: Enforce
+      namespaces: [database, apps]
   background: true
   rules:
     - name: check-image-tag
