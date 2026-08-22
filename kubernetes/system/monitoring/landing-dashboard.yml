@@ -1,0 +1,246 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homelab-landing-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  homelab-landing.json: |
+    {
+      "title": "Homelab Landing",
+      "uid": "homelab-landing",
+      "tags": ["homelab", "overview"],
+      "time": {"from": "now-24h", "to": "now"},
+      "refresh": "1m",
+      "panels": [
+        {
+          "id": 1,
+          "type": "row",
+          "title": "Health",
+          "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1}
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Alerts Firing",
+          "gridPos": {"x": 0, "y": 1, "w": 4, "h": 4},
+          "targets": [{"expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)"}],
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [
+            {"value": null, "color": "green"},
+            {"value": 1, "color": "red"}
+          ]}}}
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "External Probes Up",
+          "gridPos": {"x": 4, "y": 1, "w": 4, "h": 4},
+          "targets": [{"expr": "sum(probe_success{job=~\"blackbox-.*\"})"}],
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": null, "color": "green"}]}}}
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "External Probes Down",
+          "gridPos": {"x": 8, "y": 1, "w": 4, "h": 4},
+          "targets": [{"expr": "count(probe_success{job=~\"blackbox-.*\"} == 0) or vector(0)"}],
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [
+            {"value": null, "color": "green"},
+            {"value": 1, "color": "red"}
+          ]}}}
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Nodes Ready",
+          "gridPos": {"x": 12, "y": 1, "w": 4, "h": 4},
+          "targets": [{"expr": "sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"})"}],
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": null, "color": "green"}]}}}
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "title": "Pods Not Running",
+          "gridPos": {"x": 16, "y": 1, "w": 4, "h": 4},
+          "targets": [{"expr": "sum(kube_pod_status_phase{phase!~\"Running|Succeeded\"}) or vector(0)"}],
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [
+            {"value": null, "color": "green"},
+            {"value": 1, "color": "yellow"},
+            {"value": 4, "color": "red"}
+          ]}}}
+        },
+        {
+          "id": 7,
+          "type": "stat",
+          "title": "Restarts (1h)",
+          "gridPos": {"x": 20, "y": 1, "w": 4, "h": 4},
+          "targets": [{"expr": "sum(increase(kube_pod_container_status_restarts_total[1h])) or vector(0)"}],
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [
+            {"value": null, "color": "green"},
+            {"value": 1, "color": "yellow"},
+            {"value": 5, "color": "red"}
+          ]}}}
+        },
+        {
+          "id": 10,
+          "type": "row",
+          "title": "Backup Freshness",
+          "gridPos": {"x": 0, "y": 5, "w": 24, "h": 1}
+        },
+        {
+          "id": 11,
+          "type": "stat",
+          "title": "Last Velero Backup Age (h)",
+          "gridPos": {"x": 0, "y": 6, "w": 6, "h": 4},
+          "targets": [{"expr": "(time() - max(velero_backup_last_successful_timestamp)) / 3600"}],
+          "fieldConfig": {"defaults": {"unit": "h", "thresholds": {"steps": [
+            {"value": null, "color": "green"},
+            {"value": 26, "color": "yellow"},
+            {"value": 48, "color": "red"}
+          ]}}}
+        },
+        {
+          "id": 12,
+          "type": "stat",
+          "title": "PBS Health Check",
+          "gridPos": {"x": 6, "y": 6, "w": 6, "h": 4},
+          "targets": [{"expr": "pve_pbs_backup_healthy or vector(1)"}],
+          "fieldConfig": {"defaults": {"thresholds": {"steps": [
+            {"value": null, "color": "red"},
+            {"value": 1, "color": "green"}
+          ]}}}
+        },
+        {
+          "id": 13,
+          "type": "timeseries",
+          "title": "Backup Sizes Over Time",
+          "gridPos": {"x": 12, "y": 6, "w": 12, "h": 4},
+          "targets": [{"expr": "velero_backup_total_bytes"}],
+          "fieldConfig": {"defaults": {"unit": "bytes"}}
+        },
+        {
+          "id": 20,
+          "type": "row",
+          "title": "Storage",
+          "gridPos": {"x": 0, "y": 10, "w": 24, "h": 1}
+        },
+        {
+          "id": 21,
+          "type": "gauge",
+          "title": "Root Disk Used %",
+          "gridPos": {"x": 0, "y": 11, "w": 6, "h": 5},
+          "targets": [{"expr": "100 - (100 * node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "max": 100, "thresholds": {"steps": [
+            {"value": null, "color": "green"},
+            {"value": 75, "color": "yellow"},
+            {"value": 90, "color": "red"}
+          ]}}}
+        },
+        {
+          "id": 22,
+          "type": "gauge",
+          "title": "LVM Thin Pool Data %",
+          "gridPos": {"x": 6, "y": 11, "w": 6, "h": 5},
+          "targets": [{"expr": "pve_lvm_thinpool_data_percent or vector(0)"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "max": 100, "thresholds": {"steps": [
+            {"value": null, "color": "green"},
+            {"value": 80, "color": "yellow"},
+            {"value": 92, "color": "red"}
+          ]}}}
+        },
+        {
+          "id": 23,
+          "type": "timeseries",
+          "title": "PVC Usage by Namespace",
+          "gridPos": {"x": 12, "y": 11, "w": 12, "h": 5},
+          "targets": [{"expr": "sum by (namespace) (kubelet_volume_stats_used_bytes)"}],
+          "fieldConfig": {"defaults": {"unit": "bytes"}}
+        },
+        {
+          "id": 30,
+          "type": "row",
+          "title": "SSD Wear",
+          "gridPos": {"x": 0, "y": 16, "w": 24, "h": 1}
+        },
+        {
+          "id": 31,
+          "type": "gauge",
+          "title": "NVMe Percentage Used (wear)",
+          "gridPos": {"x": 0, "y": 17, "w": 6, "h": 5},
+          "targets": [{"expr": "smart_nvme_percentage_used"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "max": 100, "thresholds": {"steps": [
+            {"value": null, "color": "green"},
+            {"value": 70, "color": "yellow"},
+            {"value": 90, "color": "red"}
+          ]}}}
+        },
+        {
+          "id": 32,
+          "type": "stat",
+          "title": "Available Spare %",
+          "gridPos": {"x": 6, "y": 17, "w": 6, "h": 5},
+          "targets": [{"expr": "smart_nvme_available_spare_percent"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"steps": [
+            {"value": null, "color": "red"},
+            {"value": 10, "color": "yellow"},
+            {"value": 50, "color": "green"}
+          ]}}}
+        },
+        {
+          "id": 33,
+          "type": "timeseries",
+          "title": "Total Bytes Written (cumulative)",
+          "gridPos": {"x": 12, "y": 17, "w": 12, "h": 5},
+          "targets": [{"expr": "smart_nvme_data_units_written_total * 512000"}],
+          "fieldConfig": {"defaults": {"unit": "bytes"}}
+        },
+        {
+          "id": 40,
+          "type": "row",
+          "title": "Certificate Expiry",
+          "gridPos": {"x": 0, "y": 22, "w": 24, "h": 1}
+        },
+        {
+          "id": 41,
+          "type": "table",
+          "title": "TLS Cert Days Until Expiry (external probes)",
+          "gridPos": {"x": 0, "y": 23, "w": 24, "h": 6},
+          "targets": [{"expr": "(probe_ssl_earliest_cert_expiry{job=~\"blackbox-.*\"} - time()) / 86400", "format": "table", "instant": true}],
+          "fieldConfig": {"defaults": {"unit": "d", "thresholds": {"steps": [
+            {"value": null, "color": "red"},
+            {"value": 3, "color": "yellow"},
+            {"value": 14, "color": "green"}
+          ]}}}
+        },
+        {
+          "id": 50,
+          "type": "row",
+          "title": "Power Draw",
+          "gridPos": {"x": 0, "y": 29, "w": 24, "h": 1}
+        },
+        {
+          "id": 51,
+          "type": "timeseries",
+          "title": "Host Power Draw (W)",
+          "gridPos": {"x": 0, "y": 30, "w": 12, "h": 5},
+          "targets": [{"expr": "pve_power_draw_watts or node_rapl_package_joules_total or vector(0)"}],
+          "fieldConfig": {"defaults": {"unit": "watt"}}
+        },
+        {
+          "id": 52,
+          "type": "stat",
+          "title": "CPU Governor",
+          "gridPos": {"x": 12, "y": 30, "w": 6, "h": 5},
+          "targets": [{"expr": "node_cpu_scaling_governor or vector(0)"}]
+        },
+        {
+          "id": 53,
+          "type": "stat",
+          "title": "Est. Cost (EUR/month @ 0.30/kWh)",
+          "gridPos": {"x": 18, "y": 30, "w": 6, "h": 5},
+          "targets": [{"expr": "(avg_over_time(pve_power_draw_watts[24h]) * 24 * 30 / 1000) * 0.30 or vector(0)"}],
+          "fieldConfig": {"defaults": {"unit": "currencyEUR"}}
+        }
+      ]
+    }
