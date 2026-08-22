@@ -1,0 +1,110 @@
+# Section F/kube-bench finding (5.1.5/5.1.6, CIS k3s benchmark): every
+# namespace's `default` ServiceAccount auto-mounts its token into any pod
+# that doesn't explicitly request its own SA -- the vast majority of pods
+# in this cluster never call the Kubernetes API and have no use for it.
+# Pods that DO need API access already specify their own dedicated
+# ServiceAccount (weekly-report-runner, cnpg operator, argocd controllers,
+# etc.) and are unaffected by this -- this only removes an unused token
+# from pods that were never going to use it.
+#
+# Same namespace scope as pod-security-standards.yml -- core k3s
+# namespaces (kube-system, kube-public, kube-node-lease, metallb-system)
+# deliberately left untouched, no reason to risk touching how k3s's own
+# bundled components authenticate.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: apps
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: database
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: monitoring
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: vault
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: security
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: external-secrets
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: cnpg-system
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: argocd
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: cert-manager
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: velero
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: nfs-provisioner
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: trivy-system
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: kyverno
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: default
+automountServiceAccountToken: false
