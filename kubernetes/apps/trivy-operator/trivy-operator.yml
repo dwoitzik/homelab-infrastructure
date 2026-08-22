@@ -147,7 +147,19 @@ metadata:
   labels:
     app.kubernetes.io/name: trivy-operator
 spec:
-  replicas: 1
+  # 2026-08-22: paused (replicas: 0) during a sustained host load incident
+  # (40+, I/O-bound -- NVMe queue depth pegged, matches the REL-012c
+  # pattern this operator was already tuned for once). A manual `kubectl
+  # scale --replicas=0` didn't hold -- ArgoCD's selfHeal reverted it within
+  # a reconcile cycle, letting trivy-operator keep respawning concurrent
+  # scan jobs (OPERATOR_CONCURRENT_SCAN_JOBS_LIMIT=3 caps job count, not
+  # the I/O each concurrent image-layer extraction generates) the whole
+  # time load never cleanly recovered. Git-tracked this time so selfHeal
+  # can't silently undo it. Re-enable (replicas: 1) once host load is
+  # back to baseline and the operator's own scan-job I/O footprint has
+  # been reviewed (e.g. lower the concurrency limit, or throttle image
+  # pulls) rather than just flipping it back on to hit the same wall.
+  replicas: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: trivy-operator
