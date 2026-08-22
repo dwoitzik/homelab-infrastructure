@@ -1,0 +1,147 @@
+# Cloudflare R2 has no native spending cap (confirmed against their own docs
+# and community feature requests -- it's a standing, unimplemented ask, not
+# something this repo missed). The operator explicitly does not want to pay
+# for R2 overage past the free tier (10 GiB), so this enforces it at the
+# application level instead: checks real stored bytes against a threshold
+# well under the free-tier ceiling and pauses the offsite Schedule if
+# crossed, rather than trusting Cloudflare to stop billing on its own.
+#
+# Deliberately no auto-resume: going over budget is a decision the operator
+# should see and confirm, not something that silently un-pauses once the
+# next day's TTL expiry drops usage back down -- that would just repeat the
+# same near-miss every cycle instead of surfacing it once for a real look.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: r2-usage-guard
+  namespace: velero
+---
+# Scoped to only the one Schedule this needs to pause -- not general Velero
+# access (that's restore-test-runner's job, kept separate).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: r2-usage-guard
+  namespace: velero
+rules:
+  - apiGroups: ["velero.io"]
+    resources: ["schedules"]
+    resourceNames: ["daily-offsite"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: r2-usage-guard
+  namespace: velero
+subjects:
+  - kind: ServiceAccount
+    name: r2-usage-guard
+    namespace: velero
+roleRef:
+  kind: Role
+  name: r2-usage-guard
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: r2-usage-guard-script
+  namespace: velero
+data:
+  r2-usage-guard.sh: |
+    #!/bin/bash
+    set -eu
+
+    BUCKET=velero-offsite
+    R2_ENDPOINT="${R2_ENDPOINT_URL}"
+    # 9 GiB, not 10 -- real margin before the free tier's actual 10 GiB
+    # ceiling, since this only samples once a day and R2 usage could tick
+    # up between runs (a bigger-than-usual backup, a retried job).
+    THRESHOLD_BYTES=$((9 * 1024 * 1024 * 1024))
+    NTFY_URL="https://ntfy.sh/dw-homelab-a12a7b540943"
+
+    log() { echo "[r2-usage-guard] $(date -u +%FT%TZ) $*"; }
+
+    log "fetching kubectl"
+    KVER=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+    curl -fsSL -o /usr/local/bin/kubectl \
+      "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"
+    chmod +x /usr/local/bin/kubectl
+
+    log "checking real stored bytes in s3://${BUCKET} via R2's S3-compatible API"
+    USAGE_BYTES=$(aws s3 ls "s3://${BUCKET}" --recursive --summarize --endpoint-url "$R2_ENDPOINT" \
+      | awk '/Total Size:/ {print $3}')
+    USAGE_BYTES=${USAGE_BYTES:-0}
+    USAGE_GB=$(awk -v b="$USAGE_BYTES" 'BEGIN { printf "%.2f", b / 1024 / 1024 / 1024 }')
+    log "current usage: ${USAGE_BYTES} bytes (${USAGE_GB} GiB), threshold ${THRESHOLD_BYTES} bytes"
+
+    ALREADY_PAUSED=$(kubectl get schedule daily-offsite -n velero -o jsonpath='{.spec.paused}' 2>/dev/null || echo "false")
+
+    if [ "$USAGE_BYTES" -ge "$THRESHOLD_BYTES" ]; then
+      if [ "$ALREADY_PAUSED" != "true" ]; then
+        log "over threshold -- pausing daily-offsite Schedule"
+        kubectl patch schedule daily-offsite -n velero --type merge -p '{"spec":{"paused":true}}'
+        curl -fsS -H "Title: R2 offsite backup PAUSED -- near free-tier cap" -H "Priority: high" \
+          -H "Tags: warning,moneybag" \
+          -d "R2 usage hit ${USAGE_GB} GiB (cap ${THRESHOLD_BYTES} bytes). daily-offsite Schedule paused automatically -- not resuming on its own. Free up space (shorten TTL, drop a namespace from scope) or accept overage cost, then unpause: kubectl patch schedule daily-offsite -n velero --type merge -p '{\"spec\":{\"paused\":false}}'" \
+          "$NTFY_URL" || true
+      else
+        log "over threshold, already paused -- no action, not re-alerting"
+      fi
+    else
+      log "under threshold -- no action"
+    fi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: r2-usage-guard
+  namespace: velero
+spec:
+  # Before the 04:00 offsite backup fires, so a pause takes effect before
+  # that day's run rather than after it's already written more data.
+  schedule: "45 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 300
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: r2-usage-guard
+          restartPolicy: Never
+          containers:
+            - name: r2-usage-guard
+              image: amazon/aws-cli:2.17.62
+              command: ["/bin/bash", "/scripts/r2-usage-guard.sh"]
+              env:
+                # Same placeholder as r2-backuplocation.yml's s3Url -- filled
+                # in together with the real Account ID, one pass.
+                - name: R2_ENDPOINT_URL
+                  value: "https://61863ddb47e05bc833c7671f69e3454c.r2.cloudflarestorage.com"
+                - name: AWS_SHARED_CREDENTIALS_FILE
+                  value: /creds/cloud
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                - name: creds
+                  mountPath: /creds
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+          volumes:
+            - name: script
+              configMap:
+                name: r2-usage-guard-script
+                defaultMode: 0755
+            - name: creds
+              secret:
+                secretName: velero-r2-credentials

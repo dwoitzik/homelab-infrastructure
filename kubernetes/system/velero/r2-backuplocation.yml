@@ -10,7 +10,7 @@ spec:
   config:
     region: auto
     s3ForcePathStyle: "false"
-    s3Url: https://ACCOUNT_ID.r2.cloudflarestorage.com
+    s3Url: https://61863ddb47e05bc833c7671f69e3454c.r2.cloudflarestorage.com
     checksumAlgorithm: ""
   credential:
     name: velero-r2-credentials
