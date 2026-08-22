@@ -97,7 +97,13 @@ data:
               - 'https://argo.woitzik.dev/auth/callback'
             scopes: [openid, profile, email, groups]
             userinfo_signed_response_alg: 'none'
-            token_endpoint_auth_method: 'client_secret_post'
+            # ArgoCD's built-in OIDC client (coreos/go-oidc, not Dex) sends
+            # client credentials via HTTP Basic Auth, not POST -- was set to
+            # client_secret_post, which Authelia then rejects as an
+            # unsupported auth method ("invalid_client"). Every other client
+            # here already uses client_secret_basic; this one just didn't
+            # match what ArgoCD actually sends.
+            token_endpoint_auth_method: 'client_secret_basic'
             consent_mode: implicit
           - client_id: 'grafana'
             client_name: 'Grafana'
