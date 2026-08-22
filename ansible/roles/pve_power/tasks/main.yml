@@ -5,6 +5,20 @@
     state: present
     update_cache: true
 
+- name: Remove stale manual amd_pstate=passive from the main GRUB config
+  # Predates this role -- set manually in GRUB_CMDLINE_LINUX_DEFAULT before
+  # the drop-in below existed. grub-mkconfig assembles the final cmdline as
+  # GRUB_CMDLINE_LINUX (this drop-in) followed by GRUB_CMDLINE_LINUX_DEFAULT
+  # (this line), so the stale `passive` here was silently winning over the
+  # drop-in's `active` on every boot (last amd_pstate= wins) -- confirmed
+  # live via /proc/cmdline showing both, `active` first. The drop-in below
+  # is now the single source of truth for this parameter.
+  ansible.builtin.replace:
+    path: /etc/default/grub
+    regexp: '\s*amd_pstate=\S+'
+    replace: ''
+  notify: Update GRUB (reboot required)
+
 - name: Create GRUB drop-in for AMD P-State active driver
   ansible.builtin.copy:
     dest: /etc/default/grub.d/amd_pstate.cfg
