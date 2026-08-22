@@ -326,14 +326,51 @@ spec:
                   module: [http_auth_ok]
                 static_configs:
                   - targets:
-                      - https://auth.woitzik.dev
-                      - https://home.woitzik.dev
-                      - https://monitoring.woitzik.dev
-                      - https://vault.woitzik.dev
-                      - https://status.woitzik.dev
-                      - https://nextcloud.woitzik.dev
-                      - https://ha.woitzik.dev
+                      - https://ai.woitzik.dev
                       - https://argo.woitzik.dev
+                      - https://atlantis.woitzik.dev
+                      - https://auth.woitzik.dev
+                      - https://backup.woitzik.dev
+                      - https://bazarr.woitzik.dev
+                      - https://beszel.woitzik.dev
+                      - https://cars.woitzik.dev
+                      - https://dns.woitzik.dev
+                      - https://docs.woitzik.dev
+                      - https://draw.woitzik.dev
+                      - https://element.woitzik.dev
+                      - https://finance.woitzik.dev
+                      - https://git.woitzik.dev
+                      - https://gotify.woitzik.dev
+                      - https://ha.woitzik.dev
+                      - https://headscale.woitzik.dev
+                      - https://home.woitzik.dev
+                      - https://hydra.woitzik.dev
+                      - https://links.woitzik.dev
+                      - https://loki.woitzik.dev
+                      - https://matrix.woitzik.dev
+                      - https://mealie.woitzik.dev
+                      - https://media.woitzik.dev
+                      - https://monitoring.woitzik.dev
+                      - https://n8n.woitzik.dev
+                      - https://nextcloud.woitzik.dev
+                      - https://onlyoffice.woitzik.dev
+                      - https://photos.woitzik.dev
+                      - https://pve.woitzik.dev
+                      - https://radarr.woitzik.dev
+                      - https://requests.woitzik.dev
+                      - https://router.woitzik.dev
+                      - https://rss.woitzik.dev
+                      - https://s3.woitzik.dev
+                      - https://sabnzbd.woitzik.dev
+                      - https://scrutiny.woitzik.dev
+                      - https://search.woitzik.dev
+                      - https://secrets.woitzik.dev
+                      - https://sonarr.woitzik.dev
+                      - https://speed.woitzik.dev
+                      - https://status.woitzik.dev
+                      - https://traefik.woitzik.dev
+                      - https://vault.woitzik.dev
+                      - https://wazuh.woitzik.dev
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: __param_target

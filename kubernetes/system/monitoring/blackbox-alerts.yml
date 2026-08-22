@@ -1,0 +1,50 @@
+# External reachability had probes (blackbox-exporter.yml) but no alerting
+# on failure -- a hostname could go unreachable indefinitely with nothing
+# surfacing it. Covers both "the probe itself failed" and "TLS cert is
+# about to expire", the two failure modes blackbox's http module actually
+# exposes metrics for.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-blackbox-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: blackbox
+      rules:
+        - alert: ExternalProbeFailed
+          expr: |
+            probe_success{job=~"blackbox-.*"} == 0
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.instance }} is unreachable from outside the cluster"
+            description: "blackbox-exporter's probe of {{ $labels.instance }} has been failing for 10+ minutes, resolved via public DNS (1.1.1.1/8.8.8.8), not the LAN AdGuard rewrite -- this reflects what a real external client would see."
+        - alert: ExternalProbeSlow
+          expr: |
+            probe_duration_seconds{job=~"blackbox-.*"} > 5
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.instance }} is responding slowly from outside the cluster"
+            description: "{{ $labels.instance }} has taken over 5s to respond for 15+ minutes."
+        - alert: TLSCertExpiringSoon
+          expr: |
+            (probe_ssl_earliest_cert_expiry{job=~"blackbox-.*"} - time()) / 86400 < 14
+          labels:
+            severity: warning
+          annotations:
+            summary: "TLS certificate for {{ $labels.instance }} expires in under 14 days"
+            description: "{{ $labels.instance }}'s certificate expires in {{ $value | humanizeDuration }}. cert-manager should be renewing this automatically -- check `kubectl get certificate -A` if this fires."
+        - alert: TLSCertExpiringImminent
+          expr: |
+            (probe_ssl_earliest_cert_expiry{job=~"blackbox-.*"} - time()) / 86400 < 3
+          labels:
+            severity: critical
+          annotations:
+            summary: "TLS certificate for {{ $labels.instance }} expires in under 3 days"
+            description: "{{ $labels.instance }}'s certificate expires in {{ $value | humanizeDuration }} -- cert-manager renewal has not happened in time, needs immediate attention."
