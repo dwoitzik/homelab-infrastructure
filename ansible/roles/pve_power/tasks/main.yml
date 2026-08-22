@@ -173,6 +173,31 @@
     minute: "*/5"
     job: /usr/local/bin/pve-watchdog.sh
 
+# 2026-08-22 (Section G, power draw dashboard): found live that this Ryzen
+# host's RAPL package-energy counter (/sys/class/powercap/intel-rapl:0/
+# energy_uj -- the "intel-rapl" name is a Linux kernel-framework quirk, AMD
+# Zen CPUs since Zen 2 report through the same powercap interface) is real
+# and live (confirmed via a direct `cat`), but node_exporter's rapl
+# collector was silently failing (node_scrape_collector_success{collector=
+# "rapl"} 0) because the file is root-only (0400) and node_exporter runs
+# as its own unprivileged system user. World-readable energy counters are
+# the standard, widely-used fix for this exact gap (the value itself is
+# not sensitive) -- a udev rule makes it durable across reboots/device
+# re-enumeration, plus an immediate chmod since udev rules don't
+# retroactively touch already-enumerated devices.
+- name: Deploy udev rule for world-readable RAPL energy counters
+  ansible.builtin.copy:
+    dest: /etc/udev/rules.d/95-rapl-readable.rules
+    content: |
+      SUBSYSTEM=="powercap", KERNEL=="intel-rapl:*", RUN+="/bin/chmod -R a+r /sys%p"
+    mode: '0644'
+  notify: Reload udev rules
+
+- name: Apply RAPL permissions immediately (udev rule only covers future enumeration)
+  ansible.builtin.shell:
+    cmd: chmod -R a+r /sys/class/powercap/intel-rapl:0/ 2>/dev/null || true
+  changed_when: false
+
 - name: Create node_exporter textfile-collector directory
   ansible.builtin.file:
     path: "{{ pve_power_node_exporter_textfile_dir }}"

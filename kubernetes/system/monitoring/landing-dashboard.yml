@@ -222,9 +222,9 @@ data:
         {
           "id": 51,
           "type": "timeseries",
-          "title": "Host Power Draw (W)",
+          "title": "CPU Package Power Draw (W, RAPL -- not full-system)",
           "gridPos": {"x": 0, "y": 30, "w": 12, "h": 5},
-          "targets": [{"expr": "pve_power_draw_watts or node_rapl_package_joules_total or vector(0)"}],
+          "targets": [{"expr": "rate(node_rapl_package_joules_total[5m]) or vector(0)"}],
           "fieldConfig": {"defaults": {"unit": "watt"}}
         },
         {
@@ -237,9 +237,9 @@ data:
         {
           "id": 53,
           "type": "stat",
-          "title": "Est. Cost (EUR/month @ 0.30/kWh)",
+          "title": "Est. CPU-Only Cost (EUR/month @ 0.30/kWh)",
           "gridPos": {"x": 18, "y": 30, "w": 6, "h": 5},
-          "targets": [{"expr": "(avg_over_time(pve_power_draw_watts[24h]) * 24 * 30 / 1000) * 0.30 or vector(0)"}],
+          "targets": [{"expr": "(avg_over_time(rate(node_rapl_package_joules_total[5m])[24h:5m]) * 24 * 30 / 1000) * 0.30 or vector(0)"}],
           "fieldConfig": {"defaults": {"unit": "currencyEUR"}}
         }
       ]
