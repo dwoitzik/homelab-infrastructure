@@ -10,3 +10,13 @@ secret:
       match: ${WAZUH_INDEXER_PASSWORD:?set in .env, see DEPLOY.md}
     - name: wazuh docker-compose DASHBOARD_PASSWORD interpolation
       match: ${WAZUH_DASHBOARD_PASSWORD:?set in .env, see DEPLOY.md}
+    # Authelia OIDC client_secret fields are argon2id hashes (one-way,
+    # not reversible to the plaintext) -- that's the whole point of
+    # storing them this way, same as a password hash. GitGuardian's
+    # Generic High Entropy Secret detector can't distinguish a hash from
+    # a live credential. Each client rotation needs its own new entry
+    # here (exact-match, not pattern-based) -- a minor recurring cost,
+    # not worth broadening to a detector-wide ignore that would also
+    # blind this the same check to a real accidentally-committed secret.
+    - name: authelia proxmox OIDC client_secret (argon2id hash)
+      match: $argon2id$v=19$m=65536,t=3,p=4$FEGdeGGmXuJmYdBfdr8ITQ$1s8+Vk67uAKpTc/RMVTV/JdEuvDmuweTZxWBXUqmyTQ

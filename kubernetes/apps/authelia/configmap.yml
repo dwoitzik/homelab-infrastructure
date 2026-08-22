@@ -66,7 +66,13 @@ data:
         clients:
           - client_id: 'proxmox'
             client_name: 'Proxmox VE'
-            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$7T7F9hEJd0VzvLBVHWfuZw$G7xaFFtSx/6JHy8dVaLcZFy8G523C/XnTqOrL2aA//U'
+            # Regenerated -- this client was configured here for weeks but
+            # Proxmox itself never had a matching OIDC realm (`pveum realm
+            # list` showed only pam/pve), so the old secret's plaintext was
+            # never actually used/recoverable anywhere. Realm added live via
+            # `pveum realm add authelia --type openid ...` with the new
+            # plaintext; only the hash lives in git.
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$FEGdeGGmXuJmYdBfdr8ITQ$1s8+Vk67uAKpTc/RMVTV/JdEuvDmuweTZxWBXUqmyTQ'
             public: false
             authorization_policy: two_factor
             redirect_uris:
