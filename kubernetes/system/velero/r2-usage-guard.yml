@@ -121,7 +121,7 @@ spec:
                 # Same placeholder as r2-backuplocation.yml's s3Url -- filled
                 # in together with the real Account ID, one pass.
                 - name: R2_ENDPOINT_URL
-                  value: "https://ACCOUNT_ID.r2.cloudflarestorage.com"
+                  value: "https://61863ddb47e05bc833c7671f69e3454c.r2.cloudflarestorage.com"
                 - name: AWS_SHARED_CREDENTIALS_FILE
                   value: /creds/cloud
               volumeMounts:
