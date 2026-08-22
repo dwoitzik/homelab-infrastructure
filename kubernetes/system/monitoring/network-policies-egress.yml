@@ -1,0 +1,150 @@
+# Section F hardening: egress half of default-deny for the namespaces with
+# the narrowest, best-understood traffic patterns. Ingress default-deny
+# already existed for monitoring/security/vault (see network-policies.yml
+# and the security/vault Applications) -- this closes egress the same way.
+#
+# k3s's "kubernetes" API server Service has no pod backing it (the node
+# itself serves :6443), so NetworkPolicy's namespaceSelector can't match it
+# -- apiserver egress needs an explicit ipBlock at the control-plane node's
+# IP. Scoped to vm-srv-k3s-11 (10.0.20.11), the only control-plane node.
+#
+# apps, argocd, cert-manager, cnpg-system, database, external-secrets,
+# nfs-provisioner, trivy-system, velero, and default were deliberately NOT
+# included in this pass -- see phase8/LEDGER.md for the per-namespace
+# reasoning (apps has 40 workloads with no traffic map yet; velero is the
+# exact backup chain this mission spent this whole session proving works
+# and isn't being touched without dedicated verification time; cert-manager
+# has a well-known webhook/apiserver NetworkPolicy interaction that needs
+# care; the rest need the same apiserver-ipBlock + real-traffic-check pass
+# this file establishes the pattern for).
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-intra-namespace
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: vault
+---
+# vault-unseal reads/writes its unseal-key material via a k8s Secret --
+# needs the API server, which has no pod behind its Service (see header).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-apiserver
+  namespace: vault
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.11/32
+      ports:
+        - protocol: TCP
+          port: 6443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-intra-namespace
+  namespace: security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+---
+# CrowdSec syncs community blocklists against its Central API
+# (app.crowdsec.net / api.crowdsec.net over HTTPS) -- narrow to 443, not a
+# blanket internet allow.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-crowdsec-capi
+  namespace: security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
