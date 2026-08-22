@@ -1,0 +1,153 @@
+# Section F hardening: Pod Security Standards via namespace labels.
+# https://kubernetes.io/docs/concepts/security/pod-security-standards/
+#
+# Namespace labels only -- PSS is a built-in apiserver admission plugin, no
+# separate webhook pod to keep healthy (unlike Kyverno/cert-manager), so
+# there's no fail-open/fail-closed design decision to make here the way
+# there was for the NetworkPolicy and Kyverno passes.
+#
+# Scope checked live before writing this (kubectl inspection across every
+# namespace below, not guessed): zero privileged containers, zero added
+# capabilities, zero hostNetwork/hostPID/hostIPC in every namespace that
+# gets `enforce: baseline` here. Missed hostPath volumes on the first pass
+# -- `kubectl apply` itself surfaced it as an admission warning
+# (security/CrowdSec and velero/node-agent both use hostPath legitimately),
+# corrected to audit/warn-only for those two before anything could actually
+# break on a future pod restart.
+#
+# `apps` and `monitoring` are deliberately audit/warn only, NOT enforce:
+# `apps` runs kube-bench and scrutiny-collector with hostPID (legitimate --
+# they need to see host processes), `monitoring` runs node-exporter with
+# hostNetwork+hostPID (legitimate -- needs host network/process metrics).
+# Enforcing baseline there would block both. `restricted` (audit/warn only,
+# still non-blocking) surfaces everything else in those namespaces that
+# isn't yet baseline-clean, without breaking the pods that have a real
+# reason to need host access.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: database
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vault
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security
+  labels:
+    # CrowdSec reads host log files via hostPath (legitimate -- that's its
+    # whole job) -- baseline forbids hostPath volumes, would have blocked
+    # the next real pod restart. Found live via kubectl's own admission
+    # warning on the first apply of this file, downgraded to audit/warn.
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-secrets
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cnpg-system
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: velero
+  labels:
+    # node-agent needs hostPath to reach kubelet's pod-volume directories
+    # for backup -- same hostPath restriction as security/CrowdSec above,
+    # same fix.
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nfs-provisioner
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trivy-system
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kyverno
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apps
+  labels:
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
