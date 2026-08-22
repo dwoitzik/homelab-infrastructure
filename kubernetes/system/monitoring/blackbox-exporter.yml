@@ -58,6 +58,20 @@ spec:
       labels:
         app: prometheus-blackbox-exporter
     spec:
+      # This pod's DNS resolution otherwise inherits the node's own
+      # resolv.conf, which points at the LAN AdGuard resolver -- AdGuard
+      # rewrites every *.woitzik.dev query to its internal LAN IP (see
+      # docs/URL-INVENTORY.md's own Methodology section). Probing through
+      # that rewrite would silently test the internal path and prove
+      # nothing about real external reachability, which is the entire
+      # point of this exporter. Pinning to public resolvers makes every
+      # probe's DNS lookup genuinely external, even though the resulting
+      # HTTP connection still originates from this LAN.
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - "1.1.1.1"
+          - "8.8.8.8"
       containers:
       - name: blackbox-exporter
         image: prom/blackbox-exporter:v0.28.0
