@@ -21,6 +21,19 @@ spec:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
               effect: NoSchedule
+          # Section H finding: this cluster only ever uses L2Advertisement
+          # (see kubernetes/system/metallb-config/pool.yml -- zero
+          # BGPAdvertisement resources exist anywhere in the repo or live
+          # cluster). The chart's default speaker.frr.enabled=true bundles
+          # an FRR/BGP sidecar into every speaker pod regardless, which
+          # sits idle for L2-only setups -- and was chronically crash-
+          # looping doing so (1000+ restarts per pod over 9 days,
+          # "watchfrr restart all" / failed initial daemon connections,
+          # confirmed live via crictl logs). Disabling removes a
+          # completely unused container that was the actual source of
+          # that restart noise, not a real functional loss.
+          frr:
+            enabled: false
   destination:
     server: https://kubernetes.default.svc
     namespace: metallb-system
