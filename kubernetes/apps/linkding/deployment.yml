@@ -49,9 +49,13 @@ spec:
           periodSeconds: 30
           failureThreshold: 4
         resources:
+          # 2026-08-22 right-sizing pass: observed usage (~147Mi) already
+          # exceeded the old 64Mi request -- bumped to reflect real steady-
+          # state footprint instead of scheduling as if it needed less than
+          # it actually uses.
           requests:
             cpu: 50m
-            memory: 64Mi
+            memory: 160Mi
           limits:
             cpu: 200m
             memory: 256Mi

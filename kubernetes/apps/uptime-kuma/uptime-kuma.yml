@@ -48,9 +48,11 @@ spec:
           ports:
             - containerPort: 3001
           resources:
+            # 2026-08-22 right-sizing: observed usage (~169Mi) already
+            # exceeded the old 128Mi request.
             requests:
               cpu: 50m
-              memory: 128Mi
+              memory: 192Mi
             limits:
               cpu: 500m
               memory: 256Mi
