@@ -109,3 +109,50 @@ first, with no mechanical guard stopping them.
   this ADR's guard cover the two bulk-I/O sources that have actually caused incidents
   so far. A third, different source showing up in the future is not automatically
   covered — this ADR's Option D discussion is where to start if that happens.
+
+## Update, 2026-08-22: the predicted third source showed up — trivy-operator
+
+Option D above named its own trigger condition: "a second automated bulk-I/O source"
+that needs real coordination. That happened today. Redeploying Kyverno (new
+ClusterPolicies with an admission-controller pod) coincided with a real
+`KubeAPIServerHighLatency` incident (p99 8.5s, host load 33-57 on 16 threads, one
+node briefly `NodeNotReady`) — Kyverno's own admission webhook was ruled out as the
+cause (the cluster-wide resource-validating webhook had zero registered rules the
+whole time), but three concurrent `trivy-operator` vulnerability-scan jobs (two
+triggered by Kyverno's own new container images, one unrelated) plus a concurrent
+Renovate dependency-update job were a real, confirmed, simultaneous I/O contention
+source layered on top of an already-loaded host (`iostat` showed 10+ separate
+thin-pool LVs pegged near 100% `%util` at once — a shared-thin-pool symptom, not any
+single VM's disk).
+
+The operator paused it live via `kubectl scale trivy-operator --replicas=0` — this
+did **not hold**. `trivy-operator`'s ArgoCD Application has `selfHeal: true`, and
+ArgoCD reverted the scale-down back to the chart's desired `replicas: 1` on its next
+reconcile, silently resuming the scan jobs for over two hours before anyone noticed
+load hadn't actually recovered. This is the exact same failure mode as the Kyverno
+webhook `failurePolicy` fight from earlier the same day (a manual `kubectl` mitigation
+against a GitOps-managed, selfHeal-enabled resource gets reverted, often within
+minutes, sometimes silently) — now confirmed twice in one session against two
+different controllers (Kyverno's own internal reconciler; ArgoCD's Application
+selfHeal).
+
+**Standing practice, effective now**: any live mitigation against a resource managed
+by an `automated: {selfHeal: true}` ArgoCD Application (or, separately, against a
+resource an in-cluster operator reconciles itself, like Kyverno's
+`ValidatingWebhookConfiguration`s) must be **git-tracked in the same action**, not
+applied as a bare `kubectl` command first with a follow-up commit "later." A `kubectl
+scale --replicas=0` or `kubectl patch` against such a resource is not a real
+mitigation — it is, at best, a temporary no-op until the next reconcile, and at worst
+a false sense of safety while the underlying condition (in this case, sustained I/O
+contention) continues unaddressed. The durable fix, applied for real this time
+(`kubernetes/apps/trivy-operator/trivy-operator.yml`, `replicas: 0` with a comment
+explaining why), is the only form that actually holds.
+
+Option D (a generic cluster-wide bulk-I/O coordination lock across vzdump, Garage
+repairs, PBS jobs, and now scanner operators) is **still deferred** — the trigger
+condition named in the original decision technically fired, but the actual fix that
+worked was the same class of solution as Option C (a specific, cheap, git-tracked
+guard for the specific new source), not a general lock service. Revisit Option D only
+if a future incident involves two or more of these bulk-I/O sources needing to
+actively coordinate scheduling with each other (not just each independently avoiding
+running during high load) — that has not happened yet.

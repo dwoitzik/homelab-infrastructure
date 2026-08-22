@@ -49,9 +49,11 @@ spec:
             - name: http
               containerPort: 9116
           resources:
+            # 2026-08-22 right-sizing: observed usage (~51Mi) already
+            # exceeded the old 32Mi request.
             requests:
               cpu: 10m
-              memory: 32Mi
+              memory: 64Mi
             limits:
               cpu: 100m
               memory: 128Mi
