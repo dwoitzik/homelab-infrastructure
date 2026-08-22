@@ -28,6 +28,12 @@ spec:
           enabled: false
         kubeScheduler:
           enabled: false
+        # Same REL-022 reasoning as kubeScheduler/kubeProxy above: k3s uses
+        # SQLite/kine, not etcd (ADR-015) -- no real :2379 target exists, so
+        # the chart's default etcd ServiceMonitor/alerts/dashboard were dead
+        # weight (etcd dashboard was one of the Grafana curation findings).
+        kubeEtcd:
+          enabled: false
         kubeProxy:
           enabled: false
 
@@ -180,11 +186,11 @@ spec:
               cookie_samesite: lax
               cookie_secure: false
             dashboards:
-              # 2026-08-14: land on the one dashboard actually built for this
-              # homelab (slo-dashboard.yml) instead of Grafana's own generic
-              # default -- confirmed live via `kubectl exec` that the sidecar
-              # lands this specific ConfigMap at exactly this path.
-              default_home_dashboard_path: /tmp/dashboards/slo-error-budget.json
+              # Landing dashboard (landing-dashboard.yml) replaces the SLO
+              # dashboard as home -- broader at-a-glance view (health, backup
+              # freshness, storage, SSD wear, cert expiry, power). SLO
+              # dashboard still exists, just not the default view anymore.
+              default_home_dashboard_path: /tmp/dashboards/homelab-landing.json
           dnsConfig:
             options:
               - name: ndots
