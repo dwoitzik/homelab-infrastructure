@@ -36,7 +36,12 @@ spec:
             value: "1"
       containers:
       - name: myspeed
-        image: germannewsmaker/myspeed:1.0.9
+        # Pinned tag stuck at v1.0.9 (2024) -- upstream stopped cutting
+        # releases but keeps merging fixes to main. v1.0.9 crashloops on
+        # every boot with SequelizeUniqueConstraintError (gnmyt/MySpeed#1167,
+        # fixed on main by #1255, never backported to a tag). `development`
+        # is the only published tag that includes the fix.
+        image: germannewsmaker/myspeed:development
         securityContext:
           allowPrivilegeEscalation: false
           seccompProfile:
