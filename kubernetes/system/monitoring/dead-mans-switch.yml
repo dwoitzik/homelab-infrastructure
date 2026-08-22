@@ -1,0 +1,52 @@
+# External dead man's switch: if this cluster goes fully silent (host down,
+# network down, k3s itself down), every in-cluster alert mechanism is
+# equally silent -- Alertmanager can't page about its own absence. A
+# healthchecks.io check pinged on a schedule flips that: healthchecks.io
+# alerts on the ABSENCE of a ping, not the presence of a failure, so it
+# fires from outside regardless of what's actually broken in here.
+#
+# The ping URL secret (`cluster-dead-mans-switch`, key `ping-url`) is not
+# created by this manifest -- it needs a real healthchecks.io check created
+# first (free tier: https://healthchecks.io, "Add Check", schedule set to
+# match this CronJob's own cadence with a grace period comfortably larger
+# than it, e.g. every 5m schedule / 15m grace). Create the k8s Secret
+# directly once you have the ping URL:
+#   kubectl create secret generic cluster-dead-mans-switch -n monitoring \
+#     --from-literal=ping-url='https://hc-ping.com/<uuid>'
+# (or route it through Vault's secret/alertmanager path + an ExternalSecret
+# matching alertmanager-discord-webhook.yml's pattern, if that's preferred --
+# either way, this agent's own Vault AppRole isn't scoped to write it.)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dead-mans-switch
+  namespace: monitoring
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Replace
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 60
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: ping
+              image: curlimages/curl:8.11.1
+              command: ["sh", "-c", "curl -fsS -m 20 --retry 2 \"$PING_URL\""]
+              env:
+                - name: PING_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: cluster-dead-mans-switch
+                      key: ping-url
+              resources:
+                requests:
+                  cpu: 5m
+                  memory: 16Mi
+                limits:
+                  cpu: 50m
+                  memory: 32Mi

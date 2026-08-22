@@ -1,0 +1,148 @@
+# BRIEFING-V4 Section E: a weekly self-report so health/backup/cert/wear
+# status reaches the operator proactively instead of requiring someone to
+# go look. Reuses the existing alertmanager-discord-webhook Secret --
+# no new credential needed for the Discord side.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: weekly-report-runner
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: weekly-report-reader
+rules:
+  - apiGroups: ["velero.io"]
+    resources: ["backups"]
+    verbs: ["get", "list"]
+  - apiGroups: ["batch"]
+    resources: ["cronjobs", "jobs"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: weekly-report-reader
+subjects:
+  - kind: ServiceAccount
+    name: weekly-report-runner
+    namespace: monitoring
+roleRef:
+  kind: ClusterRole
+  name: weekly-report-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: weekly-report-script
+  namespace: monitoring
+data:
+  weekly-report.sh: |
+    #!/bin/sh
+    set -u
+
+    PROM="http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
+    APISERVER="https://kubernetes.default.svc"
+    TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+    CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    REPO="dwoitzik/homelab-infrastructure"
+
+    kapi() {
+      timeout 15 curl -fsS --cacert "$CACERT" -H "Authorization: Bearer $TOKEN" "${APISERVER}$1" 2>/dev/null
+    }
+    prom() {
+      timeout 15 curl -fsS -G "$PROM/api/v1/query" --data-urlencode "query=$1" 2>/dev/null
+    }
+
+    # --- Alerts currently firing ---
+    FIRING=$(prom 'count(ALERTS{alertstate="firing"})' | jq -r '.data.result[0].value[1] // "0"')
+
+    # --- External probe failures ---
+    PROBE_FAIL=$(prom 'count(probe_success{job=~"blackbox-.*"} == 0)' | jq -r '.data.result[0].value[1] // "0"')
+    PROBE_TOTAL=$(prom 'count(probe_success{job=~"blackbox-.*"})' | jq -r '.data.result[0].value[1] // "0"')
+
+    # --- Certs expiring within 14 days ---
+    CERTS_SOON=$(prom '(probe_ssl_earliest_cert_expiry{job=~"blackbox-.*"} - time()) / 86400 < 14' \
+      | jq -r '[.data.result[] | .metric.instance] | join(", ")')
+    [ -z "$CERTS_SOON" ] && CERTS_SOON="none"
+
+    # --- SSD wear ---
+    WEAR=$(prom 'smart_nvme_percentage_used' | jq -r '.data.result[0].value[1] // "unknown"')
+
+    # --- Latest Velero backup ---
+    LATEST_BACKUP=$(kapi "/apis/velero.io/v1/namespaces/velero/backups" \
+      | jq -r '[.items[]] | sort_by(.metadata.creationTimestamp) | last | "\(.metadata.name): \(.status.phase // "Unknown") (\(.metadata.creationTimestamp))"')
+    [ -z "$LATEST_BACKUP" ] || [ "$LATEST_BACKUP" = "null" ] && LATEST_BACKUP="no backups found"
+
+    # --- Last restore-test result ---
+    RESTORE_TEST=$(kapi "/apis/batch/v1/namespaces/velero/cronjobs/monthly-restore-test" \
+      | jq -r '"last scheduled: \(.status.lastScheduleTime // "never"), last successful: \(.status.lastSuccessfulTime // "never")"')
+
+    # --- Pending Renovate PRs (unauthenticated GitHub API, public repo) ---
+    RENOVATE_PRS=$(timeout 15 curl -fsS "https://api.github.com/repos/${REPO}/pulls?state=open&per_page=100" 2>/dev/null \
+      | jq -r '[.[] | select(.user.login == "renovate[bot]")] | length' 2>/dev/null)
+    [ -z "$RENOVATE_PRS" ] && RENOVATE_PRS="unknown (GitHub API unreachable)"
+
+    OPEN_PRS=$(timeout 15 curl -fsS "https://api.github.com/repos/${REPO}/pulls?state=open&per_page=100" 2>/dev/null \
+      | jq -r 'length' 2>/dev/null)
+    [ -z "$OPEN_PRS" ] && OPEN_PRS="unknown"
+
+    MSG="**Weekly homelab report -- $(date -u +%Y-%m-%d)**
+    Alerts firing: ${FIRING}
+    External probes: ${PROBE_FAIL}/${PROBE_TOTAL} failing (public DNS, genuine outside-the-cluster check)
+    Certs expiring <14d: ${CERTS_SOON}
+    NVMe wear: ${WEAR}%
+    Latest Velero backup: ${LATEST_BACKUP}
+    Restore test: ${RESTORE_TEST}
+    Open PRs: ${OPEN_PRS} (${RENOVATE_PRS} from Renovate)
+
+    Drift detection: not wired into this report yet -- Atlantis's own PR-triggered plans are the current drift signal, no scheduled out-of-band check exists. See phase8/LEDGER.md for status."
+
+    PAYLOAD=$(jq -n --arg content "$MSG" '{content: $content}')
+    timeout 15 curl -fsS -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK_URL"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: weekly-report
+  namespace: monitoring
+spec:
+  schedule: "0 8 * * 1"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 4
+  failedJobsHistoryLimit: 4
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 300
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: weekly-report-runner
+          restartPolicy: Never
+          containers:
+            - name: report
+              image: alpine:3.20
+              command: ["sh", "-c", "apk add --no-cache curl jq >/dev/null && sh /scripts/weekly-report.sh"]
+              env:
+                - name: DISCORD_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: alertmanager-discord-webhook
+                      key: url
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+          volumes:
+            - name: script
+              configMap:
+                name: weekly-report-script
+                defaultMode: 0755
