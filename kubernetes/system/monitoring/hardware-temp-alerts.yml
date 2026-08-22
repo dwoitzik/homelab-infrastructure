@@ -33,3 +33,32 @@ spec:
             description: >
               RPi CPU temperature above 75°C for 5+ minutes. These run DNS for the whole
               house - check airflow/dust before it throttles.
+
+    # Thresholds and full reasoning: docs/HARDWARE.md, "SSD wear tracking and
+    # replacement trigger". The boot NVMe backs all 3 k3s VMs and every LXC
+    # on this single-disk host -- no separate physical fallback exists.
+    - name: hardware.ssd_wear
+      rules:
+        - alert: NVMeWearWarning
+          expr: smart_nvme_percentage_used >= 80 or smart_nvme_available_spare_percent < 50
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Boot NVMe wear at {{ $value | printf \"%.0f\" }}% -- start sourcing a replacement"
+            description: >
+              percentage_used or available_spare has crossed the warning threshold. Not
+              urgent same-week, but this drive has no physical fallback -- see
+              docs/HARDWARE.md for the full projection and why the trend has been
+              tracked this closely.
+        - alert: NVMeWearCritical
+          expr: smart_nvme_percentage_used >= 90 or smart_nvme_available_spare_percent < 10 or smart_device_healthy == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Boot NVMe wear critical: {{ $value | printf \"%.0f\" }}% -- replace now"
+            description: >
+              This drive backs every k3s VM and every LXC on this single-disk host.
+              Waiting for an actual failure past this threshold is not an acceptable
+              risk -- see docs/HARDWARE.md's replacement trigger.

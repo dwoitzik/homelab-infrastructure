@@ -48,6 +48,60 @@ crash loops.
 a much lighter write pattern than etcd or ZFS's own metadata overhead, and moving them
 elsewhere wasn't justified by any measured problem.
 
+## SSD wear tracking and replacement trigger
+
+The boot/VM-image NVMe (`/dev/nvme0n1` on `pve-mgmt-01`) is an unbranded "AirDisk
+512GB SSD" — not a known enterprise or major-consumer brand, worth naming explicitly
+since it shapes how much to trust the endurance rating this projection depends on.
+
+Two real SMART data points, nine days apart:
+
+| Date | `percentage_used` | Lifetime writes | Power-on hours |
+|---|---|---|---|
+| 2026-08-13 | 45% | 26.9 TB | (not recorded that day) |
+| 2026-08-22 | 56% | 36.6 TB | 2,344 |
+
+That's **11 percentage points of wear and ~9.7TB written in 9 days** — a recent
+observed rate of ~1.22%/day. The drive's full-life average (56% over 2,344 power-on
+hours, ~98 days) works out to a slower ~0.57%/day. The two disagree by more than 2x,
+and both are honest numbers from the same drive — the recent window overlaps almost
+entirely with this repo's active disaster-recovery work (backup-chain rebuilds, LMDB
+migration, repeated restore tests, today's own load incident), which is not
+representative of ordinary steady-state homelab usage. The lifetime average dilutes
+that same burst across the drive's whole history, which is *also* not a clean
+steady-state number since a meaningful fraction of that history is this same recovery
+mission.
+
+**Projection, both bounds stated rather than false-precision averaged**: at the
+lifetime-average rate, `percentage_used` reaches 90% around **2026-11-14** (~11
+weeks out); at the recent 9-day rate, around **2026-09-19** (~4 weeks out). Reality
+is most likely somewhere between these once the recovery work itself tapers off, but
+neither bound is "someday" — even the slower one is under three months.
+
+**Replacement trigger** (the concrete, actionable rule Section G asked for, not a
+predicted date to just wait for):
+
+- **Warning** at `percentage_used >= 80` OR `available_spare < 50` — start sourcing a
+  replacement drive, not urgent same-week but don't defer past this point.
+- **Replace now** at `percentage_used >= 90` OR `available_spare < 10` OR any
+  `media_errors > 0` — the drive backs literally everything (all 3 k3s VMs, every
+  LXC, `local-lvm`) with no separate physical fallback (see Topology reality below);
+  waiting for an actual failure here is not an acceptable risk on a single-disk host.
+- PrometheusRule alerts for both thresholds exist in
+  `kubernetes/system/monitoring/hardware-temp-alerts.yml` (name predates this addition,
+  covers more than temperature now) as `NVMeWearWarning`/`NVMeWearCritical`, using the
+  `smart_nvme_percentage_used` and
+  `smart_nvme_available_spare_percent` metrics built in Section E — currently blocked
+  from reaching Prometheus by the same unapplied `fwd_04a_srv_monitoring` Terraform
+  firewall rule as the rest of the host-level metrics pipeline (see
+  `phase8/LEDGER.md`), so they exist as code but aren't live-firing yet.
+
+As of this writing (2026-08-22): 56% used, 0 media errors, 100% available spare —
+not in warning range yet, but the trend above means this deserves checking again
+within weeks, not months, especially once real historical Prometheus data (rather
+than two manual snapshots) makes the actual current rate visible instead of having
+to bound it between two very different estimates.
+
 ## Topology reality — this is not an HA cluster
 
 `pve-mgmt-01` is a single point of failure for compute. There is no way to make this
