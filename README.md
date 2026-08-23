@@ -91,6 +91,15 @@ Grafana/ArgoCD screenshots aren't included here: both require an authenticated l
 to capture without live operator credentials — see `docs/URL-INVENTORY.md` for what's
 actually reachable and how.
 
+**Currency note (2026-08-23)**: `home.woitzik.dev` is behind the same Authelia gate,
+so this screenshot can only be refreshed by someone with a real login session — checked
+live, an unauthenticated request only reaches the Authelia sign-in page. The image
+above is dated 2026-08-14 and several widgets in it show placeholder `-` values (a real
+CrowdSec widget auth bug, fixed same-session — see `phase8/LEDGER.md`) that would read
+real numbers today. Flagging this honestly rather than leaving a screenshot that reads
+as current when it isn't; refresh it opportunistically next time someone with an actual
+browser session is looking at the dashboard.
+
 ## Repository Layout
 
 ```text
