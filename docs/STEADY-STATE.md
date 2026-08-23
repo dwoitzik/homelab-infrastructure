@@ -112,11 +112,13 @@ that keeps it that way.
   (warning at 80% used, replace-now at 90% or any media error). Currently 56%,
   projected to reach 90% somewhere between late September and mid-November 2026
   depending on how much of the recent rate was recovery-mission-specific load.
-- **The `postgres-cluster` ArgoCD Application sync-loop bug** — found live while
-  validating the drift guard (2026-08-23): stuck `Health: Unknown`, one resource
-  (a PodMonitor) repeatedly fails to land despite ArgoCD claiming success. Not
-  diagnosed further (out of scope for the guard itself) — a real, separate bug worth
-  someone's attention.
+- ~~The `postgres-cluster` ArgoCD Application sync-loop bug~~ — **fixed 2026-08-23**:
+  root-caused via CNPG's own operator logs — it deletes any PodMonitor matching its
+  Cluster's own *name* on every reconcile when `monitoring.enablePodMonitor: false`,
+  regardless of who created it or what labels it carries. Renamed the git-managed
+  PodMonitor to `postgres-authelia-metrics` (Prometheus selects by label, unaffected
+  by the object's own name) and confirmed it survives multiple CNPG reconcile cycles
+  with zero further deletions.
 
 ## What the alerts mean
 
