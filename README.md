@@ -15,7 +15,7 @@ Start with [docs/OPERATIONS.md](docs/OPERATIONS.md) if you want to know where th
 | Hypervisor | Proxmox VE (Ryzen 7 5825U, 64 GB RAM) |
 | Networking | MikroTik RB5009 (Terraform-managed firewall) |
 | Edge DNS | 2× Raspberry Pi 4B — AdGuard Home + Unbound |
-| Kubernetes | k3s v1.31 — 3-node cluster. Intended/documented design is single control-plane + etcd (see `docs/k3s-architecture.md`); live topology has drifted to 2-member etcd, a known issue with a fix proposed in [ADR-014](docs/decisions/ADR-014-etcd-topology.md), not yet applied. |
+| Kubernetes | k3s v1.31 — 3-node cluster (1 control-plane, 2 workers), embedded SQLite datastore, not etcd — see [ADR-015](docs/decisions/ADR-015-k3s-datastore-sqlite.md). A single-server (not 3-way HA) topology by design, not drift — see [ADR-014](docs/decisions/ADR-014-etcd-topology.md) for why 3-way embedded-etcd HA is specifically ruled out on this hardware. |
 | Ingress + TLS | Traefik + cert-manager (wildcard `*.woitzik.dev` via DNS-01) |
 | Storage | NFS (`ct-srv-nfs-01`, ZFS-backed) — Longhorn fully removed |
 | GitOps (k8s) | ArgoCD — ApplicationSet watching `kubernetes/apps/*` |
@@ -254,10 +254,15 @@ Grafana dashboards: Node Exporter Full (1860), Proxmox PVE (10347, 19022).
 
 ## Documentation
 
+- [Steady State](docs/STEADY-STATE.md) — what runs itself, what needs a human, what
+  the alerts mean, and the monthly/quarterly operating rhythm. Start here for how this
+  cluster actually runs day to day.
+- [Disaster Recovery](DISASTER-RECOVERY.md) — full bare-metal-to-running-cluster
+  rebuild procedure, written from a real recovery, not theorized.
 - [Architecture Decision Records](docs/decisions/)
 - [k3s Cluster Architecture](docs/k3s-architecture.md)
 - [VLAN Segmentation](docs/vlan-segmentation.md)
 - [Backup Strategy](docs/backup-strategy.md)
 - [SSO Setup (Proxmox/PBS)](docs/SSO_SETUP.md)
 - [Naming Convention](docs/naming-convention.md)
-- [Roadmap](ROADMAP.md)
+- [Roadmap](docs/ROADMAP.md)

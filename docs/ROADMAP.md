@@ -34,6 +34,33 @@
 > `kubectl`/`ansible-playbook` application and are pushed as open PRs awaiting
 > merge — check `git log --all --oneline` and open PRs for what's merged vs. still
 > pending, don't assume this file or even the live cluster fully reflects git yet.
+>
+> **2026-08-23 update — recovery mission substantially complete.** Every branch from
+> this and the prior session merged to main; `gh auth` works on this box now (the
+> earlier blocker on "everything merged to main" is gone). Closed out since the
+> 2026-08-22 note above: `amd_pstate=active` reboot executed by the operator and
+> verified live (`scaling_driver: amd-pstate-epp`) — found and fixed a real follow-on
+> bug the reboot exposed (the configured CPU governor, `schedutil`, isn't offered
+> under active mode at all; `docs/HARDWARE.md`'s Power section has the full story).
+> Kyverno/NetworkPolicy hardening now covers every namespace including `apps` (the
+> last deferred one — real per-workload traffic map, not a blanket rule). A
+> declared-vs-live drift guard now runs every 30 minutes (`docs/decisions/
+> ADR-027-declared-vs-live-drift-guard.md`) after this exact failure class (a
+> manifest merged to git, never actually applied) bit the dead man's switch itself.
+> The Ansible Vault plaintext-decrypt exposure class is closed (per-key encryption)
+> and the standing Vault root token is gone (see `DISASTER-RECOVERY.md`'s "Standing
+> root token" section for the replacement procedure). See `docs/STEADY-STATE.md` for
+> what the cluster now does on its own vs. what still needs a human, going forward —
+> that document, not this roadmap, is the current source of truth for day-to-day
+> operation. **Still genuinely open**, not closed by this update: the
+> `fwd_04a_srv_monitoring` MikroTik/Terraform-state gap blocking `node-exporter-pve`
+> from reaching Prometheus (blocks NVMe wear alerts and host power/thermal metrics
+> from actually firing — trigger: fix whenever someone has real MikroTik/Terraform
+> state-import time, tracked as a real gap, not urgent-critical); CIS kubelet
+> file-permission findings (4.1.3-4.1.8) needing SSH access to the k3s VMs this
+> agent doesn't have; a cluster-admin/wildcard RBAC audit (CIS 5.1.1/5.1.3) needing
+> dedicated time; the SSD wear trigger itself (`docs/HARDWARE.md` — check monthly,
+> real replace-now trigger at 90% used or any media error).
 
 ## Offsite backup provider (2026-08-17, BRIEFING-V4.md Phase 3)
 
@@ -96,6 +123,16 @@ recommendation above, these two R2 files should be deleted (not adapted — Vele
 plugin works fine against B2's S3-compatible endpoint too, but reusing R2-named files
 for a different provider is more confusing than starting clean) as part of building the
 real schedule.
+
+**Resolved, 2026-08-23**: the operator went with **R2**, not the B2 recommendation
+above — real, working divergence, not an oversight to "correct" back to B2. Confirmed
+live: `BackupStorageLocation/r2-offsite` and `Schedule/daily-offsite` both exist and
+are genuinely applied (PR #512 built a dedicated `r2-usage-guard` CronJob specifically
+to pause offsite backup before hitting R2's free-tier cap — the actual mechanism this
+section worried B2 vs. R2 wouldn't need). Leaving the B2 analysis above as real,
+still-useful research (the Object Lock/pricing comparison holds regardless of which
+was picked) rather than deleting it, but this item itself is closed — no decision
+still pending.
 
 ## Planned Services
 
