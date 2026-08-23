@@ -1,0 +1,38 @@
+name: Declared-vs-live drift check (ADR-027)
+
+# Catches the "declared in git, never actually applied" failure class --
+# this has bitten four separate times across this mission with four
+# different resource kinds (an ExternalSecret, a Kyverno ClusterPolicy, a
+# database NetworkPolicy, and the dead man's switch CronJob). A manifest
+# sitting in git provides zero protection against whatever it exists to
+# prevent until it's actually live, and none of these are ArgoCD-managed
+# (ArgoCD's own selfHeal already covers everything that is), so nothing
+# else in this repo's tooling would ever have caught the gap.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check declared objects are live
+        id: check
+        run: |
+          python3 scripts/check-declared-vs-live.py \
+            --kubeconfig /opt/actions-runner/drift-check-kubeconfig.yaml \
+            --repo-root "$PWD"
+
+      - name: Alert on drift
+        if: failure() && steps.check.outcome == 'failure'
+        run: |
+          TOPIC=$(cat /opt/actions-runner/drift-check-ntfy-topic.txt)
+          wget -q -O- \
+            --header="Title: Drift check failed" \
+            --header="Priority: high" \
+            --post-data="kubernetes/system has objects declared in git that aren't live on the cluster. See the failed run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            "https://ntfy.sh/$TOPIC" > /dev/null
