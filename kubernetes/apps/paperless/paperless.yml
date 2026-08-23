@@ -52,6 +52,20 @@ spec:
             secretKeyRef:
               name: paperless-secrets
               key: postgres-password
+        # v3 made this a hard requirement (container refuses to start
+        # without it, previously silently accepted Django's insecure
+        # default) -- found live when the v2->v3 bump crash-looped the
+        # new pod. Sourced from a plain Secret rather than the Vault-backed
+        # paperless-secrets ExternalSecret above: this agent's Vault AppRole
+        # (ADR-025) isn't scoped to secret/paperless. Move this into Vault
+        # (add a secret-key property to secret/paperless, add it to
+        # external-secret.yml's data list) once someone with broader Vault
+        # access does that -- tracked in phase8/QUESTIONS.md.
+        - name: PAPERLESS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: paperless-secret-key
+              key: secret-key
         - name: PAPERLESS_OCR_LANGUAGE
           value: deu+eng
         - name: PAPERLESS_TIME_ZONE
