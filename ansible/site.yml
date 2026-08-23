@@ -21,14 +21,26 @@
 # 2026-08-13: k3s_nodes was never in the `nodes` group, so these hosts never
 # received `common` (including its inotify limits sysctl, whose own comment
 # says it's "for k3s/container workloads" -- a gap that predates this
-# recovery, now closed) or node_exporter_native. docker is
-# deliberately excluded here -- k3s uses containerd directly.
+# recovery, now closed). docker is deliberately excluded here -- k3s uses
+# containerd directly.
+#
+# 2026-08-23: node_exporter_native removed from this play -- these nodes
+# already run kube-prometheus-stack's own node-exporter DaemonSet (that's
+# what apps like node-exporter-rpi/app/ai/pve's custom scrape jobs exist
+# to cover for hosts *without* the DaemonSet). Both were binding :9100;
+# since systemd starts before kubelet on boot, the native one usually won
+# the race -- confirmed live: the DaemonSet pods on all 3 nodes showed
+# real restart histories (20-92 restarts) from losing that exact fight.
+# Surfaced tonight as a `node_exporter.service` restart-handler failure
+# ("address already in use") while applying an unrelated fix (inotify
+# limits, common role, for a separate promtail/crowdsec crash on the
+# same node -- coincidence of timing, not a shared root cause). Native
+# node_exporter stopped and disabled live on all 3 nodes.
 - name: Provision K3s Node Base OS
   hosts: k3s_nodes
   become: true
   roles:
     - common
-    - node_exporter_native
     - k3s_node_tuning
 
 - name: Provision HA Core Services & Gateway
