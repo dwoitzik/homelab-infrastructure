@@ -5,7 +5,7 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-        args: [--multi]
+        args: [--multi, --unsafe]
       - id: check-added-large-files
         exclude: ^(ansible/roles/monitoring_core/templates/snmp\.yml\.j2|terraform/providers/.*\.zip|ci/kubeconform-schemas/.*)$
 

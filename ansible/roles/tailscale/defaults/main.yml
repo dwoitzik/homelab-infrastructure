@@ -2,6 +2,7 @@
 tailscale_authkey: ""
 tailscale_login_server: "https://headscale.woitzik.dev"
 tailscale_advertise_routes: "10.0.0.0/8"
+tailscale_advertise_exit_node: false
 tailscale_accept_dns: false
 # MetalLB VIP workaround: RPi's kube-proxy flannel can't reach VIP directly,
 # so we DNAT VIP:443 → the k3s node currently running Traefik (discovered at runtime)
