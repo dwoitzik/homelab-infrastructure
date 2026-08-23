@@ -453,5 +453,10 @@ spec:
 # deliberately NOT routed through Traefik/this cluster -- see ADR-018. Routing
 # it here would need the cluster (VLAN20) to reach into the Admin VLAN
 # (10.0.100.0/24), which the network's firewall rules intentionally don't
-# allow in that direction. It has its own dedicated Cloudflare Tunnel instead
-# (terraform/stacks/cloudflare/main.tf), connecting straight from that host.
+# allow in that direction. ADR-018's own dedicated Cloudflare Tunnel for it
+# was applied once (PR #437) then destroyed by the very next apply (ADR-019's
+# public-exposure-allowlist, PR #440) -- the operator confirmed directly
+# (2026-08-15) that this hostname was never meant to be public at all, so no
+# tunnel exists for it today (verified 2026-08-23: no public DNS record, no
+# cloudflared process running). This host is reachable via Tailscale/LAN
+# only, which was always the primary access path.

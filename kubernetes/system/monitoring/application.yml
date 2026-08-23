@@ -331,8 +331,7 @@ spec:
               # forced public resolver (dnsPolicy: None, 1.1.1.1/8.8.8.8 --
               # see blackbox-exporter.yml). ADR-019 (2026-08-14) made public
               # DNS/tunnel exposure an explicit allowlist of exactly two
-              # hostnames (photos, headscale) plus claude.woitzik.dev on its
-              # own dedicated tunnel (ADR-018) -- every other hostname here
+              # hostnames (photos, headscale) -- every other hostname here
               # has had no public DNS record since that ADR landed, so ~41 of
               # these probes have been failing by construction, not
               # reflecting any real outage, ever since. Narrowed to the
@@ -343,6 +342,22 @@ spec:
               # separate concern (needs an internal resolver path this pod
               # deliberately doesn't have) -- not covered here, tracked as a
               # known gap rather than silently dropped (see ROADMAP.md).
+              #
+              # Correction, 2026-08-23: claude.woitzik.dev was removed from
+              # this list. ADR-018's dedicated tunnel for it was applied once
+              # (PR #437) then destroyed by the very next apply in the same
+              # session (ADR-019's allowlist PR, #440) -- confirmed via
+              # `terraform/stacks/cloudflare/imports.tf`'s own note and the
+              # operator's direct 2026-08-15 confirmation recorded there:
+              # claude.woitzik.dev was never meant to be on the public
+              # allowlist. This host has no public DNS record (`dig +short
+              # @1.1.1.1 claude.woitzik.dev A` -> NXDOMAIN) and no
+              # `cloudflared` connector process running anywhere. The probe
+              # had been reporting `probe_success 0` (confirmed via a live
+              # Prometheus query) the entire time, correctly reflecting that
+              # -- it was never a false "up", just a target that should never
+              # have been on this list post-ADR-019. This agent's own ttyd
+              # remains reachable via Tailscale/LAN only, as designed.
               - job_name: 'blackbox-http'
                 scrape_interval: 60s
                 metrics_path: /probe
@@ -350,7 +365,6 @@ spec:
                   module: [http_auth_ok]
                 static_configs:
                   - targets:
-                      - https://claude.woitzik.dev
                       - https://headscale.woitzik.dev
                       - https://photos.woitzik.dev
                 relabel_configs:
