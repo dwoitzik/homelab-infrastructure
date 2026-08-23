@@ -1,5 +1,16 @@
 ---
-pve_power_cpu_governor: schedutil
+# amd_pstate=active (below) replaces the generic cpufreq subsystem with
+# AMD's own hardware P-state driver -- confirmed live post-reboot,
+# 2026-08-23: scaling_available_governors under active mode is just
+# "performance powersave", schedutil isn't offered at all anymore. Real
+# consequence found the same day: `cpupower frequency-set -g schedutil`
+# failed (exit 237), which meant pve-cpu-power.service's ExecStart never
+# succeeded, and EPP silently stayed at the driver's own default
+# (balance_performance) instead of the balance_power below -- the service
+# never got that far. `powersave` is the correct active-mode governor
+# choice; EPP does the actual fine-grained power/performance tuning from
+# there, same intent as before.
+pve_power_cpu_governor: powersave
 pve_power_energy_perf_pref: balance_power
 pve_power_amd_pstate: active
 
