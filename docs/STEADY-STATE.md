@@ -67,6 +67,13 @@ that keeps it that way.
   traffic pattern, including `apps` (the last one, closed 2026-08-23) — a compromised
   pod can't freely reach arbitrary internal services or exfiltrate over an unexpected
   port.
+- On this control host (not the cluster): a `PreToolUse` hook
+  (`~/.claude/hooks/deny-credential-read.sh`, ADR-028) mechanically blocks any command
+  that would print a credential file's raw content — SSH keys, the Ansible Vault
+  password file, `~/.kube/config`, and more. Six real secret-exposure incidents this
+  mission all followed the same shape (a legitimate debugging step landing on a file
+  that happened to hold a live credential); this closes that shape by design rather
+  than by an agent remembering a rule.
 
 ## What the operator must still do by hand
 
@@ -78,10 +85,18 @@ that keeps it that way.
 - **`atlantis apply` comments** for any Terraform PR that's actually supposed to take
   effect — plan runs automatically, apply is a deliberate PR-comment trigger by design
   (never automatic, per `ADR-021`).
-- **Rotate the 3 GitHub PATs** currently in `~/.config/gh/hosts.yml` on this LXC —
-  they appeared in an agent's own tool output once this session (a debugging mistake,
-  not a network exposure, but per this mission's own standing rule any such appearance
-  is treated as compromised). Not urgent-critical (no evidence of misuse), but real.
+- **Rotate the 3 GitHub PATs** that appeared in an agent's tool output on 2026-08-23
+  (a debugging mistake, not a network exposure, but per this mission's own standing
+  rule any such appearance is treated as compromised). `~/.config/gh/hosts.yml` itself
+  is gone now (ADR-028 — `GH_TOKEN` is sourced from a dedicated 0600 file instead), but
+  the active `dwoitzik` token's *value* is unchanged, just relocated to
+  `/root/.secrets/gh_token` — rotating it is still real, not done by the design fix
+  alone. Not urgent-critical (no evidence of misuse), but real.
+- **Decide the disposal of 3 flagged-for-review credentials** in
+  `/root/.secrets/flagged-for-review/` (a Proxmox API token, a GitHub PAT, a Vault
+  session token — found loose on disk during ADR-028's sweep, moved somewhere
+  mechanically protected rather than deleted unverified). See
+  `phase8/QUESTIONS.md`'s 2026-08-23 entry for what each needs.
 - **Fix the `fwd_04a_srv_monitoring` MikroTik/Terraform-state gap** — blocks
   `node-exporter-pve` from reaching Prometheus, which means NVMe wear alerts and host
   power/thermal metrics exist as code but don't actually fire yet. Needs real
