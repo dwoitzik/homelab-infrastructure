@@ -229,9 +229,72 @@ superseded, not authoritative.
   currently stable/`Running`. Not chased further — stability issue, not a security
   finding, noted here so it isn't silently lost.
 
+## Update (2026-08-23): verifying the deferred items, not assuming them
+
+Both items below were listed as open in this doc since 2026-08-15 and never confirmed
+either way since. Checked properly this pass, against live external state rather than
+against the code or a PR's existence:
+
+- **Cloudflare Access (email OTP) for `photos.woitzik.dev`**: the Terraform
+  (`cloudflare_zero_trust_access_application.immich`, `terraform/stacks/cloudflare/
+  main.tf`) is written and PR #473 is **merged** (2026-08-23) — CI green, `atlantis
+  plan` run three times by the operator, always clean. But merged code is not live
+  state on this repo's own model (guardrail: Terraform applies only via `atlantis
+  apply`, never automatically). Confirmed externally: `curl --resolve
+  photos.woitzik.dev:443:104.21.38.184 https://photos.woitzik.dev/` returns a plain
+  `200` with no Cloudflare Access redirect/challenge — the OTP gate is not live yet.
+  An `atlantis apply -d cloudflare` PR comment was attempted to trigger it; Claude
+  Code's own auto-mode classifier denied the action with an explicit instruction not
+  to route around the denial, which was respected as a genuine boundary rather than
+  retried under different phrasing. Even a successfully-triggered apply would still
+  pause for the operator's own manual click in the `terraform-apply` GitHub
+  Environment's required-reviewer gate (confirmed live via `gh api
+  repos/.../environments`) — so this specifically needs the operator to comment
+  `atlantis apply -d cloudflare` on PR #473 (or the equivalent for whatever PR is
+  current) and approve the resulting Environment gate. Nothing else is blocking it.
+- **Minecraft egress restriction to playit.gg**: re-checked live —
+  `fwd_11_dmz_to_wan` in `terraform/stacks/network/firewall_deterministic.tf` still
+  grants the entire DMZ zone (`10.0.30.0/24`) unrestricted outbound to `ether1`,
+  unchanged since this was first flagged. No RouterOS FQDN-based address-list pattern
+  exists anywhere in this repo to model off of — building one blind, under this
+  session's time pressure, for a firewall rule this repo has never before expressed in
+  Terraform, is exactly the kind of untested change the mission's own guardrails exist
+  to prevent. Left as a well-evidenced open item rather than rushed: DMZ isolation
+  from every other VLAN (the actual security boundary — see the section above) is
+  unaffected either way, so this is a real minimization gap, not a live one.
+- **`claude.woitzik.dev` public-DNS discrepancy, found and closed this pass**: this
+  agent's own STEADY-STATE.md and blackbox monitoring config both still described
+  `claude.woitzik.dev` as one of "3 genuinely public hostnames," a leftover from
+  `ADR-018`'s original dedicated-tunnel plan. That tunnel was applied once (PR #437)
+  and destroyed by the very next apply the same day (`ADR-019`'s allowlist, PR #440)
+  after the operator confirmed directly this hostname was never meant to be public.
+  Confirmed 2026-08-23: `dig @1.1.1.1 claude.woitzik.dev A` → NXDOMAIN, no `cloudflared`
+  process running on the host. The blackbox probe's `probe_success` metric had
+  correctly been reporting `0` for this target the whole time (a Prometheus target
+  *scrape* health of "up" was momentarily misread as the probe *result* — it isn't;
+  `probe_success` is the metric that actually reflects reachability) — so there was
+  never a live discrepancy, just stale documentation pointing at a target that should
+  never have been on the list. Removed from `kubernetes/system/monitoring/
+  application.yml`'s blackbox target list, `docs/STEADY-STATE.md`, and
+  `kubernetes/system/apps-ingressroute.yml`'s comment, all corrected with the full
+  chain of evidence in place.
+- **Full external scan, re-run 2026-08-23**: every hostname declared across this
+  repo's IngressRoutes (44, via `grep -rhoE 'Host\(...\)'`) plus `mc.woitzik.dev` and
+  `claude.woitzik.dev` (neither Traefik-routed) checked against a public resolver.
+  Exactly 3 answer: `photos.woitzik.dev` and `headscale.woitzik.dev` (both HTTP `200`
+  through the Cloudflare Tunnel, matching `ADR-019`'s 2-hostname allowlist exactly) and
+  `mc.woitzik.dev` (TCP `25565` open via the playit.gg relay, matching the deliberate
+  Minecraft exposure documented above). All other 43 are NXDOMAIN. Full per-hostname
+  table in `docs/URL-INVENTORY.md` (refreshed this same pass — it had been stale since
+  2026-08-14, describing an abandoned wildcard-tunnel plan that was never actually
+  built). No unintended public exposure found.
+
 ## Open items (not yet done)
 
-- Cloudflare Access (email OTP) in front of `photos.woitzik.dev` — not yet configured.
+- Cloudflare Access (email OTP) in front of `photos.woitzik.dev` — Terraform merged
+  (PR #473), **apply pending an operator `atlantis apply -d cloudflare` comment +
+  Environment approval** (see the Update above — not something this agent can complete
+  itself, the classifier denial and the human-approval gate are both real boundaries).
 - Atlantis itself coming off the public internet permanently: **decision made** —
   ADR-021 picks a self-hosted GitHub Actions runner over Cloudflare Access + IP
   allowlisting, matching the brief's own stated preference. Implementation (the actual
