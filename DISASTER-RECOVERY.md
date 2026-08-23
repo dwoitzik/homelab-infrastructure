@@ -211,14 +211,80 @@ kubectl create secret generic vault-unseal-keys -n vault \
 #    or: ansible-playbook ansible/vault-unseal-secret.yml   (if the playbook sources
 #    from the vault file directly — check ansible/ for the current script name)
 
-# 5. Log in with the root token and create the token ESO uses to authenticate to Vault
+# 5. Log in with the root token, then create a NARROW policy + token for ESO --
+#    do not use the root token itself as the long-lived ESO credential (see the
+#    standing-root-token note below for why).
 kubectl exec -n vault vault-0 -- vault login <root_token>
-kubectl create secret generic vault-token -n external-secrets --from-literal=token=<root_token>
+kubectl exec -n vault vault-0 -- vault policy write eso-reader - <<'POLICY'
+path "secret/data/*" {
+  capabilities = ["read", "list"]
+}
+path "secret/metadata/*" {
+  capabilities = ["read", "list"]
+}
+POLICY
+kubectl exec -n vault vault-0 -- vault token create -policy=eso-reader -orphan -period=768h
+#    => use THIS token's value below, not the root token.
+kubectl create secret generic vault-token -n external-secrets --from-literal=token=<eso_reader_token>
 
-# 6. Confirm the ClusterSecretStore goes healthy, then ExternalSecrets start syncing
+# 6. Revoke the root token now that ESO has its own scoped credential -- a standing
+#    root token has no legitimate ongoing consumer past this bootstrap step (see
+#    "Standing root token" note below). Confirmed safe live, 2026-08-23: ESO's actual
+#    token never matched the root token's hash even before this doc was corrected,
+#    meaning this revoke step was already the de facto practice, just undocumented.
+kubectl exec -n vault vault-0 -- vault token revoke -self
+#    (run this as the LAST vault command using the root token -- it invalidates
+#    itself immediately, so nothing after this line can use it)
+
+# 7. Confirm the ClusterSecretStore goes healthy, then ExternalSecrets start syncing
 kubectl get clustersecretstore vault -o jsonpath='{.status.conditions}'
 kubectl get externalsecrets -A
 ```
+
+### Standing root token: don't keep one around
+
+`ansible/group_vars/all/vault.yml` stores the unseal key shares
+(`vault_unseal_key_1/2/3`) permanently -- that's the deliberate out-of-cluster
+root of trust this whole Tier avoids a circular dependency by having. A
+**root token** is different: it's a live, permanently-privileged credential,
+not a key share you combine with others to get one. Storing it standing
+alongside the unseal keys defeats the reason a separate secrets backend
+exists in the first place -- whoever can decrypt `vault.yml` gets root on
+Vault too, immediately, no threshold-of-shares step required.
+
+If a genuine need for root access comes up later (a policy change, an
+AppRole bootstrap, a Vault upgrade) -- generate one from the unseal keys
+you already have, use it, revoke it in the same sitting:
+
+```bash
+# 1. Start the generate-root ceremony
+kubectl exec -n vault vault-0 -- vault operator generate-root -init
+#    => note the nonce and OTP it prints
+
+# 2. Provide unseal key shares (threshold = 2 of 3) against that nonce
+kubectl exec -n vault vault-0 -- vault operator generate-root -nonce=<nonce> <key_1>
+kubectl exec -n vault vault-0 -- vault operator generate-root -nonce=<nonce> <key_2>
+#    => the second key's output includes an encoded root token
+
+# 3. Decode it with the OTP from step 1
+vault operator generate-root -decode=<encoded_token> -otp=<otp>
+
+# 4. Use it for whatever the actual task is, then revoke immediately
+kubectl exec -n vault vault-0 -- vault login <root_token>
+#    ... do the actual task ...
+kubectl exec -n vault vault-0 -- vault token revoke -self
+```
+
+A real incident this repo's own history had, worth remembering: an earlier
+mission session generated a root token this way for a one-time AppRole
+bootstrap (`docs/decisions/ADR-025-vault-approle-for-recovery-agent.md`),
+used it, and the token was later found still stored in `vault.yml` -- but
+already invalid when checked (2026-08-23): revoked at some point, just never
+removed from the file. The value being *inert* doesn't make storing it safe
+in the meantime -- anyone who found the file between those two events would
+have found a live root token. Removed from `vault.yml` in the same session
+this note was written; nothing in this repo's playbooks or manifests
+referenced it (confirmed via a repo-wide grep before removal).
 
 If this is a **new Vault with no surviving data** (worst case — raft storage itself was
 lost), every secret previously stored under `secret/<app>/...` is gone and must be
