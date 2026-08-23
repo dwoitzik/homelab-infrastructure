@@ -48,9 +48,14 @@ that keeps it that way.
   against the live cluster and alerting if something merged to git was never actually
   applied — built after this exact gap took down the dead man's switch itself for
   days undetected.
-- Blackbox external probing checks the 3 genuinely public hostnames
-  (`photos.woitzik.dev`, `headscale.woitzik.dev`, `claude.woitzik.dev`) for real
-  external reachability and TLS expiry.
+- Blackbox external probing checks the 2 hostnames on ADR-019's public allowlist
+  (`photos.woitzik.dev`, `headscale.woitzik.dev`) for real external reachability and
+  TLS expiry. `mc.woitzik.dev` (Minecraft, via the playit.gg tunnel — a separate,
+  non-Cloudflare exposure path) is the third genuinely public hostname but isn't
+  probed by this job today. `claude.woitzik.dev`'s ADR-018 tunnel was applied once
+  and destroyed by the very next apply (ADR-019); it has no public DNS record and no
+  running `cloudflared` connector as of 2026-08-23 — corrected here after that stale
+  claim was found and verified against live state.
 - Weekly Discord self-report summarizes cluster health every Monday morning.
 - kube-bench runs a CIS benchmark scan daily.
 - trivy-operator scans for container vulnerabilities on image/workload changes.
@@ -126,7 +131,7 @@ that keeps it that way.
 |---|---|---|
 | healthchecks.io silence (dead man's switch) | The *entire* monitoring stack, or the cluster itself, is down — nothing else could page | Immediate — this is the last line of defense |
 | `drift-check` workflow failure (GitHub Actions, every 30 min) | Something declared in `kubernetes/system/` isn't actually live | Same day — re-run `kubectl apply` on the named file, or investigate why it won't apply |
-| `ExternalProbeFailed` (blackbox) | One of the 3 real public hostnames is unreachable from outside | Same day — check Cloudflare Tunnel + the backing service |
+| `ExternalProbeFailed` (blackbox) | One of the 2 allowlisted public hostnames is unreachable from outside | Same day — check Cloudflare Tunnel + the backing service |
 | `TLSCertExpiringImminent` | A cert is under 3 days from expiry and cert-manager hasn't renewed it | Immediate — renewal should be automatic; if this fires, automatic renewal already failed |
 | `NVMeWearWarning`/`Critical` | SSD wear crossed 80%/90% (not live yet — see the firewall gap above) | Warning: plan a replacement. Critical: replace now |
 | `ProxmoxHostHighTemp` | Host CPU/NVMe temp crossed 85°C | Same day — check for a stuck process, thermal paste isn't the first suspect on a cool-running host like this |
