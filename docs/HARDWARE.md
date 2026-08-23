@@ -330,6 +330,52 @@ idle window (once `node-exporter-pve` actually reaches Prometheus -- still
 blocked, see above -- this becomes a Grafana query instead of a manual SSH
 sample, and idle-window comparisons get much easier).
 
+**Update, same night, load-controlled re-measurement**: waited for load to
+settle (1-min average ~2.0-2.2, close to whatever "everyday load" the
+original 10.15W baseline was likely taken at, though that figure was never a
+controlled idle measurement either) rather than publish the earlier
+load-confounded numbers as the final word. Three fresh 10-second samples at
+load 2.06-2.16: **15.12W / 15.16W / 16.23W** -- consistently higher than the
+10.15W baseline, and this time NOT explainable by load alone.
+
+Checked why: `scaling_cur_freq` reads ~3.5GHz at this same "idle-ish" load
+(`scaling_min_freq` is 1.1GHz, `scaling_max_freq` 4.5GHz) -- under
+`powersave` governor + `balance_power` EPP, both correctly set (verified
+directly in sysfs, not assumed), the clock isn't dropping anywhere near its
+floor at this load level. **Honest conclusion**: for this specific chip and
+this host's actual bursty mixed workload (many small containerd/qemu
+processes causing frequent brief activity rather than sustained idle), AMD
+P-State active mode with `balance_power` EPP does not show a measurable
+power improvement over the previous passive-mode + `schedutil` baseline --
+if anything the real, load-matched numbers trend higher. This contradicts
+the "modest additional efficiency" expectation stated when this fix was
+first identified as pending; that expectation was based on general AMD/
+community guidance, not a measurement on this exact hardware, and the
+measurement is what should win. The EPP/governor fix itself was still worth
+doing (a config that silently never applied is a config bug regardless of
+the wattage outcome), but it should not be presented as a proven power win.
+
+**Actually tried the more aggressive EPP preset before concluding anything**:
+`energy_performance_preference=power` (one step past `balance_power`, no
+reboot needed -- a live, reversible sysfs write like the EPP change already
+was) gave 14.55W / 15.88W / 17.22W across three more samples at load
+1.77-1.85 -- slightly *lower* load than the `balance_power` samples above,
+essentially the same wattage range. `scaling_cur_freq` was still ~4.1GHz at
+this lower load under the maximally power-biased EPP setting, confirming
+this isn't an EPP-tuning problem: the clock simply isn't dropping much for
+this host's actual bursty multi-process workload regardless of which EPP
+preset is asked for. Reverted live back to `balance_power` afterward to
+match the committed config -- the experiment didn't find a better setting
+worth keeping, so nothing was left diverged from git.
+
+**Not reverted to passive mode** -- that's a real reboot, a bigger action
+than the EPP experiment above, and stays a data point for the operator's own
+call rather than a unilateral one (matches the "no risky changes without
+flagging" standing instruction this whole workstream operated under). If
+lower draw genuinely matters more than the EPP-based tuning this pass tried,
+reverting `amd_pstate` to `passive` (the measured-better baseline) is the
+next real option -- not attempted here.
+
 ## Topology reality — this is not an HA cluster
 
 `pve-mgmt-01` is a single point of failure for compute. There is no way to make this
