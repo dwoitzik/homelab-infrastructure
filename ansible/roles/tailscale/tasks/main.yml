@@ -52,7 +52,7 @@
     --auth-key={{ tailscale_authkey }}
     --advertise-routes={{ tailscale_advertise_routes }}
     --accept-dns={{ tailscale_accept_dns | lower }}
-    --advertise-exit-node=false
+    --advertise-exit-node={{ tailscale_advertise_exit_node | lower }}
     --hostname={{ inventory_hostname }}
   when: >
     (tailscale_status.stdout | from_json).BackendState | default('') != 'Running'
@@ -64,6 +64,7 @@
   ansible.builtin.command: >
     tailscale set
     --advertise-routes={{ tailscale_advertise_routes }}
+    --advertise-exit-node={{ tailscale_advertise_exit_node | lower }}
   when: >
     (tailscale_status.stdout | from_json).BackendState | default('') == 'Running'
   changed_when: false
@@ -75,10 +76,18 @@
     state: present
 
 - name: Discover Traefik websecure NodePort from k3s API
-  ansible.builtin.command: >
-    kubectl get svc traefik -n kube-system
-    -o jsonpath={.spec.ports[?(@.name=="websecure")].nodePort}
-    --kubeconfig /etc/rancher/k3s/k3s.yaml
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - get
+      - svc
+      - traefik
+      - -n
+      - kube-system
+      - -o
+      - jsonpath={.spec.ports[?(@.name=="websecure")].nodePort}
+      - --kubeconfig
+      - /etc/rancher/k3s/k3s.yaml
   register: tailscale_traefik_nodeport_discovered
   delegate_to: "{{ tailscale_traefik_k3s_api_host }}"
   changed_when: false
