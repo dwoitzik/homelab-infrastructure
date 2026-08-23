@@ -102,3 +102,66 @@
     chdir: "{{ github_actions_runner_dir }}"
   when: github_actions_runner_registration_token != ""
   changed_when: true
+
+# ADR-027: declared-vs-live drift guard. The scheduled drift-check.yml
+# workflow needs cluster read access from this runner -- credential lives
+# on this host's disk rather than as a GitHub Actions secret because the
+# PAT this mission has available lacks the `secrets:write` permission
+# needed to set repo secrets via API, and a self-hosted runner (unlike a
+# GitHub-hosted one) has persistent local storage anyway, so there's no
+# real downside to keeping it here instead.
+- name: Deploy the k3s server CA cert for the drift-check kubeconfig
+  ansible.builtin.copy:
+    src: k3s-server-ca.crt
+    dest: "{{ github_actions_runner_dir }}/k3s-server-ca.crt"
+    owner: "{{ github_actions_runner_user }}"
+    group: "{{ github_actions_runner_user }}"
+    mode: "0644"
+
+- name: Deploy the drift-checker kubeconfig (read-only ServiceAccount token)
+  ansible.builtin.template:
+    src: drift-check-kubeconfig.yaml.j2
+    dest: "{{ github_actions_runner_dir }}/drift-check-kubeconfig.yaml"
+    owner: "{{ github_actions_runner_user }}"
+    group: "{{ github_actions_runner_user }}"
+    mode: "0600"
+
+# The ntfy.sh topic name is this operator's real, in-use notification
+# channel -- its obscurity (a random-looking suffix, not a guessable
+# name) is the entire protection, since ntfy topics are unauthenticated
+# pub/sub by default. This repo is a public portfolio repo, so it can't
+# go in the workflow YAML itself; deployed to disk the same way as the
+# kubeconfig above instead.
+- name: Deploy the drift-check ntfy.sh topic name
+  ansible.builtin.copy:
+    content: "{{ vault_drift_check_ntfy_topic }}"
+    dest: "{{ github_actions_runner_dir }}/drift-check-ntfy-topic.txt"
+    owner: "{{ github_actions_runner_user }}"
+    group: "{{ github_actions_runner_user }}"
+    mode: "0600"
+
+- name: Install python3-yaml for the drift-check script
+  ansible.builtin.apt:
+    name: python3-yaml
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Check current kubectl version, if installed
+  ansible.builtin.command: kubectl version --client -o yaml
+  register: github_actions_runner_kubectl_check
+  changed_when: false
+  failed_when: false
+
+- name: Install kubectl for the drift-check script (read-only use only)
+  when: >
+    github_actions_runner_kubectl_check.rc != 0 or
+    github_actions_runner_kubectl_version not in github_actions_runner_kubectl_check.stdout
+  block:
+    - name: Download kubectl
+      ansible.builtin.get_url:
+        url: "https://dl.k8s.io/release/{{ github_actions_runner_kubectl_version }}/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: "0755"
+        owner: root
+        group: root
