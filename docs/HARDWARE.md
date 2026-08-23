@@ -59,7 +59,8 @@ Two real SMART data points, nine days apart:
 | Date | `percentage_used` | Lifetime writes | Power-on hours |
 |---|---|---|---|
 | 2026-08-13 | 45% | 26.9 TB | (not recorded that day) |
-| 2026-08-22 | 56% | 36.6 TB | 2,344 |
+| 2026-08-22 (morning) | 56% | 36.6 TB | 2,344 |
+| 2026-08-22 (night, re-measured) | 56% | 36.6 TB (71,527,289 units) | 2,350 |
 
 That's **11 percentage points of wear and ~9.7TB written in 9 days** — a recent
 observed rate of ~1.22%/day. The drive's full-life average (56% over 2,344 power-on
@@ -96,11 +97,52 @@ predicted date to just wait for):
   firewall rule as the rest of the host-level metrics pipeline (see
   `phase8/LEDGER.md`), so they exist as code but aren't live-firing yet.
 
-As of this writing (2026-08-22): 56% used, 0 media errors, 100% available spare —
-not in warning range yet, but the trend above means this deserves checking again
-within weeks, not months, especially once real historical Prometheus data (rather
-than two manual snapshots) makes the actual current rate visible instead of having
-to bound it between two very different estimates.
+As of this writing (2026-08-22, re-measured same night after a host hang and hard
+power-cycle -- see below): 56% used, 0 media errors, 100% available spare -- not in
+warning range yet, but the trend above means this deserves checking again within
+weeks, not months, especially once real historical Prometheus data (rather than
+manual snapshots) makes the actual current rate visible instead of having to bound
+it between two very different estimates.
+
+**Re-measurement, same night, post-hard-reboot**: `percentage_used` is unchanged at
+the 1%-resolution the counter reports (56%), and the raw `Data Units Written` moved
+from 70,667,597 to 71,527,289 (+859,692 units, ~440 GB) over the ~12 hours between
+this morning's pipeline-build reading and this one -- driven by today's own incident
+and recovery work (a host hang, hard power-cycle, Kyverno/trivy-operator load
+incident, extensive GitOps reconciliation), not representative of steady-state daily
+usage, so not folded into the projection above as a new rate estimate. The
+projection dates (~2026-09-19 recent-rate / ~2026-11-14 lifetime-rate) stand
+unchanged -- meaningfully updating them needs either several more days of *settled*
+operation, or the real Prometheus time series once it's reachable (see below).
+
+The hard power-cycle itself is the more interesting thing to have checked: unclean
+shutdowns are harder on flash than clean ones, and this drive backs the entire host
+with no fallback. `smartctl -a` post-reboot shows `Critical Warning: 0x00`, `Media
+and Data Integrity Errors: 0`, `Error Information Log Entries: 0` -- genuinely
+healthy, no damage found. Two lifetime counters worth tracking going forward now
+that they've been read for the first time: `Power Cycles: 182` and
+`Unsafe Shutdowns: 71` (both cumulative across this drive's whole life on this host,
+not just tonight -- no prior baseline to diff against, but a real reliability signal
+given this host's documented history of freezes, see ADR-023). A brief NVMe I/O
+timeout/abort burst was logged in `dmesg` 6 minutes after tonight's boot completed
+(23:05:31-23:06:13, all `Abort status: 0x0`, i.e. cleanly recovered) -- the same
+post-reboot reconciliation-storm pattern REL-012c already exists to dampen for
+trivy-operator specifically; this instance resolved on its own within ~5 minutes
+with zero resulting errors, not chased further.
+
+**Still open**: `smart_nvme_percentage_used`/`smart_nvme_available_spare_percent`
+still aren't reaching Prometheus -- `node-exporter-pve` (`10.0.10.10:9100`) still
+shows `down` in Prometheus's own target list, so `NVMeWearWarning`/`NVMeWearCritical`
+exist as code but still don't actually fire. Checked one layer further than the
+original finding: the `fwd_04a_srv_monitoring` MikroTik rule that's supposed to
+allow this has been in git since long before this session (commit `65a65de`), which
+means the live router likely never actually has it -- consistent with this repo's
+known Terraform-state loss (state was wiped and needs re-import for dozens of
+MikroTik/Proxmox resources, see `phase1/LEDGER.md`/`phase8/LEDGER.md` history) rather
+than a rule nobody wrote. Not fixed directly -- MikroTik changes are Atlantis-only by
+this repo's own hard rule (`CLAUDE.local.md`), and this needs a real Terraform state
+audit, not a manual router edit. Folded into the maintenance-window runbook's
+pre-check list below.
 
 ### Write-rate reduction (operator decision: not replacing the drive)
 
