@@ -325,6 +325,24 @@ spec:
                     replacement: 'prometheus-snmp-exporter.monitoring.svc.cluster.local:9116'
                   - source_labels: [__param_target]
                     target_label: instance
+              # Scope fix, 2026-08-22: this job used to list all ~44
+              # woitzik.dev hostnames declared anywhere in the repo's
+              # IngressRoutes, resolved via the blackbox-exporter pod's
+              # forced public resolver (dnsPolicy: None, 1.1.1.1/8.8.8.8 --
+              # see blackbox-exporter.yml). ADR-019 (2026-08-14) made public
+              # DNS/tunnel exposure an explicit allowlist of exactly two
+              # hostnames (photos, headscale) plus claude.woitzik.dev on its
+              # own dedicated tunnel (ADR-018) -- every other hostname here
+              # has had no public DNS record since that ADR landed, so ~41 of
+              # these probes have been failing by construction, not
+              # reflecting any real outage, ever since. Narrowed to the
+              # hostnames that are actually publicly resolvable, matching
+              # what this job's own alerts (ExternalProbeFailed etc.) claim
+              # to measure: real external reachability. LAN/VPN reachability
+              # of everything else is real monitoring value but a genuinely
+              # separate concern (needs an internal resolver path this pod
+              # deliberately doesn't have) -- not covered here, tracked as a
+              # known gap rather than silently dropped (see ROADMAP.md).
               - job_name: 'blackbox-http'
                 scrape_interval: 60s
                 metrics_path: /probe
@@ -332,51 +350,9 @@ spec:
                   module: [http_auth_ok]
                 static_configs:
                   - targets:
-                      - https://ai.woitzik.dev
-                      - https://argo.woitzik.dev
-                      - https://atlantis.woitzik.dev
-                      - https://auth.woitzik.dev
-                      - https://backup.woitzik.dev
-                      - https://bazarr.woitzik.dev
-                      - https://beszel.woitzik.dev
-                      - https://cars.woitzik.dev
-                      - https://dns.woitzik.dev
-                      - https://docs.woitzik.dev
-                      - https://draw.woitzik.dev
-                      - https://element.woitzik.dev
-                      - https://finance.woitzik.dev
-                      - https://git.woitzik.dev
-                      - https://gotify.woitzik.dev
-                      - https://ha.woitzik.dev
+                      - https://claude.woitzik.dev
                       - https://headscale.woitzik.dev
-                      - https://home.woitzik.dev
-                      - https://hydra.woitzik.dev
-                      - https://links.woitzik.dev
-                      - https://loki.woitzik.dev
-                      - https://matrix.woitzik.dev
-                      - https://mealie.woitzik.dev
-                      - https://media.woitzik.dev
-                      - https://monitoring.woitzik.dev
-                      - https://n8n.woitzik.dev
-                      - https://nextcloud.woitzik.dev
-                      - https://onlyoffice.woitzik.dev
                       - https://photos.woitzik.dev
-                      - https://pve.woitzik.dev
-                      - https://radarr.woitzik.dev
-                      - https://requests.woitzik.dev
-                      - https://router.woitzik.dev
-                      - https://rss.woitzik.dev
-                      - https://s3.woitzik.dev
-                      - https://sabnzbd.woitzik.dev
-                      - https://scrutiny.woitzik.dev
-                      - https://search.woitzik.dev
-                      - https://secrets.woitzik.dev
-                      - https://sonarr.woitzik.dev
-                      - https://speed.woitzik.dev
-                      - https://status.woitzik.dev
-                      - https://traefik.woitzik.dev
-                      - https://vault.woitzik.dev
-                      - https://wazuh.woitzik.dev
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: __param_target
@@ -384,6 +360,17 @@ spec:
                     target_label: instance
                   - target_label: __address__
                     replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+              # auth.woitzik.dev lost its public DNS record in the same
+              # ADR-019 change -- this health check was never about external
+              # reachability (Authelia is LAN/VPN-only by design), so probing
+              # it through the public-only resolver above was wrong from the
+              # start and has been failing silently since 2026-08-14. The
+              # blackbox pod has no cluster DNS (dnsPolicy: None, see
+              # blackbox-exporter.yml), so *.svc.cluster.local wouldn't
+              # resolve either -- targets Authelia's ClusterIP directly,
+              # which needs no resolver at all. ClusterIP is stable for the
+              # life of the Service; only revisit if authelia's Service is
+              # ever deleted/recreated (`kubectl get svc -n apps authelia`).
               - job_name: 'blackbox-authelia-health'
                 scrape_interval: 60s
                 metrics_path: /probe
@@ -391,7 +378,7 @@ spec:
                   module: [http_2xx]
                 static_configs:
                   - targets:
-                      - https://auth.woitzik.dev/api/health
+                      - http://10.43.107.252:9091/api/health
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: __param_target
