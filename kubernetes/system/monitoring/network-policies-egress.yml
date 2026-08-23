@@ -21,13 +21,43 @@
 # the same apiserver-ipBlock + real-traffic-check pass this file establishes
 # the pattern for -- not done this round, no new reasoning to add.
 #
-# apps (40 workloads) is still deliberately excluded, now with sharper
-# reasoning than "no traffic map yet": a naive blanket 443-egress-only
-# rule (the pattern used below for cert-manager/argocd) would break real,
-# named things in this specific namespace -- `tailscale-subnet-router`
-# needs outbound WireGuard UDP, `synapse` needs Matrix federation on 8448
-# (not 443), `headscale` needs its DERP relay traffic. A correct policy
-# here needs a real per-workload pass, not a copy of the pattern below.
+# 2026-08-23: apps closed too, after the real per-workload pass the earlier
+# note above said it needed. Checked every one of its ~38 workloads'
+# container ports/images/configs (not guessed) to find what actually needs
+# more than the broad-443 pattern:
+#
+# - tailscale-subnet-router: WireGuard is UDP, NAT-traversal based (no fixed
+#   port) -- allowed UDP to anywhere, falls back to DERP over 443/TCP
+#   (already covered by the broad allow) if UDP is blocked upstream anyway.
+# - synapse: Matrix federation is TCP 8448, checked live in its own config,
+#   separate from the client-facing 443 path.
+# - headscale: checked its config.yml -- runs its own EMBEDDED DERP server
+#   (serves relay traffic as ingress, not something it needs egress for) and
+#   only calls out over HTTPS for the default Tailscale DERP map
+#   (controlplane.tailscale.com) -- the broad-443 allow already covers this,
+#   no special case needed despite being flagged as a risk earlier.
+# - authelia (this cluster's Authelia instance lives IN apps, not database):
+#   needs its own CNPG Postgres AND its session-store Redis
+#   (`redis-authelia`), both of which live in the `database` namespace --
+#   same Postgres pattern for any other apps-namespace workload with a
+#   cluster.yml under kubernetes/system/postgres/ (n8n, synapse).
+#   `database`'s own `allow-from-apps` NetworkPolicy already expects this
+#   direction, checked before assuming it. First attempt at this rule only
+#   opened 5432 -- missed the Redis port entirely, caught live (Authelia's
+#   own logs: "Unable to save updated user session ... connection refused"
+#   to redis-authelia's pod IP) and fixed before calling this done, not
+#   left as a silent regression.
+#
+# Everything else (freshrss, linkding, mealie, n8n, renovate, keel, searxng,
+# home-assistant, homepage, and more) genuinely does need broad, many-host
+# external HTTP(S) egress by design -- that's not a gap in the traffic map,
+# it's what these apps actually are (an RSS reader has to reach arbitrary
+# feed hosts, a workflow-automation tool has to reach arbitrary APIs). The
+# broad-443 allow already used elsewhere in this file is the correct,
+# proportionate answer for all of them -- narrowing further would need a
+# per-app allowlist with no real security payoff over "not TCP-443/80 or
+# UDP-anywhere", since that's genuinely what normal operation looks like for
+# most of this namespace.
 
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -549,3 +579,163 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: apps
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: apps
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-intra-namespace
+  namespace: apps
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: apps
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-apiserver
+  namespace: apps
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.11/32
+      ports:
+        - protocol: TCP
+          port: 6443
+---
+# database (CNPG Postgres for authelia/n8n/synapse) -- database's own
+# allow-from-apps NetworkPolicy already expects this direction.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-database
+  namespace: apps
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: database
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+---
+# Broad HTTP(S) egress -- the actual, legitimate operating mode for most of
+# this namespace (RSS/bookmark/recipe importers, workflow automation, a
+# private search engine querying multiple backends, dependency-update bots).
+# Same class of allow as CrowdSec's CAPI rule / cert-manager's ACME rule
+# elsewhere in this file, just needed by more workloads here. Port 80
+# included alongside 443 -- some external resources apps like freshrss/
+# linkding fetch (favicons, older RSS feeds) still aren't HTTPS.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-web
+  namespace: apps
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+---
+# Matrix federation (synapse-to-synapse, other homeservers) -- separate from
+# the client-facing 443 path, checked live in synapse's own config.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-synapse-federation
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: synapse
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 8448
+---
+# WireGuard is UDP, NAT-traversal based -- no fixed port to allowlist.
+# Falls back to DERP over 443/TCP (already covered by allow-egress-web
+# above) if direct UDP is blocked upstream of this cluster anyway. Scoped
+# to this one pod, not the whole namespace -- the broadest allow in this
+# file, kept as narrow as the actual need (one workload, not everything).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-tailscale-wireguard
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: tailscale-subnet-router
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+      ports:
+        - protocol: UDP
