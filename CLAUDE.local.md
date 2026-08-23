@@ -19,14 +19,23 @@ current topology (see `docs/compute-nodes.md` for the full authoritative breakdo
 one Proxmox host (`pve-mgmt-01`, SSH alias `pve`) runs both direct LXC workloads AND a
 3-VM k3s cluster (`vm-srv-k3s-11/12/13`) on top of itself -- "primary workloads" mostly
 means "k3s pods" now, not host-level Docker containers. Two Raspberry Pis run DNS
-(AdGuard Home + Unbound, primary+replica) plus, as of 2026-08-17 (ADR-022),
-`rpi-srv-02` also runs Headscale natively via Docker on its own attached SSD.
+(AdGuard Home + Unbound, primary+replica).
+
+**2026-08-23 correction**: an earlier session attempted (PR #463, referencing an
+"ADR-022" that was never actually merged) to migrate Headscale off k3s onto
+`rpi-srv-02` natively via Docker -- this line previously described that as done. It
+wasn't: the attempt left a real, orphaned native Headscale container running on
+`rpi-srv-02` with its own stale node registrations, decommissioned the same night
+this correction was written (see `phase8/LEDGER.md`). Headscale runs on k3s
+(`kubernetes/apps/headscale/`); `rpi-srv-02` is instead a genuine HA exit-node
+failover PEER of the k3s-hosted server via Tailscale (PR #544, `ansible/roles/
+tailscale`), not a replacement for it.
 
 | Node | Spec | Role |
 |---|---|---|
 | `pve-mgmt-01` (`pve`) | Ryzen 7 5825U (8C/16T, VCN HW-transcode), 64 GB, 512 GB NVMe | Proxmox host -- LXCs + 3-VM k3s cluster |
 | `rpi-srv-01` | RPi 4B, 8 GB RAM, SD card (10.0.20.2) | AdGuard Home + Unbound (primary DNS) |
-| `rpi-srv-02` | RPi 4B, 8 GB RAM, SD card + 111.8GB USB SSD (10.0.20.3) | AdGuard Home + Unbound (replica) + Headscale (native Docker, on the SSD) |
+| `rpi-srv-02` | RPi 4B, 8 GB RAM, SD card + 111.8GB USB SSD (10.0.20.3) | AdGuard Home + Unbound (replica) + Tailscale HA exit-node failover peer |
 | network | MikroTik RB5009 | router / L3 |
 | bulk | 2 TB HDD via USB (on `pve-mgmt-01`, ZFS pool `archive`) | backup (Garage/PBS) + Jellyfin media |
 
