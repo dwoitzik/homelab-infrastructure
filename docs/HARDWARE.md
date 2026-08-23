@@ -288,6 +288,48 @@ homelab) and there's no concrete evidence it's wrong — not changed without
 real data to justify a change either way. Revisit once RAPL history actually
 accumulates in Prometheus.
 
+### Update, 2026-08-23: reboot done, a real governor/EPP bug found and fixed
+
+The operator executed the reboot (`docs/RUNBOOK-maintenance-window-restart-
+batch.md`). Confirmed live: `amd_pstate=active` genuinely in effect
+(`scaling_driver` reads `amd-pstate-epp`, not the old `amd-pstate`), and the
+`energy_performance_preference` sysfs path now exists and is readable, as
+predicted above.
+
+**A real bug the reboot exposed**: `scaling_available_governors` under active
+mode is just `performance powersave` -- `schedutil` (this role's configured
+governor) isn't offered under active mode at all. `pve-cpu-power.service`'s
+`ExecStart` (`cpupower frequency-set -g schedutil`) failed (exit 237) every
+time it ran post-reboot, which meant its `ExecStartPost` (the EPP-setting
+line) never ran either -- EPP stayed at the driver's own default
+(`balance_performance`), not the intended `balance_power`. Fixed by changing
+`pve_power_cpu_governor` to `powersave` (the correct active-mode choice --
+EPP does the actual fine-grained tuning from there) and re-running the role
+live, no further reboot needed. Verified: `systemctl status
+pve-cpu-power.service` now shows both `ExecStart` and `ExecStartPost`
+succeeding, `scaling_governor` reads `powersave`, `energy_performance_
+preference` reads `balance_power`.
+
+**Power measurement, with an honest caveat**: three 10-second RAPL samples
+right after the fix read 16.10W / 18.98W / 17.77W, then 15.46W on a fourth
+sample a bit later -- all higher than the 10.15W baseline, which looks like a
+regression at first glance but isn't a clean comparison: host load was
+genuinely elevated during every one of these samples (1-min load average
+11.65-15.20, all 3 k3s VMs' qemu processes visibly busy in `ps aux`, this
+session's own concurrent Ansible/kubectl activity a real contributor) against
+whatever quieter moment the original 10.15W figure was captured at ("the
+host's current everyday load" -- not a controlled idle baseline either, in
+fairness). The correctness of the fix itself isn't in question -- EPP and
+governor are now verifiably set to the intended values, where before they
+silently weren't (a strictly better starting point than before, regardless of
+what the wattage happens to read under load) -- but a real, comparable
+before/after number needs both sides measured at genuinely matched load, which
+this pass didn't have. Recorded here rather than cherry-picking a flattering
+number or omitting the result. **Follow-up**: re-sample RAPL during a genuinely
+idle window (once `node-exporter-pve` actually reaches Prometheus -- still
+blocked, see above -- this becomes a Grafana query instead of a manual SSH
+sample, and idle-window comparisons get much easier).
+
 ## Topology reality — this is not an HA cluster
 
 `pve-mgmt-01` is a single point of failure for compute. There is no way to make this
