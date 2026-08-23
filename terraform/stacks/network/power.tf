@@ -39,8 +39,18 @@ resource "routeros_system_scheduler" "disable_unused_ports" {
 # pass.
 ###############################################################################
 
+#
+# 2026-08-22: this resource block existed since #493 but was never actually
+# reconciled onto the live router -- terraform state still tracked the
+# pre-existing manually-created schedulers (`night_mode_leds`/`day_mode_leds`,
+# calling separate `/system script` entries `leds_off`/`leds_on` that only
+# disable per-interface LED bindings, not the board LEDs). Renaming the
+# resource block below to match those live names/on-events instead of
+# re-fighting drift, so the next Atlantis apply converges onto what's
+# actually live and reachable, and future drift is visible in `terraform
+# plan` instead of silently never applying.
 resource "routeros_system_scheduler" "led_off_night" {
-  name       = "power_led_off_night"
+  name       = "night_mode_leds"
   start_time = "22:00:00"
   interval   = "1d"
   on_event   = "/system leds settings set all-leds-off=immediate"
@@ -48,7 +58,7 @@ resource "routeros_system_scheduler" "led_off_night" {
 }
 
 resource "routeros_system_scheduler" "led_on_day" {
-  name       = "power_led_on_day"
+  name       = "day_mode_leds"
   start_time = "06:00:00"
   interval   = "1d"
   on_event   = "/system leds settings set all-leds-off=no"
