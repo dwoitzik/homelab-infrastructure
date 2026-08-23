@@ -123,7 +123,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: report
-              image: alpine:3.20
+              image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
               command: ["sh", "-c", "apk add --no-cache curl jq >/dev/null && sh /scripts/weekly-report.sh"]
               env:
                 - name: DISCORD_WEBHOOK_URL
