@@ -9,10 +9,24 @@
 # metadata labels to the generated PodMonitor -- podMonitorRelabelings only
 # rewrites already-scraped samples, it can't make Prometheus notice the object
 # in the first place. Git-managed replacement instead, both labels present.
+#
+# 2026-08-23: named `postgres-authelia-metrics`, NOT `postgres-authelia` --
+# root-caused a real ArgoCD sync-loop bug that had this Application stuck at
+# Health: Unknown since this file was first added. CNPG's own Cluster
+# reconciler deletes any PodMonitor it finds *by name matching the Cluster's
+# own name* in the same namespace on every single reconcile when
+# enablePodMonitor is false (confirmed live via cloudnative-pg's own logs:
+# a "Deleting PodMonitor" message fired every ~15-45s for
+# Cluster/postgres-authelia, regardless of who created the object or what
+# labels it carried -- this is a name match, not a label or ownership
+# check). The object's own name is irrelevant to Prometheus (which selects
+# purely by the labels above plus spec.selector.matchLabels, unchanged
+# below) so renaming it away from the cluster's own name is a real,
+# targeted fix, not a workaround for a cosmetic symptom.
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: postgres-authelia
+  name: postgres-authelia-metrics
   namespace: database
   labels:
     cnpg.io/cluster: postgres-authelia
