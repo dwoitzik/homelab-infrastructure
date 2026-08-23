@@ -24,3 +24,8 @@ github_actions_runner_labels: "self-hosted,linux,x64,homelab"
 # is passed transiently via --extra-vars at the moment of use -- never
 # committed to git or written to Vault, it expires within the hour anyway.
 github_actions_runner_registration_token: ""
+
+# ADR-027 drift guard -- pinned separately from the k3s cluster's own
+# version since this is just a thin read-only client, not something that
+# needs to track the server version.
+github_actions_runner_kubectl_version: "v1.31.4"

@@ -1,0 +1,96 @@
+# ADR-027: declared-vs-live drift guard. This ServiceAccount is the
+# read-only credential the .github/workflows/drift-check.yml scheduled
+# workflow uses (via the self-hosted runner on ct-srv-atlantis-01, ADR-021)
+# to check every standalone manifest under kubernetes/system/ actually
+# exists live -- read-only by design, this credential only ever needs to
+# `kubectl get`, never write.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: drift-checker
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: drift-checker-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    name: drift-checker
+    namespace: monitoring
+---
+# The built-in `view` ClusterRole deliberately does NOT aggregate every CRD
+# in the cluster, and specifically excludes rbac.authorization.k8s.io
+# resources by design (reading Role/ClusterRole objects is considered
+# privilege-escalation reconnaissance) -- confirmed live the first time this
+# guard ran: 69/211 objects came back "missing" and turned out to be false
+# positives from this ServiceAccount's own read gaps, not real drift (Role/
+# ClusterRole/RoleBinding, CNPG Clusters, ServiceMonitors/PodMonitors, and
+# more). Every extra group below is one actually exercised by a real
+# manifest under kubernetes/system/. Narrow, read-only, additive to `view`.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: drift-checker-extra-read
+rules:
+  - apiGroups: ["kyverno.io"]
+    resources: ["clusterpolicies", "policies"]
+    verbs: ["get", "list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+    verbs: ["get", "list"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters", "scheduledbackups"]
+    verbs: ["get", "list"]
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["prometheusrules", "servicemonitors", "podmonitors", "alertmanagerconfigs"]
+    verbs: ["get", "list"]
+  - apiGroups: ["traefik.io"]
+    resources: ["ingressroutes", "middlewares", "serverstransports"]
+    verbs: ["get", "list"]
+  - apiGroups: ["velero.io"]
+    resources: ["schedules", "backupstoragelocations"]
+    verbs: ["get", "list"]
+  - apiGroups: ["cert-manager.io"]
+    resources: ["clusterissuers", "issuers", "certificates"]
+    verbs: ["get", "list"]
+  - apiGroups: ["metallb.io"]
+    resources: ["ipaddresspools", "l2advertisements", "bgpadvertisements"]
+    verbs: ["get", "list"]
+  - apiGroups: ["chaos-mesh.org"]
+    resources: ["schedules"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: drift-checker-extra-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: drift-checker-extra-read
+subjects:
+  - kind: ServiceAccount
+    name: drift-checker
+    namespace: monitoring
+---
+# Long-lived token (not a short-lived TokenRequest) -- deliberate: this
+# credential is consumed by an external CI process (GitHub Actions) on a
+# recurring schedule, not a live pod that could mint its own short-lived
+# token per run. Read-only scope (view + the narrow addition above) is the
+# actual safety boundary here, not the token's lifetime.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: drift-checker-token
+  namespace: monitoring
+  annotations:
+    kubernetes.io/service-account.name: drift-checker
+type: kubernetes.io/service-account-token
