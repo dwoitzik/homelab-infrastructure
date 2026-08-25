@@ -17,7 +17,7 @@ version: '3.8'
 
 services:
   wazuh.manager:
-    image: wazuh/wazuh-manager:4.12.0
+    image: wazuh/wazuh-manager:4.14.7@sha256:8665c9807a5765253c79e4b072a1b7462c997bd69be949118a8d82ce44dd33e9
     container_name: wazuh.manager
     hostname: wazuh-manager
     restart: unless-stopped
