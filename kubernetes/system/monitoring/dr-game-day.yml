@@ -1,0 +1,174 @@
+# Item 5 of the 2026-08-23 steady-state consolidation goal: STEADY-STATE.md's
+# quarterly rhythm calls for "a real DR game day... actually restore
+# something... and confirm the procedure still matches reality," not a
+# read-through of DISASTER-RECOVERY.md.
+#
+# Deliberately scoped to a SAFE kill-and-recover test, not a fully
+# unattended job that takes down a stateful production service on a
+# schedule with no human in the loop. This repo's own guardrails
+# (CLAUDE.local.md: "Destructive ops... require explicit human confirmation
+# in the PR") apply here -- an automated quarterly job that deletes a
+# stateful service's data without a human reviewing each run would violate
+# that guardrail, not exercise it responsibly. `homepage` was chosen
+# specifically because it's genuinely stateless (no PVC anywhere in
+# kubernetes/apps/homepage/, confirmed by inspection -- its one volume is an
+# emptyDir rebuilt by an init container on every pod start) and
+# `replicas: 1`, so killing its pod is a real, honest recovery-timing test
+# (no second replica silently masking the downtime window) with zero
+# data-loss risk. The broader "restore a PVC/VM/CNPG cluster from backup"
+# flavor of DR testing already exists as `monthly-restore-test`
+# (kubernetes/system/velero/restore-test.yml) -- that one proves backup
+# integrity monthly into a scratch namespace, non-destructively. This job
+# proves recovery SPEED for a real, no-second-copy live service instead --
+# the two are complementary, not duplicates.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dr-game-day-runner
+  namespace: monitoring
+---
+# Lives in `apps` (not `monitoring`, where the ServiceAccount itself lives)
+# because that's the namespace the permission actually applies to -- same
+# cross-namespace Role/RoleBinding pattern restore-test.yml already uses
+# for velero-restore-test. Scoped to exactly one label-selected pod set:
+# cannot delete anything outside app=homepage, cannot touch any other
+# namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dr-game-day-runner
+  namespace: apps
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dr-game-day-runner
+  namespace: apps
+subjects:
+  - kind: ServiceAccount
+    name: dr-game-day-runner
+    namespace: monitoring
+roleRef:
+  kind: Role
+  name: dr-game-day-runner
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dr-game-day-script
+  namespace: monitoring
+data:
+  dr-game-day.sh: |
+    #!/bin/sh
+    set -u
+
+    TARGET_LABEL="app=homepage"
+    TARGET_URL="http://homepage.apps.svc.cluster.local:80/"
+    NAMESPACE=apps
+    MAX_WAIT_SECONDS=180
+
+    log() { echo "[dr-game-day] $(date -u +%FT%TZ) $*"; }
+
+    post_discord() {
+      MSG="$1"
+      PAYLOAD=$(jq -n --arg content "$MSG" '{content: $content}')
+      curl -fsS -m 20 -X POST -H "Content-Type: application/json" \
+        -d "$PAYLOAD" "$DISCORD_WEBHOOK_URL" >/dev/null
+    }
+
+    log "pre-check: confirming target is healthy before killing anything"
+    if ! curl -fsS -m 10 -o /dev/null "$TARGET_URL"; then
+      log "FAIL: target already unhealthy before the test started -- aborting, not running the test against an already-broken service"
+      post_discord "**Quarterly DR game day -- $(date -u +%Y-%m-%d)**
+    **ABORTED**: homepage was already unhealthy before the test started. Not killing an already-broken service. Check it directly."
+      exit 1
+    fi
+
+    log "killing the target: deleting all pods matching ${TARGET_LABEL} in ${NAMESPACE}"
+    START_EPOCH=$(date -u +%s)
+    kubectl delete pods -l "$TARGET_LABEL" -n "$NAMESPACE" --wait=false
+
+    log "timing recovery (polling ${TARGET_URL}, ${MAX_WAIT_SECONDS}s budget)"
+    ELAPSED=0
+    RECOVERED=0
+    while [ "$ELAPSED" -lt "$MAX_WAIT_SECONDS" ]; do
+      if curl -fsS -m 5 -o /dev/null "$TARGET_URL" 2>/dev/null; then
+        RECOVERED=1
+        break
+      fi
+      sleep 3
+      NOW_EPOCH=$(date -u +%s)
+      ELAPSED=$((NOW_EPOCH - START_EPOCH))
+    done
+
+    if [ "$RECOVERED" -eq 1 ]; then
+      log "PASS: recovered after ${ELAPSED}s"
+      post_discord "**Quarterly DR game day -- $(date -u +%Y-%m-%d)**
+    Target: \`homepage\` (Deployment, namespace \`apps\`, replicas: 1, stateless)
+    Action: deleted the running pod (real kill, not a drill against a scratch copy)
+    Result: **PASS** -- recovered and serving HTTP 200 again in **${ELAPSED}s**
+    (self-heal path: k8s ReplicaSet reschedule + ArgoCD selfHeal watching for drift)"
+    else
+      log "FAIL: did not recover within ${MAX_WAIT_SECONDS}s"
+      post_discord "@here **Quarterly DR game day -- $(date -u +%Y-%m-%d)**
+    Target: \`homepage\` (Deployment, namespace \`apps\`)
+    Action: deleted the running pod
+    Result: **FAIL** -- did NOT recover within ${MAX_WAIT_SECONDS}s. Check \`kubectl get pods -n apps -l ${TARGET_LABEL}\` and \`kubectl describe deployment/homepage -n apps\` now."
+      exit 1
+    fi
+
+    log "done"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dr-game-day
+  namespace: monitoring
+spec:
+  # 1st of Jan/Apr/Jul/Oct, 10:00 -- matches STEADY-STATE.md's quarterly
+  # cadence, staggered after the monthly jobs' own morning slots.
+  schedule: "0 10 1 1,4,7,10 *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 4
+  failedJobsHistoryLimit: 4
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 300
+      backoffLimit: 0
+      template:
+        spec:
+          serviceAccountName: dr-game-day-runner
+          restartPolicy: Never
+          containers:
+            - name: dr-game-day
+              image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+              command: ["/bin/sh", "-c", "apk add --no-cache curl jq kubectl >/dev/null && sh /scripts/dr-game-day.sh"]
+              env:
+                - name: DISCORD_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: alertmanager-discord-webhook
+                      key: url
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+          volumes:
+            - name: script
+              configMap:
+                name: dr-game-day-script
+                defaultMode: 0755
