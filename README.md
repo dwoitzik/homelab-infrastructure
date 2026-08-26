@@ -4,9 +4,23 @@
 
 # Homelab Infrastructure as Code
 
-My homelab, fully managed as code: MikroTik firewall rules, Proxmox VMs/LXCs, and everything running on top in Kubernetes. Everything goes through a pull request — I don't apply changes by hand.
+A homelab, fully managed as code: MikroTik firewall rules, Proxmox VMs/LXCs, and ~30
+self-hosted applications running on top in Kubernetes, all applied through GitOps, none
+of it by hand. It exists to be genuinely used day to day — not a demo cluster spun up to
+have something to show — and it's also a record of what running real infrastructure
+looks like: a from-nothing disaster recovery (`docs/RECOVERY-REPORT-2026-08-13.md`), the
+architecture decisions that came out of it (`docs/decisions/`, 28 ADRs), and an honest
+closing assessment of what still needs work (`docs/POST-MISSION.md`).
 
-Start with [docs/OPERATIONS.md](docs/OPERATIONS.md) if you want to know where things live, where secrets are kept, or how I've debugged this stuff before.
+**What this demonstrates**: GitOps discipline (every change is a PR, Terraform applies
+only via Atlantis, Kubernetes only via ArgoCD), root-causing real production incidents
+rather than guessing, an explicit default-deny security posture (network segmentation,
+public exposure as an allowlist, secrets in Vault, policy enforcement via Kyverno), and
+documentation that stays honest about what's still open rather than only what's done.
+
+Start with [docs/STEADY-STATE.md](docs/STEADY-STATE.md) for how this actually runs day
+to day, or [docs/OPERATIONS.md](docs/OPERATIONS.md) for where things live, where secrets
+are kept, and how I've debugged this stuff before.
 
 ## Stack Overview
 
@@ -23,7 +37,7 @@ Start with [docs/OPERATIONS.md](docs/OPERATIONS.md) if you want to know where th
 | Auth | Authelia — SSO/OIDC for all protected services |
 | VPN | Headscale (self-hosted Tailscale control plane), OIDC login via Authelia |
 | Secrets | Ansible Vault (host-level) + HashiCorp Vault w/ auto-unseal (k8s, via ExternalSecrets) |
-| Backups | Velero → Garage S3 (k8s, incl. PVC data via Kopia) + Proxmox Backup Server (VMs/LXCs). Neither offsite leg is active yet — see `docs/backup-strategy.md`. |
+| Backups | Velero → Garage S3 (k8s, incl. PVC data via Kopia), daily offsite to Cloudflare R2 (with a usage guard that pauses it before hitting the free-tier cap), + Proxmox Backup Server (VMs/LXCs). Restore is tested automatically, monthly — see `docs/STEADY-STATE.md`. |
 
 ## Architecture
 
@@ -106,24 +120,45 @@ browser session is looking at the dashboard.
 ├── kubernetes/
 │   ├── apps/                  # ArgoCD-managed workloads (ApplicationSet picks up any new folder)
 │   │   ├── authelia/          # SSO / OIDC identity provider
+│   │   ├── beszel/            # Lightweight server monitoring
 │   │   ├── cloudflared/       # Cloudflare Tunnel
+│   │   ├── crowdsec/          # Collaborative IPS, bans malicious IPs at the Traefik edge
+│   │   ├── excalidraw/        # Collaborative whiteboard
+│   │   ├── firefly/           # Personal finance manager
+│   │   ├── freshrss/          # RSS reader
 │   │   ├── garage/            # S3-compatible object storage
 │   │   ├── gitea/             # Private git instance
+│   │   ├── gotify/            # Push notification server
 │   │   ├── headscale/         # Tailscale control plane
 │   │   ├── home-assistant/    # Smart home hub
 │   │   ├── homepage/          # Dashboard
 │   │   ├── immich/            # Photo library (Cloudflare Tunnel external access)
 │   │   ├── jellyfin/          # External-service pointer to the GPU-passthrough LXC
-│   │   ├── keel/              # Image auto-update
+│   │   ├── keel/               # Image auto-update
+│   │   ├── kube-bench/        # CIS Kubernetes benchmark, scheduled
+│   │   ├── linkding/          # Bookmark manager
+│   │   ├── lubelogger/        # Vehicle maintenance log
+│   │   ├── matrix/            # Synapse homeserver + Element web client
 │   │   ├── mealie/            # Recipe manager
 │   │   ├── myspeed/           # Internet speed-test history
+│   │   ├── n8n/                # Workflow automation
 │   │   ├── nextcloud/         # Files · CalDAV · CardDAV
+│   │   ├── onlyoffice/        # Office document editing (Nextcloud integration)
 │   │   ├── open-webui/        # Local LLM interface (Ollama)
 │   │   ├── paperless/         # Document management + paperless-gpt
 │   │   ├── renovate/          # Dependency update bot
+│   │   ├── scrutiny/          # Disk S.M.A.R.T. monitoring UI
 │   │   ├── searxng/           # Self-hosted metasearch
+│   │   ├── trivy-operator/    # Continuous container vulnerability scanning
 │   │   ├── uptime-kuma/       # Uptime monitoring
 │   │   └── vaultwarden/       # Password manager
+│   │
+│   │   # Two IngressRoute patterns coexist, not fully unified yet: older apps
+│   │   # route through the centralized kubernetes/system/apps-ingressroute.yml,
+│   │   # newer ones (beszel, excalidraw, firefly, freshrss, gotify, linkding,
+│   │   # lubelogger, matrix, myspeed, n8n, onlyoffice, searxng) declare their
+│   │   # own IngressRoute inline in their own directory. Both work; picking one
+│   │   # convention and migrating the rest is open, tracked in docs/ROADMAP.md.
 │   └── system/                # Manually-applied system components
 │       ├── argocd/            # ArgoCD config (RBAC, OIDC)
 │       ├── cert-manager/      # TLS certificate automation (+ cert-manager-config/, certificates/)
@@ -168,30 +203,53 @@ browser session is looking at the dashboard.
 
 ## Kubernetes Services
 
-| Service | URL | Auth |
-|---|---|---|
-| Homepage | home.woitzik.dev | Authelia |
-| ArgoCD | argo.woitzik.dev | Authelia OIDC |
-| Grafana | monitoring.woitzik.dev | Authelia OIDC |
-| Traefik | traefik.woitzik.dev | Authelia |
-| Uptime Kuma | status.woitzik.dev | Authelia |
-| Paperless-ngx | docs.woitzik.dev | Authelia |
-| Open WebUI | ai.woitzik.dev | Authelia |
-| Vaultwarden | vault.woitzik.dev | Built-in |
-| Nextcloud | nextcloud.woitzik.dev | Built-in |
-| Mealie | mealie.woitzik.dev | Authelia |
-| Gitea | git.woitzik.dev | Built-in |
-| Home Assistant | ha.woitzik.dev | Built-in |
-| Headscale | headscale.woitzik.dev | Built-in |
-| Atlantis | atlantis.woitzik.dev | Authelia (except `/events` webhook: GitHub HMAC) |
-| Immich | photos.woitzik.dev | Built-in |
-| Jellyfin | media.woitzik.dev | Built-in |
-| Jellyseerr | requests.woitzik.dev | Built-in |
-| AdGuard Home | dns.woitzik.dev | Authelia |
-| Proxmox VE | pve.woitzik.dev | Authelia |
-| PBS | backup.woitzik.dev | Authelia |
-| MikroTik (RouterOS webfig) | router.woitzik.dev | Authelia |
-| Garage S3 | s3.woitzik.dev | Key auth |
+Every hostname below resolves and works from the LAN or over the Headscale/Tailscale
+VPN. **Only two are actually reachable from the public internet** — everything else
+is deliberately allowlisted out of Cloudflare's DNS/tunnel entirely, an explicit
+default-deny decision (`ADR-019`), not an oversight. See `docs/URL-INVENTORY.md` for
+the full external-reachability audit.
+
+| Service | URL | Auth | Reachable from |
+|---|---|---|---|
+| Homepage | home.woitzik.dev | Authelia | LAN/VPN only |
+| ArgoCD | argo.woitzik.dev | Authelia OIDC | LAN/VPN only |
+| Grafana | monitoring.woitzik.dev | Authelia OIDC | LAN/VPN only |
+| Traefik | traefik.woitzik.dev | Authelia | LAN/VPN only |
+| Uptime Kuma | status.woitzik.dev | Authelia | LAN/VPN only |
+| Paperless-ngx | docs.woitzik.dev | Authelia | LAN/VPN only |
+| Open WebUI | ai.woitzik.dev | Authelia | LAN/VPN only |
+| Vaultwarden | vault.woitzik.dev | Built-in | LAN/VPN only |
+| Nextcloud | nextcloud.woitzik.dev | Built-in | LAN/VPN only |
+| Mealie | mealie.woitzik.dev | Authelia | LAN/VPN only |
+| Gitea | git.woitzik.dev | Built-in | LAN/VPN only |
+| Home Assistant | ha.woitzik.dev | Built-in | LAN/VPN only |
+| Headscale | headscale.woitzik.dev | Built-in | **Public** — structurally required, a device has to reach this before any VPN path exists |
+| Atlantis | atlantis.woitzik.dev | Authelia (except `/events` webhook: GitHub HMAC) | LAN/VPN only |
+| Immich | photos.woitzik.dev | Rate-limited, own login | **Public** — family photo access is a real, named use case |
+| Jellyfin | media.woitzik.dev | Built-in | LAN/VPN only |
+| Jellyseerr | requests.woitzik.dev | Built-in | LAN/VPN only |
+| AdGuard Home | dns.woitzik.dev | Authelia | LAN/VPN only |
+| Proxmox VE | pve.woitzik.dev | Authelia | LAN/VPN only |
+| PBS | backup.woitzik.dev | Authelia | LAN/VPN only |
+| MikroTik (RouterOS webfig) | router.woitzik.dev | Authelia | LAN/VPN only |
+| Garage S3 | s3.woitzik.dev | Key auth | LAN/VPN only |
+| Wazuh (SIEM) | wazuh.woitzik.dev | Built-in | LAN/VPN only |
+| Vault | secrets.woitzik.dev | Built-in | LAN/VPN only |
+| Loki | loki.woitzik.dev | Authelia | LAN/VPN only |
+| Scrutiny | scrutiny.woitzik.dev | Authelia | LAN/VPN only |
+| Beszel | beszel.woitzik.dev | Authelia | LAN/VPN only |
+| Firefly III | finance.woitzik.dev | Authelia | LAN/VPN only |
+| FreshRSS | rss.woitzik.dev | Authelia | LAN/VPN only |
+| Gotify | gotify.woitzik.dev | Authelia | LAN/VPN only |
+| Linkding | links.woitzik.dev | Authelia | LAN/VPN only |
+| LubeLogger | cars.woitzik.dev | Authelia | LAN/VPN only |
+| Matrix/Synapse + Element | matrix.woitzik.dev, element.woitzik.dev | Federation protocol / Authelia | LAN/VPN only |
+| MySpeed | speed.woitzik.dev | Authelia | LAN/VPN only |
+| n8n | n8n.woitzik.dev | Authelia | LAN/VPN only |
+| OnlyOffice | onlyoffice.woitzik.dev | Authelia | LAN/VPN only |
+| SearXNG | search.woitzik.dev | Authelia | LAN/VPN only |
+| Excalidraw | draw.woitzik.dev | Authelia | LAN/VPN only |
+| Minecraft | mc.woitzik.dev | Server-side auth | **Public** — via a playit.gg relay tunnel, not the Cloudflare allowlist above (raw TCP, can't route through Cloudflare's CDN); the DMZ LXC it runs on has no cluster credentials and no path to any other VLAN |
 
 ## VLAN Layout
 
@@ -229,16 +287,28 @@ ansible-playbook ansible/site.yml --check
 # Apply to specific group
 ansible-playbook ansible/site.yml --limit rpi_nodes
 
-# Edit secrets
-ansible-vault edit ansible/group_vars/all/vault.yml
+# Rotate/add one secret -- vault.yml is plaintext-structured YAML with each
+# value individually vault-encrypted (not a whole-file-encrypted blob), so
+# `ansible-vault edit` doesn't work on it. Value goes over stdin, never a
+# CLI arg or on-screen:
+printf '%s' 'new-value' | ansible-vault encrypt_string \
+  --vault-password-file ansible/.ansible_vault_pass --stdin-name vault_foo
+# paste the output block in place of the existing vault_foo entry in vault.yml
 ```
 
 ## Adding a New k8s Service
 
 1. Create `kubernetes/apps/<service>/<service>.yml` with Deployment + Service + PVC
 2. ArgoCD ApplicationSet auto-detects the new directory and deploys it
-3. Add IngressRoute to `kubernetes/system/apps-ingressroute.yml`
-4. Run `kubectl apply -f kubernetes/system/apps-ingressroute.yml`
+3. Add an IngressRoute — either declare it inline in the new app's own directory
+   (the pattern most recent apps use, and the one to prefer for anything new — no
+   separate `kubectl apply` step, ArgoCD picks it up with the rest of the manifest)
+   or add it to `kubernetes/system/apps-ingressroute.yml` and `kubectl apply -f` that
+   file directly (the older, still-working, not-yet-migrated pattern most existing
+   apps use — see the Repository Layout note above)
+4. Decide deliberately whether it needs a public DNS/tunnel entry at all — the
+   default is no (`ADR-019`); only add one with a real reason, in
+   `terraform/stacks/cloudflare/main.tf`
 
 ## Monitoring
 
