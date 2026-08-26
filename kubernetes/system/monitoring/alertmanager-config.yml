@@ -65,14 +65,22 @@ spec:
             name: severity
             value: critical
       # Task 2 (autonomy-readiness): these specific alertnames matter at
-      # steady-state (crash-looping pods, failed Jobs -- which covers
-      # Renovate's own CronJob, since Velero doesn't use a native Job -- see
-      # velero-alerts.yml, a node going NotReady, and cert-manager's expiry
-      # early-warning) but ship severity=warning upstream/by design, so the
-      # severity=critical route above doesn't catch them. Named explicitly
-      # rather than routing all severity=warning, which would also forward
-      # noisy/routine warnings (KubeMemoryQuotaOvercommit, etc.) not worth a
-      # Discord ping.
+      # steady-state (a node going NotReady, cert-manager's expiry
+      # early-warning, a partial backup) but ship severity=warning
+      # upstream/by design, so the severity=critical route above doesn't
+      # catch them. Named explicitly rather than routing all
+      # severity=warning, which would also forward noisy/routine warnings
+      # (KubeMemoryQuotaOvercommit, etc.) not worth a Discord ping.
+      #
+      # 2026-08-26: dropped KubePodCrashLooping, KubeJobFailed, and
+      # CadenceJobDidNotRun from this route -- David asked for notification
+      # volume down to genuinely-actionable-only ("CPU 95 degrees, fine --
+      # not how often I get pinged that I just swipe it away annoyed").
+      # These three fire constantly for routine, usually self-healing stuff
+      # (a CronJob's Job failing once and retrying, a pod bouncing during a
+      # deploy) and were the dominant source of Discord/ntfy volume. Still
+      # fully visible in Prometheus/Grafana for whoever's actually working
+      # the cluster at the time -- just not pushed.
       - receiver: discord
         groupWait: 30s
         groupInterval: 4h
@@ -80,7 +88,7 @@ spec:
         matchers:
           - matchType: "=~"
             name: alertname
-            value: "KubePodCrashLooping|KubeJobFailed|KubeNodeNotReady|CertManagerCertExpirySoon|VeleroBackupPartialFailure|CadenceJobDidNotRun"
+            value: "KubeNodeNotReady|CertManagerCertExpirySoon|VeleroBackupPartialFailure"
       # 2026-08-16: ProxmoxStorageCapacityHigh (severity: warning, 85% threshold,
       # storage-capacity-alerts.yml) was NOT reaching Discord at all -- only the
       # 93% Critical variant was, via the generic severity=critical route above.
