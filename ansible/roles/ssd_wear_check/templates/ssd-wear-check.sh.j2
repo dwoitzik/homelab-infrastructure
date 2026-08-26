@@ -1,0 +1,92 @@
+#!/bin/sh
+# Item 5 of the 2026-08-23 steady-state consolidation goal: docs/HARDWARE.md
+# defines a real replacement trigger (warning >= 80% used or spare < 50%;
+# replace now >= 90% used or spare < 10% or any media error) and a projected
+# date range for reaching it, but as of this writing the Prometheus-based
+# NVMeWearWarning/NVMeWearCritical alerts (kubernetes/system/monitoring/
+# hardware-temp-alerts.yml) exist as code and don't actually fire --
+# node-exporter-pve can't reach Prometheus yet (fwd_04a_srv_monitoring, a
+# known unapplied MikroTik/Terraform-state gap, ansible-only can't fix it).
+# This runs directly on the host that owns the drive instead, with no
+# dependency on that pipeline, and posts to the same Discord channel as the
+# rest of cluster alerting.
+#
+# Tracks its own previous reading in STATE_FILE to compute a rate estimate
+# and a projected 90%-used date each run, the same two-bound approach
+# HARDWARE.md itself uses (lifetime-average vs recent-rate) rather than
+# false-precision from a single delta -- but only once a real previous
+# reading exists; the first run after deploy has nothing to diff against
+# and says so rather than fabricating a rate from zero data.
+
+set -eu
+
+DEVICE="{{ ssd_wear_check_device }}"
+WARN_PCT={{ ssd_wear_check_warning_pct }}
+CRIT_PCT={{ ssd_wear_check_critical_pct }}
+WARN_SPARE_BELOW={{ ssd_wear_check_warning_spare_below }}
+CRIT_SPARE_BELOW={{ ssd_wear_check_critical_spare_below }}
+STATE_FILE=/var/lib/ssd-wear-check/state.json
+WEBHOOK_URL_FILE=/root/.secrets/ssd_wear_check_discord_webhook_url
+
+log() { echo "[ssd-wear-check] $(date -u +%FT%TZ) $*"; }
+
+post_discord() {
+  MSG="$1"
+  PAYLOAD=$(jq -n --arg content "$MSG" '{content: $content}')
+  curl -fsS -m 20 -X POST -H "Content-Type: application/json" \
+    -d "$PAYLOAD" "$(cat "$WEBHOOK_URL_FILE")" >/dev/null
+}
+
+SMART_JSON=$(smartctl -a -j "$DEVICE")
+
+PCT_USED=$(echo "$SMART_JSON" | jq -r '.nvme_smart_health_information_log.percentage_used')
+SPARE=$(echo "$SMART_JSON" | jq -r '.nvme_smart_health_information_log.available_spare')
+MEDIA_ERRORS=$(echo "$SMART_JSON" | jq -r '.nvme_smart_health_information_log.media_errors')
+DATA_UNITS=$(echo "$SMART_JSON" | jq -r '.nvme_smart_health_information_log.data_units_written')
+NOW_EPOCH=$(date -u +%s)
+
+log "percentage_used=${PCT_USED}% available_spare=${SPARE}% media_errors=${MEDIA_ERRORS}"
+
+STATUS="OK"
+if [ "$PCT_USED" -ge "$CRIT_PCT" ] || [ "$SPARE" -lt "$CRIT_SPARE_BELOW" ] || [ "$MEDIA_ERRORS" != "0" ]; then
+  STATUS="CRITICAL"
+elif [ "$PCT_USED" -ge "$WARN_PCT" ] || [ "$SPARE" -lt "$WARN_SPARE_BELOW" ]; then
+  STATUS="WARNING"
+fi
+
+PROJECTION="no prior reading yet -- projection needs at least one more monthly run"
+if [ -f "$STATE_FILE" ]; then
+  PREV_PCT=$(jq -r '.percentage_used' "$STATE_FILE")
+  PREV_EPOCH=$(jq -r '.epoch' "$STATE_FILE")
+  DAYS_ELAPSED=$(( (NOW_EPOCH - PREV_EPOCH) / 86400 ))
+  PCT_DELTA=$(( PCT_USED - PREV_PCT ))
+  if [ "$DAYS_ELAPSED" -gt 0 ] && [ "$PCT_DELTA" -gt 0 ]; then
+    RATE_PER_DAY=$(awk -v d="$PCT_DELTA" -v t="$DAYS_ELAPSED" 'BEGIN { printf "%.4f", d/t }')
+    PCT_REMAINING=$((CRIT_PCT - PCT_USED))
+    DAYS_TO_CRIT=$(awk -v r="$PCT_REMAINING" -v rate="$RATE_PER_DAY" 'BEGIN { if (rate > 0) printf "%d", r/rate; else print "n/a" }')
+    PROJECTION="at this run's observed rate (~${RATE_PER_DAY}%/day over the last ${DAYS_ELAPSED}d), ${CRIT_PCT}% used in roughly ${DAYS_TO_CRIT} days"
+  else
+    PROJECTION="no wear increase (or no time elapsed) since the last reading ${DAYS_ELAPSED}d ago -- rate not meaningful this run"
+  fi
+fi
+
+mkdir -p "$(dirname "$STATE_FILE")"
+jq -n --argjson pct "$PCT_USED" --argjson epoch "$NOW_EPOCH" \
+  '{percentage_used: $pct, epoch: $epoch}' > "$STATE_FILE"
+
+MSG="**Monthly SSD wear check -- $(date -u +%Y-%m-%d)** (${DEVICE} on pve-mgmt-01)
+Status: **${STATUS}**
+percentage_used: ${PCT_USED}% (warning >= ${WARN_PCT}%, replace now >= ${CRIT_PCT}%)
+available_spare: ${SPARE}% (warning < ${WARN_SPARE_BELOW}%, replace now < ${CRIT_SPARE_BELOW}%)
+media_errors: ${MEDIA_ERRORS}
+Lifetime data written: ${DATA_UNITS} units
+Projection: ${PROJECTION}"
+
+if [ "$STATUS" != "OK" ]; then
+  MSG="@here ${MSG}
+See docs/HARDWARE.md's replacement trigger section for the sourcing/replacement procedure."
+fi
+
+log "posting to Discord (status=${STATUS})"
+post_discord "$MSG"
+log "done"

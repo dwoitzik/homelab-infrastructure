@@ -1,0 +1,14 @@
+[Unit]
+Description=Monthly SSD wear check timer
+
+[Timer]
+# 1st of the month, 07:00 -- after the 04:00 pve-config-backup and 06:00
+# in-cluster monthly-restore-test have both had a chance to complete, same
+# staggering reasoning as pve_host_backup's own timer (avoid simultaneous
+# scheduled I/O on this single-disk host).
+OnCalendar=*-*-01 07:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

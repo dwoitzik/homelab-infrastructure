@@ -1,0 +1,7 @@
+---
+ssd_wear_check_device: /dev/nvme0n1
+# HARDWARE.md's own replacement trigger, not invented here.
+ssd_wear_check_warning_pct: 80
+ssd_wear_check_critical_pct: 90
+ssd_wear_check_warning_spare_below: 50
+ssd_wear_check_critical_spare_below: 10
