@@ -1,0 +1,8 @@
+[Unit]
+Description=Monthly SSD wear check against docs/HARDWARE.md's replacement trigger
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ssd-wear-check.sh

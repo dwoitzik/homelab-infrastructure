@@ -136,3 +136,9 @@
     # confirmed live, a real gap. Daily to Garage S3, staggered an hour
     # after PBS's own 03:00 job.
     - pve_host_backup
+    # Item 5 of the 2026-08-23 steady-state consolidation goal: the
+    # Prometheus-based NVMeWearWarning/NVMeWearCritical alerts exist as code
+    # but don't fire yet (node-exporter-pve blocked by the unapplied
+    # fwd_04a_srv_monitoring firewall rule) -- runs directly on the host
+    # instead, no dependency on that pipeline.
+    - ssd_wear_check
