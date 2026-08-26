@@ -146,8 +146,12 @@ that keeps it that way.
 
 - Review the `monthly-restore-test` CronJob's actual result, not just that it ran —
   confirm the restored data was real and complete, not just "exit 0."
-- Check SSD wear (`smartctl -a /dev/nvme0n1` on `pve-mgmt-01`, or the Grafana dashboard
-  once the firewall gap above is fixed) against the replacement trigger.
+- **Automated 2026-08-26**: SSD wear is now checked automatically — the
+  `ssd_wear_check` Ansible role (`ansible/roles/ssd_wear_check/`) runs a systemd timer
+  on `pve-mgmt-01` on the 1st of the month, reads `smartctl` directly (bypassing the
+  still-blocked Prometheus pipeline below), checks against the replacement trigger,
+  and posts a summary with a rate-based projected-date estimate to Discord every run.
+  Still worth a human glance at the Discord post, not a blind trust-and-ignore.
 - Clear the Renovate PR backlog — merge what's safe, investigate anything held back
   (a major version, a stateful-service bump) rather than letting it silently age.
 
@@ -157,10 +161,24 @@ that keeps it that way.
   restore something (a PVC, a VM from PBS, a CNPG cluster from WAL-G) to a scratch
   target and confirm the procedure still matches reality. The 2026-08-13 rebuild
   proved the full procedure once under real pressure; a quarterly partial exercise is
-  what keeps it trustworthy between real incidents.
-- **Dependency review** beyond Renovate's own PRs — anything Renovate doesn't track
-  (base OS packages, Ansible collections, Terraform providers) and a look at whether
-  any pinned version has a known CVE with no update path yet.
+  what keeps it trustworthy between real incidents. Not yet automated as a scheduled
+  job — see the Open item below.
+- **Automated 2026-08-26**: dependency/CVE review beyond Renovate's own PRs is now a
+  scheduled quarterly job — `dependency-cve-review.timer`/`.service` on
+  `ct-srv-claude-agent` (this agent's own host, deliberately not committed to this
+  repo as an Ansible role or GitHub Actions workflow — it needs SSH access to
+  `pve`/`rpi-srv-01`/`rpi-srv-02` that only this host holds, and a GitHub Actions
+  repository-secret write for Discord was denied by Claude Code's own auto-mode
+  classifier, so ntfy is used instead, same as this repo's own `drift-check.yml`
+  already does for the same reason. See `ADR-018` for the precedent on why this
+  particular host's own automation is out-of-IaC by design). Checks Terraform
+  provider pins (all 4 stacks) against the latest stable release on the public
+  registry, the 3 pinned Ansible collections against Galaxy, and pending `apt`
+  upgrades on all 3 real hosts — a review surfacing what's worth a look, not a real
+  CVE-database match. First real run (2026-08-26) found genuine drift worth noting:
+  `hashicorp/aws` is a full major version behind (5.100.0 pinned vs 6.62.0 latest)
+  and both `community.general` and `community.docker` Ansible collections are a
+  major version behind their installed versions.
 - **Re-read this document and `docs/ROADMAP.md`'s open items** — confirm the "what
   still needs a human" list above hasn't quietly grown stale in either direction (an
   item fixed and not removed, or a new gap that opened and was never added).
