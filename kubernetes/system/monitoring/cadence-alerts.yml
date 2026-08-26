@@ -1,0 +1,60 @@
+# Item 5 of the 2026-08-23 steady-state consolidation goal: STEADY-STATE.md
+# describes a monthly/quarterly operational rhythm, but a rhythm written down
+# in a doc is only as real as someone remembering to run it. This rule closes
+# the other half of that: not "did the job fail" (each job already alerts on
+# its own failure -- monthly-restore-test via ntfy, weekly-report would show
+# up as a failed Job in `kubectl get jobs`) but "did the job even run at
+# all" -- the class of gap that let this cluster's own dead man's switch sit
+# unapplied for days, undetected, earlier this mission (see ADR-027).
+#
+# kube-state-metrics' kube_cronjob_status_last_successful_time is the right
+# primitive here: no new external account/API key needed (unlike
+# healthchecks.io, which needs a manual "Add Check" click per job and has no
+# API key stored in Vault for this account), already scraped, already live.
+# `absent(...)` covers the case where a job has never once succeeded (the
+# metric series doesn't exist yet at all) as well as the case where it
+# succeeded once, long enough ago that the threshold has since been crossed.
+#
+# New cadence jobs land their own alert entry here in the same PR that adds
+# the job -- this file is meant to grow with STEADY-STATE.md's rhythm, not
+# be a one-time snapshot of the two jobs that happened to exist when it was
+# written.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-cadence-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: cadence-jobs
+      rules:
+        - alert: CadenceJobDidNotRun
+          expr: |
+            (
+              time() - kube_cronjob_status_last_successful_time{namespace="velero", cronjob="monthly-restore-test"}
+              > 3024000
+            )
+            or
+            absent(kube_cronjob_status_last_successful_time{namespace="velero", cronjob="monthly-restore-test"})
+          labels:
+            severity: warning
+            cadence_job: monthly-restore-test
+          annotations:
+            summary: "monthly-restore-test has not succeeded in 35+ days"
+            description: "Expected roughly monthly (schedule: 0 6 1 * *). No successful run recorded within the last 35 days, or the job has never once succeeded -- the restore-test's own failure alert (ntfy) only fires when the job actually runs and fails; this catches it not running at all."
+        - alert: CadenceJobDidNotRun
+          expr: |
+            (
+              time() - kube_cronjob_status_last_successful_time{namespace="monitoring", cronjob="weekly-report"}
+              > 777600
+            )
+            or
+            absent(kube_cronjob_status_last_successful_time{namespace="monitoring", cronjob="weekly-report"})
+          labels:
+            severity: warning
+            cadence_job: weekly-report
+          annotations:
+            summary: "weekly-report has not succeeded in 9+ days"
+            description: "Expected weekly (schedule: 0 8 * * 1). No successful run recorded within the last 9 days, or the job has never once succeeded."

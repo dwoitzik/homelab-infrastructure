@@ -80,7 +80,7 @@ spec:
         matchers:
           - matchType: "=~"
             name: alertname
-            value: "KubePodCrashLooping|KubeJobFailed|KubeNodeNotReady|CertManagerCertExpirySoon|VeleroBackupPartialFailure"
+            value: "KubePodCrashLooping|KubeJobFailed|KubeNodeNotReady|CertManagerCertExpirySoon|VeleroBackupPartialFailure|CadenceJobDidNotRun"
       # 2026-08-16: ProxmoxStorageCapacityHigh (severity: warning, 85% threshold,
       # storage-capacity-alerts.yml) was NOT reaching Discord at all -- only the
       # 93% Critical variant was, via the generic severity=critical route above.
