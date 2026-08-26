@@ -1,0 +1,17 @@
+# Warm-standby HA (ADR-029): continuous WAL streaming to rpi-srv-02's USB
+# SSD, same pattern as headscale/litestream-config.yml -- see that file's
+# comment for why host-key pinning was tried and reverted (a real,
+# confirmed Go-ssh-client/multi-host-key-type incompatibility, not
+# skipped carelessly).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vaultwarden-litestream-config
+  namespace: apps
+data:
+  litestream.yml: |
+    dbs:
+      - path: /data/db.sqlite3
+        replica:
+          url: sftp://litestream@10.0.20.3:22/vaultwarden
+          key-path: /etc/litestream/ssh/id_ed25519
