@@ -212,3 +212,31 @@ spec:
           port: 7844
         - protocol: UDP
           port: 7844
+---
+# Warm-standby HA (ADR-029): the litestream sidecars on headscale and
+# vaultwarden need egress to rpi-srv-02's restricted SFTP replica target
+# (10.0.20.3:22, the litestream user set up by
+# ansible/roles/litestream_standby -- chrooted, SFTP-only, no shell). A
+# plain IP+port rule rather than a pod/namespaceSelector since rpi-srv-02
+# isn't a cluster member. One rule covering both apps via matchExpressions
+# rather than two near-identical policies.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-litestream-sftp
+  namespace: apps
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: ["headscale", "vaultwarden"]
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.3/32
+      ports:
+        - protocol: TCP
+          port: 22

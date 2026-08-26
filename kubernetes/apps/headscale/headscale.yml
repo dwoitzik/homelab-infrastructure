@@ -89,6 +89,41 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+        # Warm-standby HA (ADR-029): continuously ships db.sqlite's WAL to
+        # rpi-srv-02. Same pod/PVC (sidecar pattern, not a separate
+        # Deployment) because litestream needs to read the live WAL
+        # directly, not a point-in-time copy.
+        - name: litestream
+          image: litestream/litestream:0.5.16@sha256:837279d1279a90d670c915ddbb641b6e7b98bc42cc4dfb040eb569ee931078a1
+          args:
+            - replicate
+            - -config
+            - /etc/litestream/litestream.yml
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/headscale
+            - name: litestream-config
+              mountPath: /etc/litestream
+              readOnly: true
+            - name: litestream-ssh
+              mountPath: /etc/litestream/ssh
+              readOnly: true
+            - name: litestream-tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
       volumes:
         - name: config
           configMap:
@@ -99,6 +134,15 @@ spec:
         - name: tmp
           emptyDir: {}
         - name: run
+          emptyDir: {}
+        - name: litestream-config
+          configMap:
+            name: headscale-litestream-config
+        - name: litestream-ssh
+          secret:
+            secretName: litestream-ssh-credentials
+            defaultMode: 0400
+        - name: litestream-tmp
           emptyDir: {}
 ---
 apiVersion: v1

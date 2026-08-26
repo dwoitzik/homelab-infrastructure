@@ -1,0 +1,30 @@
+# Warm-standby HA (ADR-029): continuous WAL streaming to rpi-srv-02's USB
+# SSD via the restricted litestream user set up by
+# ansible/roles/litestream_standby.
+#
+# host-key pinning tried first (litestream's own docs call it "strongly
+# recommended") and reverted after a real, confirmed failure: rpi-srv-02
+# presents ed25519/ecdsa/rsa host keys (standard OpenSSH default), and
+# litestream's Go ssh client doesn't restrict HostKeyAlgorithms the way
+# `ssh -o HostKeyAlgorithms=ssh-ed25519` does -- confirmed live that
+# pinning the ed25519 key produced "ssh: handshake failed: ssh: host key
+# mismatch" against the real server, while a strict OpenSSH client pinned
+# to the exact same key value connects cleanly. Rather than narrowing
+# rpi-srv-02's sshd to a single host key type host-wide (a bigger, riskier
+# change than this one credential's threat model justifies -- see
+# ADR-029), accepted litestream's own unpinned fallback here: this is a
+# LAN-only hop already scoped by NetworkPolicy to exactly this one
+# destination, and the SFTP account itself is key-auth-only, chrooted,
+# and shell-restricted.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: headscale-litestream-config
+  namespace: apps
+data:
+  litestream.yml: |
+    dbs:
+      - path: /var/lib/headscale/db.sqlite
+        replica:
+          url: sftp://litestream@10.0.20.3:22/headscale
+          key-path: /etc/litestream/ssh/id_ed25519
