@@ -97,15 +97,16 @@ Implemented and merged:
    skipped carelessly).
 
 **Not yet built** (items 3-6 of the original implementation plan,
-`phase8/HA-PLAN.md`):
+`phase8/HA-PLAN.md`, numbered here as originally listed there):
 
-3. Docker-compose standby containers on rpi-srv-02 (`headscale-standby`,
-   `vaultwarden-standby`), present but stopped.
-4. The failover runbook itself (`docs/runbooks/failover-headscale-vaultwarden.md`).
-5. `docs/DISASTER-RECOVERY.md` / `CLAUDE.local.md` updates reflecting the new
-   standby capability.
-6. The induced-failure verification pass (stop the primaries, confirm the standby
-   serves real traffic, confirm failback is clean).
+- Item 3: Docker-compose standby containers on rpi-srv-02 (`headscale-standby`,
+  `vaultwarden-standby`), present but stopped.
+- Item 4: the failover runbook itself
+  (`docs/runbooks/failover-headscale-vaultwarden.md`).
+- Item 5: `docs/DISASTER-RECOVERY.md` / `CLAUDE.local.md` updates reflecting the new
+  standby capability.
+- Item 6: the induced-failure verification pass (stop the primaries, confirm the
+  standby serves real traffic, confirm failback is clean).
 
 **A real gap found while starting item 3, disclosed rather than worked around**:
 headscale's `private.key`/`noise_private.key` and vaultwarden's `rsa_key.pem` are
