@@ -1,0 +1,53 @@
+---
+- name: Install smartmontools, jq, curl
+  ansible.builtin.apt:
+    name:
+      - smartmontools
+      - jq
+      - curl
+    state: present
+    update_cache: true
+
+- name: Ensure /root/.secrets exists (0700, matches this repo's convention)
+  ansible.builtin.file:
+    path: /root/.secrets
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Deploy the Discord webhook URL (Vault-sourced, single-purpose file)
+  ansible.builtin.copy:
+    content: "{{ vault_pve_host_alerts_discord_webhook_url }}"
+    dest: /root/.secrets/ssd_wear_check_discord_webhook_url
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Deploy the wear-check script
+  ansible.builtin.template:
+    src: ssd-wear-check.sh.j2
+    dest: /usr/local/bin/ssd-wear-check.sh
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Deploy systemd service
+  ansible.builtin.template:
+    src: ssd-wear-check.service.j2
+    dest: /etc/systemd/system/ssd-wear-check.service
+    mode: '0644'
+
+- name: Deploy systemd timer
+  ansible.builtin.template:
+    src: ssd-wear-check.timer.j2
+    dest: /etc/systemd/system/ssd-wear-check.timer
+    mode: '0644'
+
+- name: Enable and start the wear-check timer
+  ansible.builtin.systemd:
+    name: ssd-wear-check.timer
+    daemon_reload: true
+    enabled: true
+    state: started
