@@ -1,0 +1,57 @@
+---
+# Warm-standby HA for headscale + vaultwarden (docs/decisions/ADR-029).
+# Deliberately deployed only to rpi-srv-02 (has the USB SSD; rpi-srv-01
+# does not) via its own playbook, not folded into site.yml's shared
+# rpi_nodes play.
+
+- name: Create the litestream system user (SFTP-only, no shell)
+  ansible.builtin.user:
+    name: litestream
+    system: true
+    shell: /usr/sbin/nologin
+    home: /
+    create_home: false
+
+- name: Create the replica root (must be root-owned for sshd chroot)
+  ansible.builtin.file:
+    path: "{{ litestream_standby_replica_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create per-app replica directories
+  ansible.builtin.file:
+    path: "{{ litestream_standby_replica_root }}/{{ item }}"
+    state: directory
+    owner: litestream
+    group: litestream
+    mode: '0700'
+  loop: "{{ litestream_standby_apps }}"
+
+- name: Deploy the litestream user's authorized_keys
+  ansible.posix.authorized_key:
+    user: litestream
+    key: "{{ litestream_standby_public_key }}"
+    exclusive: true
+
+- name: Deploy the restricted sshd Match block
+  ansible.builtin.template:
+    src: sshd-litestream.conf.j2
+    dest: /etc/ssh/sshd_config.d/litestream.conf
+    owner: root
+    group: root
+    mode: '0644'
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload sshd
+
+- name: Download the litestream .deb (arm64, checksum-verified)
+  ansible.builtin.get_url:
+    url: "{{ litestream_standby_deb_url }}"
+    dest: /tmp/litestream_{{ litestream_standby_version }}_arm64.deb
+    checksum: "{{ litestream_standby_deb_sha256 }}"
+    mode: '0644'
+
+- name: Install litestream
+  ansible.builtin.apt:
+    deb: /tmp/litestream_{{ litestream_standby_version }}_arm64.deb

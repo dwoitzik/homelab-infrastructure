@@ -1,0 +1,13 @@
+# Managed by ansible/roles/litestream_standby -- restricted SFTP-only access
+# for the litestream replication user. Key-based auth only, chrooted to the
+# replica root, internal-sftp subsystem only (no shell, no port forwarding,
+# no arbitrary command execution) -- this account exists to receive WAL
+# segments from the headscale/vaultwarden litestream sidecars, nothing else.
+Match User litestream
+    ChrootDirectory {{ litestream_standby_replica_root }}
+    ForceCommand internal-sftp
+    PasswordAuthentication no
+    PermitTunnel no
+    AllowAgentForwarding no
+    AllowTcpForwarding no
+    X11Forwarding no
