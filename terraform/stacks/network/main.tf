@@ -161,29 +161,13 @@ resource "routeros_ip_dhcp_server_lease" "mgmt_nodes" {
 }
 
 ###############################################################################
-# LEDs
+# LEDs -- REMOVED 2026-08-26, see power.tf's own LED section for the full
+# story. This block and power.tf's separate led_off_night/led_on_day block
+# were two independent, non-identical Terraform declarations racing to own
+# the SAME live scheduler objects (both named night_mode_leds/day_mode_leds
+# on the router) -- this one was never actually the live mechanism (the
+# fresh import diff confirmed the live on_event is power.tf's raw
+# `/system leds settings set all-leds-off=...` form, not this file's
+# script-call form via leds_off/leds_on). Removed here rather than left as
+# a second, untested, permanently-drifting declaration of the same objects.
 ###############################################################################
-
-resource "routeros_system_script" "leds_off" {
-  name   = "leds_off"
-  source = "/system leds set [find] enabled=no"
-}
-
-resource "routeros_system_script" "leds_on" {
-  name   = "leds_on"
-  source = "/system leds set [find] enabled=yes"
-}
-
-resource "routeros_system_scheduler" "night_mode" {
-  name       = "night_mode_leds"
-  start_time = "22:00:00"
-  interval   = "1d"
-  on_event   = "leds_off"
-}
-
-resource "routeros_system_scheduler" "day_mode" {
-  name       = "day_mode_leds"
-  start_time = "06:00:00"
-  interval   = "1d"
-  on_event   = "leds_on"
-}
