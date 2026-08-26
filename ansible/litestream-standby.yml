@@ -1,0 +1,6 @@
+---
+- name: Deploy litestream warm-standby replica target (ADR-029)
+  hosts: rpi-srv-02
+  become: true
+  roles:
+    - litestream_standby
