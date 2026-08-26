@@ -67,10 +67,14 @@ data:
         body: |
           {"content": "🟡 **ArgoCD Sync Status Unknown**: `{{.app.metadata.name}}`. <https://argo.woitzik.dev/applications/{{.app.metadata.name}}>"}
 
+  # on-sync-status-unknown removed 2026-08-26: Unknown is usually a transient
+  # refresh-cycle state (repo-server mid-comparison), not a real problem --
+  # fired for dozens of apps simultaneously with no debounce and was the
+  # single biggest source of Discord noise, badly diluting the two triggers
+  # below that actually mean something.
   subscriptions: |
     - recipients:
         - discord
       triggers:
         - on-health-degraded
         - on-sync-failed
-        - on-sync-status-unknown
