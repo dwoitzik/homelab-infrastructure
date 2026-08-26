@@ -519,24 +519,14 @@ import {
 }
 
 # --- Scheduler / scripts ---
-import {
-  to = routeros_system_scheduler.night_mode
-  id = "*0"
-}
-import {
-  to = routeros_system_scheduler.day_mode
-  id = "*1"
-}
+# night_mode/day_mode/leds_on/leds_off import blocks removed 2026-08-26 along
+# with their resource blocks in main.tf -- see that file's LED section. These
+# targeted the same live objects (night_mode_leds/day_mode_leds, *0/*1) that
+# power.tf's own led_off_night/led_on_day resources already own; importing
+# both would have left two Terraform resource addresses fighting over the
+# same live scheduler on every subsequent plan.
 import {
   to = routeros_system_scheduler.disable_unused_ports
-  id = "*2"
-}
-import {
-  to = routeros_system_script.leds_on
-  id = "*1"
-}
-import {
-  to = routeros_system_script.leds_off
   id = "*2"
 }
 # Trigger fresh atlantis plan (GIT-009 apply pending)

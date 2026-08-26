@@ -25,42 +25,22 @@ resource "routeros_system_scheduler" "disable_unused_ports" {
 }
 
 ###############################################################################
-# LED scheduling — cosmetic, off 22:00-06:00 local
+# LED scheduling — REMOVED 2026-08-26 (was: cosmetic, off 22:00-06:00 local)
 ###############################################################################
 #
-# RouterOS exposes board LED control via `/system leds settings` (the
-# terraform-routeros provider ships both a typed `routeros_system_led_settings`
-# resource and the raw `/system/leds` API path), specifically the
-# `all-leds-off` property. Using the same raw-script `routeros_system_scheduler`
-# pattern as disable_unused_ports above instead of the typed resource, since
-# this repo's existing usage of that pattern is already proven live and this
-# avoids depending on the typed resource's exact accepted enum values, which
-# weren't independently verified against this specific RouterOS version this
-# pass.
+# Live RB5009 (RouterOS 7.19.4) started getting stuck with LEDs off past
+# 06:00 -- the day-mode scheduler's on-event kept its run-count incrementing
+# (so the schedule itself fired), but the LEDs didn't come back. Confirmed
+# separately that a live write to all-leds-off (either "no" or "false") via
+# the REST API 500s outright -- RouterOS itself errors on this write, not a
+# policy/script issue. Matches a known class of RB5009 LED-subsystem
+# regressions seen across other RouterOS versions -- not chasing a firmware
+# bug for a feature that saves ~0W and only exists for looks. Live scheduler
+# entries (night_mode_leds / day_mode_leds on the router -- note the live
+# name never matched this file's declared resource names, pre-existing
+# drift) need removing via Atlantis apply of this PR -- a direct REST write
+# against them hit "policy does not allow to edit this script" for this API
+# user, so cleanup goes through the normal apply path, not a manual call.
+# LEDs stay off until that apply runs (or the router is rebooted, which also
+# clears it).
 ###############################################################################
-
-#
-# 2026-08-22: this resource block existed since #493 but was never actually
-# reconciled onto the live router -- terraform state still tracked the
-# pre-existing manually-created schedulers (`night_mode_leds`/`day_mode_leds`,
-# calling separate `/system script` entries `leds_off`/`leds_on` that only
-# disable per-interface LED bindings, not the board LEDs). Renaming the
-# resource block below to match those live names/on-events instead of
-# re-fighting drift, so the next Atlantis apply converges onto what's
-# actually live and reachable, and future drift is visible in `terraform
-# plan` instead of silently never applying.
-resource "routeros_system_scheduler" "led_off_night" {
-  name       = "night_mode_leds"
-  start_time = "22:00:00"
-  interval   = "1d"
-  on_event   = "/system leds settings set all-leds-off=immediate"
-  comment    = "Cosmetic: turn off board LEDs 22:00-06:00"
-}
-
-resource "routeros_system_scheduler" "led_on_day" {
-  name       = "day_mode_leds"
-  start_time = "06:00:00"
-  interval   = "1d"
-  on_event   = "/system leds settings set all-leds-off=no"
-  comment    = "Cosmetic: restore board LEDs at 06:00"
-}
