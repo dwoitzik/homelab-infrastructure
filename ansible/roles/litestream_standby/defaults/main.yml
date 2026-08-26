@@ -1,0 +1,13 @@
+---
+litestream_standby_version: "0.5.16"
+litestream_standby_deb_sha256: "sha256:aceee9c179a221d072652e810ae19b5a83158df8a29b03e644a719b6b113b80b"
+litestream_standby_deb_url: "https://github.com/benbjohnson/litestream/releases/download/v{{ litestream_standby_version }}/litestream-{{ litestream_standby_version }}-linux-arm64.deb"
+litestream_standby_replica_root: /mnt/ssd/litestream-replicas
+litestream_standby_apps:
+  - headscale
+  - vaultwarden
+# Public half of the dedicated keypair generated for this purpose (2026-08-26,
+# on the recovery agent's own host) -- private half never lives here, it's
+# consumed in-cluster by the litestream sidecars via a Kubernetes Secret. Not
+# sensitive; safe to commit.
+litestream_standby_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINPjWG+lfnLg8hFLSDqYWsIyytbnJ1w362nML1Brilmd litestream@ct-srv-claude-agent"
