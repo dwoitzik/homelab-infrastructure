@@ -534,4 +534,9 @@ import {
   to = routeros_queue_simple.wan_egress_sqm
   id = "*1"
 }
+
+import {
+  to = routeros_ip_firewall_filter.fwd_k3s_nfs_media
+  id = "*B8"
+}
 # Trigger fresh atlantis plan (GIT-009 apply pending)
