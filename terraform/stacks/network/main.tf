@@ -171,3 +171,13 @@ resource "routeros_ip_dhcp_server_lease" "mgmt_nodes" {
 # script-call form via leds_off/leds_on). Removed here rather than left as
 # a second, untested, permanently-drifting declaration of the same objects.
 ###############################################################################
+
+###############################################################################
+# DNS -- the router itself never had resolver servers configured (found
+# 2026-08-27 while trying a package update: "could not resolve dns name").
+# Points at the AdGuard VIP, same as every other internal client.
+###############################################################################
+
+resource "routeros_ip_dns" "settings" {
+  servers = ["10.0.20.5"]
+}
