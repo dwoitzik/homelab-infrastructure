@@ -80,23 +80,26 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
         # hostnames the operator named as needing public reachability
         # (ADR-019): a device re-authenticating or joining the mesh needs to
         # reach this directly, by definition, before any VPN path exists.
-        # Routed through Traefik so headscale-final's own middleware chain
-        # (websockets) applies, same pattern the old atlantis rule used.
-        service = "https://traefik.kube-system.svc.cluster.local:443"
+        #
+        # 2026-08-27: moved OFF the Traefik hop. Headscale's ts2021/noise
+        # registration protocol upgrades the connection with
+        # `Upgrade: tailscale-control-protocol` -- not the literal
+        # `websocket` value. Traefik only forwards the Upgrade header when
+        # it's exactly `websocket` (github.com/traefik/traefik#12609, a
+        # known, still-open limitation), so every registration/reconnect
+        # through Traefik 500'd with "no upgrade header in TS2021 request"
+        # -- confirmed live in headscale's own logs, repeating on a loop.
+        # The pre-existing "websockets" Traefik middleware never addressed
+        # this; it only sets X-Forwarded-Proto. Routed straight to the
+        # Service instead, same pattern already used for photos.woitzik.dev
+        # -- cloudflared proxies arbitrary Upgrade values transparently, no
+        # Traefik hop to lose the header at.
+        service = "http://headscale.apps.svc.cluster.local:8080"
         origin_request = {
-          no_tls_verify          = false
-          connect_timeout        = 10
-          tcp_keep_alive         = 30
-          keep_alive_connections = 10
-          http_host_header       = "headscale.woitzik.dev"
-          # Learned from the wildcard rule's own bug (see ADR-019 / the PR
-          # this replaced): cloudflared verifies the origin's TLS cert
-          # against the origin *service* hostname unless origin_server_name
-          # is set explicitly -- there's no auto-fill-from-request behavior.
-          # Traefik's cert SAN list is `*.woitzik.dev, woitzik.dev` (checked
-          # via openssl), so the bare apex works here same as it would for
-          # any *.woitzik.dev host.
-          origin_server_name       = "woitzik.dev"
+          connect_timeout          = 10
+          tcp_keep_alive           = 30
+          keep_alive_connections   = 10
+          http_host_header         = "headscale.woitzik.dev"
           disable_chunked_encoding = false
         }
       },
