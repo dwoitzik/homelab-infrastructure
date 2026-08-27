@@ -205,6 +205,19 @@ resource "routeros_ip_firewall_filter" "fwd_mgmt_oidc_traefik" {
   }
 }
 
+# ADR-027 backlog: no `import` block exists for this resource in imports.tf,
+# same bug class as wan_egress_sqm/mgmt_port/vlan10 (all fixed in #585) --
+# the commit that added this ("fix(network): allow Server VLAN to reach
+# Proxmox NFS export for media PVC") reads as a real, applied fix, so this
+# almost certainly already exists live and will hit the same "already have
+# such rule" apply failure #585 hit for wan_egress_sqm, or worse (unlike
+# named objects, filter rules aren't uniquely named -- RouterOS may not
+# reject a duplicate the way it did for the queue, it may silently create a
+# second one). Needs a live `id` from `GET /rest/ip/firewall/filter`
+# (filter by comment "19: Server VLAN") before the next apply -- not added
+# here: the RouterOS admin credential needed to query it is
+# classifier-gated for this agent, same boundary already hit elsewhere this
+# session, not routed around.
 resource "routeros_ip_firewall_filter" "fwd_k3s_nfs_media" {
   action       = "accept"
   chain        = "forward"
