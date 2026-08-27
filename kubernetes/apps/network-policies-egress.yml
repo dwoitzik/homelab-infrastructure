@@ -240,3 +240,28 @@ spec:
       ports:
         - protocol: TCP
           port: 22
+---
+# homepage is a dashboard aggregator by design -- its whole job is polling
+# ~15+ services across multiple namespaces (argocd, kube-system, security,
+# monitoring) plus external LAN hosts that aren't in the cluster at all
+# (Proxmox, Jellyfin, the RPis' beszel agents). Same root gap as the
+# cloudflared/tailscale-subnet-router incidents (2026-08-23 NetworkPolicy
+# rollout never got a matching egress rule per pod), caught a third time
+# when the homepage dashboard itself started showing connection errors.
+# A single narrow port rule would just break again the next time a widget
+# is added -- broad internal-LAN egress fits what this pod actually does.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-homepage-lan
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: homepage
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
