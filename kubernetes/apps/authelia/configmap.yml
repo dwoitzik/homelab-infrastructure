@@ -84,7 +84,15 @@ data:
             consent_mode: implicit
           - client_id: 'pbs'
             client_name: 'Proxmox Backup Server'
-            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$9PhlazByK4bJMxisCcxqQQ$MnIJ94FXildgDhBxlKK6y5W35+WdIxUUlXIkSaBVn0M'
+            # Regenerated 2026-08-27 -- same situation as the proxmox client
+            # above: this client sat here for a while but PBS itself never
+            # had a matching OpenID realm (`proxmox-backup-manager openid
+            # list` was empty). Realm added live via `proxmox-backup-manager
+            # openid create` with the new plaintext; only the hash lives in
+            # git. PBS runs co-located on pve-mgmt-01 (10.0.10.10:8007) --
+            # the separate ct-mgmt-pbs-01 (10.0.10.110) in inventory.ini is
+            # stale, that host doesn't exist anymore.
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$5nnxOpLrnPQKL0LZE/715w$l1MyS99/37M3P54Hu+lAXmDIkVBk1c1KFB/5sSBuzz0'
             public: false
             authorization_policy: two_factor
             redirect_uris:
