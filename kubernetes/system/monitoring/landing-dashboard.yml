@@ -105,7 +105,7 @@ data:
           "type": "stat",
           "title": "PBS Health Check",
           "gridPos": {"x": 6, "y": 6, "w": 6, "h": 4},
-          "targets": [{"expr": "pve_pbs_backup_healthy or vector(1)"}],
+          "targets": [{"expr": "pve_pbs_backup_healthy"}],
           "fieldConfig": {"defaults": {"thresholds": {"steps": [
             {"value": null, "color": "red"},
             {"value": 1, "color": "green"}
