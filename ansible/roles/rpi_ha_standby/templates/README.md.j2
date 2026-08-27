@@ -1,0 +1,25 @@
+# headscale / vaultwarden warm standby
+
+This directory holds the **stopped-by-default** standby containers for
+headscale and vaultwarden. Do not run `docker compose up -d` here outside
+a real failover -- follow the runbook:
+
+    docs/runbooks/failover-headscale-vaultwarden.md
+
+in the homelab-infrastructure repo.
+
+## One-time manual prerequisites (not yet done by an automated role)
+
+1. Copy these 3 files from the live headscale/vaultwarden pods to this host
+   once (they rotate essentially never):
+   - `{{ rpi_ha_standby_data_root }}/headscale/data/private.key`
+   - `{{ rpi_ha_standby_data_root }}/headscale/data/noise_private.key`
+   - `{{ rpi_ha_standby_data_root }}/vaultwarden/data/rsa_key.pem` (and
+     `rsa_key.pub.pem`, `rsa_key.pem` alone regenerates the `.pub` on start)
+2. Fill in `HEADSCALE_OIDC_CLIENT_SECRET` in
+   `{{ rpi_ha_standby_compose_root }}/headscale/.env` (same value as the
+   live `headscale-oidc` Kubernetes Secret).
+
+Until both are done, `docker compose up -d` will still start both
+containers, but headscale will mint a fresh node identity (breaking every
+device's tailnet trust) and OIDC login won't work against the standby.

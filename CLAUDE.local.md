@@ -63,6 +63,15 @@ tailscale`), not a replacement for it.
 - Target **recovery, not HA**: define and document RTO/RPO and make every component
   restorable from Git + backups. A full rebuild from a bare host must be a documented,
   tested procedure.
+- **One narrow, deliberate exception (2026-08-27, ADR-029)**: headscale and
+  vaultwarden have a **warm standby** on `rpi-srv-02` -- Litestream WAL
+  streaming (RPO: seconds) plus a manual, documented failover
+  (`docs/runbooks/failover-headscale-vaultwarden.md`, RTO: minutes). Still
+  not zero-downtime/automatic failover -- a human runs the runbook, on
+  purpose, to avoid split-brain on hardware this small. Every other
+  component is still "recovery, not HA" as stated above; this is not a
+  precedent for auto-failing-over anything else without the same
+  single-writer-by-construction reasoning ADR-029 lays out.
 - HW transcoding (Jellyfin) and ML (Immich) run on `pve-mgmt-01` (the APU, via LXC/k3s
   GPU passthrough). Never schedule them on RPi nodes.
 

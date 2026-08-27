@@ -1,0 +1,19 @@
+---
+# Warm-standby HA for headscale + vaultwarden (docs/decisions/ADR-029),
+# item 3/6. Deployed only to rpi-srv-02, same as litestream_standby.
+
+rpi_ha_standby_compose_root: /opt/ha-standby
+rpi_ha_standby_data_root: /mnt/ssd/ha-standby
+
+# Must match litestream_standby_replica_root in ansible/roles/litestream_standby
+# (kept as a separate var, not a cross-role reference, so this role stays
+# deployable on its own -- the coupling is real, just not code-shared).
+rpi_ha_standby_litestream_replica_root: /mnt/ssd/litestream-replicas
+
+rpi_ha_standby_headscale_image: "ghcr.io/juanfont/headscale:v0.29.2"
+rpi_ha_standby_headscale_host_port: 8082
+
+rpi_ha_standby_vaultwarden_image: "vaultwarden/server:1.37.1"
+rpi_ha_standby_vaultwarden_host_port: 8083
+rpi_ha_standby_vaultwarden_uid: 1000
+rpi_ha_standby_vaultwarden_gid: 1000

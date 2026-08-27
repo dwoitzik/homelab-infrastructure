@@ -134,6 +134,17 @@ and hijack short-hostname lookups — external and internal alike. Confirmed liv
 running the current Ansible role — but if pods are behaving oddly on DNS for hostnames
 that look otherwise correct, check this first.
 
+## 7b. Exception: headscale + vaultwarden have a warm standby
+
+Everything above assumes a full rebuild after total loss. Two apps don't have to wait
+for that: headscale and vaultwarden replicate continuously to `rpi-srv-02` (Litestream
+WAL streaming) and can fail over there in minutes without waiting on `pve-mgmt-01` at
+all — see `docs/decisions/ADR-029-warm-standby-ha-headscale-vaultwarden.md` for the
+design and `docs/runbooks/failover-headscale-vaultwarden.md` for the actual failover
+steps. This is a narrow, deliberate exception to "recovery, not HA" (see
+`CLAUDE.local.md`'s Topology reality section) — every other component still follows
+this document's full-rebuild path.
+
 ## 8. Prove it, don't assume it
 
 Before declaring the recovery done, actually demonstrate (not just configure):

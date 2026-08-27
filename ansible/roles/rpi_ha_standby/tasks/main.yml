@@ -1,0 +1,86 @@
+---
+# Warm-standby HA for headscale + vaultwarden (docs/decisions/ADR-029),
+# item 3/6. Deployed only to rpi-srv-02 via its own playbook (same pattern
+# as litestream_standby), not folded into site.yml's shared rpi_nodes play.
+#
+# This role only lays down config + a docker-compose file. It never starts
+# the containers -- that's the failover runbook's job, after a
+# `litestream restore` and after the operator confirms the one-time manual
+# prerequisites below are in place. See this role's README.md.j2.
+
+- name: Create the compose root and per-app config dirs
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ rpi_ha_standby_compose_root }}"
+    - "{{ rpi_ha_standby_compose_root }}/headscale"
+    - "{{ rpi_ha_standby_compose_root }}/vaultwarden"
+
+- name: Create the standby data root
+  ansible.builtin.file:
+    path: "{{ rpi_ha_standby_data_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create the headscale-standby data dir (litestream restore target)
+  ansible.builtin.file:
+    path: "{{ rpi_ha_standby_data_root }}/headscale/data"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create the vaultwarden-standby data dir (litestream restore target)
+  ansible.builtin.file:
+    path: "{{ rpi_ha_standby_data_root }}/vaultwarden/data"
+    state: directory
+    owner: "{{ rpi_ha_standby_vaultwarden_uid }}"
+    group: "{{ rpi_ha_standby_vaultwarden_gid }}"
+    mode: '0755'
+
+- name: Deploy the docker-compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ rpi_ha_standby_compose_root }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy the headscale-standby config.yaml
+  ansible.builtin.template:
+    src: headscale-config.yaml.j2
+    dest: "{{ rpi_ha_standby_compose_root }}/headscale/config.yaml"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy the headscale-standby policy.hujson
+  ansible.builtin.template:
+    src: headscale-policy.hujson.j2
+    dest: "{{ rpi_ha_standby_compose_root }}/headscale/policy.hujson"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy the headscale-standby .env (never overwritten once filled in)
+  ansible.builtin.template:
+    src: headscale.env.j2
+    dest: "{{ rpi_ha_standby_compose_root }}/headscale/.env"
+    owner: root
+    group: root
+    mode: '0600'
+    force: false
+
+- name: Deploy the on-host README pointing at the real runbook
+  ansible.builtin.template:
+    src: README.md.j2
+    dest: "{{ rpi_ha_standby_compose_root }}/README.md"
+    owner: root
+    group: root
+    mode: '0644'
