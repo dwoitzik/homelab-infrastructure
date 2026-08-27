@@ -133,7 +133,7 @@ import {
 }
 import {
   to = routeros_interface_bridge_port.mgmt_port
-  id = "*1"
+  id = "*C"
 }
 import {
   to = routeros_interface_bridge_port.proxmox_port
@@ -195,7 +195,7 @@ import {
 # --- Bridge VLAN matrix ---
 import {
   to = routeros_interface_bridge_vlan.vlan10
-  id = "*10"
+  id = "*1E"
 }
 import {
   to = routeros_interface_bridge_vlan.vlan_matrix["vlan20-srv"]
@@ -528,5 +528,10 @@ import {
 import {
   to = routeros_system_scheduler.disable_unused_ports
   id = "*2"
+}
+
+import {
+  to = routeros_queue_simple.wan_egress_sqm
+  id = "*1"
 }
 # Trigger fresh atlantis plan (GIT-009 apply pending)
