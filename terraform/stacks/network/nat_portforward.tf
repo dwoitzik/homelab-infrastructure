@@ -55,3 +55,15 @@ resource "routeros_ip_firewall_nat" "srcnat_masquerade_mgmt_to_srv" {
   dst_address = "10.0.20.0/24"
   comment     = "NAT: Masquerade MGMT to SRV for return traffic"
 }
+
+# Same class of problem as MGMT->SRV above, hit by Admin VLAN (100) instead:
+# without this, Admin-VLAN clients (e.g. LXC 100 on the Proxmox trunk) could
+# reach the AdGuard VIP (10.0.20.5) per the firewall filter rules, but DNS
+# queries still timed out -- return traffic wasn't routing back correctly.
+resource "routeros_ip_firewall_nat" "srcnat_masquerade_admin_to_srv" {
+  chain       = "srcnat"
+  action      = "masquerade"
+  src_address = "10.0.100.0/24"
+  dst_address = "10.0.20.0/24"
+  comment     = "NAT: Masquerade Admin to SRV for return traffic"
+}
