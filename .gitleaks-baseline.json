@@ -2290,5 +2290,29 @@
    "custom"
   ],
   "Fingerprint": "6d24f99723d5a1c20ccb60deff15437148ac723f:network/scripts/bootstrap.rsc:hardcoded-password-assignment:11"
+ },
+ {
+  "RuleID": "hardcoded-password-assignment",
+  "Description": "Literal (non-variable, non-hash) password assignment",
+  "StartLine": 28,
+  "EndLine": 28,
+  "StartColumn": 61,
+  "EndColumn": 81,
+  "Match": "password=\"$REPL_PASS\"",
+  "Secret": "password",
+  "File": "kubernetes/system/postgres/cluster.yml",
+  "SymlinkFile": "",
+  "Commit": "0b240c2eafebc5900e810ea72d0b2456e8822794",
+  "Link": "https://github.com/dwoitzik/homelab-infrastructure/blob/0b240c2eafebc5900e810ea72d0b2456e8822794/kubernetes/system/postgres/cluster.yml#L28",
+  "Entropy": 2.75,
+  "Author": "dwoitzik",
+  "Email": "david@woitzik.dev",
+  "Date": "2026-08-27T14:25:52Z",
+  "Message": "wip: ADR-030 Authelia Postgres warm standby (paused, incomplete)\n\nPaused mid-implementation to switch to a higher-priority goal (alert\nnoise, headscale 24h stability, Minecraft timeout root-cause). Not\nready for review: the Ansible role has only defaults/main.yml so far\n(no tasks/templates yet), and none of this has been applied live --\nthe cluster.yml/network-policies.yml/standby-replication-service.yml\nchanges are drafted but unmerged, matching the \"Prerequisites\" comment\nadded to cluster.yml (operator must create the k8s Secret + vault\nentry before any of this can actually run).\n\nResume by finishing ansible/roles/postgres_authelia_standby/{tasks,templates}\nand the failover-authelia-postgres.md runbook referenced in ADR-030.",
+  "Tags": [
+   "password",
+   "custom"
+  ],
+  "Fingerprint": "0b240c2eafebc5900e810ea72d0b2456e8822794:kubernetes/system/postgres/cluster.yml:hardcoded-password-assignment:28"
  }
 ]
