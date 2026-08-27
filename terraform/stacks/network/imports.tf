@@ -529,4 +529,9 @@ import {
   to = routeros_system_scheduler.disable_unused_ports
   id = "*2"
 }
+
+import {
+  to = routeros_queue_simple.wan_egress_sqm
+  id = "*1"
+}
 # Trigger fresh atlantis plan (GIT-009 apply pending)
