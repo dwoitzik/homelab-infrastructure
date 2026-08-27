@@ -1,0 +1,6 @@
+---
+- name: Deploy warm-standby containers for headscale + vaultwarden (ADR-029)
+  hosts: rpi-srv-02
+  become: true
+  roles:
+    - rpi_ha_standby

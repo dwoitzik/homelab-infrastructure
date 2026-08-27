@@ -1,0 +1,37 @@
+# Warm-standby containers for headscale + vaultwarden (docs/decisions/ADR-029).
+# Deliberately NOT started by this role -- ansible only lays these files
+# down. Starting them is the first step of the failover runbook
+# (docs/runbooks/failover-headscale-vaultwarden.md), after a fresh
+# `litestream restore` and after confirming the two one-time manual
+# prerequisites (identity key files, headscale OIDC client secret) are in
+# place. Running `docker compose up -d` here at deploy time would mean two
+# writers could plausibly both hold a DB at once if someone forgot the
+# standby was live -- avoided by construction, not by discipline.
+services:
+  headscale-standby:
+    image: {{ rpi_ha_standby_headscale_image }}
+    container_name: headscale-standby
+    restart: unless-stopped
+    command: serve
+    ports:
+      - "{{ rpi_ha_standby_headscale_host_port }}:8080"
+    env_file:
+      - {{ rpi_ha_standby_compose_root }}/headscale/.env
+    volumes:
+      - {{ rpi_ha_standby_compose_root }}/headscale/config.yaml:/etc/headscale/config.yaml:ro
+      - {{ rpi_ha_standby_compose_root }}/headscale/policy.hujson:/etc/headscale/policy.hujson:ro
+      - {{ rpi_ha_standby_data_root }}/headscale/data:/var/lib/headscale
+
+  vaultwarden-standby:
+    image: {{ rpi_ha_standby_vaultwarden_image }}
+    container_name: vaultwarden-standby
+    restart: unless-stopped
+    user: "{{ rpi_ha_standby_vaultwarden_uid }}:{{ rpi_ha_standby_vaultwarden_gid }}"
+    ports:
+      - "{{ rpi_ha_standby_vaultwarden_host_port }}:80"
+    environment:
+      - SIGNUPS_ALLOWED=true
+      - DOMAIN=https://vault.woitzik.dev
+      - ICON_SERVICE=internal
+    volumes:
+      - {{ rpi_ha_standby_data_root }}/vaultwarden/data:/data

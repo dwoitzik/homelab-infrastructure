@@ -1,0 +1,24 @@
+{
+  // Standby copy of kubernetes/apps/headscale/config.yml's policy.hujson.
+  // Identical ACL, kept in sync by hand (see headscale-config.yaml.j2's
+  // header comment). ADR-029, item 3.
+  "groups": {
+    "group:admin": ["dw@", "david@"]
+  },
+  "tagOwners": {
+    "tag:subnet-router": ["group:admin"]
+  },
+  "acls": [
+    {
+      "action": "accept",
+      "src": ["group:admin"],
+      "dst": ["*:*"]
+    }
+  ],
+  "autoApprovers": {
+    "routes": {
+      "10.0.20.0/24": ["tag:subnet-router"]
+    },
+    "exitNode": ["tag:subnet-router"]
+  }
+}

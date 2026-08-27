@@ -167,3 +167,34 @@ a separate infrastructure issue from this ADR's own scope.
   deliberately did not do.
 - Items 3-6 remain open — this ADR will need a follow-up status update (or a
   superseding entry) once they land.
+
+## Status update, 2026-08-27: items 3, 4, 6 landed
+
+- `ansible/roles/rpi_ha_standby/`, `ansible/rpi-ha-standby.yml`: docker-compose
+  definitions for `headscale-standby`/`vaultwarden-standby` on `rpi-srv-02`,
+  static config files mirroring the live k8s ConfigMaps, and data directories
+  as the `litestream restore` target. Deliberately **deployed but never
+  started** by this role or its playbook — starting the containers is the
+  failover runbook's job, not something that happens at config-apply time
+  (avoids ever having two writers live at once by construction, same
+  reasoning as the rest of this ADR).
+- `docs/runbooks/failover-headscale-vaultwarden.md`: the actual step-by-step
+  runbook (item 4) — confirm-primary-down, reach `rpi-srv-02`,
+  `litestream restore`, start the standby, flip AdGuard DNS rewrites +
+  Cloudflare Tunnel target, verify against a real client, and the mirror-image
+  failback.
+- `docs/RECOVERY.md` (§7b) and `CLAUDE.local.md` (Topology reality) updated to
+  point at this ADR and the runbook as the one narrow exception to
+  "recovery, not HA" (item 6).
+- **Still open**: item 6's actual induced-failure verification pass (a real
+  DNS/Cloudflare Tunnel flip against live traffic) — this is the highest-risk,
+  least-rehearsed part of the design specifically because it touches live
+  production routing. Deliberately not rehearsed silently against real
+  traffic in this pass; see the runbook's own "Known gaps" section for why
+  this should be a scheduled game-day exercise or a real incident, not a
+  quiet test. The two one-time manual prerequisites (the 3 static identity
+  files, the headscale OIDC client secret — see the runbook's step 0) are
+  also still outstanding; both need the operator, not this agent (Vault
+  AppRole scope and the credential-safety block already explained above).
+- Authelia stays scoped out, unchanged from the entry above
+  (`phase8/QUESTIONS.md`, 2026-08-26).
