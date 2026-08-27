@@ -161,13 +161,8 @@ resource "routeros_ip_dhcp_server_lease" "mgmt_nodes" {
 }
 
 ###############################################################################
-# LEDs -- REMOVED 2026-08-26, see power.tf's own LED section for the full
-# story. This block and power.tf's separate led_off_night/led_on_day block
-# were two independent, non-identical Terraform declarations racing to own
-# the SAME live scheduler objects (both named night_mode_leds/day_mode_leds
-# on the router) -- this one was never actually the live mechanism (the
-# fresh import diff confirmed the live on_event is power.tf's raw
-# `/system leds settings set all-leds-off=...` form, not this file's
-# script-call form via leds_off/leds_on). Removed here rather than left as
-# a second, untested, permanently-drifting declaration of the same objects.
+# LEDs -- removed, see power.tf's LED section for why. This block and
+# power.tf's led_off_night/led_on_day block were two competing declarations
+# of the same live scheduler objects; power.tf's was the live mechanism, so
+# this one was dropped rather than left as a second, drifting declaration.
 ###############################################################################
