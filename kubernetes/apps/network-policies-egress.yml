@@ -212,6 +212,34 @@ spec:
           port: 7844
         - protocol: UDP
           port: 7844
+    # Second half of the fix (found 2026-08-27, live NetworkPolicy audit):
+    # the 7844 rule above only covers the outbound tunnel control connection
+    # to Cloudflare's edge -- it says nothing about the return path
+    # cloudflared needs to actually PROXY a tunneled request back into the
+    # cluster. `allow-egress-web` doesn't cover this either: its `except
+    # 10.0.0.0/8` excludes it, because k3s's own Service CIDR (10.43.0.0/16,
+    # where Traefik's ClusterIP lives) is itself a subnet of 10.0.0.0/8 --
+    # the same collateral-exclusion shape as the LAN carve-out, just for a
+    # cluster-internal address instead of a physical host. Confirmed live via
+    # cloudflared's own logs: continuous `dial tcp 10.43.26.11:443: connect:
+    # connection refused` against `traefik.kube-system.svc.cluster.local`,
+    # while Traefik's own access log for the same window shows it serving
+    # every other client's requests successfully -- Traefik itself was never
+    # down, only this pod's egress to it. Same namespaceSelector/podSelector/
+    # port pattern as allow-egress-tailscale-headscale-control above, which
+    # already proves this exact selector reaches Traefik correctly.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 8000
 ---
 # Warm-standby HA (ADR-029): the litestream sidecars on headscale and
 # vaultwarden need egress to rpi-srv-02's restricted SFTP replica target
