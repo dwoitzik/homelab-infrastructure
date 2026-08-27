@@ -539,4 +539,9 @@ import {
   to = routeros_ip_firewall_filter.fwd_k3s_nfs_media
   id = "*B8"
 }
+
+import {
+  to = routeros_system_led_settings.power
+  id = "*0"
+}
 # Trigger fresh atlantis plan (GIT-009 apply pending)
