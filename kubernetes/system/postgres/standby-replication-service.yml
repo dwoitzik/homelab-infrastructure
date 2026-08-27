@@ -1,0 +1,30 @@
+# ADR-030: dedicated external entry point for rpi-srv-02's warm standby to
+# stream replication from postgres-authelia. A NEW Service, not a change to
+# the existing postgres-authelia-rw's type -- the primary connection path
+# Authelia itself uses stays untouched.
+#
+# Three independent restriction layers, not just this one:
+#   1. loadBalancerSourceRanges below -- MetalLB refuses any source IP
+#      other than rpi-srv-02's.
+#   2. network-policies.yml's allow-from-rpi02-replication -- NetworkPolicy
+#      ipBlock, same restriction enforced again at the pod's own ingress.
+#   3. cluster.yml's pg_hba rule -- hostssl + password auth, further scoped
+#      to exactly the rpi02_replica role and the `replication` pseudo-db
+#      (this role cannot open a normal SQL session to any real database).
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-authelia-standby-replication
+  namespace: database
+spec:
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - 10.0.20.3/32
+  selector:
+    cnpg.io/cluster: postgres-authelia
+    cnpg.io/instanceRole: primary
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgresql

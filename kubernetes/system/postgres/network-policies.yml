@@ -110,3 +110,27 @@ spec:
       ports:
         - port: 8000
           protocol: TCP
+---
+# ADR-030: rpi-srv-02's warm standby streams replication in from outside the
+# cluster (a pull, unlike ADR-029's SFTP push) -- an ipBlock rule, not a
+# namespaceSelector, since the source has no cluster namespace. One of three
+# independent restriction layers -- see standby-replication-service.yml's
+# header comment for the other two.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-rpi02-replication
+  namespace: database
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: postgres-authelia
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.20.3/32
+      ports:
+        - port: 5432
+          protocol: TCP
