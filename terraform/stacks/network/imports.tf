@@ -133,7 +133,7 @@ import {
 }
 import {
   to = routeros_interface_bridge_port.mgmt_port
-  id = "*1"
+  id = "*C"
 }
 import {
   to = routeros_interface_bridge_port.proxmox_port
