@@ -47,3 +47,24 @@ import {
   to = proxmox_cluster_options.datacenter
   id = "cluster"
 }
+
+# ADR-027 backlog: these 3 LXCs (lxc.tf) were added after this file's
+# original skeleton and never got import blocks -- same "declared, applied
+# live, never brought into state" gap as several resources fixed in
+# terraform/stacks/network this same pass. VMIDs confirmed live via
+# `pct list` on pve-mgmt-01 (read-only, no RouterOS/Terraform credential
+# needed), not guessed.
+import {
+  to = proxmox_virtual_environment_container.ct_srv_media_acq_01
+  id = "pve-mgmt-01/202"
+}
+
+import {
+  to = proxmox_virtual_environment_container.ct_srv_jellyfin_01
+  id = "pve-mgmt-01/203"
+}
+
+import {
+  to = proxmox_virtual_environment_container.ct_srv_atlantis_01
+  id = "pve-mgmt-01/204"
+}
