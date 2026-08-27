@@ -1,7 +1,11 @@
 # ADR-018: claude.woitzik.dev gets its own Cloudflare Tunnel, not a VLAN20→VLAN100 firewall hole
 
 **Date:** 2026-08-14
-**Status:** Accepted
+**Status:** Superseded 2026-08-27 -- the tunnel and DNS record were removed
+entirely. A dedicated tunnel avoided the VLAN-boundary problem this ADR
+addresses, but a control-plane web terminal shouldn't be publicly routable
+at all, regardless of what's in front of it. Tailscale (the host already
+carries its own tailnet identity) is the remote-access path now.
 
 ## Context
 
