@@ -265,3 +265,26 @@ spec:
     - to:
         - ipBlock:
             cidr: 10.0.0.0/8
+---
+# Same root gap, found via Loki: myspeed has thrown "NoServers" on every
+# hourly test since the 2026-08-23 rollout (confirmed live -- server
+# discovery works fine on 443, but the actual test servers it's handed run
+# on provider-controlled ports like 8080, which aren't predictable or
+# enumerable). allow-egress-web only covers 80/443.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-myspeed-test-servers
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: myspeed
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
