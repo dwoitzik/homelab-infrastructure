@@ -195,7 +195,7 @@ import {
 # --- Bridge VLAN matrix ---
 import {
   to = routeros_interface_bridge_vlan.vlan10
-  id = "*10"
+  id = "*1E"
 }
 import {
   to = routeros_interface_bridge_vlan.vlan_matrix["vlan20-srv"]
