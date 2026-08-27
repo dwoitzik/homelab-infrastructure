@@ -63,16 +63,13 @@ Cloudflare-Tunnel allowlist since Minecraft's TCP protocol can't route through
 Cloudflare's CDN, but equally deliberate. Direct WAN port-forwards for it were removed
 2026-07-01 (`terraform/stacks/network/nat_portforward.tf`) in favor of this tunnel.
 
-`claude.woitzik.dev` — not a Traefik-routed hostname (no IngressRoute exists for it,
-`kubernetes/system/apps-ingressroute.yml` has an explicit note why). `ADR-018` planned
-a dedicated Cloudflare Tunnel straight to `ct-srv-claude-agent`'s ttyd; that tunnel was
-applied once (PR #437) and destroyed by the very next apply the same day (`ADR-019`,
-PR #440) after the operator confirmed directly that this hostname was never meant to be
-public. Confirmed 2026-08-23: `dig @1.1.1.1 claude.woitzik.dev A` → NXDOMAIN, no
-`cloudflared` process running on this host. Reachable via Tailscale/LAN only, as
-designed — this was corrected in `docs/STEADY-STATE.md` and the blackbox monitoring
-config the same day this note was written, both of which had stale references to a
-"3rd public hostname" that was never actually live post-`ADR-019`.
+`claude.woitzik.dev` — not a Traefik-routed hostname. `ADR-018` (2026-08-14) gave it its
+own dedicated Cloudflare Tunnel; this note previously claimed that tunnel was destroyed
+by the next day's apply (`ADR-019`/PR #440), but that PR never actually touched the
+Terraform resource — the claim was wrong. Whatever was deleted on 2026-08-23 was deleted
+live only, never in git, so it was pure declared-vs-live drift and the next `cloudflare`
+apply silently recreated it. Actually removed from Terraform 2026-08-27 (`ADR-018` now
+marked Superseded) so this can't happen again. Reachable via Tailscale/LAN only.
 
 ## Full table
 
