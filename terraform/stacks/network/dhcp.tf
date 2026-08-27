@@ -38,6 +38,13 @@ resource "routeros_ip_dhcp_server" "vlan_dhcp" {
   name         = "dhcp-${each.key}"
   address_pool = routeros_ip_pool.vlan_pools[each.key].name
   disabled     = false
+  # Declared explicitly (ADR-027 pass, ground-truthed via a real live plan,
+  # not guessed): RouterOS rejects clearing this field entirely ("at least
+  # one dynamic lease identifier should be specified", a genuine live 400
+  # confirmed by a real failed apply attempt) -- the provider was silently
+  # planning to null it because nothing here declared it, not because the
+  # live value was ever actually different.
+  dynamic_lease_identifiers = "client-mac,client-id"
 }
 
 # --- Management DHCP (VLAN 10) ---
@@ -59,4 +66,6 @@ resource "routeros_ip_dhcp_server" "vlan10_dhcp" {
   name         = "dhcp-vlan10"
   address_pool = routeros_ip_pool.vlan10_pool.name
   disabled     = false
+  # See vlan_dhcp's identical comment above -- same real, live-confirmed fix.
+  dynamic_lease_identifiers = "client-mac,client-id"
 }
