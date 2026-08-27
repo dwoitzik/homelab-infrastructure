@@ -52,11 +52,11 @@ sidecars for two concrete reasons, both accepted here:
    `rpi-srv-02` on VLAN20. This ADR adds a new, narrowly-scoped
    `LoadBalancer` Service for exactly this purpose (see Implementation).
 
-### Why not Litestream-for-Postgres (e.g. logical replication via a similar
-WAL-shipping tool) or barman/pgBackRest continuous WAL archiving to
-`rpi-srv-02`
+### Why not Litestream-for-Postgres or barman/pgBackRest WAL archiving
 
-Considered and rejected in favor of native streaming replication:
+Considered and rejected in favor of native streaming replication (a
+similar WAL-shipping tool, or continuous barman/pgBackRest archiving to
+`rpi-srv-02`):
 
 - CNPG's `Cluster` spec already declares one `barmanObjectStore` backup
   target (`s3://cnpg-backups/authelia` on Garage) — CNPG doesn't support two
@@ -172,3 +172,25 @@ Considered and rejected in favor of native streaming replication:
   this as implemented-but-unverified-by-a-human until that review happens,
   same posture as ADR-029's still-open manual prerequisites. No induced
   promotion test has been run either — see the runbook's own caveats.
+
+## Status update: role + runbook complete, still nothing applied live
+
+`ansible/roles/postgres_authelia_standby/` (install `postgresql-17`, drop
+Debian's own auto-created default cluster, seed via `pg_basebackup -R`
+against the live primary, disable TLS post-seed since the primary's
+CNPG-mounted cert paths don't exist on `rpi-srv-02`, run continuously via
+a standalone systemd unit rather than Debian's `pg_ctlcluster` wrapper)
+and `docs/runbooks/failover-authelia-postgres.md` (promote via
+`pg_promote()`, repoint Authelia, and an honest failback section --
+physical streaming replication has no clean live resync, unlike
+Litestream's, so failback here means rebuilding the primary from the
+promoted standby's own fresh dump, not a five-minute mirror-image).
+
+**Still entirely unapplied.** Direct network access from this agent's
+own host to `rpi-srv-02` and the Atlantis/RouterOS path needed to apply
+`kubernetes/system/postgres/standby-replication-service.yml` live has
+been down for this whole pass (a separate, already-tracked network
+issue -- see `phase8/LEDGER.md`). Nothing in this ADR has been
+`ansible-playbook`'d or `kubectl apply`'d against the real cluster yet.
+`ansible-lint` (production profile), `yamllint`, `kubeconform`, and
+`terraform validate`/`fmt` are all clean on everything this ADR adds.
