@@ -40,3 +40,31 @@
   community.docker.docker_compose_v2:
     project_src: /opt/npm
     state: present
+
+# Defense in depth: only the WAN dst-nat'd port (443) should ever reach this
+# box from outside. Docker publishes 80 and 81 (plain HTTP, NPM admin UI) on
+# 0.0.0.0 regardless -- correct behavior depends entirely on upstream NAT
+# (MikroTik, FritzBox) never forwarding those ports. This restricts them to
+# RFC1918 sources at the DOCKER-USER chain (evaluated before Docker's own
+# ACCEPT rules) so a FritzBox misconfig/UPnP surprise can't expose the admin
+# UI, independent of what the router side does.
+- name: Allow internal sources to NPM admin UI (81) and plain HTTP (80)
+  ansible.builtin.iptables:
+    chain: DOCKER-USER
+    protocol: tcp
+    source: 10.0.0.0/8
+    destination_ports: "80,81"
+    jump: ACCEPT
+    action: insert
+    rule_num: 1
+    comment: "NPM admin/HTTP -- internal only, allow"
+
+- name: Drop non-internal sources to NPM admin UI (81) and plain HTTP (80)
+  ansible.builtin.iptables:
+    chain: DOCKER-USER
+    protocol: tcp
+    destination_ports: "80,81"
+    jump: DROP
+    action: insert
+    rule_num: 2
+    comment: "NPM admin/HTTP -- drop non-internal (defense in depth vs. WAN NAT misconfig)"
