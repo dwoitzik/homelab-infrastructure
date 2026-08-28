@@ -46,29 +46,52 @@ resource "routeros_system_scheduler" "disable_unused_ports" {
 ###############################################################################
 
 ###############################################################################
-# LED state — captured into Terraform 2026-08-27, ADR-027 pass
+# LED scheduling — re-added 2026-08-27, cosmetic, off 22:00-06:00 local
 ###############################################################################
 #
 # The RB5009 firmware bug documented above is genuinely fixed on RouterOS
 # 7.24.1 (confirmed live: `GET /rest/system/resource` -> version 7.24.1,
-# past the 7.22.2 fix). The router was moved to `all-leds-off: never`
-# directly (not via this file) to unblock the "LEDs stuck off" symptom
-# immediately -- this declares that live value so a future apply doesn't
-# silently revert it, matching what's actually running rather than what
-# the removed scheduler used to try to do.
+# past the 7.22.2 fix that resolved it). Rebuilding the original off-hours
+# schedule (#493) with the values this firmware actually accepts.
 #
-# Deliberately NOT re-adding the night/day off-hours schedule the old
-# scheduler tried to run -- that's a real feature decision (worth doing now
-# that the underlying write bug is fixed), not a declared-vs-live
-# reconciliation. Left for the operator, see `phase8/QUESTIONS.md`.
+# Interim step, superseded by this: right after confirming the firmware
+# fix, `all-leds-off` was captured into Terraform as a static
+# `routeros_system_led_settings` resource pinned to "never" (LEDs always
+# on) -- a snapshot of the live emergency fix, not the real feature. That
+# static resource is removed here rather than kept alongside these
+# schedulers: a static declared value and a scheduler that changes the
+# same field twice a day would fight each other on every apply (the same
+# "two mechanisms managing one live object" bug that caused the original
+# main.tf/power.tf collision this repo already hit once, see #570) --
+# picking one mechanism (the scheduler) instead of layering both.
 #
-# Also note the value itself: on 7.19.4 this field only accepted "no"/"yes"
-# (and even those 500'd, see above) -- on 7.24.1 the accepted values
-# changed to "never"/"immediate" (confirmed live: "no" now 400s with
-# "input does not match any value"). A real RouterOS-version-driven schema
+# Same raw-script `routeros_system_scheduler` pattern as
+# disable_unused_ports above, matching the original #493 design (not the
+# typed `routeros_system_led_settings` resource, to avoid a second
+# collision risk between it and the scheduler's own writes).
+#
+# Value change from the original: "no" -> "never" for the day-mode
+# (LEDs-on) state. On RouterOS 7.19.4 `all-leds-off` accepted "no"/"yes"
+# (and even "no" 500'd, which is what broke this feature in the first
+# place). On 7.24.1 the accepted values are "never"/"immediate" --
+# confirmed live: "no" now 400s with "input does not match any value",
+# "never" succeeds. "immediate" (the night-mode/LEDs-off value) was valid
+# on both versions, unchanged. A real RouterOS-version-driven schema
 # change, not this repo's own inconsistency.
 ###############################################################################
 
-resource "routeros_system_led_settings" "power" {
-  all_leds_off = "never"
+resource "routeros_system_scheduler" "led_off_night" {
+  name       = "power_led_off_night"
+  start_time = "22:00:00"
+  interval   = "1d"
+  on_event   = "/system leds settings set all-leds-off=immediate"
+  comment    = "Cosmetic: turn off board LEDs 22:00-06:00"
+}
+
+resource "routeros_system_scheduler" "led_on_day" {
+  name       = "power_led_on_day"
+  start_time = "06:00:00"
+  interval   = "1d"
+  on_event   = "/system leds settings set all-leds-off=never"
+  comment    = "Cosmetic: restore board LEDs at 06:00"
 }
