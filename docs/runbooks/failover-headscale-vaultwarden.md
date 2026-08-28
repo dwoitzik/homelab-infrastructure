@@ -7,7 +7,7 @@ RPO target: seconds (last Litestream WAL segment shipped before the
 primary went down).
 
 **Applies to headscale and vaultwarden only.** Everything else on
-`pve-mgmt-01` is still "recovery, not HA" — see `docs/RECOVERY.md`.
+`pve-mgmt-01` is still "recovery, not HA" — see `DISASTER-RECOVERY.md`.
 
 ## 0. Before you ever need this for real
 

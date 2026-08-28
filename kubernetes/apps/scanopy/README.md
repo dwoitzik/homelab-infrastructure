@@ -6,7 +6,7 @@ interactive, self-updating map of hosts and services — replaces manually redra
 architecture diagram every time something changes.
 
 Covers VLAN10 (MGMT), VLAN20 (SRV), VLAN30 (DMZ). VLAN40 (IoT) and VLAN100 (Admin) are
-deliberately excluded — see `docs/decisions/ADR-031-scanopy-topology-mapping.md` for why.
+deliberately excluded — see `docs/decisions/ADR-035-scanopy-topology-mapping.md` for why.
 
 ## Architecture
 

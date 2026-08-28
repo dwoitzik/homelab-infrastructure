@@ -1,4 +1,4 @@
-# ADR-031: Scanopy for Network Topology Mapping
+# ADR-035: Scanopy for Network Topology Mapping
 
 **Date:** 2026-08-28
 **Status:** Accepted
