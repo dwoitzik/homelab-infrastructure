@@ -540,8 +540,4 @@ import {
   id = "*B8"
 }
 
-import {
-  to = routeros_system_led_settings.power
-  id = "*0"
-}
 # Trigger fresh atlantis plan (GIT-009 apply pending)
