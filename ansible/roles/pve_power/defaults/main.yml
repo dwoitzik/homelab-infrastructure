@@ -1,101 +1,50 @@
 ---
-# amd_pstate=active (below) replaces the generic cpufreq subsystem with
-# AMD's own hardware P-state driver -- confirmed live post-reboot,
-# 2026-08-23: scaling_available_governors under active mode is just
-# "performance powersave", schedutil isn't offered at all anymore. Real
-# consequence found the same day: `cpupower frequency-set -g schedutil`
-# failed (exit 237), which meant pve-cpu-power.service's ExecStart never
-# succeeded, and EPP silently stayed at the driver's own default
-# (balance_performance) instead of the balance_power below -- the service
-# never got that far. `powersave` is the correct active-mode governor
-# choice; EPP does the actual fine-grained power/performance tuning from
-# there, same intent as before.
+# CPU governor + AMD P-State + EPP tuning. See ADR-034 for why `powersave`
+# is the correct governor under `amd_pstate=active` (schedutil isn't
+# offered), not a compromise.
 pve_power_cpu_governor: powersave
 pve_power_energy_perf_pref: balance_power
 pve_power_amd_pstate: active
 
-# REL-012c/REL-037: ZFS module tuning. arc_max/prefetch_disable/dirty_data_max/
-# txg_timeout were applied manually (never in git) after the original
-# REL-012c etcd fdatasync incident. zfs_vdev_async_write_max_active=3 is new
-# (2026-07-04) -- default is 10, equal to zfs_vdev_sync_write_max_active (also
-# 10), meaning bulk async writes from any LXC/VM on this host could compete
-# for the single shared SSD's queue on completely equal footing with etcd's
-# own synchronous WAL fdatasync. Capping async well below sync's ceiling
-# gives etcd's sync writes priority in the ZIO scheduler's issue order,
-# directly targeting "leader is overloaded likely from slow disk" (the
-# recurring REL-012c crash signature) instead of just tolerating it better
-# (REL-035's cpu.units was CPU scheduling only, doesn't touch disk I/O
-# contention at all).
-# 2026-08-29 (ADR-037): lowered 16 GiB -> 8 GiB. Live investigation during
-# the vm-srv-k3s-11 wedge incident found the host genuinely memory-starved
-# (swap in active use, all 3 k3s VMs balloon-deflated well below their
-# `dedicated` ceiling, `vm-srv-k3s-11` itself thrashing hard enough to
-# stall its kubelet's PLEG and make the apiserver unreachable). ARC was
-# quietly using ~13 GB of its 16 GB cap at the time -- real host RAM that
-# could otherwise relieve the VMs' ballooning. Lowering to 8 GiB (the low
-# end of the generally-recommended 12-16 GiB range for a 64 GB host, a
-# deliberate deviation given this host runs 3 latency-sensitive k3s
-# control-plane/worker VMs rather than a typical storage-workload profile)
-# freed ~5 GB of real host RAM immediately, live-verified via `free -m`.
-# See ADR-037 for the full investigation and the paired VM `floating`
-# (balloon floor) changes in terraform/stacks/proxmox/vm.tf.
+# ZFS module tuning for a single shared, DRAM-less NVMe. See ADR-034 --
+# zfs_vdev_async_write_max_active keeps bulk async writes from starving a
+# latency-sensitive synchronous writer's I/O queue priority.
+# 2026-08-29 (ADR-037): lowered 16 GiB -> 8 GiB after the vm-srv-k3s-11
+# wedge incident found the host memory-starved with ARC quietly holding
+# ~13 GB of its old 16 GB cap -- real host RAM that could otherwise relieve
+# the k3s VMs' ballooning. Freed ~5 GB immediately, live-verified.
 pve_power_zfs_arc_max_bytes: 8589934592
 pve_power_zfs_prefetch_disable: 1
 pve_power_zfs_dirty_data_max_bytes: 268435456
 pve_power_zfs_txg_timeout: 5
 pve_power_zfs_vdev_async_write_max_active: 3
 
-# 2026-08-16/19: vzdump global throttle. Applied manually (`vim
-# /etc/vzdump.conf`) during the local-lvm thin-pool exhaustion incident
-# that crashed the host that day, never brought under IaC -- exactly the
-# regression risk this role already exists to close for the ZFS tuning
-# above. bwlimit is KB/s (51200 = 50MB/s); ionice=7 is the lowest priority
-# best-effort class, so vzdump's own reads/writes yield to everything else
-# on the shared NVMe. Doesn't cover every bulk-I/O source on this host (see
-# phase8/LEDGER.md Entry 40 for the 2026-08-19 Garage block-resync incident,
-# a different job entirely that this setting can't throttle), but closes
-# the specific vzdump gap this value was originally added for.
+# vzdump global throttle -- backup I/O yields to everything else sharing
+# this host's one disk. See ADR-034.
 pve_power_vzdump_bwlimit_kbps: 51200
 pve_power_vzdump_ionice: 7
 
-# 2026-08-21: local-lvm thin-pool exhaustion (phase8/LEDGER.md Entries 59-68).
-# thin_pool_autoextend_threshold defaults to 80, but this host's single PV is
-# already 100% allocated at the VG level (`vgs pve` VFree=0) -- dmeventd's
-# autoextend can structurally never succeed here, so the 80% threshold was
-# pure downside: it blocked every new thin-LV/snapshot (i.e. every vzdump
-# backup) once Data% crossed it, for zero actual protection in return. Raised
-# to 92 rather than disabled (100) to keep a real margin before the
-# unrecoverable "pool actually full" failure mode, which risks I/O errors/
-# corruption across every guest on the pool -- categorically worse than a
-# failed backup.
+# This host's LVM thin pool has zero free space at the volume-group level,
+# so the default 80% autoextend threshold only ever blocked new thin-LVs
+# (every vzdump backup) with no actual protection in return -- see
+# ADR-034. Raised, not disabled, to keep a real margin before the
+# unrecoverable "pool actually full" failure mode.
 pve_power_lvm_thin_autoextend_threshold: 92
 
-# 2026-08-21: PBS backup health check (phase8/LEDGER.md Entries 59-68).
-# VM211/213 sat at 1-byte "successful" PBS archives for two nights (2026-08-18/
-# 19) before failing outright on 08-20 -- root cause was a chunk-store
-# ownership mismatch (some chunks landed 100034:100034 instead of the real
-# backup:backup service identity, giving EPERM on dedup atime-touch), fixed by
-# a targeted chown. This hook script (registered as vzdump's `script:` in
-# /etc/vzdump.conf, phase job-end) is the alerting half the operator asked
-# for so this exact "reports success while writing ~nothing" failure mode
-# can't go silently unnoticed again -- checks real PBS-datastore manifest
-# size and age per VMID, not vzdump's own log/exit status (which is exactly
-# what missed this the first time).
+# PBS backup health check: verifies real datastore manifest size/age per
+# VMID, not just vzdump's own exit status -- see ADR-034 for why that
+# distinction matters.
 pve_power_pbs_healthcheck_storeid: local-pbs
 pve_power_pbs_healthcheck_ntfy_topic: dw-homelab-a12a7b540943
 pve_power_pbs_healthcheck_min_size_mib: 100
 pve_power_pbs_healthcheck_max_age_hours: 26
 
-# 2026-08-21: pve-watchdog.sh -- see tasks/main.yml comment for the incident
-# (repeated ntfy spam overnight from a flat rate-limit) that motivated
-# bringing this under IaC with an escalating backoff.
+# Host watchdog with escalating backoff (see tasks/main.yml and ADR-034)
+# instead of a flat rate-limit, so an ongoing condition doesn't re-alert
+# every check cycle while a genuinely new one still alerts promptly.
 pve_power_watchdog_ntfy_topic: dw-homelab-a12a7b540943
 
-# 2026-08-22 (BRIEFING-V4 Section E/G): SSD wear had no Prometheus-queryable
-# metric at all -- node_exporter had no --collector.textfile.directory flag,
-# and Scrutiny (the app meant to track this) has its own InfluxDB PVC
-# broken (pre-existing, unrelated). A small textfile-collector cron closes
-# this with real NVMe SMART data, serving both the weekly report and
-# Section G's wear-projection work.
+# NVMe SMART data as real Prometheus textfile-collector metrics -- feeds
+# the weekly wear report and HARDWARE.md's wear projection.
 pve_power_smart_device: /dev/nvme0n1
 pve_power_node_exporter_textfile_dir: /var/lib/node_exporter/textfile_collector
