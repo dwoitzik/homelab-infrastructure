@@ -160,3 +160,25 @@ spec:
       name: metrics
   selector:
     app: headscale
+---
+# Dedicated LoadBalancer IP for the DMZ reverse proxy (ct-dmz-proxy-01) to
+# reach headscale directly, bypassing Traefik. Traefik can't proxy ts2021's
+# noise-protocol upgrade (Upgrade: tailscale-control-protocol) -- it only
+# forwards the literal "websocket" value -- same reason the Cloudflare
+# Tunnel route was moved off it. sourceRanges restricts this IP to the DMZ
+# subnet only; nothing else on the network can reach it directly.
+apiVersion: v1
+kind: Service
+metadata:
+  name: headscale-dmz-lb
+  namespace: apps
+spec:
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - 10.0.30.0/24
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+  selector:
+    app: headscale
