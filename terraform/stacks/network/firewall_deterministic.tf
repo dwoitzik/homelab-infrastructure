@@ -301,6 +301,41 @@ resource "routeros_ip_firewall_filter" "fwd_09b_dmz_to_headscale" {
   }
 }
 
+
+# Scanopy MGMT/DMZ daemons -> scanopy-server-daemon-lb (10.0.20.202:60072).
+# DaemonPoll mode -- daemon-initiated only, no inbound path to either
+# daemon exists. Single host source, single dest, single port each -- not
+# VLAN-wide. See kubernetes/apps/scanopy/README.md.
+resource "routeros_ip_firewall_filter" "fwd_09c_mgmt_to_scanopy" {
+  chain        = "forward"
+  action       = "accept"
+  src_address  = "10.0.10.111/32"
+  dst_address  = "10.0.20.202"
+  dst_port     = "60072"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_10_srv_to_wan.id
+  comment      = "09c: MGMT (ct-mgmt-scanopy-01) - Access to scanopy-server-daemon-lb"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
+resource "routeros_ip_firewall_filter" "fwd_09d_dmz_to_scanopy" {
+  chain        = "forward"
+  action       = "accept"
+  src_address  = "10.0.30.2/32"
+  dst_address  = "10.0.20.202"
+  dst_port     = "60072"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_10_srv_to_wan.id
+  comment      = "09d: DMZ (ct-dmz-proxy-01) - Access to scanopy-server-daemon-lb"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
 resource "routeros_ip_firewall_filter" "fwd_10_srv_to_wan" {
   action        = "accept"
   chain         = "forward"

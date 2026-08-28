@@ -1,0 +1,20 @@
+---
+services:
+  scanopy-daemon:
+    image: ghcr.io/scanopy/scanopy/daemon:v0.16.2
+    container_name: scanopy-daemon
+    restart: unless-stopped
+    # host networking: ARP discovery needs the real NIC on this VLAN, a
+    # normal bridge container never sees that L2 traffic. NET_RAW+NET_ADMIN
+    # (not upstream's default privileged:true, no Docker-socket mount) --
+    # see kubernetes/apps/scanopy/scanopy.yml's comment for why.
+    network_mode: host
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    environment:
+      - SCANOPY_SERVER_URL={{ scanopy_server_url }}
+      - SCANOPY_DAEMON_API_KEY={{ scanopy_daemon_api_key }}
+      - SCANOPY_NETWORK_ID={{ scanopy_network_id }}

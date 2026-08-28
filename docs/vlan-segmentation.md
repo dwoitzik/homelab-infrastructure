@@ -6,7 +6,7 @@ This document defines the logical network structure and security zones. The Mikr
 
 | VLAN ID | Name  | Subnet         | Gateway    | Primary Function |
 | :--- | :--- | :--- | :--- | :--- |
-| 10 | MGMT | 10.0.10.0/24 | 10.0.10.1 | Infrastructure Management (Proxmox host, PBS, Router API). |
+| 10 | MGMT | 10.0.10.0/24 | 10.0.10.1 | Infrastructure Management (Proxmox host, PBS, Router API, Scanopy MGMT daemon). |
 | 20 | SRV | 10.0.20.0/24 | 10.0.20.1 | Internal Services (AdGuard, Internal Proxy, Vaultwarden). |
 | 30 | DMZ | 10.0.30.0/24 | 10.0.30.1 | Public-facing Services (External Reverse Proxy, Game Servers). |
 | 40 | IOT | 10.0.40.0/24 | 10.0.40.1 | Untrusted / Smart Home Devices (Restricted Internet). |

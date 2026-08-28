@@ -1,0 +1,60 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-scanopy
+  namespace: database
+spec:
+  instances: 1
+
+  postgresql:
+    parameters:
+      max_connections: "50"
+      shared_buffers: "64MB"
+
+  bootstrap:
+    initdb:
+      database: scanopy
+      owner: scanopy
+      secret:
+        name: postgres-scanopy-user
+
+  storage:
+    size: 5Gi
+    storageClass: local-path
+
+  affinity:
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 50m
+    limits:
+      memory: 256Mi
+      cpu: 250m
+
+  monitoring:
+    enablePodMonitor: false
+
+  backup:
+    retentionPolicy: "7d"
+    barmanObjectStore:
+      destinationPath: s3://cnpg-backups/scanopy
+      endpointURL: http://garage.apps.svc.cluster.local:3900
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-garage-backup
+          key: access-key-id
+        secretAccessKey:
+          name: cnpg-garage-backup
+          key: secret-access-key
+        region:
+          name: cnpg-backup-config
+          key: region
+      wal:
+        compression: gzip
+      data:
+        compression: gzip

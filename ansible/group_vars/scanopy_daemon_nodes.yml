@@ -1,0 +1,9 @@
+---
+# Scanopy MGMT-VLAN daemon (kubernetes/apps/scanopy/README.md, step 3-5).
+# Undefined on purpose until the server's daemon-lb IP and a real
+# Network/API key exist -- the role's tasks are gated on
+# scanopy_daemon_api_key being defined, so nothing deploys until these are
+# filled in:
+# scanopy_server_url: "http://<scanopy-server-daemon-lb IP>:60072"
+# scanopy_daemon_api_key: "{{ vault_scanopy_mgmt_daemon_api_key }}"
+# scanopy_network_id: "REPLACE_ME"

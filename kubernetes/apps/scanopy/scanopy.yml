@@ -1,0 +1,167 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scanopy-server-data
+  namespace: apps
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scanopy-server
+  namespace: apps
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: scanopy-server
+  template:
+    metadata:
+      labels:
+        app: scanopy-server
+    spec:
+      containers:
+        - name: scanopy-server
+          # Renovate tracks this tag going forward.
+          image: ghcr.io/scanopy/scanopy/server:v0.16.2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 60072
+          envFrom:
+            - secretRef:
+                name: scanopy-server
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: scanopy-server-data
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scanopy-server
+  namespace: apps
+spec:
+  ports:
+    - port: 60072
+      targetPort: 60072
+      name: http
+  selector:
+    app: scanopy-server
+---
+# Reachable from the MGMT and DMZ daemons, which live on different VLANs and
+# can't resolve the in-cluster ClusterIP. Scoped to exactly those two daemon
+# hosts (see terraform/stacks/network/firewall_deterministic.tf for the
+# matching forward rules) -- not a LAN-wide LB, same pattern as
+# headscale-dmz-lb.
+apiVersion: v1
+kind: Service
+metadata:
+  name: scanopy-server-daemon-lb
+  namespace: apps
+spec:
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - 10.0.30.2/32
+    - 10.0.10.111/32
+  ports:
+    - port: 60072
+      targetPort: 60072
+      name: http
+  selector:
+    app: scanopy-server
+---
+# SRV-VLAN daemon. hostNetwork: true because ARP discovery needs the real
+# node NIC on 10.0.20.0/24 -- flannel's overlay hides real L2 traffic from a
+# normal pod IP. This bypasses NetworkPolicy entirely (hostNetwork pods use
+# the node's own network namespace, not a CNI-managed pod IP that
+# NetworkPolicy can select on) -- this daemon's egress is governed by the
+# node's OS and the MikroTik firewall, not network-policies-egress.yml.
+#
+# Upstream's own docker-compose.yml runs this with privileged:true and a
+# Docker-socket mount (for auto-detecting what's running in Docker on the
+# scanned host) -- deliberately not doing either here. NET_RAW+NET_ADMIN is
+# the actual requirement for raw-socket ARP/port scanning; privileged grants
+# far more than that. The Docker-socket mount is an optional enhancement
+# (container auto-tagging), not required for host/service discovery -- and
+# on the DMZ daemon specifically, mounting it would hand a scanner
+# effective root over the CrowdSec/NPM stack sitting right next to it,
+# which is the opposite of what this deployment is for. See
+# docs/decisions/ADR-031-scanopy-topology-mapping.md.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scanopy-daemon-srv
+  namespace: apps
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: scanopy-daemon-srv
+  template:
+    metadata:
+      labels:
+        app: scanopy-daemon-srv
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: scanopy-daemon
+          # Renovate tracks this tag going forward.
+          image: ghcr.io/scanopy/scanopy/daemon:v0.16.2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_RAW", "NET_ADMIN"]
+          envFrom:
+            - secretRef:
+                name: scanopy-daemon-srv
+          volumeMounts:
+            - name: config
+              mountPath: /root/.config/scanopy/daemon
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: config
+          emptyDir: {}
