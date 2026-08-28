@@ -68,3 +68,19 @@
     action: insert
     rule_num: 2
     comment: "NPM admin/HTTP -- drop non-internal (defense in depth vs. WAN NAT misconfig)"
+
+# The community blocklist (CAPI decisions) already syncs continuously on its
+# own -- confirmed live, real IPs in the nftables set. This is a different
+# thing: the local scenario/parser/collection ruleset (what counts as an
+# attack in the first place) only updates when `cscli hub upgrade` runs --
+# nothing did that automatically before this task existed.
+- name: Schedule weekly CrowdSec hub upgrade (parsers/scenarios/collections)
+  ansible.builtin.cron:
+    name: crowdsec-hub-upgrade
+    weekday: "0"
+    hour: "4"
+    minute: "0"
+    job: >-
+      docker exec crowdsec cscli hub upgrade >> /var/log/crowdsec-hub-upgrade.log 2>&1 &&
+      docker restart crowdsec >> /var/log/crowdsec-hub-upgrade.log 2>&1
+  when: npm_enable_crowdsec | default(false) | bool
