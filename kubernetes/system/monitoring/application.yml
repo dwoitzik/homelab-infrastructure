@@ -329,7 +329,7 @@ spec:
               # woitzik.dev hostnames declared anywhere in the repo's
               # IngressRoutes, resolved via the blackbox-exporter pod's
               # forced public resolver (dnsPolicy: None, 1.1.1.1/8.8.8.8 --
-              # see blackbox-exporter.yml). ADR-019 (2026-08-14) made public
+              # see blackbox-exporter.yml). ADR-033 (2026-08-14) made public
               # DNS/tunnel exposure an explicit allowlist of exactly two
               # hostnames (photos, headscale) -- every other hostname here
               # has had no public DNS record since that ADR landed, so ~41 of
@@ -344,9 +344,9 @@ spec:
               # known gap rather than silently dropped (see ROADMAP.md).
               #
               # Correction, 2026-08-23: claude.woitzik.dev was removed from
-              # this list. ADR-018's dedicated tunnel for it was applied once
+              # this list. ADR-032's dedicated tunnel for it was applied once
               # (PR #437) then destroyed by the very next apply in the same
-              # session (ADR-019's allowlist PR, #440) -- confirmed via
+              # session (ADR-033's allowlist PR, #440) -- confirmed via
               # `terraform/stacks/cloudflare/imports.tf`'s own note and the
               # operator's direct 2026-08-15 confirmation recorded there:
               # claude.woitzik.dev was never meant to be on the public
@@ -356,7 +356,7 @@ spec:
               # had been reporting `probe_success 0` (confirmed via a live
               # Prometheus query) the entire time, correctly reflecting that
               # -- it was never a false "up", just a target that should never
-              # have been on this list post-ADR-019. This agent's own ttyd
+              # have been on this list post-ADR-033. This agent's own ttyd
               # remains reachable via Tailscale/LAN only, as designed.
               - job_name: 'blackbox-http'
                 scrape_interval: 60s
@@ -375,7 +375,7 @@ spec:
                   - target_label: __address__
                     replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
               # auth.woitzik.dev lost its public DNS record in the same
-              # ADR-019 change -- this health check was never about external
+              # ADR-033 change -- this health check was never about external
               # reachability (Authelia is LAN/VPN-only by design), so probing
               # it through the public-only resolver above was wrong from the
               # start and has been failing silently since 2026-08-14. The

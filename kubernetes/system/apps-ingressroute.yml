@@ -450,11 +450,11 @@ spec:
         serversTransport: insecure-transport
 
 # Note: claude.woitzik.dev (ttyd on ct-srv-claude-agent, Admin VLAN) is
-# deliberately NOT routed through Traefik/this cluster -- see ADR-018. Routing
+# deliberately NOT routed through Traefik/this cluster -- see ADR-032. Routing
 # it here would need the cluster (VLAN20) to reach into the Admin VLAN
 # (10.0.100.0/24), which the network's firewall rules intentionally don't
-# allow in that direction. ADR-018's own dedicated Cloudflare Tunnel for it
-# was applied once (PR #437) then destroyed by the very next apply (ADR-019's
+# allow in that direction. ADR-032's own dedicated Cloudflare Tunnel for it
+# was applied once (PR #437) then destroyed by the very next apply (ADR-033's
 # public-exposure-allowlist, PR #440) -- the operator confirmed directly
 # (2026-08-15) that this hostname was never meant to be public at all, so no
 # tunnel exists for it today (verified 2026-08-23: no public DNS record, no

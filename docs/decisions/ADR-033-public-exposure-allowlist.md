@@ -1,4 +1,4 @@
-# ADR-019: Public exposure is an explicit allowlist of two hostnames, not a wildcard
+# ADR-033: Public exposure is an explicit allowlist of two hostnames, not a wildcard
 
 **Date:** 2026-08-14
 **Status:** Accepted
@@ -34,7 +34,7 @@ new app, every IngressRoute added without thinking hard about exposure, is publi
 until someone notices and narrows it — and three real gaps had already accumulated in
 the single day this wildcard existed.
 
-This directly extends `ADR-018`'s reasoning (why `claude.woitzik.dev` got its own
+This directly extends `ADR-032`'s reasoning (why `claude.woitzik.dev` got its own
 dedicated tunnel instead of a VLAN20→VLAN100 firewall hole, rather than accepting even
 a narrow cross-zone exception): the operator's instinct there — don't open a hole
 between a higher-exposure zone and a lower-exposure one, no matter how narrow — applies

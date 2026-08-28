@@ -1,7 +1,7 @@
 name: Terraform Plan (ADR-021)
 
 # Replaces Atlantis's webhook-driven `atlantis plan` PR comment. Atlantis's
-# own webhook has no working inbound path since ADR-019 removed
+# own webhook has no working inbound path since ADR-033 removed
 # atlantis.woitzik.dev's public DNS/tunnel entry (see ADR-021's Context) --
 # this reproduces the same comment-triggered UX using a self-hosted runner
 # that polls GitHub outbound, so no inbound path is needed at all.

@@ -13,7 +13,7 @@ this Phase 1 pass has looked at is inbound because a human wants to reach it fro
 outside the LAN/VPN — Atlantis is inbound because of a *machine-to-machine* direction
 problem, not a genuine "someone needs to reach this from their phone" need.
 
-ADR-019 (this session) already dropped `atlantis.woitzik.dev`'s Cloudflare DNS record
+ADR-033 (this session) already dropped `atlantis.woitzik.dev`'s Cloudflare DNS record
 and tunnel ingress rule as part of moving to an explicit public-exposure allowlist —
 Atlantis is not on that allowlist and has no plausible case for being on it. That
 apply is what actually happened live, confirmed via the Cloudflare API; see
@@ -34,7 +34,7 @@ needs solving structurally, not worked around each time it bites.
 **Option A — self-hosted GitHub Actions runner (chosen).** A runner inside the
 network polls GitHub outbound for work; GitHub never initiates a connection inward.
 `atlantis.woitzik.dev`'s tunnel entry is deleted outright (already effectively true
-post-ADR-019) rather than narrowed. Atlantis itself — or a GitHub Actions workflow
+post-ADR-033) rather than narrowed. Atlantis itself — or a GitHub Actions workflow
 doing the equivalent `terraform plan`/`apply`-on-PR-comment flow directly — runs on
 that runner.
 
@@ -68,7 +68,7 @@ port forward, Cloudflare Tunnel, or WAN-listening service is needed at all.
   allowlist has to track GitHub's published ranges as they change; Access has to stay
   correctly wired; HMAC verification has to stay correctly implemented) — every one of
   those is a way to silently regress back to "actually open" the way the wildcard
-  ingress rule did in one day (ADR-019's own context section). Option A has no ongoing
+  ingress rule did in one day (ADR-033's own context section). Option A has no ongoing
   configuration surface to regress: there's simply nothing listening on the public
   internet.
 - **Removes the `terraform@pve` token-in-compose problem as a side effect.** Atlantis's
@@ -109,7 +109,7 @@ port forward, Cloudflare Tunnel, or WAN-listening service is needed at all.
   homelab-scale repo with a small number of concurrent PRs.
 - This is a real implementation project, not a config toggle — sequenced as its own
   follow-up PR (or set of PRs), not done as part of writing this ADR. Until it lands,
-  Atlantis continues running exactly as today (LAN/VPN-reachable only, per ADR-019 —
+  Atlantis continues running exactly as today (LAN/VPN-reachable only, per ADR-033 —
   already correctly the interim state), just without a public webhook path, which
   means `atlantis plan`/`apply` PR comments won't trigger anything until either this
   migration completes or the webhook path is manually unstuck once (see the parked
@@ -128,7 +128,7 @@ port forward, Cloudflare Tunnel, or WAN-listening service is needed at all.
   part of that follow-up (folds into the Tier 1 credential rotation work already
   tracked in `docs/EXPOSURE.md`).
 - `terraform/stacks/cloudflare/`'s Atlantis tunnel entry stays removed permanently
-  (already true post-ADR-019) — this ADR is what makes that removal a deliberate,
+  (already true post-ADR-033) — this ADR is what makes that removal a deliberate,
   permanent architectural decision rather than a still-open loose end.
 - Until the migration lands, `atlantis plan`/`apply` PR comments have no working
   delivery path — noted in `phase8/STATE.md` as an open item, not silently assumed
