@@ -194,3 +194,81 @@ issue -- see `phase8/LEDGER.md`). Nothing in this ADR has been
 `ansible-playbook`'d or `kubectl apply`'d against the real cluster yet.
 `ansible-lint` (production profile), `yamllint`, `kubeconform`, and
 `terraform validate`/`fmt` are all clean on everything this ADR adds.
+
+## Re-examined 2026-08-28: can this go over Tailscale instead of a new LoadBalancer? No -- explained why, design unchanged
+
+The operator asked, reasonably, whether this could replicate over the
+existing Tailscale path to `rpi-srv-02` instead of standing up a new
+externally-reachable `LoadBalancer` on a live auth database -- reusing
+already-audited infrastructure instead of adding a new one. Investigated
+properly rather than assumed either way.
+
+**It can't, and it's not actually a Tailscale-vs-LAN question at all.**
+Two separate things were being conflated, worth untangling explicitly:
+
+1. **This design's replication traffic never crosses VLAN100 or needs
+   Tailscale in the first place.** `rpi-srv-02` (10.0.20.3) and the new
+   `LoadBalancer`'s IP (MetalLB's pool, 10.0.20.200-240) are both on
+   VLAN20 -- the same physical LAN segment the CNPG primary itself runs
+   behind. This traffic was never affected by the VLAN100->VLAN20
+   connectivity incident that dominated this session (see
+   `phase8/LEDGER.md` Entries 96-102) -- that incident was specifically
+   about *this agent's own host* (VLAN100/Admin) reaching VLAN20, not
+   about `rpi-srv-02` reaching another VLAN20 host, which has worked the
+   whole time.
+2. **Tailscale genuinely can't reach what this needs to reach, with or
+   without the VLAN100 issue.** `tailscale-subnet-router`
+   (`kubernetes/apps/headscale/subnet-router.yml`) advertises exactly
+   `10.0.20.0/24` -- the physical LAN -- not the cluster's internal
+   networks (`10.42.0.0/16` pods, `10.43.0.0/16` Services, per
+   `terraform/stacks/network` and this cluster's k3s defaults). CNPG's
+   `postgres-authelia-rw`/`-ro`/`-r` Services are `ClusterIP`-only,
+   which by Kubernetes design are reachable *only* from inside the
+   cluster's own network -- not from the physical LAN, and not from
+   anything Tailscale can route to, because Tailscale never gets inside
+   that boundary either. Whatever exposes the primary to `rpi-srv-02` --
+   Tailscale-routed or plain LAN, doesn't matter -- has to originate
+   *inside* the cluster's network boundary, which is exactly what a
+   `LoadBalancer` (or a `NodePort`, functionally equivalent here) does.
+   There's no way to make "reachable from outside the cluster" not mean
+   "a new reachable-from-outside-the-cluster thing."
+
+**The genuine alternative that *would* avoid any new listening endpoint
+at all: push-based WAL archiving** (Postgres's native
+`archive_command`/`restore_command` PITR mechanism, the same shape as
+Litestream but Postgres-native, mentioned and set aside in this ADR's
+original "Why not" section). This would have the *primary* push
+completed WAL segments out to `rpi-srv-02` over the already-proven SFTP
+target (`ansible/roles/litestream_standby`), mirroring ADR-029 exactly
+-- `rpi-srv-02` would never need to open a connection *to* the cluster
+at all. Re-examined seriously this time, not just named and dismissed:
+it doesn't work cleanly here, for a reason specific to this cluster, not
+a general objection --
+
+- CNPG owns `archive_command` completely once `backup.barmanObjectStore`
+  is configured (it points it at its own `barman-cloud-wal-archive`
+  invocation and reconciles it back on any manual change) -- there is no
+  supported way to chain a second, custom archive destination
+  alongside CNPG's own declarative backup management. Getting a second
+  push target would mean either fighting CNPG's reconciler (a
+  configuration that silently reverts itself is worse than one that's
+  merely unreviewed) or replacing CNPG's declarative backup entirely
+  with a hand-rolled `archive_command` script -- which would also have
+  to keep archiving to Garage itself (nothing else backs this database
+  up), turning "avoid a new endpoint" into "hand-maintain the thing that
+  currently protects this database's own backups," a materially bigger
+  and riskier lift than the LoadBalancer this is trying to avoid.
+- This is a real architectural gap CNPG has (single declarative backup
+  target, no native multi-destination WAL fan-out), not a shortcut this
+  agent is refusing to take.
+
+**Design unchanged.** The `LoadBalancer` stays, scoped exactly as
+already designed (`loadBalancerSourceRanges: [10.0.20.3/32]`, `pg_hba`
+restricted to the same one IP, a dedicated minimal-privilege
+replication-only role) -- which, worth restating now that the VLAN100
+red herring is cleared up, is genuinely narrow: reachable from exactly
+one specific already-trusted LAN host on the same segment the primary
+already lives behind, not "the internet" or "every VLAN." Still
+unapplied, still needs the operator's own review of that exposure before
+it's treated as load-bearing -- that part of the original Status line
+stands.
