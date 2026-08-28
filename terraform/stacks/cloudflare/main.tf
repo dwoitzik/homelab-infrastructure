@@ -1,14 +1,14 @@
 # =============================================================================
 # Cloudflare Tunnel configuration for woitzik.dev public services.
 #
-# 2026-08-14 (ADR-019): rewritten from a "public by default, opt out" wildcard
+# 2026-08-14 (ADR-033): rewritten from a "public by default, opt out" wildcard
 # to an explicit allowlist of exactly two hostnames. Everything else in this
 # repo's ~46 declared IngressRoutes is reachable only via LAN or Headscale/
 # Tailscale VPN (the existing AdGuard rewrite to Traefik's ClusterIP LB,
 # 10.0.20.200, which never touches this tunnel or the public internet at
-# all) -- same reasoning as ADR-018 (why claude.woitzik.dev got its own
+# all) -- same reasoning as ADR-032 (why claude.woitzik.dev got its own
 # tunnel instead of a VLAN20->VLAN100 firewall hole), extended from "which
-# network zone" to "the public internet as a whole." See ADR-019 for the
+# network zone" to "the public internet as a whole." See ADR-033 for the
 # full exposure audit this rewrite is based on.
 #
 # The cloudflared daemon runs in K3s (apps/cloudflared) and holds persistent
@@ -58,7 +58,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
         hostname = "photos.woitzik.dev"
         # Family access to the Immich photo library -- explicitly named by
         # the operator as one of exactly two hostnames that should be
-        # publicly reachable (ADR-019). Routed directly to the Immich Service,
+        # publicly reachable (ADR-033). Routed directly to the Immich Service,
         # not through Traefik -- Immich has no external auth in front of it
         # (mobile app needs API-token auth, not Authelia's browser redirect).
         service = "http://immich-server.apps.svc.cluster.local:2283"
@@ -87,7 +87,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
       # dns_headscale_dmz below and terraform/stacks/network/nat_portforward.tf.
       # Every other hostname: no ingress entry, no route through this tunnel
       # at all. Falls through to this 404 -- the deliberate default per
-      # ADR-019, not a gap to fill in later. LAN/Tailscale clients reach
+      # ADR-033, not a gap to fill in later. LAN/Tailscale clients reach
       # these exact same services fine via the existing AdGuard rewrite to
       # Traefik's ClusterIP LB (10.0.20.200), which never touches Cloudflare.
       { service = "http_status:404" }
@@ -135,7 +135,7 @@ moved {
   to   = cloudflare_dns_record.dns_headscale_dmz
 }
 
-# 2026-08-14 (ADR-019): atlantis, auth, home, and the *.woitzik.dev wildcard
+# 2026-08-14 (ADR-033): atlantis, auth, home, and the *.woitzik.dev wildcard
 # DNS records were removed here. The operator's explicit instruction: only
 # photos.woitzik.dev and headscale.woitzik.dev (above) should have any public
 # DNS/tunnel exposure at all. Every other hostname declared in this repo's
@@ -143,7 +143,7 @@ moved {
 # wildcard used to catch -- is reachable only via LAN or Headscale/Tailscale
 # VPN through the existing AdGuard rewrite to Traefik's ClusterIP LB
 # (10.0.20.200), which never touches Cloudflare or the public internet. See
-# ADR-019 for the full exposure audit and reasoning.
+# ADR-033 for the full exposure audit and reasoning.
 
 # mc.woitzik.dev -> playit.gg tunnel for Minecraft (port 25565, main server).
 # Only created once var.mc_playit_hostname is set in tfvars.

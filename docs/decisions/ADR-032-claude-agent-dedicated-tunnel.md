@@ -1,4 +1,4 @@
-# ADR-018: claude.woitzik.dev gets its own Cloudflare Tunnel, not a VLAN20→VLAN100 firewall hole
+# ADR-032: claude.woitzik.dev gets its own Cloudflare Tunnel, not a VLAN20→VLAN100 firewall hole
 
 **Date:** 2026-08-14
 **Status:** Superseded 2026-08-27 -- the tunnel and DNS record were removed
@@ -9,7 +9,7 @@ carries its own tailnet identity) is the remote-access path now.
 
 ## Context
 
-After PR #436 (ADR-016/017's sibling — the wildcard tunnel/DNS fix) merged and was
+After PR #436 (ADR-022/031's sibling — the wildcard tunnel/DNS fix) merged and was
 applied, `claude.woitzik.dev` resolved correctly with a valid certificate, but requests
 still 502'd. Traced live (David, via jump-box): a `curl` from a pod in the `apps`
 namespace (VLAN20, `10.0.20.0/24`) to `ct-srv-claude-agent`'s ttyd (VLAN100/Admin,
