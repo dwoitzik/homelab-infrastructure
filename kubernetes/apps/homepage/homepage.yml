@@ -59,10 +59,11 @@ data:
             href: https://headscale.woitzik.dev
             description: VPN Mesh Controller
         - Scanopy:
-            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/network-wired.svg
-            # Internal-only by design (ADR-031) -- no public hostname, homepage's
-            # own pod resolves the in-cluster Service directly.
-            href: http://scanopy-server.apps.svc.cluster.local:60072
+            icon: router.png
+            # LAN/Tailscale only by design (ADR-031), via the *.woitzik.dev
+            # wildcard AdGuard rewrite + Traefik (apps-ingressroute.yml) --
+            # never the Cloudflare Tunnel.
+            href: https://scanopy.woitzik.dev
             description: Network Topology Map
     - Platform:
         - ArgoCD:
