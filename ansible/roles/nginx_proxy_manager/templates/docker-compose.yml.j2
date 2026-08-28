@@ -44,3 +44,25 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
 {% endif %}
+
+{% if npm_enable_scanopy_daemon | default(false) | bool %}
+  scanopy-daemon:
+    image: ghcr.io/scanopy/scanopy/daemon:v0.16.2
+    container_name: scanopy-daemon
+    restart: unless-stopped
+    # host networking: ARP discovery needs the real NIC on 10.0.30.0/24, a
+    # normal bridge container never sees that L2 traffic. NET_RAW+NET_ADMIN
+    # (not upstream's default privileged:true, and no Docker-socket mount --
+    # see kubernetes/apps/scanopy/scanopy.yml's comment on why not, doubly
+    # true on this specific box).
+    network_mode: host
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    environment:
+      - SCANOPY_SERVER_URL={{ scanopy_server_url }}
+      - SCANOPY_DAEMON_API_KEY={{ scanopy_daemon_api_key }}
+      - SCANOPY_NETWORK_ID={{ scanopy_network_id }}
+{% endif %}
