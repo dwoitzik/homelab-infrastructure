@@ -1,0 +1,13 @@
+# NPM "Custom Nginx Configuration" snippet for the headscale.woitzik.dev proxy
+# host. Not applied by Ansible -- NPM's proxy hosts live in its own SQLite DB,
+# configured through its UI (matching authelia.conf.j2's existing pattern).
+#
+# The point of this snippet: nginx's $http_upgrade variable forwards whatever
+# Upgrade header value the client actually sent (headscale's ts2021 protocol
+# uses "tailscale-control-protocol", not the literal "websocket"). This is
+# exactly what Traefik and Cloudflare Tunnel can't do -- both only recognize
+# the literal "websocket" value and drop anything else.
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+proxy_read_timeout 3600s;

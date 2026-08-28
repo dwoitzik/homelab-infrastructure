@@ -21,6 +21,45 @@ removed {
 }
 
 ###############################################################################
+# headscale.woitzik.dev direct WAN exposure (2026-08-28)
+#
+# Cloudflare Tunnel doesn't support headscale's TS2021 protocol upgrade at
+# all (confirmed: neither Traefik nor cloudflared forward a non-"websocket"
+# Upgrade header value, and headscale's own docs say Cloudflare Tunnel/Proxy
+# "is not supported and will not work"). Routed via the DMZ reverse proxy
+# instead -- FritzBox forwards its WAN port to this router's ether1 IP,
+# which forwards here to ct-dmz-proxy-01 (nginx + CrowdSec), which proxies
+# to headscale's dedicated LoadBalancer IP (10.0.20.201), bypassing Traefik
+# for the same reason. FritzBox's own forward is out of Terraform's reach
+# (ISP router, not IaC-managed) -- configured manually.
+###############################################################################
+
+resource "routeros_ip_firewall_nat" "dstnat_headscale_dmz" {
+  chain        = "dstnat"
+  action       = "dst-nat"
+  in_interface = "ether1"
+  protocol     = "tcp"
+  dst_port     = "443"
+  to_addresses = "10.0.30.2"
+  to_ports     = "443"
+  comment      = "headscale.woitzik.dev -> DMZ reverse proxy (nginx+CrowdSec), see nat_portforward.tf header"
+}
+
+resource "routeros_ip_firewall_filter" "fwd_wan_headscale_dmz" {
+  chain        = "forward"
+  action       = "accept"
+  dst_address  = "10.0.30.2"
+  dst_port     = "443"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_09b_dmz_to_headscale.id
+  comment      = "WAN -> DMZ headscale proxy, matches dstnat_headscale_dmz"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
+###############################################################################
 # Outbound NAT (GIT-009) — these two srcnat rules existed live but were never
 # declared in Terraform at all; basic internet access for the whole homelab
 # depended on undocumented, unmanaged router config.

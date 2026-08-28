@@ -1,3 +1,10 @@
 ---
 npm_network_mode: "bridge"
 npm_enable_crowdsec: true
+
+# CrowdSec console enrollment (community blocklist -- proactively blocks IPs
+# already seen attacking other CrowdSec users, not just local detection).
+# Not enrolled yet: needs a free account at https://app.crowdsec.net and an
+# enrollment key from Security Engines -> Add Security Engine. Once you have
+# one, uncomment this line pointing at a new vault_crowdsec_enroll_key entry:
+# crowdsec_enroll_key: "{{ vault_crowdsec_enroll_key }}"

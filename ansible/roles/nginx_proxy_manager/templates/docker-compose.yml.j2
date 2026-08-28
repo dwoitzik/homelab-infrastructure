@@ -10,8 +10,6 @@ services:
       - '80:80'
       - '81:81'
       - '443:443'
-      - '25565:25565'
-      - '25566:25566'
 {% endif %}
     volumes:
       - /opt/npm/data:/data
@@ -30,9 +28,13 @@ services:
     restart: unless-stopped
     environment:
       - GID={{ nginx_proxy_manager_docker_gid }}
-      - COLLECTIONS=crowdsecurity/nginx crowdsecurity/http-cve
+      - COLLECTIONS=crowdsecurity/nginx crowdsecurity/http-cve crowdsecurity/base-http-scenarios crowdsecurity/linux crowdsecurity/sshd crowdsecurity/whitelist-good-actors
       - LAPI_LISTEN_ADDR=0.0.0.0
       - TRUSTED_PROXIES=172.16.0.0/12,10.0.0.0/8,192.168.0.0/16
+{% if crowdsec_enroll_key is defined %}
+      - ENROLL_KEY={{ crowdsec_enroll_key }}
+      - ENROLL_INSTANCE_NAME=ct-dmz-proxy-01
+{% endif %}
     volumes:
       - /opt/npm/crowdsec/data:/var/lib/crowdsec/data
       - /opt/npm/crowdsec/config:/etc/crowdsec
