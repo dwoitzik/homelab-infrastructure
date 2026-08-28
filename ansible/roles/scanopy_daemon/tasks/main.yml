@@ -1,0 +1,19 @@
+---
+- name: Ensure scanopy-daemon directory exists
+  ansible.builtin.file:
+    path: /opt/scanopy-daemon
+    state: directory
+    mode: '0755'
+
+- name: Deploy scanopy-daemon docker-compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/scanopy-daemon/docker-compose.yml
+    mode: '0644'
+  when: scanopy_daemon_api_key is defined
+
+- name: Ensure scanopy-daemon stack is running
+  community.docker.docker_compose_v2:
+    project_src: /opt/scanopy-daemon
+    state: present
+  when: scanopy_daemon_api_key is defined

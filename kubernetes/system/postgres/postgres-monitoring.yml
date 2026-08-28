@@ -40,3 +40,23 @@ spec:
       cnpg.io/cluster: postgres-authelia
   podMetricsEndpoints:
     - port: metrics
+---
+# Same naming rule as above: name != cluster name, or CNPG's reconciler
+# deletes this on every reconcile.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres-scanopy-metrics
+  namespace: database
+  labels:
+    cnpg.io/cluster: postgres-scanopy
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - database
+  selector:
+    matchLabels:
+      cnpg.io/cluster: postgres-scanopy
+  podMetricsEndpoints:
+    - port: metrics

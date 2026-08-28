@@ -2,6 +2,14 @@
 npm_network_mode: "bridge"
 npm_enable_crowdsec: true
 
+# Scanopy DMZ daemon (kubernetes/apps/scanopy/README.md, step 3-5). Disabled
+# until the server's daemon-lb IP and a real Network/API key exist -- flip on
+# and fill these in once that's done:
+npm_enable_scanopy_daemon: false
+# scanopy_server_url: "http://<scanopy-server-daemon-lb IP>:60072"
+# scanopy_daemon_api_key: "{{ vault_scanopy_dmz_daemon_api_key }}"
+# scanopy_network_id: "REPLACE_ME"
+
 # CrowdSec console enrollment (community blocklist -- proactively blocks IPs
 # already seen attacking other CrowdSec users, not just local detection).
 # Not enrolled yet: needs a free account at https://app.crowdsec.net and an

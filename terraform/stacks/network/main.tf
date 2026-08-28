@@ -151,7 +151,8 @@ resource "routeros_ip_dhcp_server_lease" "server_nodes" {
 
 resource "routeros_ip_dhcp_server_lease" "mgmt_nodes" {
   for_each = {
-    "ct-mgmt-pbs-01" = { mac = "bc:24:11:24:7a:71", ip = "10.0.10.110" }
+    "ct-mgmt-pbs-01"     = { mac = "bc:24:11:24:7a:71", ip = "10.0.10.110" }
+    "ct-mgmt-scanopy-01" = { mac = "bc:24:11:7d:c3:9a", ip = "10.0.10.111" }
   }
 
   address     = each.value.ip

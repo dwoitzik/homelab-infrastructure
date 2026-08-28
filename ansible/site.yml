@@ -74,6 +74,12 @@
     - nginx_proxy_manager
     - crowdsec_bouncer
 
+- name: Provision Scanopy MGMT-VLAN Daemon
+  hosts: scanopy_daemon_nodes
+  become: true
+  roles:
+    - scanopy_daemon
+
 - name: Provision DMZ Game Servers
   hosts: dmz_games
   become: true

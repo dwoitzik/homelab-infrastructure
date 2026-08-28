@@ -73,6 +73,69 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
   }
 }
 
+resource "proxmox_virtual_environment_container" "ct_mgmt_scanopy_01" {
+  vm_id        = 111
+  node_name    = local.target_node
+  tags         = ["network", "management"]
+  started      = true
+  unprivileged = true
+
+  startup {
+    order    = 5
+    up_delay = 10
+  }
+
+  initialization {
+    hostname = "ct-mgmt-scanopy-01"
+    ip_config {
+      ipv4 {
+        address = "dhcp"
+      }
+      ipv6 {
+        address = "auto"
+      }
+    }
+  }
+
+  cpu {
+    cores = 1
+  }
+
+  memory {
+    dedicated = 512
+    swap      = 512
+  }
+
+  features {
+    nesting = true
+  }
+
+  disk {
+    datastore_id = local.storage
+    size         = 8
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr0"
+    mac_address = "bc:24:11:7d:c3:9a"
+    vlan_id     = 10
+  }
+
+  operating_system {
+    template_file_id = local.template
+    type             = "debian"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      description,
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
+  }
+}
+
 # --- Server Stack ---
 
 # REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
