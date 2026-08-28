@@ -74,35 +74,17 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
           disable_chunked_encoding = false
         }
       },
-      {
-        hostname = "headscale.woitzik.dev"
-        # The Tailscale/Headscale control plane -- the other of exactly two
-        # hostnames the operator named as needing public reachability
-        # (ADR-019): a device re-authenticating or joining the mesh needs to
-        # reach this directly, by definition, before any VPN path exists.
-        #
-        # 2026-08-27: moved OFF the Traefik hop. Headscale's ts2021/noise
-        # registration protocol upgrades the connection with
-        # `Upgrade: tailscale-control-protocol` -- not the literal
-        # `websocket` value. Traefik only forwards the Upgrade header when
-        # it's exactly `websocket` (github.com/traefik/traefik#12609, a
-        # known, still-open limitation), so every registration/reconnect
-        # through Traefik 500'd with "no upgrade header in TS2021 request"
-        # -- confirmed live in headscale's own logs, repeating on a loop.
-        # The pre-existing "websockets" Traefik middleware never addressed
-        # this; it only sets X-Forwarded-Proto. Routed straight to the
-        # Service instead, same pattern already used for photos.woitzik.dev
-        # -- cloudflared proxies arbitrary Upgrade values transparently, no
-        # Traefik hop to lose the header at.
-        service = "http://headscale.apps.svc.cluster.local:8080"
-        origin_request = {
-          connect_timeout          = 10
-          tcp_keep_alive           = 30
-          keep_alive_connections   = 10
-          http_host_header         = "headscale.woitzik.dev"
-          disable_chunked_encoding = false
-        }
-      },
+      # headscale.woitzik.dev: removed from this tunnel's ingress 2026-08-28.
+      # Headscale's ts2021/noise registration protocol upgrades the
+      # connection with `Upgrade: tailscale-control-protocol`, not the
+      # literal `websocket` value. Neither Traefik
+      # (github.com/traefik/traefik#12609) nor cloudflared itself forward a
+      # non-"websocket" Upgrade header -- confirmed live (repeated 500s "no
+      # upgrade header in TS2021 request") and in headscale's own docs
+      # ("Running Headscale behind a Cloudflare Proxy or Tunnel is not
+      # supported"). Moved to a direct WAN path via the DMZ reverse proxy
+      # instead (nginx forwards $http_upgrade unconditionally) -- see
+      # dns_headscale_dmz below and terraform/stacks/network/nat_portforward.tf.
       # Every other hostname: no ingress entry, no route through this tunnel
       # at all. Falls through to this 404 -- the deliberate default per
       # ADR-019, not a gap to fill in later. LAN/Tailscale clients reach
@@ -114,9 +96,9 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
 }
 
 # -----------------------------------------------------------------------------
-# DNS records -- CNAME -> tunnel (proxied through Cloudflare CDN/DDoS layer)
-#
-# ttl = 1 means "Auto" for proxied records (required field in provider v5).
+# DNS records. photos.woitzik.dev is CNAME -> tunnel (proxied through
+# Cloudflare CDN/DDoS layer, ttl = 1 means "Auto", required for proxied
+# records in provider v5). headscale.woitzik.dev is DNS-only, see below.
 # -----------------------------------------------------------------------------
 resource "cloudflare_dns_record" "tunnel_photos" {
   zone_id = var.zone_id
@@ -128,14 +110,29 @@ resource "cloudflare_dns_record" "tunnel_photos" {
   comment = "Immich photo library -- routed via Cloudflare tunnel"
 }
 
-resource "cloudflare_dns_record" "tunnel_headscale" {
+# 2026-08-28: no longer routed through the tunnel (see the removed ingress
+# comment above) -- points straight at the MikroTik's Cloudflare-Cloud DDNS
+# hostname (routeros_ip_cloud.ddns in the network stack; that stack has no
+# output wired to this one, so the value is copied here, not referenced).
+# DNS-only (not proxied): traffic goes WAN -> FritzBox port-forward (manual,
+# not IaC-managed) -> MikroTik dst-nat -> DMZ nginx reverse proxy, matching
+# nat_portforward.tf's dstnat_headscale_dmz.
+resource "cloudflare_dns_record" "dns_headscale_dmz" {
   zone_id = var.zone_id
   name    = "headscale"
   type    = "CNAME"
-  content = local.tunnel_cname
-  proxied = true
-  ttl     = 1
-  comment = "Tailscale/Headscale control plane -- needs public reachability for device re-auth (ADR-019)"
+  content = "ec190fe6b6ab.sn.mynetname.net"
+  proxied = false
+  ttl     = 300
+  comment = "DMZ direct WAN path, Tunnel incompatible w/ headscale TS2021"
+}
+
+# Same underlying DNS record (already live-patched via API to match the
+# config above) -- moved, not destroyed/recreated, so Terraform reconciles
+# in place instead of flapping the record.
+moved {
+  from = cloudflare_dns_record.tunnel_headscale
+  to   = cloudflare_dns_record.dns_headscale_dmz
 }
 
 # 2026-08-14 (ADR-019): atlantis, auth, home, and the *.woitzik.dev wildcard
