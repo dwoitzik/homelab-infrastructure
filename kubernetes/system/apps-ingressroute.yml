@@ -288,6 +288,24 @@ spec:
       - name: websockets
     services: [{name: external-atlantis, port: 4141}]
 ---
+# Scanopy (network topology map, ADR-031) -- LAN/Tailscale only, same as
+# every other internal tool: reachable via the *.woitzik.dev wildcard AdGuard
+# rewrite to this Traefik LB, never via the Cloudflare Tunnel.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: scanopy-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`scanopy.woitzik.dev`)
+    kind: Rule
+    middlewares:
+      - name: crowdsec-bouncer
+      - name: authelia
+    services: [{name: scanopy-server, port: 60072}]
+---
 # Uptime Kuma
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute

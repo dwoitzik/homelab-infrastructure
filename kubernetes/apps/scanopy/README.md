@@ -10,8 +10,12 @@ deliberately excluded — see `docs/decisions/ADR-031-scanopy-topology-mapping.m
 
 ## Architecture
 
-- **Server + Postgres** run here (`apps`/`database` namespaces), reachable in-cluster on
-  `scanopy-server.apps.svc.cluster.local:60072`.
+- **Server + Postgres** run here (`apps`/`database` namespaces). Browser access is
+  `https://scanopy.woitzik.dev` (LAN/Tailscale only, Authelia-gated, via the
+  `*.woitzik.dev` AdGuard wildcard -> Traefik -> `kubernetes/system/apps-ingressroute.yml`'s
+  `scanopy-final` route -- same pattern as every other internal-only tool, never the
+  Cloudflare Tunnel). In-cluster consumers (the SRV daemon) use
+  `scanopy-server.apps.svc.cluster.local:60072` directly.
 - **SRV daemon** (`scanopy-daemon-srv`, this file): `hostNetwork: true` pod, same
   cluster. Bypasses NetworkPolicy entirely — see the manifest's own comment before
   changing its egress assumptions.
