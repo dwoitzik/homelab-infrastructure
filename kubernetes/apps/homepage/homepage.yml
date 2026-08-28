@@ -58,6 +58,12 @@ data:
             icon: tailscale.png
             href: https://headscale.woitzik.dev
             description: VPN Mesh Controller
+        - Scanopy:
+            icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/network-wired.svg
+            # Internal-only by design (ADR-031) -- no public hostname, homepage's
+            # own pod resolves the in-cluster Service directly.
+            href: http://scanopy-server.apps.svc.cluster.local:60072
+            description: Network Topology Map
     - Platform:
         - ArgoCD:
             icon: https://cdn.jsdelivr.net/gh/selfhst/icons/svg/argo-cd.svg
