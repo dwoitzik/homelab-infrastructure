@@ -31,8 +31,10 @@ import {
 # live via the Cloudflare API directly: headscale.woitzik.dev was already
 # serving 200 through the correct tunnel config the whole time, no outage,
 # just Terraform's own state not yet tracking this one resource.
+# 2026-08-28: retargeted to dns_headscale_dmz (see main.tf's moved block) --
+# same record, same id, renamed when the record moved off the tunnel.
 import {
-  to = cloudflare_dns_record.tunnel_headscale
+  to = cloudflare_dns_record.dns_headscale_dmz
   id = "1f15ed0f3a8b497302ba339dcab3c060/6a324d0a219b681417f63b08503f87c1"
 }
 
