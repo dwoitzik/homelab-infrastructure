@@ -286,6 +286,21 @@ resource "routeros_ip_firewall_filter" "fwd_09_dmz_to_backends" {
   }
 }
 
+resource "routeros_ip_firewall_filter" "fwd_09b_dmz_to_headscale" {
+  chain        = "forward"
+  action       = "accept"
+  src_address  = "10.0.30.0/24"
+  dst_address  = "10.0.20.201"
+  dst_port     = "8080"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_10_srv_to_wan.id
+  comment      = "09b: DMZ - Access to headscale LB (bypasses Traefik, see headscale-dmz-lb Service)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
 resource "routeros_ip_firewall_filter" "fwd_10_srv_to_wan" {
   action        = "accept"
   chain         = "forward"
