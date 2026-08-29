@@ -27,20 +27,28 @@ spec:
               provider: aws
               config:
                 region: homelab
-          # ADR-038: AWS SDK for Go v2's S3 module (v1.74.1+, per its own
-          # changelog) started auto-attaching a CRC32 checksum to every
-          # PutObject by default, regardless of the BSL's own
-          # `checksumAlgorithm: ""` setting above (that setting stops
-          # Velero from requesting a checksum explicitly -- it doesn't
-          # stop the SDK's own newer default behavior underneath). This is
-          # what was actually breaking `daily-offsite` against Cloudflare
-          # R2 for 7+ days straight (`x-amz-tagging` in the error is R2's
-          # own mislabeling of the real unsupported header -- confirmed via
-          # the plugin's source, which never sets a real Tagging header
-          # unless `tagging` is set in the BSL config, which it isn't
-          # here). WHEN_REQUIRED reverts the SDK to pre-v1.74.1 behavior;
-          # AWS's own documented fix for exactly this S3-compatible-backend
-          # class of breakage, not Velero-specific.
+          # ADR-038: two things layered here, corrected mid-investigation
+          # -- keeping the honest trail rather than rewriting history.
+          #
+          # 1. First hypothesis (WRONG for this specific bug, kept anyway
+          #    as real, AWS-documented hardening): AWS SDK for Go v2's S3
+          #    module (v1.74.1+) auto-attaches a CRC32 checksum to every
+          #    PutObject by default. WHEN_REQUIRED reverts that. Applied,
+          #    verified live on the pod, then re-tested against R2 --
+          #    `daily-offsite` still failed with the exact same error.
+          #    Wrong theory, harmless to leave in place.
+          # 2. Real cause, found by reading the actual TAGGED v1.14.2
+          #    plugin source (not an assumption, not the main branch,
+          #    which had already silently fixed this) --
+          #    velero-plugin-for-aws v1.14.2's PutObject unconditionally
+          #    sets `Tagging: aws.String(o.tagging)` on every call, with
+          #    no empty-string guard. Since `tagging` is unset here,
+          #    every PutObject sends a literal empty `x-amz-tagging`
+          #    header -- Garage tolerates it, Cloudflare R2 hard-rejects
+          #    it (501). The guard (`if o.tagging != ""`) exists on the
+          #    plugin's main branch already but isn't in any tagged
+          #    release yet -- see the initContainer image comment below
+          #    for the fix actually shipped.
           # NOTE: this chart's extraEnvVars is a flat key/value map, not a
           # list of {name, value} objects (confirmed against the actual
           # values.yaml for the pinned 7.2.2 chart) -- a first attempt used
@@ -63,7 +71,21 @@ spec:
             - --default-repo-maintain-frequency=24h
         initContainers:
           - name: velero-plugin-for-aws
-            image: velero/velero-plugin-for-aws:v1.14.2
+            # ADR-038: no tagged release fixes the unconditional empty
+            # x-amz-tagging bug (see the BSL config comment above) -- the
+            # fix landed on the plugin's main branch but v1.14.2 is still
+            # the latest tag as of this change. `release-1.14-dev` is the
+            # project's own rolling dev build for the 1.14 line (Docker
+            # Hub, updated 2026-08-28 -- the day before this fix), pinned
+            # by digest for reproducibility despite the tag itself being
+            # mutable. Deliberate, temporary deviation from this repo's
+            # normal pinned-release convention: a broken offsite backup
+            # for 7+ days outweighs the reproducibility risk of a
+            # digest-pinned dev build for one initContainer. Revisit and
+            # move back to a tagged release once v1.14.3+ (or whatever
+            # ships this fix) is out -- check the plugin's release notes
+            # for a `tagging`/`x-amz-tagging` fix mention before bumping.
+            image: velero/velero-plugin-for-aws:release-1.14-dev@sha256:cf0eaabef943c5780f23741194bec77c30fd4590be3203b5afed49c9e6dddb36
             imagePullPolicy: IfNotPresent
             volumeMounts:
               - mountPath: /target
