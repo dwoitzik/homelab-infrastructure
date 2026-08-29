@@ -157,7 +157,14 @@ spec:
           image: ghcr.io/scanopy/scanopy/daemon:v0.16.2
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            # NOT readOnlyRootFilesystem -- the daemon writes its own log
+            # files somewhere under its rootfs unconditionally (crashes on
+            # startup otherwise: "failed to create log directory ...
+            # Read-only file system", no env var found to disable file
+            # logging). The real hardening goal (see ADR-031) was never
+            # this specific flag -- it was avoiding upstream's default
+            # privileged:true and Docker-socket mount, both still absent
+            # here.
             seccompProfile:
               type: RuntimeDefault
             capabilities:
