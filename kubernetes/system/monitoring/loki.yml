@@ -165,6 +165,19 @@ spec:
           enabled: false
         test:
           enabled: false
+        # ADR-036: same soft preference off vm-srv-k3s-11 as the rest of
+        # this stack, for the nginx gateway frontend.
+        gateway:
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  preference:
+                    matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: NotIn
+                        values:
+                          - vm-srv-k3s-11
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
