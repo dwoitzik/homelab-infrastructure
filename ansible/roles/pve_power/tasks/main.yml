@@ -93,6 +93,16 @@
     cmd: echo {{ pve_power_zfs_vdev_async_write_max_active }} > /sys/module/zfs/parameters/zfs_vdev_async_write_max_active
   changed_when: false
 
+# ADR-037 (2026-08-29): zfs_arc_max is live-tunable the same way --
+# ZFS shrinks the cache to fit a lower cap immediately, no export/reboot
+# needed (only raising it past the boot-time value can require a reload on
+# some ZFS versions; this role only ever lowers it, so live-apply is safe).
+# Live-verified during the incident this role's default now reflects.
+- name: Apply zfs_arc_max immediately (no reboot needed)
+  ansible.builtin.shell:
+    cmd: echo {{ pve_power_zfs_arc_max_bytes }} > /sys/module/zfs/parameters/zfs_arc_max
+  changed_when: false
+
 # 2026-08-19: bring vzdump's global throttle under IaC (see defaults/main.yml
 # comment) -- surgical, leaves the rest of Proxmox's own stock
 # /etc/vzdump.conf template (all commented examples) alone rather than

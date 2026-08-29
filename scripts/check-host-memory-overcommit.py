@@ -61,7 +61,18 @@ VM_TF = REPO_ROOT / "terraform/stacks/proxmox/vm.tf"
 # on a balloon that hasn't deflated yet. So the hard gate conservatively sums
 # `dedicated` for every VM, not `floating`. `floating` is still parsed and
 # printed for visibility, never counted.
-ZFS_ARC_MAX_GB = 4  # confirmed live via /sys/module/zfs/parameters/zfs_arc_max
+# 2026-08-29 (ADR-037): corrected twice in one day. First found stale at 4
+# (a 2026-08-05 measurement that predated pve_power_zfs_arc_max_bytes
+# actually taking effect on the host -- see PR #616, superseded by this
+# change). Re-checked live during the same day's vm-srv-k3s-11 wedge
+# incident and found it was actually 16 GiB, not 4 -- then, as part of
+# fixing that incident, deliberately lowered the real value to 8 GiB
+# (ADR-037) to free real host RAM for VM ballooning headroom. This
+# constant must track pve_power_zfs_arc_max_bytes
+# (ansible/roles/pve_power/defaults/main.yml) -- keep them in sync, a
+# drift here silently erodes the REL-016 safety margin without CI ever
+# noticing, which is exactly how the original 4 GB staleness happened.
+ZFS_ARC_MAX_GB = 8
 HOST_RESERVE_GB = 6  # kernel + hypervisor/qemu process overhead (non-ARC)
 # REL-012d (2026-08-01): raised 44→46 GB. vm-srv-k3s-11 grew to 16 GB
 # dedicated after the post-vacation cold-start crash loop (etcd read-index

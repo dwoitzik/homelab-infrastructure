@@ -55,9 +55,20 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   # (16GB/8GB) rather than the inflated figure; if a future measured
   # workload profile (Phase 4.7 monitoring) shows this is tight, re-bump
   # with the same evidence bar REL-036 was held to, not preemptively.
+  #
+  # 2026-08-29 (ADR-037): floating 8192->16384 (== dedicated, ballooning
+  # effectively disabled for this VM). Host-wide ballooning squeezed this
+  # VM down to ~8.4 GB actual under real host memory pressure, which
+  # starved it badly enough to stall the kubelet's PLEG and make the
+  # apiserver unreachable (the same-day vm-srv-k3s-11 wedge incident).
+  # This is the sole control-plane/apiserver node -- exactly the
+  # "database/control-plane, disable ballooning" case, not a general-
+  # purpose guest. Made safe by pairing it with the zfs_arc_max cut
+  # (16->8 GiB, ansible/roles/pve_power) that freed the real host RAM
+  # this now claims; see ADR-037 for the full investigation.
   memory {
     dedicated = 16384
-    floating  = 8192
+    floating  = 16384
   }
 
   # cache=none + aio=native (O_DIRECT, no QEMU page cache). Originally
@@ -180,9 +191,13 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
     units = 2048
   }
 
+  # 2026-08-29 (ADR-037): floating 4096->7168. Same host-wide ballooning
+  # pressure as vm-srv-k3s-11 (see that VM's comment) squeezed this worker
+  # to ~6.3 GB actual. Raised, not fully disabled -- less latency-critical
+  # than the control-plane node, so some ballooning headroom is kept.
   memory {
     dedicated = 8192
-    floating  = 4096
+    floating  = 7168
   }
 
   # REL-012c: cache=none + aio=native (see k3s-11 comment).
@@ -280,9 +295,14 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
     units = 2048
   }
 
+  # 2026-08-29 (ADR-037): floating 4096->6144. Same host-wide ballooning
+  # pressure as vm-srv-k3s-11/12 (see those VMs' comments), and this was
+  # the worst-squeezed of the 3 -- actual deflated to ~4.3 GB with major
+  # page faults in the hundreds of millions. Raised, not fully disabled --
+  # less latency-critical than the control-plane node.
   memory {
     dedicated = 8192
-    floating  = 4096
+    floating  = 6144
   }
 
   # cache=none + aio=native (see k3s-11 comment).
