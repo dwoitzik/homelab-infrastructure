@@ -5,8 +5,12 @@ locals {
   # VG pve / thin pool data) -- see /root/phase1/LEDGER.md Entries 18-21 and
   # the ZFS+etcd+DRAM-less-SSD write-amplification postmortem in
   # docs/compute-nodes.md. "local-zfs" no longer exists on this host.
-  storage  = "local-lvm"
-  template = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+  storage = "local-lvm"
+  # 2026-08-29: 13.1-2 no longer exists on the host (Proxmox's own template
+  # management rotated it out at some point) -- confirmed live via `pveam
+  # list local`, only 13.6-1 present. Existing LXCs all ignore_changes on
+  # operating_system[0].template_file_id, so this only affects new ones.
+  template = "local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
 }
 
 # --- Management Stack ---
