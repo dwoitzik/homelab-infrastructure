@@ -55,7 +55,7 @@ what remains is Terraform's own state bookkeeping catching up.
   (`terraform/stacks/network/nat_portforward.tf`) — the Minecraft/Cobblemon port
   forwards were explicitly removed 2026-07-01 when Minecraft moved to playit.gg. Only
   outbound masquerade rules exist.
-- **External port scan of the actual home WAN IP** (`178.202.46.102`, resolved via the
+- **External port scan of the actual home WAN IP** (resolved via the
   DDNS hostname the network uses, independent of any woitzik.dev record): 18 common
   ports checked (22, 23, 80, 443, 8006, 8007, 3389, 5900, 25565, 25566, 8080, 8443, 21,
   2049, 445, 139, 6379, 5432) from this LXC, over the real internet path (not a LAN
