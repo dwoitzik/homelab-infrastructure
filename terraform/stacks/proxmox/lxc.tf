@@ -887,4 +887,72 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
     ]
   }
 }
+
+# Rybbit self-hosted analytics for woitzik.dev. ClickHouse+Postgres+Redis+
+# backend+client, all Docker Compose -- genuinely wants a dedicated box, not
+# a shared one, given ClickHouse's own memory/CPU footprint.
+resource "proxmox_virtual_environment_container" "ct_srv_rybbit_01" {
+  vm_id                 = 205
+  node_name             = local.target_node
+  tags                  = ["server", "analytics"]
+  started               = true
+  unprivileged          = true
+  environment_variables = {}
+
+  startup {
+    order    = 6
+    up_delay = 10
+  }
+
+  initialization {
+    hostname = "ct-srv-rybbit-01"
+    ip_config {
+      ipv4 {
+        address = "10.0.20.205/24"
+        gateway = "10.0.20.1"
+      }
+    }
+    dns {
+      servers = ["1.1.1.1", "8.8.8.8"]
+    }
+  }
+
+  cpu {
+    cores = 2
+  }
+
+  memory {
+    dedicated = 4096
+    swap      = 1024
+  }
+
+  features {
+    nesting = true
+  }
+
+  disk {
+    datastore_id = local.storage
+    size         = 24
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr0"
+    mac_address = "bc:24:11:c1:9e:44"
+    vlan_id     = 20
+  }
+
+  operating_system {
+    template_file_id = local.template
+    type             = "debian"
+  }
+
+  lifecycle {
+    ignore_changes = [
+      description,
+      initialization[0].user_account,
+      operating_system[0].template_file_id,
+    ]
+  }
+}
 # Trigger fresh atlantis plan (media-acq LXC apply pending)

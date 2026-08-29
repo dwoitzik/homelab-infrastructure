@@ -2,7 +2,9 @@
 # Cloudflare Tunnel configuration for woitzik.dev public services.
 #
 # 2026-08-14 (ADR-033): rewritten from a "public by default, opt out" wildcard
-# to an explicit allowlist of exactly two hostnames. Everything else in this
+# to an explicit allowlist -- originally two hostnames, now three
+# (photos.woitzik.dev, headscale.woitzik.dev via the DMZ path below,
+# analytics.woitzik.dev added 2026-08-29 for Rybbit). Everything else in this
 # repo's ~46 declared IngressRoutes is reachable only via LAN or Headscale/
 # Tailscale VPN (the existing AdGuard rewrite to Traefik's ClusterIP LB,
 # 10.0.20.200, which never touches this tunnel or the public internet at
@@ -57,8 +59,8 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
       {
         hostname = "photos.woitzik.dev"
         # Family access to the Immich photo library -- explicitly named by
-        # the operator as one of exactly two hostnames that should be
-        # publicly reachable (ADR-033). Routed directly to the Immich Service,
+        # the operator as one of the hostnames that should be publicly
+        # reachable (ADR-033). Routed directly to the Immich Service,
         # not through Traefik -- Immich has no external auth in front of it
         # (mobile app needs API-token auth, not Authelia's browser redirect).
         service = "http://immich-server.apps.svc.cluster.local:2283"
@@ -72,6 +74,23 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
           # Cloudflare from buffering the full upload body before forwarding --
           # the root cause of ECONNRESET on large Immich uploads (REL-026).
           disable_chunked_encoding = false
+        }
+      },
+      {
+        hostname = "analytics.woitzik.dev"
+        # Rybbit self-hosted analytics (ansible/roles/rybbit) -- deliberately
+        # public: real visitors to woitzik.dev need to reach it, same
+        # reasoning ADR-033 used for photos.woitzik.dev. This is the third
+        # hostname on the public allowlist, not two anymore -- see that ADR
+        # for the original reasoning, still followed here just with an
+        # updated count.
+        service = "http://10.0.20.205:80"
+        origin_request = {
+          no_tls_verify          = false
+          connect_timeout        = 10
+          tcp_keep_alive         = 30
+          keep_alive_connections = 10
+          http_host_header       = "analytics.woitzik.dev"
         }
       },
       # headscale.woitzik.dev: removed from this tunnel's ingress 2026-08-28.
@@ -110,6 +129,16 @@ resource "cloudflare_dns_record" "tunnel_photos" {
   comment = "Immich photo library -- routed via Cloudflare tunnel"
 }
 
+resource "cloudflare_dns_record" "tunnel_analytics" {
+  zone_id = var.zone_id
+  name    = "analytics"
+  type    = "CNAME"
+  content = local.tunnel_cname
+  proxied = true
+  ttl     = 1
+  comment = "Rybbit analytics -- routed via Cloudflare tunnel"
+}
+
 # 2026-08-28: no longer routed through the tunnel (see the removed ingress
 # comment above) -- points straight at the MikroTik's Cloudflare-Cloud DDNS
 # hostname (routeros_ip_cloud.ddns in the network stack; that stack has no
@@ -137,8 +166,9 @@ moved {
 
 # 2026-08-14 (ADR-033): atlantis, auth, home, and the *.woitzik.dev wildcard
 # DNS records were removed here. The operator's explicit instruction: only
-# photos.woitzik.dev and headscale.woitzik.dev (above) should have any public
-# DNS/tunnel exposure at all. Every other hostname declared in this repo's
+# an explicit allowlist (photos, headscale, and now analytics -- see this
+# file's header) should have any public DNS/tunnel exposure at all. Every
+# other hostname declared in this repo's
 # IngressRoutes -- including atlantis, auth, home, and everything the
 # wildcard used to catch -- is reachable only via LAN or Headscale/Tailscale
 # VPN through the existing AdGuard rewrite to Traefik's ClusterIP LB

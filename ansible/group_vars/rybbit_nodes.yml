@@ -1,0 +1,9 @@
+---
+rybbit_postgres_password: "{{ vault_rybbit_postgres_password }}"
+rybbit_clickhouse_password: "{{ vault_rybbit_clickhouse_password }}"
+rybbit_redis_password: "{{ vault_rybbit_redis_password }}"
+rybbit_better_auth_secret: "{{ vault_rybbit_better_auth_secret }}"
+
+# Signup starts open for the first (real) admin account, then gets flipped
+# to true right after -- see ansible/roles/rybbit/README.md.
+rybbit_disable_signup: false
