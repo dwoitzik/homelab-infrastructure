@@ -61,7 +61,19 @@ VM_TF = REPO_ROOT / "terraform/stacks/proxmox/vm.tf"
 # on a balloon that hasn't deflated yet. So the hard gate conservatively sums
 # `dedicated` for every VM, not `floating`. `floating` is still parsed and
 # printed for visibility, never counted.
-ZFS_ARC_MAX_GB = 4  # confirmed live via /sys/module/zfs/parameters/zfs_arc_max
+# 2026-08-29 correction: this was hardcoded to 4 based on a 2026-08-05
+# live measurement, but that predates `pve_power_zfs_arc_max_bytes`
+# (ansible/roles/pve_power/defaults/main.yml, set 2026-07-04 in REL-037)
+# actually taking effect on the host -- the role's declared value (16 GiB)
+# hadn't yet been applied/reloaded at measurement time, so the guard's
+# assumption silently went stale the moment it was. Re-confirmed live
+# 2026-08-29 during the vm-srv-k3s-11 incident follow-up
+# (`/proc/spl/kstat/zfs/arcstats`: c_max=17179869184, size=~13 GB in active
+# use) -- matches the Ansible role's declared value now. Keep this in sync
+# with `pve_power_zfs_arc_max_bytes` if that ever changes again; a drift
+# here silently erodes the REL-016 safety margin without CI ever noticing,
+# which is exactly what happened between 2026-08-05 and today.
+ZFS_ARC_MAX_GB = 16
 HOST_RESERVE_GB = 6  # kernel + hypervisor/qemu process overhead (non-ARC)
 # REL-012d (2026-08-01): raised 44→46 GB. vm-srv-k3s-11 grew to 16 GB
 # dedicated after the post-vacation cold-start crash loop (etcd read-index
