@@ -36,7 +36,7 @@ now.
 
 That second act was not a quiet cleanup pass. It included, in rough chronological
 order: a full external-exposure audit that found real, unintended public attack
-surface and closed it to an explicit two-hostname allowlist (`ADR-019`); Garage's
+surface and closed it to an explicit two-hostname allowlist (`ADR-033`); Garage's
 metadata store corrupting *twice* under real write pressure and eventually being wiped
 and reprovisioned from scratch, taking Terraform's own remote state with it; a PBS
 backup bug that silently produced 1-byte archives for weeks, caught by an agent that
@@ -62,10 +62,9 @@ major deviation was forced by something real, not preference:
 - **Boot/VM storage: LVM-thin, not ZFS.** Direct consequence of §1 — ZFS's overhead was
   incompatible with this specific disk under this specific write pattern.
 - **k3s VM disks stay on the NVMe thin-pool, not the HDD-backed archive pool**
-  (`ADR-019-k3s-vm-disk-placement`, distinct from the exposure-allowlist ADR sharing
-  the same number). Tested rather than assumed once the etcd write-amplification cause
-  was actually fixed — HDD latency would have traded a solved wear problem for a new
-  scheduling-latency one.
+  (`ADR-019-k3s-vm-disk-placement`). Tested rather than assumed once the etcd
+  write-amplification cause was actually fixed — HDD latency would have traded a
+  solved wear problem for a new scheduling-latency one.
 - **Storage classes: `local-path` and `nfs-client`, not Longhorn.** Longhorn's
   replication overhead was a poor fit for a topology that is, in practice, a single
   host — redundancy comes from disciplined Velero+kopia backup instead.
@@ -78,7 +77,7 @@ major deviation was forced by something real, not preference:
   second disk to isolate noisy jobs onto, so the only lever is throttling and
   scheduling discipline, encoded as an actual guard rather than an operational habit
   to remember.
-- **Public exposure is an explicit two-hostname allowlist, not opt-out** (`ADR-019`,
+- **Public exposure is an explicit two-hostname allowlist, not opt-out** (`ADR-033`,
   the exposure one). An opt-out wildcard model accumulated three real, unnoticed
   exposure gaps (including one app with *no* protection at all) within a single day of
   existing. Default-deny at the DNS/tunnel layer, matching the firewall's own posture
@@ -110,7 +109,7 @@ spine, not the whole tree.
 | CNPG WAL archiving broken for 3 production databases since cluster creation | **Fixed and verified** — `ContinuousArchiving: Success` confirmed live on all three, including the one (Synapse) that took longest to confirm. |
 | PostgreSQL/CNPG PodMonitor sync-loop (`Health: Unknown` since the manifest was added) | **Fixed this pass** — CNPG deletes any PodMonitor matching its Cluster's own *name* on every reconcile; renamed away from the collision. |
 | Six secret-exposure near-misses across the mission (config files holding live credentials, read for legitimate reasons) | **Fixed by design this pass** (`ADR-028`) — mechanically blocked, not a rule to remember. Explicitly not a security boundary against a hostile actor; explicitly doesn't cover the k3s guest VMs (this agent's key doesn't reach them). |
-| Unintended public exposure (opt-out wildcard model, 3 real gaps found in one day) | **Fixed**, `ADR-019` allowlist. Re-verified this pass via a full external DNS scan — exactly the 3 intended hostnames answer, nothing else. |
+| Unintended public exposure (opt-out wildcard model, 3 real gaps found in one day) | **Fixed**, `ADR-033` allowlist. Re-verified this pass via a full external DNS scan — exactly the 3 intended hostnames answer, nothing else. |
 | Cloudflare Access (email OTP) for `photos.woitzik.dev` | **Not live.** Terraform written and merged (PR #473), `atlantis plan` clean three times, but the apply itself needs the operator's own PR comment plus a required-reviewer Environment approval — this agent hit a real, respected boundary (Claude Code's own classifier denied triggering the apply) and did not route around it. **Accepted with trigger**: operator comments `atlantis apply -d cloudflare`, approves the gate. |
 | Minecraft egress restricted to playit.gg specifically | **Not done.** DMZ still has blanket internet egress (isolated from every other VLAN, which is the actual security boundary — this is a minimization gap, not a live one). No RouterOS FQDN-address-list pattern exists in this repo to build from safely; documented rather than rushed. **Accepted with trigger**: worth doing when someone has real MikroTik Terraform time, not urgent. |
 | Drift between git and live state going undetected | **Mitigated, with a known gap just found.** `ADR-027`'s drift-check covers `kubernetes/system/` on a 30-minute schedule. It does **not** cover `kubernetes/apps/` (assumed covered by ArgoCD's own selfHeal) — but selfHeal only reverts drift *away* from git; it does nothing for a resource that's live but was never committed at all. That exact gap caused a real 4-day outage this pass (a `NetworkPolicy` egress rule applied live 2026-08-23, never committed, crash-looping `cloudflared` — see the note from the parallel session that found and fixed it, PR #572). The drift-checker's own scope is now a known, named blind spot, not a solved problem. |
@@ -157,7 +156,7 @@ spine, not the whole tree.
   `ADR-028` sweep) were still awaiting operator disposal as of this writing. Check
   `phase8/QUESTIONS.md`'s 2026-08-23 entry before assuming they're handled.
 - **This agent's own host (`ct-srv-claude-agent`) is deliberately out-of-IaC**
-  (`ADR-018`). Two pieces of real automation now live there instead of in the repo
+  (`ADR-032`). Two pieces of real automation now live there instead of in the repo
   (the credential-deny hook, the quarterly dependency/CVE review) — both for
   defensible reasons specific to what this host alone can access, both documented in
   `STEADY-STATE.md` even though neither is committed. Don't "fix" that inconsistency

@@ -258,7 +258,7 @@ data:
             # is correct -- service name, namespace, port, and API key all check
             # out; jellyfin.apps.svc.cluster.local:8096 is the intentional
             # headless Service+Endpoints pattern this repo uses for LXC-hosted
-            # apps (see ADR-017), pointing at ct-srv-jellyfin-01's real IP
+            # apps (see ADR-031), pointing at ct-srv-jellyfin-01's real IP
             # (10.0.20.254). The actual cause is that LXC 203
             # (ct-srv-jellyfin-01) is currently stopped at the Proxmox level --
             # confirmed via `pct list` on pve, and this is documented as
