@@ -1,8 +1,35 @@
 # ADR-036: Pod Topology Spread to Prevent Single-Node Workload Concentration
 
 **Date:** 2026-08-29
-**Status:** Accepted (rebalance procedure below) — not yet executed. This ADR
-is the plan; nothing in it has been applied to the live cluster.
+**Status:** Accepted (rebalance procedure below) — implementation in progress.
+
+**2026-08-29 correction (found during implementation, before any edit was
+made to Garage's manifest):** this ADR originally listed Garage among the
+NFS-backed pods safe to reschedule, based on `garage-data-archive`'s PV
+being NFS-backed. That's true for `garage-data-archive`, but Garage also
+has a second, separate volume — `garage-meta` — which is a **hostPath on
+`vm-srv-k3s-11`'s own dedicated disk** (`/mnt/garage-meta-dedicated`),
+pinned via an explicit `nodeSelector: kubernetes.io/hostname:
+vm-srv-k3s-11` in `kubernetes/apps/garage/garage.yml`. This is deliberate,
+documented, correct: ADR-024 moved Garage's LMDB metadata off `local-path`
+onto a dedicated disk specifically because LMDB is corruption-sensitive to
+the kind of I/O contention `local-path`/NFS didn't reliably isolate.
+**Garage is removed from the reschedule list below and must not get a
+`NotIn -11` node-affinity change** — the two other NFS-backed pods it was
+originally grouped with (`immich-postgres`, `postgres-paperless`) have no
+such hidden pin (checked directly, no nodeSelector/hostPath on either) and
+remain safe.
+
+**2026-08-29 correction (mechanism):** implementation found
+`topologySpreadConstraints` doesn't achieve the intended effect here —
+it spreads *replicas of the same workload* apart from each other, but
+every pod in the reschedule list below is a single-replica, unrelated
+workload; there's nothing for a spread constraint to balance against.
+Switched to soft `nodeAffinity`
+(`preferredDuringSchedulingIgnoredDuringExecution`, weight 100,
+`kubernetes.io/hostname NotIn [vm-srv-k3s-11]`) instead — same "soft
+preference, not a hard rule" intent as originally decided, different
+mechanism. The "Prevention" section below is updated accordingly.
 
 ## Context
 
@@ -39,7 +66,9 @@ assumed, and only partly true:**
   `immich-library-usb`) — assumed node-pinned, since they're statically
   provisioned rather than dynamically via a StorageClass — are **actually
   NFS-backed** (`nfsvers=4.1` in each PV's `mountOptions`). Not node-pinned
-  at all.
+  at all. (Garage separately has a second, genuinely node-pinned volume,
+  `garage-meta` — see the 2026-08-29 correction above; that one is a real,
+  deliberate exception, not part of this finding.)
 - Cross-referencing live pod placement against this: the pods actually
   concentrated on `-11` right now — Garage, `immich-postgres`,
   `postgres-paperless`, every ArgoCD component (7 pods), Alertmanager,
@@ -83,10 +112,12 @@ one-off.
    deleting the pod (or `kubectl rollout restart` for a Deployment) is
    sufficient, since the data lives on NFS and follows the pod to wherever
    it's rescheduled. This is a scheduling change, not a storage migration.
-2. **Add `topologySpreadConstraints` (soft — `whenUnsatisfiable:
-   ScheduleAnyway`, not a hard requirement) to the workloads above**, so
-   this doesn't silently re-accumulate on `-11` again. Soft rather than
-   hard: this is a 3-node cluster with real, uneven resource profiles (one
+2. **Add a soft node anti-affinity preference away from `-11` to the
+   workloads above** (`preferredDuringSchedulingIgnoredDuringExecution`,
+   not a hard requirement — see the 2026-08-29 mechanism correction above
+   for why `nodeAffinity` rather than `topologySpreadConstraints`), so this
+   doesn't silently re-accumulate on `-11` again. Soft rather than hard:
+   this is a 3-node cluster with real, uneven resource profiles (one
    control-plane node, two workers) — a hard constraint risks pods going
    `Pending` when a genuinely-justified imbalance exists (e.g. control-plane-
    only tolerations), which is a worse failure mode than an imperfect
@@ -123,8 +154,9 @@ deliberately low-traffic window, not as a single bulk operation:
 4. Only proceed to the next pod once the current one is confirmed healthy
    against real data, not merely `Running`.
 
-**Reschedule list** (NFS-backed or storage-less, currently on `-11`):
-Garage, `immich-postgres`, `postgres-paperless`, all 7 ArgoCD components
+**Reschedule list** (NFS-backed or storage-less, currently on `-11`;
+Garage excluded — see the 2026-08-29 correction above, it stays pinned):
+`immich-postgres`, `postgres-paperless`, all 7 ArgoCD components
 (`application-controller`, `applicationset-controller`, `dex-server`,
 `notifications-controller`, `redis`, `repo-server`, `server`),
 Alertmanager, Grafana, `kube-state-metrics`, the `kube-prometheus-stack`
@@ -138,29 +170,47 @@ deliberate, watched session — not folded into an unrelated change, and not
 run unattended given today's demonstration that a routine operation was
 enough to cause a brief `NotReady`.
 
-## Prevention (step 2 — topology spread)
+## Prevention (step 2 — soft node anti-affinity)
 
-Add soft `topologySpreadConstraints` (`topologyKey: kubernetes.io/hostname`,
-`maxSkew: 1`, `whenUnsatisfiable: ScheduleAnyway`) to:
+**Mechanism updated during implementation — see the 2026-08-29 "mechanism"
+correction above.** `topologySpreadConstraints` spreads replicas of the
+*same* workload apart; every pod here is a single-replica, unrelated
+workload, so there's nothing for a spread constraint to act on. Using soft
+`nodeAffinity` instead (`preferredDuringSchedulingIgnoredDuringExecution`,
+weight 100, `matchExpressions: kubernetes.io/hostname NotIn
+[vm-srv-k3s-11]`) — same "soft preference, not a hard rule" intent, applied
+to:
 
 - `kubernetes/system/monitoring/application.yml`'s Helm `values:` —
-  `prometheus.prometheusSpec.topologySpreadConstraints`,
-  `alertmanager.alertmanagerSpec.topologySpreadConstraints`,
-  `grafana.affinity`/`grafana.topologySpreadConstraints` (chart-dependent
-  key names, confirm against the pinned `kube-prometheus-stack` chart
-  version before implementing).
-- Loki's and Tempo's own Helm `values:` (same pattern, confirm each
-  chart's exact key).
-- ArgoCD's Deployments directly, if it's raw manifests rather than a Helm
-  values block (confirm during implementation — `kubernetes/system/argocd/`
-  currently shows CRD/ConfigMap files in this repo, the core install
-  itself needs checking).
-- Garage, `immich-postgres`, `postgres-paperless` as plain
-  Deployment/StatefulSet manifests — add directly to `spec.template.spec`.
+  `grafana.affinity`, `alertmanager.alertmanagerSpec.affinity`,
+  `prometheus.prometheusSpec.affinity`.
+- `kubernetes/system/monitoring/loki.yml`'s Helm `values:` —
+  `singleBinary.affinity` (chart runs `deploymentMode: SingleBinary`).
+- `kubernetes/system/tempo/application.yml`'s Helm `values:` — top-level
+  `affinity`.
+- `immich-postgres` (`kubernetes/apps/immich/immich.yml`) and
+  `postgres-paperless` (`kubernetes/apps/paperless/stack.yml`) — added
+  directly to each StatefulSet's `spec.template.spec`. **Garage is
+  excluded** — see the 2026-08-29 correction above.
+- Still pending: `kube-state-metrics`, the `kube-prometheus-stack`
+  operator pod, Velero's own Deployment, the blackbox/SNMP exporters.
+- **ArgoCD's own components are out of scope for a git-only fix**:
+  discovered during implementation that `kubernetes/system/argocd/` only
+  tracks ConfigMaps/RBAC/notifications/ingressroute/network-policies in
+  this repo — the core install itself (server, repo-server, redis, dex,
+  notifications-controller, applicationset-controller,
+  application-controller) is not sourced from this repo at all, so there's
+  no GitOps-tracked manifest to add `affinity` to. (ArgoCD's own install
+  does already ship upstream `podAntiAffinity` on some components, but it's
+  self-anti-affinity between replicas of the same component, which doesn't
+  help — most of these are single-replica.) Fixing this needs either
+  vendoring ArgoCD's install manifest into this repo or an untracked
+  imperative `kubectl patch`, which conflicts with this repo's own IaC
+  philosophy — flagged here as a real, separate gap, not fixed as part of
+  this ADR.
 
-Exact manifest diffs are implementation work, not this ADR — this records
-the decision and the constraint shape (soft, hostname-keyed, `maxSkew: 1`),
-not the line-by-line YAML.
+Exact manifest diffs are implementation work; the manifest-level PR carries
+the line-by-line YAML.
 
 ## Verification done for this ADR (today, read-only + one reversible check)
 
