@@ -112,8 +112,18 @@ pinned release.
   separately, completed cleanly (6574/6574 items, 0 errors) — confirms the
   cluster and Velero itself are healthy; the failure was specific to the R2
   path via this specific plugin bug.
-- [Fill in after deploying the digest-pinned image and re-running
-  `daily-offsite`: confirm `Completed`, not `Failed`.]
+- **Confirmed fixed, live, the same day**: after the digest-pinned image
+  rolled out (verified on the running pod's `initContainers[0].image`
+  first), manually retried a full `daily-offsite`-equivalent backup
+  (`storageLocation: r2-offsite`, same `includedNamespaces` as the real
+  schedule) end to end. Result: `Completed`, 0 errors, 2951/2951 items,
+  all 128 `PodVolumeBackup`s individually `Completed` — no `x-amz-tagging`
+  error, no partial failure. Both `BackupStorageLocation`s (`default` and
+  `r2-offsite`) `Available` afterward; the schedule itself (`daily-
+  offsite`) left `Enabled`, not paused, so the next natural 04:00 run will
+  use the same fix. Cluster stayed `Ready`/stable throughout this real,
+  full-size backup run (128 volumes) — confirms ADR-037's memory fix
+  holds under genuine production load, not just a quiet cluster.
 
 ## Trade-offs
 
