@@ -41,11 +41,13 @@ spec:
           # here). WHEN_REQUIRED reverts the SDK to pre-v1.74.1 behavior;
           # AWS's own documented fix for exactly this S3-compatible-backend
           # class of breakage, not Velero-specific.
+          # NOTE: this chart's extraEnvVars is a flat key/value map, not a
+          # list of {name, value} objects (confirmed against the actual
+          # values.yaml for the pinned 7.2.2 chart) -- a first attempt used
+          # the wrong shape and silently rendered nothing.
           extraEnvVars:
-            - name: AWS_REQUEST_CHECKSUM_CALCULATION
-              value: WHEN_REQUIRED
-            - name: AWS_RESPONSE_CHECKSUM_VALIDATION
-              value: WHEN_REQUIRED
+            AWS_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
+            AWS_RESPONSE_CHECKSUM_VALIDATION: WHEN_REQUIRED
           # REL-044: originally placed at the top level as `extraArgs` and
           # misspelled `--default-repo-maintenance-frequency` -- Helm silently
           # ignores unknown top-level keys, and the flag (even if it had been
