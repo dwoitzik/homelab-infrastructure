@@ -27,6 +27,19 @@ spec:
           enabled: true
           storageClassName: nfs-client
           size: 10Gi
+        # ADR-036: soft preference off vm-srv-k3s-11, which had accumulated
+        # most of this cluster's stateful/heavy workload with nothing
+        # steering new placements elsewhere.
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                preference:
+                  matchExpressions:
+                    - key: kubernetes.io/hostname
+                      operator: NotIn
+                      values:
+                        - vm-srv-k3s-11
         serviceMonitor:
           enabled: true
           namespace: monitoring

@@ -16,6 +16,18 @@ spec:
       annotations:
         backup.velero.io/backup-volumes: db
     spec:
+      # ADR-036: soft preference off vm-srv-k3s-11 -- storage is
+      # nfs-client, not node-pinned, so this pod is safely reschedulable.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - vm-srv-k3s-11
       dnsConfig:
         options:
           - name: ndots
