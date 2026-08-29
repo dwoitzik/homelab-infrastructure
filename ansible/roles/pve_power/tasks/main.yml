@@ -6,13 +6,9 @@
     update_cache: true
 
 - name: Remove stale manual amd_pstate=passive from the main GRUB config
-  # Predates this role -- set manually in GRUB_CMDLINE_LINUX_DEFAULT before
-  # the drop-in below existed. grub-mkconfig assembles the final cmdline as
-  # GRUB_CMDLINE_LINUX (this drop-in) followed by GRUB_CMDLINE_LINUX_DEFAULT
-  # (this line), so the stale `passive` here was silently winning over the
-  # drop-in's `active` on every boot (last amd_pstate= wins) -- confirmed
-  # live via /proc/cmdline showing both, `active` first. The drop-in below
-  # is now the single source of truth for this parameter.
+  # grub-mkconfig appends GRUB_CMDLINE_LINUX_DEFAULT after GRUB_CMDLINE_LINUX
+  # (the drop-in below), so a stale amd_pstate= here would silently win over
+  # the drop-in's value on every boot -- last one wins.
   ansible.builtin.replace:
     path: /etc/default/grub
     regexp: '\s*amd_pstate=\S+'
@@ -40,13 +36,8 @@
 
       [Service]
       Type=oneshot
-      # 2026-08-17: was a hardcoded /usr/sbin/cpupower -- on this Debian
-      # trixie install, the linux-cpupower package puts the binary at
-      # /usr/bin/cpupower instead (confirmed live via `dpkg -L
-      # linux-cpupower`), so the service failed every time it actually ran
-      # ("203/EXEC ... No such file or directory"). Resolving via PATH
-      # instead of a hardcoded path avoids re-hardcoding a location that's
-      # apparently not stable across package versions/distros.
+      # linux-cpupower on Debian trixie installs to /usr/bin, not the more
+      # common /usr/sbin -- resolve via PATH rather than hardcode either.
       ExecStart=/usr/bin/env cpupower frequency-set -g {{ pve_power_cpu_governor }}
       ExecStartPost=/bin/sh -c 'echo {{ pve_power_energy_perf_pref }} | tee /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference 2>/dev/null || true'
       RemainAfterExit=yes
@@ -69,11 +60,7 @@
   changed_when: false
   failed_when: false
 
-# REL-012c/REL-037: bring the previously-manual /etc/modprobe.d/zfs.conf
-# under Ansible so it survives a fresh host build, and add
-# zfs_vdev_async_write_max_active to actually prioritize etcd's synchronous
-# WAL fdatasync over bulk async writes from every other VM/CT sharing this
-# host's single SSD (see defaults/main.yml comment for the full incident).
+# See ADR-034 for the full ZFS tuning rationale.
 - name: Persist ZFS module tuning (survives reboot)
   ansible.builtin.copy:
     dest: /etc/modprobe.d/zfs.conf
@@ -88,7 +75,7 @@
 
 - name: Apply zfs_vdev_async_write_max_active immediately (no reboot needed)
   # sysfs isn't a real filesystem -- ansible.builtin.copy's atomic
-  # write-then-rename fails with EXDEV/EACCES against it, needs a direct echo.
+  # write-then-rename fails against it (EXDEV/EACCES), needs a direct echo.
   ansible.builtin.shell:
     cmd: echo {{ pve_power_zfs_vdev_async_write_max_active }} > /sys/module/zfs/parameters/zfs_vdev_async_write_max_active
   changed_when: false
@@ -103,24 +90,11 @@
     cmd: echo {{ pve_power_zfs_arc_max_bytes }} > /sys/module/zfs/parameters/zfs_arc_max
   changed_when: false
 
-# 2026-08-19: bring vzdump's global throttle under IaC (see defaults/main.yml
-# comment) -- surgical, leaves the rest of Proxmox's own stock
-# /etc/vzdump.conf template (all commented examples) alone rather than
-# replacing the whole file. Two steps, in this order:
-#   1. One-time-only: strip any bare (unmanaged) bwlimit:/ionice: lines.
-#      Live-caught bug on the real host, twice: the file already had TWO
-#      pre-existing `ionice:` lines (real prior drift, predates this role)
-#      -- a first-draft version used two separate `lineinfile` calls, whose
-#      regexp match only updates the LAST matching line when there are
-#      duplicates, silently leaving the other in place. Fixed by removing
-#      bare lines outright before inserting a managed block instead. But an
-#      UNGATED removal task reran on every play and matched the managed
-#      block's own content lines too (they're still bare `bwlimit:
-#      NNN`/`ionice: N` text, marker comments don't change that) --
-#      confirmed live: `changed=2` on a second consecutive run even though
-#      nothing should differ. Gated on the marker not existing yet fixes
-#      this for real: once the managed block is in place, this task is
-#      permanently skipped, so it can never eat the block's own lines.
+# Surgical: leaves the rest of Proxmox's stock /etc/vzdump.conf template
+# alone rather than replacing the whole file. Strips any pre-existing
+# unmanaged bwlimit:/ionice: lines once (gated on the managed marker not
+# existing yet, so this can never re-match and eat the managed block's own
+# lines on a later run), then inserts the managed block. See ADR-034.
 - name: Check whether the vzdump throttle block already exists
   ansible.builtin.command:
     cmd: grep -q "BEGIN ANSIBLE MANAGED THROTTLE (pve_power role, ADR-023)" /etc/vzdump.conf
@@ -146,10 +120,7 @@
       bwlimit: {{ pve_power_vzdump_bwlimit_kbps }}
       ionice: {{ pve_power_vzdump_ionice }}
 
-# 2026-08-21: see defaults/main.yml comment -- this host's thin pool can
-# never autoextend (VG has zero free space), so the default 80% threshold
-# only ever blocked backups, never actually protected anything.
-- name: Raise LVM thin-pool autoextend threshold (see phase8/LEDGER.md Entry 68)
+- name: Raise LVM thin-pool autoextend threshold
   ansible.builtin.lineinfile:
     path: /etc/lvm/lvm.conf
     regexp: '^(\s*)thin_pool_autoextend_threshold\s*=\s*\d+\s*$'
@@ -164,17 +135,6 @@
     group: root
     mode: '0700'
 
-# 2026-08-21: pve-watchdog.sh predates this role (found live-only, no IaC
-# ownership -- same drift pattern the vzdump throttle above was in before
-# ADR-023). Brought under IaC here rather than left as tribal knowledge, and
-# fixed in the same pass: its old flat 15min rate-limit re-alerted on every
-# check (every 5min via cron) for a condition that stayed true for hours --
-# exactly what happened during the real disk-latency incident the night of
-# 2026-08-20/21 (phase8/LEDGER.md Entries 63-64), generating dozens of
-# redundant pushes for one already-known, ongoing condition. Now uses an
-# escalating backoff (15/30/60/120/240min, resets the moment the condition
-# actually clears) instead of a blanket quiet-hours window, so a genuinely
-# new problem starting overnight still alerts promptly.
 - name: Deploy pve-watchdog.sh (load/pool/temp health alerts)
   ansible.builtin.template:
     src: pve-watchdog.sh.j2
@@ -186,7 +146,7 @@
 - name: Register the health-check script as vzdump's job-end hook
   ansible.builtin.blockinfile:
     path: /etc/vzdump.conf
-    marker: "# {mark} ANSIBLE MANAGED HOOK SCRIPT (pve_power role, phase8 Entry 68)"
+    marker: "# {mark} ANSIBLE MANAGED HOOK SCRIPT (pve_power role)"
     insertafter: "END ANSIBLE MANAGED THROTTLE"
     block: |
       script: /usr/local/bin/pbs-backup-healthcheck.sh
@@ -197,18 +157,11 @@
     minute: "*/5"
     job: /usr/local/bin/pve-watchdog.sh
 
-# 2026-08-22 (Section G, power draw dashboard): found live that this Ryzen
-# host's RAPL package-energy counter (/sys/class/powercap/intel-rapl:0/
-# energy_uj -- the "intel-rapl" name is a Linux kernel-framework quirk, AMD
-# Zen CPUs since Zen 2 report through the same powercap interface) is real
-# and live (confirmed via a direct `cat`), but node_exporter's rapl
-# collector was silently failing (node_scrape_collector_success{collector=
-# "rapl"} 0) because the file is root-only (0400) and node_exporter runs
-# as its own unprivileged system user. World-readable energy counters are
-# the standard, widely-used fix for this exact gap (the value itself is
-# not sensitive) -- a udev rule makes it durable across reboots/device
-# re-enumeration, plus an immediate chmod since udev rules don't
-# retroactively touch already-enumerated devices.
+# RAPL's power-monitoring interface defaults root-only, which silently
+# breaks any unprivileged exporter reading it. The energy value itself
+# isn't sensitive -- world-readable via udev rule (durable across
+# reboots) is the standard fix, plus an immediate chmod since udev rules
+# don't retroactively touch already-enumerated devices.
 - name: Deploy udev rule for world-readable RAPL energy counters
   ansible.builtin.copy:
     dest: /etc/udev/rules.d/95-rapl-readable.rules
@@ -222,23 +175,9 @@
     cmd: chmod -R a+r /sys/class/powercap/intel-rapl:0/ 2>/dev/null || true
   changed_when: false
 
-# 2026-08-22 (SSD write-rate reduction, operator decision not to replace
-# the wearing drive -- see docs/HARDWARE.md's wear projection): found
-# live that vm.swappiness=10 was already set on this host but from
-# somewhere outside this repo's IaC (present in /etc/sysctl.d/, no
-# matching source anywhere in ansible/) -- brought under IaC here rather
-# than left as untracked drift. Host had 6.6GiB of 8GiB swap in active
-# use (confirmed via `free -h`/`vmstat` si/so columns showing ongoing
-# swap-in/out, not just historically-allocated-and-idle) -- every page
-# swapped is a write to the same NVMe this whole effort is trying to
-# slow wear on. Halved to 5 rather than dropping to the common "1" floor
-# some tuning guides suggest: this host has a real, documented history of
-# genuine memory pressure under load (see phase8/LEDGER.md), and an
-# overly aggressive swappiness reduction trades "less swap I/O" for
-# "more OOM-kill risk" when real memory pressure hits -- a worse trade on
-# a host that's already shown fragility under load this same day. Doesn't
-# evict what's already in swap (stays until actively reclaimed), only
-# reduces the rate of new pages being proactively pushed out from here.
+# See ADR-034: reduced, not minimized to near-zero -- this host has real
+# memory-pressure headroom problems under load, and too aggressive a
+# reduction trades swap I/O for OOM-kill risk.
 - name: Reduce swappiness to cut ongoing swap-driven NVMe writes
   ansible.posix.sysctl:
     name: vm.swappiness
@@ -270,7 +209,6 @@
     job: /usr/local/bin/smart-metrics.sh
 
 # node_exporter's own systemd unit and --collector.textfile.directory flag
-# are managed by the node_exporter_native role (templated, runs after this
-# one in site.yml's pve_hosts play) -- not duplicated here. A lineinfile
-# edit against a file another role fully templates just gets clobbered on
-# the next run; confirmed live the first time this was tried.
+# are managed by the node_exporter_native role (runs after this one in
+# site.yml's pve_hosts play) -- not duplicated here, a lineinfile edit
+# against a file another role fully templates would just get overwritten.
