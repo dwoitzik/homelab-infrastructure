@@ -75,7 +75,7 @@ carry forward and defend if questioned:
   every current `local-path` PVC is pinned to, since it's the sole server and stateful pods
   are scheduled there — see LEDGER Phase 1 findings) is lost, every one of these apps loses
   its live data until restored from backup. This is a real, accepted cost, not a hidden one
-  — `docs/RECOVERY.md` must document the exact restore procedure per app (Phase 4 task).
+  — `DISASTER-RECOVERY.md` must document the exact restore procedure per app (Phase 4 task).
 - `nfs-client`'s durability depends entirely on `ct-srv-nfs-01`'s own ZFS redundancy and
   Velero's daily backups — the NFS server is a SPOF for everything on that class, same as
   ADR-005 already accepted.

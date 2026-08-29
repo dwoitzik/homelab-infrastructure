@@ -9,7 +9,7 @@ self-hosted applications running on top in Kubernetes, all applied through GitOp
 of it by hand. It exists to be genuinely used day to day — not a demo cluster spun up to
 have something to show — and it's also a record of what running real infrastructure
 looks like: a from-nothing disaster recovery (`docs/RECOVERY-REPORT-2026-08-13.md`), the
-architecture decisions that came out of it (`docs/decisions/`, 28 ADRs), and an honest
+architecture decisions that came out of it (`docs/decisions/`, 33 ADRs), and an honest
 closing assessment of what still needs work (`docs/POST-MISSION.md`).
 
 **What this demonstrates**: GitOps discipline (every change is a PR, Terraform applies
