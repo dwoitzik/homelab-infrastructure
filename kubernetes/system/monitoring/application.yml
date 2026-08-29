@@ -48,6 +48,19 @@ spec:
         grafana:
           assertNoLeakedSecrets: false
           enabled: true
+          # ADR-036: soft preference off vm-srv-k3s-11, which had
+          # accumulated most of this cluster's stateful/heavy workload with
+          # nothing steering new placements elsewhere.
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  preference:
+                    matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: NotIn
+                        values:
+                          - vm-srv-k3s-11
           # 2026-08-14: found live while testing the dashboards.default_home_
           # dashboard_path change below -- a fresh Grafana pod's own SQLite
           # migration set (accumulated schema history, not something this repo
@@ -197,6 +210,17 @@ spec:
                 value: "1"
         alertmanager:
           alertmanagerSpec:
+            # ADR-036: same reasoning as grafana's affinity below.
+            affinity:
+              nodeAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 100
+                    preference:
+                      matchExpressions:
+                        - key: kubernetes.io/hostname
+                          operator: NotIn
+                          values:
+                            - vm-srv-k3s-11
             secrets:
               - alertmanager-discord-webhook
             # REL-042: AlertmanagerConfig objects can't be referenced as
@@ -238,6 +262,19 @@ spec:
               - name: "null"
         prometheus:
           prometheusSpec:
+            # ADR-036: already running on vm-srv-k3s-12 as of this change,
+            # but nothing was keeping it there -- soft preference makes
+            # that explicit rather than incidental.
+            affinity:
+              nodeAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 100
+                    preference:
+                      matchExpressions:
+                        - key: kubernetes.io/hostname
+                          operator: NotIn
+                          values:
+                            - vm-srv-k3s-11
             tolerations:
               - key: node-role.kubernetes.io/control-plane
                 operator: Exists
