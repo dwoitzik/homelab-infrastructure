@@ -15,6 +15,19 @@ spec:
       labels:
         app: pve-exporter
     spec:
+      # ADR-036: soft preference off vm-srv-k3s-11, which had accumulated
+      # most of this cluster's stateful/heavy workload with nothing
+      # steering new placements elsewhere.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - vm-srv-k3s-11
       containers:
       - name: pve-exporter
         image: prompve/prometheus-pve-exporter:3.10.0@sha256:4867684c0a937716f11f770a32d32958bded507cf570fc334f774392afcb2f37
