@@ -1,0 +1,201 @@
+---
+services:
+  caddy:
+    image: caddy:2.10.0
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - client
+
+  clickhouse:
+    container_name: clickhouse
+    image: clickhouse/clickhouse-server:26.3.17.4
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    configs:
+      - source: clickhouse_network
+        target: /etc/clickhouse-server/config.d/network.xml
+      - source: clickhouse_logging
+        target: /etc/clickhouse-server/config.d/logging_rules.xml
+      - source: clickhouse_resource_limits
+        target: /etc/clickhouse-server/config.d/resource_limits.xml
+      - source: clickhouse_user_settings
+        target: /etc/clickhouse-server/users.d/user_settings.xml
+    environment:
+      - CLICKHOUSE_DB=analytics
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD={{ rybbit_clickhouse_password }}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8123:8123"
+
+  postgres:
+    image: postgres:17.4
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=rybbit
+      - POSTGRES_PASSWORD={{ rybbit_postgres_password }}
+      - POSTGRES_DB=analytics
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rybbit -d analytics"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    image: redis:8.6.4-alpine
+    container_name: redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "{{ rybbit_redis_password }}", "--no-auth-warning", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - {{ rybbit_redis_password }}
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory-policy
+      - noeviction
+
+  backend:
+    image: ghcr.io/rybbit-io/rybbit-backend:latest
+    container_name: backend
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      - NODE_ENV=production
+      - CLICKHOUSE_HOST=http://clickhouse:8123
+      - CLICKHOUSE_DB=analytics
+      - CLICKHOUSE_PASSWORD={{ rybbit_clickhouse_password }}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=analytics
+      - POSTGRES_USER=rybbit
+      - POSTGRES_PASSWORD={{ rybbit_postgres_password }}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD={{ rybbit_redis_password }}
+      - BETTER_AUTH_SECRET={{ rybbit_better_auth_secret }}
+      - BASE_URL=https://analytics.woitzik.dev
+      - DISABLE_SIGNUP={{ rybbit_disable_signup | default('true') }}
+      - DISABLE_TELEMETRY=true
+      - CLUSTER_WORKERS=2
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/api/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  client:
+    image: ghcr.io/rybbit-io/rybbit-client:latest
+    container_name: client
+    ports:
+      - "127.0.0.1:3002:3002"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_BACKEND_URL=https://analytics.woitzik.dev
+      - NEXT_PUBLIC_DISABLE_SIGNUP={{ rybbit_disable_signup | default('true') }}
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  clickhouse-data:
+  postgres-data:
+  redis-data:
+  caddy_data:
+  caddy_config:
+
+configs:
+  clickhouse_network:
+    content: |
+      <clickhouse>
+          <listen_host>0.0.0.0</listen_host>
+      </clickhouse>
+
+  clickhouse_logging:
+    content: |
+      <clickhouse>
+        <logger>
+            <level>warning</level>
+            <console>true</console>
+        </logger>
+        <query_thread_log remove="remove"/>
+        <query_log remove="remove"/>
+        <query_views_log remove="remove"/>
+        <query_metric_log remove="remove"/>
+        <error_log remove="remove"/>
+        <opentelemetry_span_log remove="remove"/>
+        <text_log remove="remove"/>
+        <trace_log remove="remove"/>
+        <metric_log remove="remove"/>
+        <asynchronous_metric_log remove="remove"/>
+        <session_log remove="remove"/>
+        <part_log remove="remove"/>
+        <latency_log remove="remove"/>
+        <processors_profile_log remove="remove"/>
+      </clickhouse>
+
+  clickhouse_resource_limits:
+    content: |
+      <clickhouse>
+        <max_server_memory_usage_to_ram_ratio>0.80</max_server_memory_usage_to_ram_ratio>
+        <concurrent_threads_soft_limit_ratio_to_cores>1</concurrent_threads_soft_limit_ratio_to_cores>
+        <merges_mutations_memory_usage_to_ram_ratio>0.25</merges_mutations_memory_usage_to_ram_ratio>
+      </clickhouse>
+
+  clickhouse_user_settings:
+    content: |
+      <clickhouse>
+        <profiles>
+          <default>
+            <enable_json_type>1</enable_json_type>
+            <async_insert>1</async_insert>
+            <wait_for_async_insert>1</wait_for_async_insert>
+            <log_queries>0</log_queries>
+            <log_query_threads>0</log_query_threads>
+            <log_processors_profiles>0</log_processors_profiles>
+            <max_memory_usage>3200000000</max_memory_usage>
+            <max_threads>2</max_threads>
+          </default>
+        </profiles>
+      </clickhouse>

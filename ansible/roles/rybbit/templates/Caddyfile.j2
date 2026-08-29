@@ -1,0 +1,20 @@
+{
+	auto_https off
+}
+
+# Plain HTTP only -- this box has no inbound WAN exposure at all, reachable
+# only via Cloudflare Tunnel (cloudflared makes outbound connections to
+# Cloudflare's edge; the tunnel is the last hop into this LXC). Cloudflare's
+# edge is what terminates public TLS for real visitors, same as the other
+# tunnel-routed services in this repo (headscale/immich) -- Caddy's own
+# automatic-HTTPS/ACME would just fail here anyway (no way for Let's
+# Encrypt to reach this box from the internet). Caddy's only job is routing
+# / to the client and /api to the backend behind one hostname.
+:80 {
+	handle /api/* {
+		reverse_proxy backend:3001
+	}
+	handle {
+		reverse_proxy client:3002
+	}
+}

@@ -80,6 +80,12 @@
   roles:
     - scanopy_daemon
 
+- name: Provision Rybbit Analytics
+  hosts: rybbit_nodes
+  become: true
+  roles:
+    - rybbit
+
 - name: Provision DMZ Game Servers
   hosts: dmz_games
   become: true

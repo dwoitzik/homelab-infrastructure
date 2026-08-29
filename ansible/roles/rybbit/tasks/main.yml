@@ -1,0 +1,26 @@
+---
+- name: Ensure rybbit directory exists
+  ansible.builtin.file:
+    path: /opt/rybbit
+    state: directory
+    mode: '0755'
+
+- name: Deploy Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /opt/rybbit/Caddyfile
+    mode: '0644'
+  when: rybbit_postgres_password is defined
+
+- name: Deploy docker-compose configuration
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /opt/rybbit/docker-compose.yml
+    mode: '0644'
+  when: rybbit_postgres_password is defined
+
+- name: Ensure rybbit stack is running
+  community.docker.docker_compose_v2:
+    project_src: /opt/rybbit
+    state: present
+  when: rybbit_postgres_password is defined
