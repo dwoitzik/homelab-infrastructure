@@ -26,7 +26,20 @@ pve_power_amd_pstate: active
 # recurring REL-012c crash signature) instead of just tolerating it better
 # (REL-035's cpu.units was CPU scheduling only, doesn't touch disk I/O
 # contention at all).
-pve_power_zfs_arc_max_bytes: 17179869184
+# 2026-08-29 (ADR-037): lowered 16 GiB -> 8 GiB. Live investigation during
+# the vm-srv-k3s-11 wedge incident found the host genuinely memory-starved
+# (swap in active use, all 3 k3s VMs balloon-deflated well below their
+# `dedicated` ceiling, `vm-srv-k3s-11` itself thrashing hard enough to
+# stall its kubelet's PLEG and make the apiserver unreachable). ARC was
+# quietly using ~13 GB of its 16 GB cap at the time -- real host RAM that
+# could otherwise relieve the VMs' ballooning. Lowering to 8 GiB (the low
+# end of the generally-recommended 12-16 GiB range for a 64 GB host, a
+# deliberate deviation given this host runs 3 latency-sensitive k3s
+# control-plane/worker VMs rather than a typical storage-workload profile)
+# freed ~5 GB of real host RAM immediately, live-verified via `free -m`.
+# See ADR-037 for the full investigation and the paired VM `floating`
+# (balloon floor) changes in terraform/stacks/proxmox/vm.tf.
+pve_power_zfs_arc_max_bytes: 8589934592
 pve_power_zfs_prefetch_disable: 1
 pve_power_zfs_dirty_data_max_bytes: 268435456
 pve_power_zfs_txg_timeout: 5
