@@ -27,6 +27,25 @@ spec:
               provider: aws
               config:
                 region: homelab
+          # ADR-038: AWS SDK for Go v2's S3 module (v1.74.1+, per its own
+          # changelog) started auto-attaching a CRC32 checksum to every
+          # PutObject by default, regardless of the BSL's own
+          # `checksumAlgorithm: ""` setting above (that setting stops
+          # Velero from requesting a checksum explicitly -- it doesn't
+          # stop the SDK's own newer default behavior underneath). This is
+          # what was actually breaking `daily-offsite` against Cloudflare
+          # R2 for 7+ days straight (`x-amz-tagging` in the error is R2's
+          # own mislabeling of the real unsupported header -- confirmed via
+          # the plugin's source, which never sets a real Tagging header
+          # unless `tagging` is set in the BSL config, which it isn't
+          # here). WHEN_REQUIRED reverts the SDK to pre-v1.74.1 behavior;
+          # AWS's own documented fix for exactly this S3-compatible-backend
+          # class of breakage, not Velero-specific.
+          extraEnvVars:
+            - name: AWS_REQUEST_CHECKSUM_CALCULATION
+              value: WHEN_REQUIRED
+            - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+              value: WHEN_REQUIRED
           # REL-044: originally placed at the top level as `extraArgs` and
           # misspelled `--default-repo-maintenance-frequency` -- Helm silently
           # ignores unknown top-level keys, and the flag (even if it had been
