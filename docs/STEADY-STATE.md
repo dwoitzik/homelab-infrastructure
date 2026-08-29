@@ -48,12 +48,12 @@ that keeps it that way.
   against the live cluster and alerting if something merged to git was never actually
   applied — built after this exact gap took down the dead man's switch itself for
   days undetected.
-- Blackbox external probing checks the 2 hostnames on ADR-019's public allowlist
+- Blackbox external probing checks the 2 hostnames on ADR-033's public allowlist
   (`photos.woitzik.dev`, `headscale.woitzik.dev`) for real external reachability and
   TLS expiry. `mc.woitzik.dev` (Minecraft, via the playit.gg tunnel — a separate,
   non-Cloudflare exposure path) is the third genuinely public hostname but isn't
-  probed by this job today. `claude.woitzik.dev`'s ADR-018 tunnel was applied once
-  and destroyed by the very next apply (ADR-019); it has no public DNS record and no
+  probed by this job today. `claude.woitzik.dev`'s ADR-032 tunnel was applied once
+  and destroyed by the very next apply (ADR-033); it has no public DNS record and no
   running `cloudflared` connector as of 2026-08-23 — corrected here after that stale
   claim was found and verified against live state.
 - Weekly Discord self-report summarizes cluster health every Monday morning.
@@ -170,7 +170,7 @@ that keeps it that way.
   `pve`/`rpi-srv-01`/`rpi-srv-02` that only this host holds, and a GitHub Actions
   repository-secret write for Discord was denied by Claude Code's own auto-mode
   classifier, so ntfy is used instead, same as this repo's own `drift-check.yml`
-  already does for the same reason. See `ADR-018` for the precedent on why this
+  already does for the same reason. See `ADR-032` for the precedent on why this
   particular host's own automation is out-of-IaC by design). Checks Terraform
   provider pins (all 4 stacks) against the latest stable release on the public
   registry, the 3 pinned Ansible collections against Galaxy, and pending `apt`

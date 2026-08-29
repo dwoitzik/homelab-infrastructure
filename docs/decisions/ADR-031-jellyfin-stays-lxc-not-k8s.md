@@ -1,4 +1,4 @@
-# ADR-017: Jellyfin stays on a dedicated LXC, not migrated into k3s
+# ADR-031: Jellyfin stays on a dedicated LXC, not migrated into k3s
 
 **Date:** 2026-08-14
 **Status:** Accepted (kept as-is, after genuine re-evaluation)

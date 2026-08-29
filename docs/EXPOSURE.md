@@ -9,7 +9,7 @@ incident response).
 | Hostname | What it fronts | Protection | Why it's public |
 |---|---|---|---|
 | `photos.woitzik.dev` | Immich (photo library) | Rate-limited, Immich's own mobile-app token auth. Cloudflare Access (email OTP) still to be added — see Open Items. | Family uses it for photo backup/access away from home. |
-| `headscale.woitzik.dev` | Headscale (Tailscale control plane) | Its own device-registration/preauth-key flow. No Authelia — cannot be, by definition (see below). | A device re-authenticating or joining the mesh has to reach the coordination server *before* any VPN path to it exists. Confirmed by the operator directly (2026-08-15) as a deliberate, structural requirement, not an oversight — see `docs/decisions/ADR-019-public-exposure-allowlist.md`. |
+| `headscale.woitzik.dev` | Headscale (Tailscale control plane) | Its own device-registration/preauth-key flow. No Authelia — cannot be, by definition (see below). | A device re-authenticating or joining the mesh has to reach the coordination server *before* any VPN path to it exists. Confirmed by the operator directly (2026-08-15) as a deliberate, structural requirement, not an oversight — see `docs/decisions/ADR-033-public-exposure-allowlist.md`. |
 | `mc.woitzik.dev` (Minecraft) | Minecraft server, `ct-dmz-games-01` (VLAN 30) | Not a Cloudflare Tunnel host at all — routed via playit.gg's own relay infrastructure (`doing-sigma.gl.joinmc.link`, playit-owned IP `147.185.221.212`). The home WAN IP never appears in this path. VLAN 30 (DMZ) firewall-isolated from every other zone (verified below). | Friends play on it. The only surface with actual strangers on it. |
 
 **Everything else is not public at all.** Reachable only via LAN or the Headscale/Tailscale
@@ -38,7 +38,7 @@ Closed during this audit: ran the pending Terraform apply, which destroyed the w
 DNS record and ingress rule, and the `atlantis`/`auth`/`home`/`media` DNS records.
 Confirmed via direct Cloudflare API queries (not just the apply's own log) that these no
 longer resolve. The apply also removed the dedicated `claude.woitzik.dev` tunnel
-(ADR-018) entirely — correct, since that hostname was never on the public allowlist
+(ADR-032) entirely — correct, since that hostname was never on the public allowlist
 either; this agent remains reachable via Tailscale/LAN, its original primary path.
 
 The apply hit one real snag (a pre-existing, out-of-band `headscale.woitzik.dev` DNS
@@ -265,8 +265,8 @@ against the code or a PR's existence:
 - **`claude.woitzik.dev` public-DNS discrepancy, found and closed this pass**: this
   agent's own STEADY-STATE.md and blackbox monitoring config both still described
   `claude.woitzik.dev` as one of "3 genuinely public hostnames," a leftover from
-  `ADR-018`'s original dedicated-tunnel plan. That tunnel was applied once (PR #437)
-  and destroyed by the very next apply the same day (`ADR-019`'s allowlist, PR #440)
+  `ADR-032`'s original dedicated-tunnel plan. That tunnel was applied once (PR #437)
+  and destroyed by the very next apply the same day (`ADR-033`'s allowlist, PR #440)
   after the operator confirmed directly this hostname was never meant to be public.
   Confirmed 2026-08-23: `dig @1.1.1.1 claude.woitzik.dev A` → NXDOMAIN, no `cloudflared`
   process running on the host. The blackbox probe's `probe_success` metric had
@@ -282,7 +282,7 @@ against the code or a PR's existence:
   repo's IngressRoutes (44, via `grep -rhoE 'Host\(...\)'`) plus `mc.woitzik.dev` and
   `claude.woitzik.dev` (neither Traefik-routed) checked against a public resolver.
   Exactly 3 answer: `photos.woitzik.dev` and `headscale.woitzik.dev` (both HTTP `200`
-  through the Cloudflare Tunnel, matching `ADR-019`'s 2-hostname allowlist exactly) and
+  through the Cloudflare Tunnel, matching `ADR-033`'s 2-hostname allowlist exactly) and
   `mc.woitzik.dev` (TCP `25565` open via the playit.gg relay, matching the deliberate
   Minecraft exposure documented above). All other 43 are NXDOMAIN. Full per-hostname
   table in `docs/URL-INVENTORY.md` (refreshed this same pass — it had been stale since

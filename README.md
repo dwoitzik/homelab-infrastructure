@@ -206,7 +206,7 @@ browser session is looking at the dashboard.
 Every hostname below resolves and works from the LAN or over the Headscale/Tailscale
 VPN. **Only two are actually reachable from the public internet** — everything else
 is deliberately allowlisted out of Cloudflare's DNS/tunnel entirely, an explicit
-default-deny decision (`ADR-019`), not an oversight. See `docs/URL-INVENTORY.md` for
+default-deny decision (`ADR-033`), not an oversight. See `docs/URL-INVENTORY.md` for
 the full external-reachability audit.
 
 | Service | URL | Auth | Reachable from |
@@ -307,7 +307,7 @@ printf '%s' 'new-value' | ansible-vault encrypt_string \
    file directly (the older, still-working, not-yet-migrated pattern most existing
    apps use — see the Repository Layout note above)
 4. Decide deliberately whether it needs a public DNS/tunnel entry at all — the
-   default is no (`ADR-019`); only add one with a real reason, in
+   default is no (`ADR-033`); only add one with a real reason, in
    `terraform/stacks/cloudflare/main.tf`
 
 ## Monitoring

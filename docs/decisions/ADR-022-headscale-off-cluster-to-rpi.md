@@ -1,4 +1,4 @@
-# ADR-016: Move Headscale off the k3s cluster to rpi-srv-02
+# ADR-022: Move Headscale off the k3s cluster to rpi-srv-02
 
 **Date:** 2026-08-14
 **Status:** Accepted (decision only — migration not yet executed, see Consequences)

@@ -15,7 +15,7 @@ import {
   id = "1f15ed0f3a8b497302ba339dcab3c060/0a20f0e459e5fb34169ff5d4dda9e8c2"
 }
 
-# 2026-08-14 (ADR-019): tunnel_atlantis and tunnel_home import blocks removed
+# 2026-08-14 (ADR-033): tunnel_atlantis and tunnel_home import blocks removed
 # from here -- both records are being dropped entirely per the operator's
 # public-exposure-allowlist decision (see main.tf), not imported/kept. No
 # import needed for a resource that's being removed from config, only for one
@@ -38,7 +38,7 @@ import {
   id = "1f15ed0f3a8b497302ba339dcab3c060/6a324d0a219b681417f63b08503f87c1"
 }
 
-# The claude-agent dedicated tunnel (ADR-018, PR #437) was destroyed by that
+# The claude-agent dedicated tunnel (ADR-032, PR #437) was destroyed by that
 # same apply -- expected and correct, not a bug: claude.woitzik.dev was never
 # on the 2-host public allowlist this PR establishes, confirmed by the
 # operator directly (2026-08-15, Phase 8 brief). This agent remains reachable
