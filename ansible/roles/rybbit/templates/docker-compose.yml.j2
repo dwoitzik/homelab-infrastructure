@@ -107,7 +107,7 @@ services:
       - REDIS_PASSWORD={{ rybbit_redis_password }}
       - BETTER_AUTH_SECRET={{ rybbit_better_auth_secret }}
       - BASE_URL=https://analytics.woitzik.dev
-      - DISABLE_SIGNUP={{ rybbit_disable_signup | default('true') }}
+      - DISABLE_SIGNUP={{ rybbit_disable_signup | default(true) | lower }}
       - DISABLE_TELEMETRY=true
       - CLUSTER_WORKERS=2
     depends_on:
@@ -133,7 +133,7 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_BACKEND_URL=https://analytics.woitzik.dev
-      - NEXT_PUBLIC_DISABLE_SIGNUP={{ rybbit_disable_signup | default('true') }}
+      - NEXT_PUBLIC_DISABLE_SIGNUP={{ rybbit_disable_signup | default(true) | lower }}
     depends_on:
       - backend
     restart: unless-stopped

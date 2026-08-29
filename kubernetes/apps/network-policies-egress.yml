@@ -269,6 +269,31 @@ spec:
         - protocol: TCP
           port: 22
 ---
+# cloudflared's analytics.woitzik.dev ingress (terraform/stacks/cloudflare)
+# points straight at ct-srv-rybbit-01's raw LAN IP, not an in-cluster
+# Service -- same class of gap as allow-egress-cloudflared-tunnel's second
+# rule above (that one only covers Traefik specifically), confirmed live:
+# 404 on the tunnel path until this existed, no error in cloudflared's own
+# logs since NetworkPolicy drops are silent.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-cloudflared-rybbit
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: cloudflared
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.205/32
+      ports:
+        - protocol: TCP
+          port: 80
+---
 # homepage is a dashboard aggregator by design -- its whole job is polling
 # ~15+ services across multiple namespaces (argocd, kube-system, security,
 # monitoring) plus external LAN hosts that aren't in the cluster at all
