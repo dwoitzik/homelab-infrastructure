@@ -52,6 +52,19 @@ spec:
           existingSecret: velero-s3-credentials
         backupsEnabled: true
         snapshotsEnabled: true
+        # ADR-036: soft preference off vm-srv-k3s-11 for the main Velero
+        # Deployment only -- deliberately NOT applied to nodeAgent below,
+        # which is a DaemonSet and must keep running on every node.
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                preference:
+                  matchExpressions:
+                    - key: kubernetes.io/hostname
+                      operator: NotIn
+                      values:
+                        - vm-srv-k3s-11
         deployNodeAgent: true
         # REL-064 load-smoothing: node-agent had NO resource limits at all
         # (confirmed live: `resources: {}` on the running DaemonSet) --
