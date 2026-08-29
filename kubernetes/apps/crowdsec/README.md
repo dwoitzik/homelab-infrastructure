@@ -14,7 +14,7 @@ from the CrowdSec Hub (upstream), not from local persistence.
 - **On first boot it tries to register with CrowdSec's central Console
   (`api.crowdsec.net`)** for community threat-intel sharing — this is optional and not
   required for local bouncer functionality. Failing to reach it (e.g. during the DNS
-  wildcard-hijack bug documented in `docs/RECOVERY.md` §7) causes a crash loop; fixing
+  wildcard-hijack bug documented in `DISASTER-RECOVERY.md` §7) causes a crash loop; fixing
   the underlying DNS issue resolves it without needing to explicitly disable console
   registration.
 - **A plaintext bouncer API key was found committed in this repo's git history**

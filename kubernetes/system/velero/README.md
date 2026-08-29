@@ -38,7 +38,7 @@ verified restore test.
 
 ## How to restore
 
-See `docs/backup-strategy.md` / `docs/RECOVERY.md` for the full procedure. In short:
+See `docs/backup-strategy.md` / `DISASTER-RECOVERY.md` for the full procedure. In short:
 `velero restore create --from-backup <name>`, verify data in place afterward — this
 repo's own non-negotiable rule (never trust a backup that hasn't been restore-tested).
 

@@ -183,7 +183,7 @@ a separate infrastructure issue from this ADR's own scope.
   `litestream restore`, start the standby, flip AdGuard DNS rewrites +
   Cloudflare Tunnel target, verify against a real client, and the mirror-image
   failback.
-- `docs/RECOVERY.md` (§7b) and `CLAUDE.local.md` (Topology reality) updated to
+- `DISASTER-RECOVERY.md` (§7b) and `CLAUDE.local.md` (Topology reality) updated to
   point at this ADR and the runbook as the one narrow exception to
   "recovery, not HA" (item 6).
 - **Still open**: item 6's actual induced-failure verification pass (a real

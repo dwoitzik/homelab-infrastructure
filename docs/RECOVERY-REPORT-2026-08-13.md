@@ -32,7 +32,7 @@ Root causes, established with evidence (not assumed):
 | Headscale | 1 | Restored, live | `sqlite3 integrity_check` = ok; nodes/users/api_keys/pre_auth_keys/policies present; noise key present | **Recovered, verified** |
 | Garage metadata | 1 | Restored, live | `sqlite3 integrity_check` = ok; live test instance against restored copy confirmed all 4 buckets with plausible object counts | **Recovered, verified** |
 | Garage bulk data | 1 | Never at risk — static PV points directly at the untouched `/archive-garage-data` NFS export | Byte content unchanged throughout | **Never lost** |
-| Vault (raft/bolt) | 1 | Restored and unsealed via the old cluster's own preserved datastore (unseal-key circular-dependency procedure, see §4 and `docs/RECOVERY.md`) | BoltDB file-magic/header check; live unseal succeeded | **Recovered, verified** |
+| Vault (raft/bolt) | 1 | Restored and unsealed via the old cluster's own preserved datastore (unseal-key circular-dependency procedure, see §4 and `DISASTER-RECOVERY.md`) | BoltDB file-magic/header check; live unseal succeeded | **Recovered, verified** |
 | Authelia (CNPG Postgres) | 1 | Restored, live | Full 25-table schema confirmed via a temporary standalone Postgres instance against the extracted pgdata | **Recovered, verified** |
 | Uptime Kuma | 1 | Restored, live | `sqlite3 integrity_check` = ok; 0 monitors — matches known pre-existing state, not data loss | **Recovered, verified** |
 | Mealie | 2 | Restored, live | `sqlite3 integrity_check` = ok; 1 user | **Recovered, verified** |
