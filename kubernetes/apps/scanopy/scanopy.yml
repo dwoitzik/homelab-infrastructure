@@ -28,6 +28,13 @@ spec:
       labels:
         app: scanopy-server
     spec:
+      # Kubernetes auto-injects Docker-link-style env vars for every Service
+      # in the namespace, uppercased+underscored from the Service's own name
+      # -- the "scanopy-server" Service collides directly with this app's own
+      # SCANOPY_* config vars (SCANOPY_SERVER_PORT arrives as a Kubernetes
+      # "tcp://ip:port" string, not the u16 the app expects). Confirmed live:
+      # "Configuration error: invalid type: found string ... expected u16".
+      enableServiceLinks: false
       containers:
         - name: scanopy-server
           # Renovate tracks this tag going forward.
@@ -44,6 +51,12 @@ spec:
           ports:
             - name: http
               containerPort: 60072
+          env:
+            # Without this the binary runs API-only ("Web UI: disabled")
+            # even though the UI files ship in the image at this exact
+            # path -- confirmed live (404 on / before this, 200 after).
+            - name: SCANOPY_WEB_EXTERNAL_PATH
+              value: /app/static
           envFrom:
             - secretRef:
                 name: scanopy-server
@@ -137,6 +150,7 @@ spec:
     spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      enableServiceLinks: false
       containers:
         - name: scanopy-daemon
           # Renovate tracks this tag going forward.
