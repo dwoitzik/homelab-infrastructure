@@ -295,12 +295,10 @@ spec:
           port: 80
 ---
 # Nextcloud's user_oidc app needs to reach Authelia's public issuer
-# (auth.woitzik.dev, routed via Traefik) for both the discovery-document
-# fetch and the server-to-server token exchange -- same class of gap as
-# allow-egress-tailscale-headscale-control above (10.0.20.200 is inside the
-# 10.0.0.0/8 carve-out allow-egress-web excludes). Confirmed live: cURL
-# error 7 "Could not connect" from inside the nextcloud pod until this
-# existed.
+# (auth.woitzik.dev, routed via Traefik) for discovery and token exchange --
+# same gap class as allow-egress-tailscale-headscale-control above
+# (10.0.20.200 sits inside the 10.0.0.0/8 carve-out allow-egress-web
+# excludes).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
