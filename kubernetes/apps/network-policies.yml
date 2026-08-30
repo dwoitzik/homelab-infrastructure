@@ -29,6 +29,27 @@ spec:
             matchLabels:
               app.kubernetes.io/name: traefik
 ---
+# headscale-dmz-lb traffic arrives SNAT'd to a pod-CIDR address, so it
+# never matches allow-intra-namespace below.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-headscale-dmz-lb
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: headscale
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.42.0.0/16
+      ports:
+        - protocol: TCP
+          port: 8080
+---
 # Allow intra-namespace traffic (pods within apps talk to each other).
 # REL-034/ADR-012: previously excluded atlantis (it held Terraform apply
 # credentials for the entire homelab and had zero auth of its own on its raw
