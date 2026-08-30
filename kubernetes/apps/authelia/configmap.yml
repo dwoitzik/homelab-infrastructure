@@ -144,3 +144,29 @@ data:
             userinfo_signed_response_alg: 'none'
             token_endpoint_auth_method: 'client_secret_basic'
             consent_mode: implicit
+          - client_id: 'nextcloud'
+            client_name: 'Nextcloud'
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$Wzn1HOsVqYBer35S+mI+3A$V6+ig73ataFSHXC8F+Qq81x3EgH52lyqSVGN+4phI0o'
+            public: false
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://nextcloud.woitzik.dev/apps/user_oidc/code'
+            scopes: [openid, profile, email]
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_basic'
+            consent_mode: implicit
+          - client_id: 'jellyfin'
+            client_name: 'Jellyfin'
+            client_secret: '$argon2id$v=19$m=65536,t=3,p=4$iWMdjMq6pfzZdWSiYW4m4g$WIIhLxLonkcYmidtrRAn0W5Zp7tFE9ciYmU1cMLnQZU'
+            public: false
+            # Forward-auth stays off for Jellyfin (mobile clients can't do the
+            # SSO redirect, see apps-ingressroute.yml) -- this is a native
+            # in-app OIDC login button via the Community SSO plugin, opt-in
+            # per client, so it doesn't affect API/mobile login at all.
+            authorization_policy: two_factor
+            redirect_uris:
+              - 'https://media.woitzik.dev/sso/OID/redirect/authelia'
+            scopes: [openid, profile, email]
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_basic'
+            consent_mode: implicit
