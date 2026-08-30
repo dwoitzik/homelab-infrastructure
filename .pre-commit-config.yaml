@@ -136,6 +136,18 @@ repos:
         pass_filenames: false
         stages: [pre-commit, pre-push]
 
+      - id: comment-narration-guard
+        name: Comment narration guard
+        description: >-
+          Blocks dated or "confirmed via/live"-style investigation-diary
+          comments (CLAUDE.local.md's Comment style section) -- see
+          scripts/check-comment-narration.py.
+        entry: python3 scripts/check-comment-narration.py
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: gitleaks-staged
         name: Gitleaks (staged changes)
         description: >-
