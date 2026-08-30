@@ -1,0 +1,23 @@
+# Rybbit runs on ct-srv-rybbit-01 (10.0.20.205), not in k3s -- this
+# Service+Endpoints exists purely so Traefik's IngressRoute (apps-ingressroute.yml)
+# can route analytics.woitzik.dev to it, same external-LXC pattern as jellyfin/wazuh.
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-rybbit
+  namespace: apps
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: external-rybbit
+  namespace: apps
+subsets:
+  - addresses:
+      - ip: 10.0.20.205
+    ports:
+      - port: 80
