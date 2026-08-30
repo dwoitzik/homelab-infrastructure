@@ -467,8 +467,12 @@ spec:
         scheme: https
         serversTransport: insecure-transport
 ---
-# Rybbit (own auth via better-auth, signup closed) -- external LXC, see
-# kubernetes/apps/rybbit/rybbit.yml for the Service+Endpoints.
+# Rybbit -- external LXC, see kubernetes/apps/rybbit/rybbit.yml for the
+# Service+Endpoints. Authelia gate added on top of Rybbit's own better-auth
+# login (signup closed) for the same SSO consistency every other
+# *.woitzik.dev app gets -- Rybbit's own login still appears after Authelia,
+# this only stops an anonymous LAN/internet client from reaching Rybbit's
+# login page at all.
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -481,6 +485,7 @@ spec:
     kind: Rule
     middlewares:
       - name: crowdsec-bouncer
+      - name: authelia
     services: [{name: external-rybbit, port: 80}]
 
 # Note: claude.woitzik.dev (ttyd on ct-srv-claude-agent, Admin VLAN) is
