@@ -59,6 +59,7 @@ data:
         - domain: 'analytics.woitzik.dev'
           resources:
             - '^/api/.*$'
+            - '^/(track|identify|script\.js|replay\.js|metrics\.js|session-replay/.*|site/.*)$'
           policy: 'bypass'
         - domain: '*.woitzik.dev'
           policy: 'two_factor'
