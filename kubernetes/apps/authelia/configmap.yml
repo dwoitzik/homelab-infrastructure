@@ -53,6 +53,17 @@ data:
           policy: 'two_factor'
           subject:
             - 'group:admins'
+        # Rybbit's tracker script/ingest endpoints, not the dashboard --
+        # real site visitors (anonymous, no Authelia session) need these to
+        # actually load/report. Rybbit's own site.public flag already gates
+        # what data a public request can read; the dashboard/admin API
+        # stays behind two_factor via the wildcard rule below.
+        - domain: 'analytics.woitzik.dev'
+          resources:
+            - '^/api/(script|replay|metrics)\.js$'
+            - '^/api/track$'
+            - '^/api/identify$'
+          policy: 'bypass'
         - domain: '*.woitzik.dev'
           policy: 'two_factor'
 
