@@ -466,6 +466,22 @@ spec:
         port: 443
         scheme: https
         serversTransport: insecure-transport
+---
+# Rybbit (own auth via better-auth, signup closed) -- external LXC, see
+# kubernetes/apps/rybbit/rybbit.yml for the Service+Endpoints.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: rybbit-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+  - match: Host(`analytics.woitzik.dev`)
+    kind: Rule
+    middlewares:
+      - name: crowdsec-bouncer
+    services: [{name: external-rybbit, port: 80}]
 
 # Note: claude.woitzik.dev (ttyd on ct-srv-claude-agent, Admin VLAN) is
 # deliberately NOT routed through Traefik/this cluster -- see ADR-032. Routing
