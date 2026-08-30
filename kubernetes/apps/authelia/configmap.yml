@@ -164,8 +164,11 @@ data:
             # in-app OIDC login button via the Community SSO plugin, opt-in
             # per client, so it doesn't affect API/mobile login at all.
             authorization_policy: two_factor
+            # /sso/OID/r/authelia, not /redirect/authelia -- confirmed live
+            # from the plugin's own generated authorization request, the
+            # wiki's "redirect" alias doesn't match this plugin version.
             redirect_uris:
-              - 'https://media.woitzik.dev/sso/OID/redirect/authelia'
+              - 'https://media.woitzik.dev/sso/OID/r/authelia'
             scopes: [openid, profile, email]
             userinfo_signed_response_alg: 'none'
             token_endpoint_auth_method: 'client_secret_basic'
