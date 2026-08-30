@@ -1,3 +1,9 @@
+# 2026-08-30: found this Application itself was never actually applied to
+# the cluster -- the exact bootstrap gap described below, happening to its
+# own fix. network-policies-egress.yml (added after this file, never added
+# to the include list) was consequently also never GitOps-tracked; both
+# fixed together.
+#
 # SEC hardening pass (2026-07-08): network-policies.yml and
 # traefik-websockets.yml are loose files directly under kubernetes/apps/,
 # not subdirectories -- the homelab-apps ApplicationSet
@@ -40,7 +46,7 @@ spec:
       # Includes itself, matching monitoring/manifests-application.yml's
       # same pattern -- otherwise a future edit to THIS Application's own
       # spec would hit the exact bootstrap gap this file exists to fix.
-      include: "{network-policies,traefik-websockets,gitops-tracking-application}.yml"
+      include: "{network-policies,network-policies-egress,traefik-websockets,gitops-tracking-application}.yml"
   destination:
     server: https://kubernetes.default.svc
     namespace: apps
