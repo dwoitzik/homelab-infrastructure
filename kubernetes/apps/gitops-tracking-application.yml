@@ -1,8 +1,7 @@
-# 2026-08-30: found this Application itself was never actually applied to
-# the cluster -- the exact bootstrap gap described below, happening to its
-# own fix. network-policies-egress.yml (added after this file, never added
-# to the include list) was consequently also never GitOps-tracked; both
-# fixed together.
+# This Application resource is itself subject to the exact bootstrap gap
+# described below -- if it's ever missing live, apply it manually first.
+# network-policies-egress.yml must stay in the include list below or it
+# silently falls out of GitOps tracking too.
 #
 # SEC hardening pass (2026-07-08): network-policies.yml and
 # traefik-websockets.yml are loose files directly under kubernetes/apps/,

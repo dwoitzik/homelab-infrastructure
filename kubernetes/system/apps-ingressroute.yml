@@ -467,12 +467,9 @@ spec:
         scheme: https
         serversTransport: insecure-transport
 ---
-# Rybbit -- external LXC, see kubernetes/apps/rybbit/rybbit.yml for the
-# Service+Endpoints. Authelia gate added on top of Rybbit's own better-auth
-# login (signup closed) for the same SSO consistency every other
-# *.woitzik.dev app gets -- Rybbit's own login still appears after Authelia,
-# this only stops an anonymous LAN/internet client from reaching Rybbit's
-# login page at all.
+# Rybbit -- external LXC, see kubernetes/apps/rybbit/rybbit.yml. Authelia
+# gate is on top of Rybbit's own login (signup closed), not instead of it --
+# tracker/ingest paths stay bypassed, see authelia/configmap.yml.
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
