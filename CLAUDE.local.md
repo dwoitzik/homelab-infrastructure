@@ -125,6 +125,11 @@ leave. For a portfolio repo this is a liability, not a flex.
 - Before adding a comment, ask: would a human engineer, mid-incident, have
   written this exact thing in the code? If it reads like a changelog entry,
   it goes in the PR/ADR/LEDGER instead.
+- This got violated again after being written, so it's mechanically
+  enforced now too: `comment-narration-guard` (pre-commit hook,
+  `scripts/check-comment-narration.py`) blocks dated or "confirmed via/live"
+  comments in the staged diff. If it fires, rewrite the comment -- don't
+  bypass the hook.
 
 ## Quality bar (portfolio repo)
 - Every component has a README/runbook: what it is, how to deploy, how to restore, dependencies.
