@@ -1,0 +1,110 @@
+---
+# Physical streaming-replication warm standby for Authelia's Postgres
+# (docs/decisions/ADR-030-authelia-postgres-warm-standby.md), rpi-srv-02
+# only, own playbook (same pattern as litestream_standby/rpi_ha_standby).
+#
+# Unlike the headscale/vaultwarden standby (docker-compose, stopped by
+# default), this instance runs continuously in recovery mode -- there is
+# no "stopped but present" equivalent for a streaming physical replica.
+# Failover is `SELECT pg_promote();`, not "start the container" -- see
+# docs/runbooks/failover-authelia-postgres.md.
+#
+# Prerequisites this role does NOT set up (see cluster.yml's own header
+# comment and ADR-030): the `postgres-authelia-rpi02-replica` k8s Secret,
+# `vault_postgres_authelia_rpi02_replica_password` in Ansible Vault, and
+# kubernetes/system/postgres/standby-replication-service.yml actually
+# applied (so `postgres_authelia_standby_primary_host` below is a real,
+# reachable LoadBalancer IP, not the placeholder default).
+
+- name: Install postgresql-17 (Debian 13 trixie ships this version natively)
+  ansible.builtin.apt:
+    name:
+      - "postgresql-{{ postgres_authelia_standby_pg_version }}"
+      - "postgresql-client-{{ postgres_authelia_standby_pg_version }}"
+    state: present
+    update_cache: true
+
+- name: Check whether Debian's own default cluster still exists
+  ansible.builtin.stat:
+    path: "/etc/postgresql/{{ postgres_authelia_standby_pg_version }}/main"
+  register: postgres_authelia_standby_default_cluster
+
+# The apt package auto-creates and starts a fresh "main" cluster on
+# install (its own initdb, /var/lib/postgresql, port 5432) -- not what we
+# want here, this host runs one thing: a restored replica of the real
+# authelia database. Dropping it frees port 5432 and avoids two
+# postgres instances on the same host confusing which one is "the"
+# standby.
+- name: Drop Debian's default postgresql cluster
+  ansible.builtin.command:
+    cmd: "pg_dropcluster {{ postgres_authelia_standby_pg_version }} main --stop"
+  when: postgres_authelia_standby_default_cluster.stat.exists
+  changed_when: true
+
+- name: Create the standby PGDATA directory (on the USB SSD, not the SD card)
+  ansible.builtin.file:
+    path: "{{ postgres_authelia_standby_data_dir }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0700'
+    recurse: true
+
+- name: Check whether the standby has already been seeded
+  ansible.builtin.stat:
+    path: "{{ postgres_authelia_standby_data_dir }}/PG_VERSION"
+  register: postgres_authelia_standby_seeded
+
+# -R writes standby.signal + primary_conninfo into postgresql.auto.conf
+# automatically -- this pg_basebackup IS the seeding step, not just a
+# backup. Requires vault_postgres_authelia_rpi02_replica_password to
+# already be set (ADR-030 prerequisite, not templated with a real value
+# by this role -- see cluster.yml's own header comment for why).
+- name: Seed the standby via pg_basebackup against the live primary
+  ansible.builtin.command:
+    cmd: >-
+      pg_basebackup
+      -h {{ postgres_authelia_standby_primary_host }}
+      -p {{ postgres_authelia_standby_primary_port }}
+      -U {{ postgres_authelia_standby_replication_user }}
+      -D {{ postgres_authelia_standby_data_dir }}
+      -X stream -P -R
+      -S {{ postgres_authelia_standby_replication_slot }}
+      -C
+  become: true
+  become_user: postgres
+  environment:
+    PGPASSWORD: "{{ vault_postgres_authelia_rpi02_replica_password }}"
+    PGSSLMODE: require
+  when: not postgres_authelia_standby_seeded.stat.exists
+  changed_when: true
+
+# pg_basebackup copies the primary's postgresql.conf verbatim -- including
+# CNPG's own TLS cert paths (/controller/certificates/..., only meaningful
+# inside that pod). Postgres refuses to start if a configured cert file
+# doesn't exist, so this standby would never come up without overriding
+# it. ssl=off is a deliberate, accepted trade-off here: this is a LAN-only
+# hop (rpi-srv-02 is not internet-reachable), same posture as the
+# litestream SFTP replica path in ADR-029.
+- name: Disable TLS for the standby (primary's cert paths don't exist here)
+  ansible.builtin.lineinfile:
+    path: "{{ postgres_authelia_standby_data_dir }}/postgresql.auto.conf"
+    regexp: "^ssl\\s*="
+    line: "ssl = off"
+    create: false
+
+- name: Deploy the standalone systemd unit (not Debian's pg_ctlcluster wrapper)
+  ansible.builtin.template:
+    src: postgres-authelia-standby.service.j2
+    dest: /etc/systemd/system/postgres-authelia-standby.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd and restart postgres-authelia-standby
+
+- name: Enable and start the standby (runs continuously, in recovery mode)
+  ansible.builtin.systemd:
+    name: postgres-authelia-standby
+    enabled: true
+    state: started
+    daemon_reload: true

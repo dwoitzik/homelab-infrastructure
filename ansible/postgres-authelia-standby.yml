@@ -1,0 +1,6 @@
+---
+- name: Deploy Authelia's Postgres warm standby (ADR-030)
+  hosts: rpi-srv-02
+  become: true
+  roles:
+    - postgres_authelia_standby

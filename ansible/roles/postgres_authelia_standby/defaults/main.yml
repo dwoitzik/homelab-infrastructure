@@ -1,0 +1,21 @@
+---
+# Physical streaming-replication warm standby for Authelia's Postgres
+# (docs/decisions/ADR-030-authelia-postgres-warm-standby.md). Unlike
+# litestream_standby/rpi_ha_standby, this instance runs continuously in
+# recovery mode -- there's no "stopped by default" equivalent for a
+# streaming replica.
+
+postgres_authelia_standby_pg_version: "17"
+postgres_authelia_standby_data_dir: /mnt/ssd/postgres-authelia-standby/17/main
+
+# MetalLB assigns this from first-pool (10.0.20.200-10.0.20.240) once
+# kubernetes/system/postgres/standby-replication-service.yml is applied --
+# not knowable ahead of time, must be set for real via
+# `kubectl get svc postgres-authelia-standby-replication -n database` before
+# this role can actually run (the pg_basebackup task below will simply fail
+# fast against an unreachable placeholder otherwise, not corrupt anything).
+postgres_authelia_standby_primary_host: "REPLACE-ME-with-the-real-LoadBalancer-IP"
+postgres_authelia_standby_primary_port: 5432
+
+postgres_authelia_standby_replication_user: rpi02_replica
+postgres_authelia_standby_replication_slot: rpi02_standby_slot
