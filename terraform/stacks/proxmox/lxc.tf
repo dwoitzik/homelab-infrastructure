@@ -178,6 +178,8 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
     nesting = true
   }
 
+  # Noisy-neighbor throttle, host cgroup2 io.max not Terraform-managed --
+  # see ct_srv_ai_01's disk comment for why.
   disk {
     datastore_id = local.storage
     size         = 40
@@ -270,6 +272,9 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
     nesting = true
   }
 
+  # rootfs has no mbps/speed attribute here (PVE schema rejects it) --
+  # throttled via cgroup2 io.max instead (lxc.cgroup2.io.max in
+  # /etc/pve/lxc/201.conf, 50MB/s write), not Terraform-managed.
   disk {
     datastore_id = local.storage
     size         = 80
@@ -357,6 +362,8 @@ resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
     nesting = true
   }
 
+  # Noisy-neighbor throttle, host cgroup2 io.max not Terraform-managed --
+  # see ct_srv_ai_01's disk comment for why.
   disk {
     datastore_id = local.storage
     size         = 25
