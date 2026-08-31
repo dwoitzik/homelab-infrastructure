@@ -1,0 +1,84 @@
+# Wazuh, CrowdSec, and the CNPG operator all silently broke and stayed
+# broken for days -- caught only by manual audit. These rules target the
+# exact failure modes: operator down, backups stopping, log source stale.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-silent-failure-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: cnpg.operator
+      rules:
+        - alert: CNPGOperatorDown
+          expr: |
+            (kube_deployment_status_replicas_available{namespace="cnpg-system", deployment="cloudnative-pg"} == 0)
+            or
+            (absent(kube_deployment_status_replicas_available{namespace="cnpg-system", deployment="cloudnative-pg"}))
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CNPG operator has 0 ready replicas"
+            description: >
+              The cloudnative-pg operator (cnpg-system) has had 0 available replicas for
+              10+ minutes, or the deployment is missing entirely. No new Backup objects can
+              be created and Cluster reconciliation stops while this is down -- it was down
+              10+ hours undetected before this rule existed, during which Authelia's backups
+              silently stopped. Uses kube-state-metrics rather than the operator's own
+              metrics on purpose: the operator being down is exactly the case its own
+              /metrics endpoint can't report on.
+
+    - name: cnpg.backup
+      rules:
+        - alert: CNPGAutheliaBackupTooOld
+          expr: |
+            (time() - cnpg_collector_last_available_backup_timestamp{namespace="database", pod=~"postgres-authelia-.*"}) > 10800
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "postgres-authelia's last successful backup is over 3h old"
+            description: >
+              postgres-authelia's ScheduledBackup runs hourly -- no successful backup in
+              3+ hours means the schedule stopped firing or every attempt is failing. This
+              exact gap let Authelia's backups silently stop for 6 days (2026-08-25 to
+              2026-08-31, root cause: CNPG operator down). Check:
+              kubectl get backup -n database --sort-by=.metadata.creationTimestamp | tail,
+              and CNPGOperatorDown above.
+
+    - name: crowdsec
+      rules:
+        - alert: CrowdSecContainerDown
+          expr: |
+            crowdsec_container_up{instance=~"10.0.30.2.*"} == 0
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CrowdSec container is not running on ct-dmz-proxy-01"
+            description: >
+              The crowdsec Docker container on ct-dmz-proxy-01 (the WAN-adjacent box) has
+              been down for 10+ minutes -- its nftables bouncer stops receiving new
+              decisions and community-blocklist sync stops. Check: ssh + `docker ps` /
+              `docker logs crowdsec` on that host.
+
+        - alert: CrowdSecAcquisitionSourceMissing
+          expr: |
+            crowdsec_acquis_source_missing{instance=~"10.0.30.2.*"} > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CrowdSec's configured log source is missing on ct-dmz-proxy-01"
+            description: >
+              One of CrowdSec's acquis.yaml sources (auth.log, NPM's fallback access log)
+              doesn't exist or isn't growing -- this is exactly how detection silently died
+              this session (acquis.yaml pointed at a nonexistent file for an unknown
+              duration, collections stayed "enabled" the whole time with zero real
+              ingestion). Deliberately not alerting on decision-count: zero decisions is a
+              legitimate quiet-day outcome, a missing source file never is.

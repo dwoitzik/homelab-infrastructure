@@ -347,6 +347,15 @@ spec:
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: instance
+              - job_name: 'node-exporter-dmz'
+                static_configs:
+                  - targets:
+                      - '10.0.30.2:9100'
+                    labels:
+                      group: 'dmz_proxies'
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: instance
               - job_name: 'node-exporter-pve'
                 static_configs:
                   - targets:

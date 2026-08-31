@@ -1,0 +1,31 @@
+#!/bin/bash
+# Textfile-collector metrics for CrowdSecContainerDown / CrowdSecAcquisitionSourceMissing.
+set -u
+OUT=/var/lib/node_exporter/textfile_collector/crowdsec_healthcheck.prom.tmp
+FINAL=/var/lib/node_exporter/textfile_collector/crowdsec_healthcheck.prom
+
+RUNNING=$(docker inspect -f '{{.State.Running}}' crowdsec 2>/dev/null)
+if [ "$RUNNING" = "true" ]; then
+  UP=1
+else
+  UP=0
+fi
+
+MISSING=0
+if [ "$UP" -eq 1 ]; then
+  for src in /var/log/npm/fallback_http_access.log /var/log/auth.log; do
+    if ! docker exec crowdsec test -s "$src" 2>/dev/null; then
+      MISSING=$((MISSING + 1))
+    fi
+  done
+fi
+
+{
+  echo "# HELP crowdsec_container_up Whether the crowdsec Docker container is running (1) or not (0)"
+  echo "# TYPE crowdsec_container_up gauge"
+  echo "crowdsec_container_up $UP"
+  echo "# HELP crowdsec_acquis_source_missing Count of configured acquis.yaml sources that are missing or empty inside the container"
+  echo "# TYPE crowdsec_acquis_source_missing gauge"
+  echo "crowdsec_acquis_source_missing $MISSING"
+} >"$OUT"
+mv "$OUT" "$FINAL"

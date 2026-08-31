@@ -129,3 +129,31 @@
       docker exec crowdsec cscli hub upgrade >> /var/log/crowdsec-hub-upgrade.log 2>&1 &&
       docker restart crowdsec >> /var/log/crowdsec-hub-upgrade.log 2>&1
   when: npm_enable_crowdsec | default(false) | bool
+
+# Closes the exact gap that let CrowdSec's log source silently go stale
+# this session -- "enabled" collections with no real ingestion, nothing
+# ever noticed.
+- name: Create node_exporter textfile-collector directory
+  ansible.builtin.file:
+    path: /var/lib/node_exporter/textfile_collector
+    state: directory
+    owner: node_exporter
+    group: node_exporter
+    mode: '0755'
+  when: npm_enable_crowdsec | default(false) | bool
+
+- name: Deploy CrowdSec healthcheck script
+  ansible.builtin.template:
+    src: crowdsec-healthcheck.sh.j2
+    dest: /usr/local/bin/crowdsec-healthcheck.sh
+    owner: root
+    group: root
+    mode: '0700'
+  when: npm_enable_crowdsec | default(false) | bool
+
+- name: Schedule CrowdSec healthcheck via cron (every 5 minutes)
+  ansible.builtin.cron:
+    name: crowdsec-healthcheck
+    minute: "*/5"
+    job: /usr/local/bin/crowdsec-healthcheck.sh
+  when: npm_enable_crowdsec | default(false) | bool

@@ -67,10 +67,13 @@
     - node_exporter_native
     - pbs
 
+# node_exporter_native first -- nginx_proxy_manager's CrowdSec healthcheck
+# needs the node_exporter user + textfile dir to already exist.
 - name: Provision DMZ External Proxy
   hosts: dmz_proxies
   become: true
   roles:
+    - node_exporter_native
     - nginx_proxy_manager
     - crowdsec_bouncer
 
