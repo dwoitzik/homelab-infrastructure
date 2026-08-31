@@ -60,3 +60,41 @@ spec:
       cnpg.io/cluster: postgres-scanopy
   podMetricsEndpoints:
     - port: metrics
+---
+# n8n and synapse had no PodMonitor -- their cnpg_collector_* metrics
+# (WAL backlog, backup age) were invisible.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres-n8n-metrics
+  namespace: database
+  labels:
+    cnpg.io/cluster: postgres-n8n
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - database
+  selector:
+    matchLabels:
+      cnpg.io/cluster: postgres-n8n
+  podMetricsEndpoints:
+    - port: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres-synapse-metrics
+  namespace: database
+  labels:
+    cnpg.io/cluster: postgres-synapse
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - database
+  selector:
+    matchLabels:
+      cnpg.io/cluster: postgres-synapse
+  podMetricsEndpoints:
+    - port: metrics
