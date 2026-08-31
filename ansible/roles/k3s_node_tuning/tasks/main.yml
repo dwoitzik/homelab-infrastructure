@@ -103,3 +103,59 @@
     name: fstrim.timer
     enabled: true
     state: started
+
+# kine/SQLite never had auto_vacuum enabled -- dead freelist pages turn
+# every list/watch query into a full scan, causing sustained API latency.
+# One-time VACUUM already applied; this prevents silent regrowth.
+- name: Check whether this node holds the k3s datastore
+  ansible.builtin.stat:
+    path: /var/lib/rancher/k3s/server/db/state.db
+  register: k3s_node_tuning_state_db
+
+- name: Install sqlite3
+  ansible.builtin.apt:
+    name: sqlite3
+    state: present
+    update_cache: true
+  when: k3s_node_tuning_state_db.stat.exists
+
+- name: Install kine datastore incremental-vacuum script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/k3s-kine-vacuum.sh
+    mode: '0755'
+    content: |
+      #!/bin/sh
+      set -eu
+      sqlite3 /var/lib/rancher/k3s/server/db/state.db \
+        "PRAGMA incremental_vacuum;"
+  when: k3s_node_tuning_state_db.stat.exists
+
+- name: Install k3s-kine-vacuum systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/k3s-kine-vacuum.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Reclaim free pages from k3s's kine/SQLite datastore
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/k3s-kine-vacuum.sh
+  when: k3s_node_tuning_state_db.stat.exists
+
+- name: Install k3s-kine-vacuum systemd timer (monthly)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/k3s-kine-vacuum.timer
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Monthly k3s kine/SQLite incremental vacuum
+
+      [Timer]
+      OnCalendar=monthly
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+  when: k3s_node_tuning_state_db.stat.exists
+  notify: Reload systemd and enable kine-vacuum timer
