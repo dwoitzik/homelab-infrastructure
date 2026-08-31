@@ -48,7 +48,7 @@ plus comparison against the 50+ essential self-hosted services lists.
 |---|---|---|---|
 | ✅ | Scrutiny | Disk Health (S.M.A.R.T.) | ✅ Deployed |
 | ✅ | OnlyOffice | Document Editing | ✅ Deployed |
-| 🔴 P1 | Wazuh | SIEM | ✅ Deployed (2026-07-21) |
+| 🔴 P1 | Wazuh | SIEM | ❌ Decommissioned (2026-08-31, #649) -- 0 agents ever enrolled in 8 days, zero detection value, real resource cost. CrowdSec's sshd/nginx/linux collections on ct-dmz-proxy-01 fill the log-monitoring gap instead (#654/#656). |
 | 🟡 P2 | Firefly III | Finance | ⏳ Pending |
 | 🟡 P2 | Overseerr | Media Requests | ⏳ Pending |
 | 🟡 P2 | Tautulli | Jellyfin Analytics | ⏳ Pending |
@@ -57,12 +57,15 @@ plus comparison against the 50+ essential self-hosted services lists.
 
 | ID | Gap | Impact | Status |
 |---|---|---|---|
-| REL-003 | Velero backs up into Garage (inside cluster) | Total cluster loss = no backups | Scaffolded R2 offsite, not active |
-| REL-012 | etcd apply latency under disk I/O | API Server outages | Monitoring in place |
+| REL-003 | Velero backs up into Garage (inside cluster) | Total cluster loss = no backups | Fixed -- `r2-offsite` BSL active for apps/argocd/database/vault, daily-offsite jobs completing |
+| REL-012 | "etcd" apply latency under disk I/O | API Server outages | This cluster never ran etcd (ADR-015, kine/SQLite) -- root cause was an un-vacuumed `state.db` (623MB, 78% dead pages). Fixed 2026-08-31, `k3s_node_tuning` role now runs a monthly incremental vacuum |
 | REL-073 | Garage meta (local-path) + data (nfs) different backends | Torn-state risk | Documented |
 | — | No MikroTik remote syslog | Security events lost | Open |
-| — | Kyverno excludes monitoring namespace | No policy enforcement on monitoring | Workaround |
+| — | Kyverno excludes monitoring namespace | No policy enforcement on monitoring | Reviewed 2026-08-31: `disallow-privileged-containers` (the safety-critical one) already covers monitoring; `require-resource-limits`/`disallow-latest-tag` stay Audit-only there because upstream kube-prometheus-stack/Loki chart sidecars don't set resource limits by default -- correctly scoped, not a lazy gap |
 | — | AUDIT.md referenced in code but missing | Stale references | Low priority |
+| — | ct-dmz-proxy-01's CrowdSec had collections enabled but no working log source (`acquis.yaml` pointed at a nonexistent file, then rsyslog's ISO8601 default broke grok parsing) | Zero real sshd/nginx detection despite looking configured | Fixed 2026-08-31, #654/#656 |
+| — | CNPG operator (`cnpg-system`) NotReady for 10+ hours, webhook endpoint empty, all 4 Postgres clusters' Backup creation blocked (`connection refused` to the webhook) | No new backups possible while down; found `postgres-authelia`'s backups had silently stopped since 2026-08-25 | Operator force-restarted 2026-08-31, webhook + backup creation confirmed working again |
+| — | CNPG operator's periodic `/pg/status` health poll to instance pods (port 8000) gets instant `connection refused` for all 4 clusters -- instance-manager's actual health listener found bound to `127.0.0.1:8010`, not `0.0.0.0:8000` | `kubectl get cluster` status is stale/wrong ("Instance Status Extraction Error"); does NOT block backups (WAL archiving + on-demand/scheduled Backups confirmed working despite this) | Open -- found 2026-08-31, needs its own investigation (looks like a CNPG version/port mismatch, not urgent since actual backup/replication function is unaffected) |
 
 ## Deployment Log
 
