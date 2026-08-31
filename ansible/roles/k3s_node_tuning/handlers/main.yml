@@ -3,3 +3,10 @@
   ansible.builtin.systemd:
     name: systemd-journald
     state: restarted
+
+- name: Reload systemd and enable kine-vacuum timer
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: k3s-kine-vacuum.timer
+    enabled: true
+    state: started
