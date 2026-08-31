@@ -48,25 +48,6 @@ services:
       - "127.0.0.1:8080:8080"
 {% endif %}
 
-  node-exporter:
-    image: prom/node-exporter:latest
-    container_name: node_exporter
-    restart: unless-stopped
-    command:
-      - --path.procfs=/host/proc
-      - --path.rootfs=/rootfs
-      - --path.sysfs=/host/sys
-      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
-      - --collector.textfile.directory=/textfile_collector
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-      - /run/udev:/run/udev:ro
-      - /opt/npm/node-exporter-textfile:/textfile_collector:ro
-    ports:
-      - "9100:9100"
-
 {% if npm_enable_scanopy_daemon | default(false) | bool %}
   scanopy-daemon:
     image: ghcr.io/scanopy/scanopy/daemon:v0.16.2

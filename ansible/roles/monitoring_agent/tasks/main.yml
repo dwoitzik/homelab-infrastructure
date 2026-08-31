@@ -5,6 +5,12 @@
     state: directory
     mode: "0755"
 
+- name: Ensure node_exporter textfile-collector directory exists
+  ansible.builtin.file:
+    path: /opt/docker/node_exporter/textfile_collector
+    state: directory
+    mode: "0755"
+
 - name: Deploy docker-compose.yml for node_exporter
   ansible.builtin.template:
     src: docker-compose.yml.j2

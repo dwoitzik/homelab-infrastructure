@@ -1,8 +1,8 @@
 #!/bin/bash
 # Textfile-collector metrics for CrowdSecContainerDown / CrowdSecAcquisitionSourceMissing.
 set -u
-OUT=/opt/npm/node-exporter-textfile/crowdsec_healthcheck.prom.tmp
-FINAL=/opt/npm/node-exporter-textfile/crowdsec_healthcheck.prom
+OUT=/opt/docker/node_exporter/textfile_collector/crowdsec_healthcheck.prom.tmp
+FINAL=/opt/docker/node_exporter/textfile_collector/crowdsec_healthcheck.prom
 
 RUNNING=$(docker inspect -f '{% raw %}{{.State.Running}}{% endraw %}' crowdsec 2>/dev/null)
 if [ "$RUNNING" = "true" ]; then
