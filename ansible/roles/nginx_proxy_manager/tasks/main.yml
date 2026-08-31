@@ -63,7 +63,7 @@
     path: /etc/ssh/sshd_config
     regexp: '^#?PasswordAuthentication'
     line: 'PasswordAuthentication no'
-  notify: Reload sshd
+  notify: Restart sshd
 
 - name: Deploy Nginx Proxy Manager docker-compose configuration
   ansible.builtin.template:
