@@ -427,46 +427,6 @@ spec:
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: scrutiny-web, port: 8080}]
 ---
-# Wazuh (SIEM on ct-srv-docker-01, 10.0.20.252:443) — own auth, no Authelia
-apiVersion: v1
-kind: Service
-metadata:
-  name: external-wazuh
-  namespace: apps
-spec:
-  ports:
-    - port: 443
-      targetPort: 443
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: external-wazuh
-  namespace: apps
-subsets:
-  - addresses:
-      - ip: 10.0.20.252
-    ports:
-      - port: 443
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata:
-  name: wazuh-final
-  namespace: apps
-spec:
-  entryPoints: [websecure]
-  routes:
-  - match: Host(`wazuh.woitzik.dev`)
-    kind: Rule
-    middlewares:
-      - name: crowdsec-bouncer
-    services:
-      - name: external-wazuh
-        port: 443
-        scheme: https
-        serversTransport: insecure-transport
----
 # Rybbit -- external LXC, see kubernetes/apps/rybbit/rybbit.yml. Authelia
 # gate is on top of Rybbit's own login (signup closed), not instead of it --
 # tracker/ingest paths stay bypassed, see authelia/configmap.yml.
