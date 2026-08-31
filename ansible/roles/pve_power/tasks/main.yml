@@ -208,6 +208,22 @@
     minute: "*/15"
     job: /usr/local/bin/smart-metrics.sh
 
+- name: Deploy fstrim-all.sh (host root + every LXC + every VM)
+  ansible.builtin.template:
+    src: fstrim-all.sh.j2
+    dest: /usr/local/bin/fstrim-all.sh
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Schedule weekly fstrim-all.sh (Sunday 04:30, off the PBS backup window)
+  ansible.builtin.cron:
+    name: fstrim-all
+    weekday: "0"
+    hour: "4"
+    minute: "30"
+    job: /usr/local/bin/fstrim-all.sh >> /var/log/fstrim-all.log 2>&1
+
 # node_exporter's own systemd unit and --collector.textfile.directory flag
 # are managed by the node_exporter_native role (runs after this one in
 # site.yml's pve_hosts play) -- not duplicated here, a lineinfile edit
