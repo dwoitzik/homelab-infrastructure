@@ -47,6 +47,16 @@
     state: started
   when: npm_enable_crowdsec | default(false) | bool
 
+# rsyslog's modern default (RSYSLOG_FileFormat, ISO8601 timestamps) doesn't
+# match CrowdSec's grok patterns -- every line went unparsed until this.
+- name: Force traditional syslog timestamp format (CrowdSec's grok expects it)
+  ansible.builtin.template:
+    src: rsyslog-traditional-format.conf.j2
+    dest: /etc/rsyslog.d/49-crowdsec-traditional-format.conf
+    mode: '0644'
+  when: npm_enable_crowdsec | default(false) | bool
+  notify: Restart rsyslog
+
 - name: Deploy CrowdSec acquisition config (log sources it actually reads)
   ansible.builtin.template:
     src: acquis.yaml.j2
