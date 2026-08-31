@@ -179,10 +179,11 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
   }
 
   # Noisy-neighbor throttle, host cgroup2 io.max not Terraform-managed --
-  # see ct_srv_ai_01's disk comment for why.
+  # see ct_srv_ai_01's disk comment for why. Grown 40->60G live (was 97%
+  # used) once pve/data had headroom again after the fstrim pass.
   disk {
     datastore_id = local.storage
-    size         = 40
+    size         = 60
   }
 
   network_interface {
