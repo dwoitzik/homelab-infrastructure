@@ -67,7 +67,16 @@
     state: started
     enabled: true
 
+- name: Check whether the Gemma 4 26B-A4B model is already present
+  ansible.builtin.command: ollama list
+  register: ollama_list_result
+  changed_when: false
+
+# No idempotency check before this ran a full multi-GB pull on every
+# playbook run against ai_nodes -- caused a real host I/O storm when a
+# common-role fix pulled ai_nodes into an unrelated ansible run.
 - name: Pull the Gemma 4 26B-A4B model
   ansible.builtin.command: ollama pull gemma4:26b
   register: ollama_pull_result
   changed_when: "'downloading' in ollama_pull_result.stdout"
+  when: "'gemma4:26b' not in ollama_list_result.stdout"
