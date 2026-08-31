@@ -1,0 +1,14 @@
+#!/bin/bash
+# Thin-pool blocks stay allocated until TRIMmed -- this is what silently
+# pushes pve/data's data_percent toward REL-019's ENOSPC territory.
+set -u
+
+fstrim -a 2>&1
+
+for id in $(pct list | tail -n +2 | awk '{print $1}'); do
+  pct fstrim "$id" 2>&1 || true
+done
+
+for id in $(qm list | tail -n +2 | awk '{print $1}'); do
+  qm agent "$id" fstrim 2>&1 || true
+done
