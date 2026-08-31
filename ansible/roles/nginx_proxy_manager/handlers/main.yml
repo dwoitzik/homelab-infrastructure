@@ -1,8 +1,11 @@
 ---
-- name: Reload sshd
+# reload fails here ("Cannot bind any address") -- this host runs ssh.socket
+# + ssh.service split activation (Debian trixie), and SIGHUP-reloading the
+# long-running daemon collides with the socket unit already owning :22.
+- name: Restart sshd
   ansible.builtin.systemd:
     name: ssh
-    state: reloaded
+    state: restarted
 
 - name: Recreate crowdsec container
   community.docker.docker_compose_v2:
