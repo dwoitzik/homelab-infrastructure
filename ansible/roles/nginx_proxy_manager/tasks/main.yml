@@ -30,6 +30,41 @@
   ansible.builtin.set_fact:
     nginx_proxy_manager_docker_gid: "{{ nginx_proxy_manager_docker_group_info.ansible_facts.getent_group.docker[1] }}"
 
+# Collections were enabled but acquis.yaml had no real source -- detecting
+# nothing. journald-only host + no journalctl in the image, so rsyslog
+# gives it a flat auth.log to read instead.
+- name: Install rsyslog (host ships journald only, no flat auth.log)
+  ansible.builtin.apt:
+    name: rsyslog
+    state: present
+    update_cache: true
+  when: npm_enable_crowdsec | default(false) | bool
+
+- name: Ensure rsyslog is enabled and running
+  ansible.builtin.systemd:
+    name: rsyslog
+    enabled: true
+    state: started
+  when: npm_enable_crowdsec | default(false) | bool
+
+- name: Deploy CrowdSec acquisition config (log sources it actually reads)
+  ansible.builtin.template:
+    src: acquis.yaml.j2
+    dest: /opt/npm/crowdsec/config/acquis.yaml
+    mode: '0644'
+  when: npm_enable_crowdsec | default(false) | bool
+  # the new bind-mount below (docker-compose.yml.j2) already forces a
+  # container recreate on drift -- this only covers acquis.yaml content
+  # changing on its own with the compose file otherwise unchanged.
+  notify: Recreate crowdsec container
+
+- name: Disable SSH password authentication (key-only)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication no'
+  notify: Reload sshd
+
 - name: Deploy Nginx Proxy Manager docker-compose configuration
   ansible.builtin.template:
     src: docker-compose.yml.j2
