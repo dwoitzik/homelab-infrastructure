@@ -133,13 +133,6 @@
 # Closes the exact gap that let CrowdSec's log source silently go stale
 # this session -- "enabled" collections with no real ingestion, nothing
 # ever noticed.
-- name: Create node_exporter textfile-collector directory (bind-mounted into the container)
-  ansible.builtin.file:
-    path: /opt/npm/node-exporter-textfile
-    state: directory
-    mode: '0755'
-  when: npm_enable_crowdsec | default(false) | bool
-
 - name: Deploy CrowdSec healthcheck script
   ansible.builtin.template:
     src: crowdsec-healthcheck.sh.j2
