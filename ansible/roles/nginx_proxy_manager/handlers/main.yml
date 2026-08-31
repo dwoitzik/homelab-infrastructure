@@ -1,0 +1,11 @@
+---
+- name: Reload sshd
+  ansible.builtin.systemd:
+    name: ssh
+    state: reloaded
+
+- name: Recreate crowdsec container
+  community.docker.docker_compose_v2:
+    project_src: /opt/npm
+    state: present
+    recreate: always

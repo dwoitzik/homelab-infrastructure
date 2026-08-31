@@ -40,7 +40,10 @@ services:
       - /opt/npm/crowdsec/config:/etc/crowdsec
       # Read-only access to NPM logs
       - /opt/npm/data/logs:/var/log/npm:ro
+      # rsyslog-written (see role tasks -- host ships journald only)
+      - /var/log/auth.log:/var/log/auth.log:ro
       - /opt/npm/crowdsec/config/local_api_credentials.yaml:/etc/crowdsec/local_api_credentials.yaml
+      - /opt/npm/crowdsec/config/acquis.yaml:/etc/crowdsec/acquis.yaml
     ports:
       - "127.0.0.1:8080:8080"
 {% endif %}
