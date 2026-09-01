@@ -37,17 +37,18 @@ spec:
       rules:
         - alert: CNPGAutheliaBackupTooOld
           expr: |
-            (time() - cnpg_collector_last_available_backup_timestamp{namespace="database", pod=~"postgres-authelia-.*"}) > 10800
+            (time() - cnpg_collector_last_available_backup_timestamp{namespace="database", pod=~"postgres-authelia-.*"}) > 97200
           for: 5m
           labels:
             severity: critical
           annotations:
-            summary: "postgres-authelia's last successful backup is over 3h old"
+            summary: "postgres-authelia's last successful backup is over 27h old"
             description: >
-              postgres-authelia's ScheduledBackup runs hourly -- no successful backup in
-              3+ hours means the schedule stopped firing or every attempt is failing. This
-              exact gap let Authelia's backups silently stop for 6 days (2026-08-25 to
-              2026-08-31, root cause: CNPG operator down). Check:
+              postgres-authelia's ScheduledBackup runs daily at 02:00 -- no successful
+              backup in 27+ hours (one cycle plus buffer) means the schedule stopped
+              firing or every attempt is failing. This exact gap let Authelia's backups
+              silently stop for 6 days (2026-08-25 to 2026-08-31, root cause: CNPG
+              operator down). Check:
               kubectl get backup -n database --sort-by=.metadata.creationTimestamp | tail,
               and CNPGOperatorDown above.
 
