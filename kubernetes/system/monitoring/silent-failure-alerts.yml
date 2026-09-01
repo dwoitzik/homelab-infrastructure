@@ -83,3 +83,34 @@ spec:
               duration, collections stayed "enabled" the whole time with zero real
               ingestion). Deliberately not alerting on decision-count: zero decisions is a
               legitimate quiet-day outcome, a missing source file never is.
+
+    - name: renovate
+      rules:
+        - alert: RenovateCronJobStale
+          expr: |
+            time() - kube_cronjob_status_last_schedule_time{namespace="apps", cronjob="renovate"} > 21600
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Renovate hasn't been scheduled in 6+ hours"
+            description: >
+              The renovate CronJob runs every 2h; no schedule attempt in 6+ hours means
+              the CronJob is suspended, the controller is stuck, or something cluster-wide
+              is blocking scheduling. Dependency PRs silently stop appearing -- exactly
+              the deprecation-creeps-in-unnoticed pattern this file targets. Check:
+              kubectl get cronjob -n apps renovate.
+
+        - alert: RenovateJobFailing
+          expr: |
+            kube_job_status_failed{namespace="apps", job_name=~"renovate-[0-9]+"} > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "A scheduled Renovate run failed"
+            description: >
+              A renovate-<timestamp> Job (cronjob="renovate") reported a failure. Often
+              a transient registry/API hiccup, but repeated failures mean dependency
+              scanning has silently stopped making progress. Check:
+              kubectl logs -n apps job/<job-name>.
