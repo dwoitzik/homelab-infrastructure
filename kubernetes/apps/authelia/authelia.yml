@@ -63,7 +63,7 @@ spec:
             value: "1"
       containers:
       - name: authelia
-        image: ghcr.io/authelia/authelia:4.39.20
+        image: ghcr.io/authelia/authelia:4.39.20@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b
         # SEC-012: image entrypoint runs as root and needs CAP_CHOWN/
         # CAP_SETGID/CAP_SETUID to chown /config and su-exec into its
         # runtime user -- confirmed live, dropping all capabilities
