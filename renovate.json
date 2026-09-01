@@ -7,23 +7,23 @@
   "minimumReleaseAge": "3 days",
   "packageRules": [
     {
-      "description": "Stateless services + digest pins: patch/minor/digest only, auto-merge after CI green + a 3-day soak so a bad upstream release doesn't land same-day. Rule order matters -- the stateful/critical rule below is listed last so it overrides this one for the specific packages it names.",
+      "description": "Stateless services + digest pins: patch/minor/digest/pin only, auto-merge after CI green + a 3-day soak so a bad upstream release doesn't land same-day. 'pin' covers first-time digest pinning (no prior digest to diff against), which otherwise sits stuck needing a manual merge forever -- same soak/CI gate applies. Rule order matters -- the stateful/critical rule below is listed last so it overrides this one for the specific packages it names.",
       "matchManagers": ["kubernetes"],
-      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
       "automerge": true,
       "platformAutomerge": true
     },
     {
-      "description": "CI tooling (GitHub Actions): low risk, easy to revert, auto-merge after soak.",
+      "description": "CI tooling (GitHub Actions): low risk, easy to revert, auto-merge after soak. 'pin' included for the same first-time-pinning reason as above.",
       "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
       "automerge": true,
       "platformAutomerge": true
     },
     {
-      "description": "Dev tooling (pre-commit hooks, Terraform providers): doesn't touch live services, auto-merge after soak.",
+      "description": "Dev tooling (pre-commit hooks, Terraform providers): doesn't touch live services, auto-merge after soak. 'pin' included for the same first-time-pinning reason as above.",
       "matchManagers": ["pre-commit", "terraform"],
-      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
       "automerge": true,
       "platformAutomerge": true
     },
