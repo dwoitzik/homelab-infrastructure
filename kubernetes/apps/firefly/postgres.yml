@@ -59,7 +59,7 @@ spec:
             value: "1"
       containers:
         - name: postgres
-          image: postgres:17-alpine
+          image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
           # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
           # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
           # the postgres user -- same pattern as the other postgres
