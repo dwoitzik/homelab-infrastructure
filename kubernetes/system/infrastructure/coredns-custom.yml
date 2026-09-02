@@ -4,11 +4,13 @@ metadata:
   name: coredns-custom
   namespace: kube-system
 data:
-  # Points in-cluster callers at Traefik's stable ClusterIP instead of its
-  # external LB VIP, which hairpins unreliably for pod-to-pod calls -- see
-  # ADR-040. Add a hostname only once confirmed called service-to-service.
-  woitzik-dev-internal.override: |
-    hosts {
-        10.43.26.11 auth.woitzik.dev
-        fallthrough
+  # Dedicated server block: the main `.` block already runs `hosts` once
+  # (NodeHosts) and a second instance in the same block errors. Routes this
+  # hostname to Traefik's ClusterIP instead of its flaky LB VIP -- ADR-040.
+  woitzik-dev-internal.server: |
+    auth.woitzik.dev:53 {
+        hosts {
+            10.43.26.11 auth.woitzik.dev
+            fallthrough
+        }
     }
