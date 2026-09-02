@@ -322,6 +322,32 @@ spec:
         - protocol: TCP
           port: 8443
 ---
+# headscale's OIDC init fetches Authelia's discovery doc at startup -- same
+# gap class as allow-egress-nextcloud-authelia above, just never given the
+# matching rule. Crashlooped on every restart until this.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-headscale-authelia
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: headscale
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8443
+---
 # homepage is a dashboard aggregator by design -- its whole job is polling
 # ~15+ services across multiple namespaces (argocd, kube-system, security,
 # monitoring) plus external LAN hosts that aren't in the cluster at all
