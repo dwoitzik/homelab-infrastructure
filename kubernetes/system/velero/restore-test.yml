@@ -38,7 +38,9 @@ metadata:
 ---
 # Scoped to only what's needed to create+watch a Restore -- the actual
 # object creation in the target namespace is performed by velero-server
-# itself (already cluster-admin), not by this ServiceAccount.
+# itself (already cluster-admin), not by this ServiceAccount. "delete" on
+# restores only (not backups) -- the script's own cleanup deletes the
+# Restore it just created; missing this left 3 stale Restore objects behind.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -46,8 +48,11 @@ metadata:
   namespace: velero
 rules:
   - apiGroups: ["velero.io"]
-    resources: ["backups", "restores"]
-    verbs: ["get", "list", "watch", "create"]
+    resources: ["backups"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["velero.io"]
+    resources: ["restores"]
+    verbs: ["get", "list", "watch", "create", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -81,7 +86,10 @@ rules:
     resources: ["pods/log"]
     verbs: ["get"]
   - apiGroups: ["apps"]
-    resources: ["statefulsets"]
+    resources: ["statefulsets", "deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["traefik.io"]
+    resources: ["ingressroutes"]
     verbs: ["get", "list", "watch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -151,7 +159,7 @@ data:
     chmod +x /usr/local/bin/velero
 
     log "clearing any leftovers from a previous run in $NS (pure scratch space, safe to blanket-clear)"
-    timeout 130 kubectl delete pods,statefulsets,pvc,services,configmaps,secrets \
+    timeout 130 kubectl delete pods,deployments,replicasets,statefulsets,pvc,services,configmaps,secrets,ingressroutes.traefik.io \
       --all -n "$NS" --ignore-not-found --wait=true --timeout=120s || true
 
     log "finding latest completed backup"
@@ -205,7 +213,7 @@ data:
 
     log "cleaning up"
     timeout 30 velero restore delete "$RESTORE_NAME" --confirm || true
-    timeout 30 kubectl delete pods,statefulsets,pvc,services,configmaps,secrets \
+    timeout 30 kubectl delete pods,deployments,replicasets,statefulsets,pvc,services,configmaps,secrets,ingressroutes.traefik.io \
       --all -n "$NS" --ignore-not-found --wait=false || true
 
     log "done"
