@@ -30,6 +30,12 @@ spec:
   jobTemplate:
     spec:
       template:
+        metadata:
+          annotations:
+            # Scratch space, recreated every run -- nothing worth restoring,
+            # and this short-lived Job's pod is often already gone by the
+            # time Velero's fs-backup step reaches it, causing PartialFailure.
+            backup.velero.io/backup-volumes-excludes: tmp
         spec:
           restartPolicy: Never
           containers:
