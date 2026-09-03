@@ -70,7 +70,7 @@ spec:
             - containerPort: 8080
           env:
             - name: APP_ENV
-              value: local
+              value: production
             - name: APP_DEBUG
               value: "false"
             - name: SITE_OWNER
@@ -193,7 +193,7 @@ spec:
                   mountPath: /tmp
               env:
                 - name: APP_ENV
-                  value: local
+                  value: production
                 - name: APP_KEY
                   valueFrom:
                     secretKeyRef:
