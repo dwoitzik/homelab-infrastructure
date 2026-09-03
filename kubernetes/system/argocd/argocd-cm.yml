@@ -38,3 +38,26 @@ data:
   resource.customizations.ignoreDifferences.external-secrets.io_SecretStore: |
     jqPathExpressions:
       - .status
+  # ArgoCD has no built-in health check for CNPG's Cluster CRD -- without
+  # this it reports every Cluster as permanently Unknown regardless of
+  # actual state, dragging the whole Application's health down with it.
+  resource.customizations.health.postgresql.cnpg.io_Cluster: |
+    health_status = {}
+    if obj.status ~= nil and obj.status.phase ~= nil then
+      if obj.status.phase == "Cluster in healthy state" then
+        health_status.status = "Healthy"
+        health_status.message = obj.status.phase
+        return health_status
+      end
+      if obj.status.phase == "Failed" then
+        health_status.status = "Degraded"
+        health_status.message = obj.status.phase
+        return health_status
+      end
+      health_status.status = "Progressing"
+      health_status.message = obj.status.phase
+      return health_status
+    end
+    health_status.status = "Progressing"
+    health_status.message = "Waiting for Cluster status"
+    return health_status
