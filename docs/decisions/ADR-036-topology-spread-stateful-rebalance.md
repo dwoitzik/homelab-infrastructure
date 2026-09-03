@@ -283,6 +283,34 @@ the line-by-line YAML.
   migration procedure for them is genuinely higher-risk — sequencing the
   safer fix first, revisiting this only if it proves insufficient.
 
+**2026-09-03 follow-up (k3s-13 is also too small for Prometheus):**
+the soft anti-affinity above only excludes `vm-srv-k3s-11`, treating
+`-12` (7.5GB) and `-13` (4GB) as interchangeable landing spots. They
+aren't: `-13` is the smallest node in the cluster, and Prometheus alone
+(no resource requests/limits had ever been set) was observed using
+~1.4Gi there -- over a third of the node's entire allocatable memory.
+Combined with everything else already soft-preferred onto `-12`/`-13`
+by this same ADR, `-13` was found at 100% memory utilization, causing
+containerd kill-timeouts and cascading restarts of unrelated pods
+scheduled on it (chaos-mesh, kyverno-admission-controller,
+nfs-provisioner, freshrss).
+
+Fix: `prometheus.prometheusSpec.affinity` now also excludes `-13`
+(forcing it onto `-12` specifically, still a soft preference, not a
+hard requirement), plus explicit `resources.requests/limits` (1Gi/2Gi)
+so the scheduler accounts for its real footprint instead of treating
+it as free. Grafana/Alertmanager/kube-state-metrics are much lighter
+(under 400Mi each observed) and are left spread across `-12`/`-13` as
+this ADR originally intended -- only Prometheus itself needed the
+narrower placement.
+
+A parallel, unrelated contributor to the same `-13` memory pressure
+was also found and fixed separately: `onlyoffice` (a different app,
+not part of this ADR's reschedule list) had its own explicit
+nodeAffinity pinning it to `-13` specifically because it's memory-
+heavy -- the opposite of what it should have done on the smallest
+node. Moved to `-11` (see `kubernetes/apps/onlyoffice/onlyoffice.yml`).
+
 ## Consequences
 
 - Implementation PR(s), not yet written: the actual
