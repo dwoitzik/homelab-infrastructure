@@ -288,9 +288,9 @@ spec:
               - name: "null"
         prometheus:
           prometheusSpec:
-            # ADR-036: already running on vm-srv-k3s-12 as of this change,
-            # but nothing was keeping it there -- soft preference makes
-            # that explicit rather than incidental.
+            # ADR-036 follow-up: k3s-13 (4GB, smallest node) also excluded --
+            # Prometheus alone runs ~1.4Gi, more than a third of that node's
+            # total memory, and was found pushing it to 100% utilization.
             affinity:
               nodeAffinity:
                 preferredDuringSchedulingIgnoredDuringExecution:
@@ -301,6 +301,14 @@ spec:
                           operator: NotIn
                           values:
                             - vm-srv-k3s-11
+                            - vm-srv-k3s-13
+            resources:
+              requests:
+                cpu: 100m
+                memory: 1Gi
+              limits:
+                cpu: 1000m
+                memory: 2Gi
             tolerations:
               - key: node-role.kubernetes.io/control-plane
                 operator: Exists
