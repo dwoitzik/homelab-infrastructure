@@ -1,5 +1,6 @@
 # OnlyOffice Document Server — bundled image (PG + Redis + Nginx included)
-# Memory-heavy: 2GB+ RAM required. Scheduled on k3s-13 via nodeAffinity.
+# Memory-heavy: 2GB+ RAM required. Pinned to k3s-11 (16GB, most headroom) --
+# a prior pin to k3s-13 (the smallest node, 4GB) pushed it to 100% memory.
 ---
 apiVersion: v1
 kind: Secret
@@ -51,7 +52,7 @@ spec:
               matchExpressions:
               - key: kubernetes.io/hostname
                 operator: In
-                values: [vm-srv-k3s-13]
+                values: [vm-srv-k3s-11]
       containers:
         - name: onlyoffice
           image: onlyoffice/documentserver:9.4
