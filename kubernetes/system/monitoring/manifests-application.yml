@@ -16,6 +16,9 @@
 # alerting) sat in git for 8+ days having zero effect live, because nothing
 # was watching that file. Adding both here so any future edit to either one
 # actually gets applied automatically going forward.
+#
+# Third occurrence of the same class: network-policies-egress.yml was live
+# but missing from this glob too -- added below for the same reason.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -28,7 +31,7 @@ spec:
     targetRevision: main
     path: kubernetes/system/monitoring
     directory:
-      include: '{alertmanager-config,blackbox-exporter,snmp-exporter,control-plane-alerts,slo-rules,hardware-temp-alerts,storage-capacity-alerts,postgres-alerts,cert-manager-alerts,velero-alerts,silent-failure-alerts,argocd-servicemonitor,pve-exporter,alertmanager-discord,external-secret,ingressroute,network-policies,loki-dashboard,slo-dashboard,application,manifests-application}.yml'
+      include: '{alertmanager-config,blackbox-exporter,snmp-exporter,control-plane-alerts,slo-rules,hardware-temp-alerts,storage-capacity-alerts,postgres-alerts,cert-manager-alerts,velero-alerts,silent-failure-alerts,argocd-servicemonitor,pve-exporter,alertmanager-discord,external-secret,ingressroute,network-policies,network-policies-egress,loki-dashboard,slo-dashboard,application,manifests-application}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
