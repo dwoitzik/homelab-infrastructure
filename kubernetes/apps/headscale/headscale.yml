@@ -94,7 +94,7 @@ spec:
         # Deployment) because litestream needs to read the live WAL
         # directly, not a point-in-time copy.
         - name: litestream
-          image: litestream/litestream:0.5.16@sha256:837279d1279a90d670c915ddbb641b6e7b98bc42cc4dfb040eb569ee931078a1
+          image: litestream/litestream:0.5.17@sha256:dff47ab648faddd4b6385e9eeebc1649edd84fb020c576e8b9311cf1dc4a0155
           args:
             - replicate
             - -config
