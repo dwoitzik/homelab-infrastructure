@@ -81,10 +81,14 @@ jobs:
         id: tfapply
         run: |
           set -o pipefail
+          # --user: the image's baked-in uid can't write $GITHUB_WORKSPACE,
+          # owned by the actions-runner account -- see terraform-plan.yml.
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -w "/workspace/terraform/stacks/${{ steps.parse.outputs.stack }}" \
             --env-file /opt/atlantis/terraform-runner.env \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
             --entrypoint sh \
             atlantis-custom:v0.46.0 \
             -c "terraform init -input=false -no-color && terraform apply -input=false -auto-approve -no-color" \
