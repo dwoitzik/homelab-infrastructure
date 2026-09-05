@@ -110,9 +110,13 @@ spec:
       spec:
         accessModes: [ReadWriteOnce]
         storageClassName: nfs-client
+        # volumeMode explicit: the API server defaults this live and ArgoCD
+        # can never prune it back off an immutable volumeClaimTemplate,
+        # leaving this StatefulSet permanently OutOfSync otherwise.
+        volumeMode: Filesystem
         resources:
           requests:
-                storage: 2Gi
+            storage: 2Gi
 ---
 apiVersion: v1
 kind: Service
