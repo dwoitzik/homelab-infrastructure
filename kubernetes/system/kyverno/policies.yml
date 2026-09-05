@@ -139,3 +139,22 @@ spec:
                   - key: "{{ element.image | contains(@, ':') }}"
                     operator: Equals
                     value: false
+---
+# tailscale-subnet-router genuinely needs privileged (NET_ADMIN/NET_RAW,
+# iptables NAT) -- despite this policy's description claiming otherwise.
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: allow-privileged-tailscale-subnet-router
+  namespace: apps
+spec:
+  exceptions:
+    - policyName: disallow-privileged-containers
+      ruleNames:
+        - check-privileged
+  match:
+    any:
+      - resources:
+          kinds: [Pod]
+          namespaces: [apps]
+          names: ["tailscale-subnet-router-*"]
