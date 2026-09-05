@@ -22,6 +22,14 @@ spec:
       destination:
         server: 'https://kubernetes.default.svc'
         namespace: apps
+      # volumeClaimTemplates is immutable once a StatefulSet exists, so the
+      # API server's own defaulting (e.g. volumeMode) can never be synced
+      # back out -- leaves any StatefulSet here permanently OutOfSync.
+      ignoreDifferences:
+        - group: apps
+          kind: StatefulSet
+          jsonPointers:
+            - /spec/volumeClaimTemplates
       syncPolicy:
         automated:
           prune: true
