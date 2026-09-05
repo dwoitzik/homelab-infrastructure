@@ -81,6 +81,13 @@ spec:
               add:
                 - NET_ADMIN
                 - NET_RAW
+          # containerboot only auto-enables IPv4 forwarding (TS_ROUTES is an
+          # IPv4-only CIDR) -- IPv6 stays off despite --advertise-exit-node
+          # needing it, breaking clients on IPv6-primary mobile carriers.
+          lifecycle:
+            postStart:
+              exec:
+                command: ["sysctl", "-w", "net.ipv6.conf.all.forwarding=1"]
           volumeMounts:
             - name: state
               mountPath: /var/lib/tailscale
