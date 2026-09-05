@@ -10,7 +10,10 @@ DEVICE="{{ pve_power_smart_device }}"
 OUT="{{ pve_power_node_exporter_textfile_dir }}/smart_nvme.prom.$$"
 FINAL="{{ pve_power_node_exporter_textfile_dir }}/smart_nvme.prom"
 
-JSON=$(smartctl -a -j "$DEVICE" 2>/dev/null || echo '{}')
+# Absolute path: cron's default PATH lacks /usr/sbin, so a bare `smartctl`
+# silently "not found" here, swallowed by 2>/dev/null -- every scheduled run
+# fell back to {} and reported false 0%/unhealthy data.
+JSON=$(/usr/sbin/smartctl -a -j "$DEVICE" 2>/dev/null || echo '{}')
 
 get() { echo "$JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d$1)" 2>/dev/null || echo ""; }
 

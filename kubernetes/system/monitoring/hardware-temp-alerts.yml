@@ -52,7 +52,7 @@ spec:
               docs/HARDWARE.md for the full projection and why the trend has been
               tracked this closely.
         - alert: NVMeWearCritical
-          expr: smart_nvme_percentage_used >= 90 or smart_nvme_available_spare_percent < 10 or smart_device_healthy == 0
+          expr: smart_nvme_percentage_used >= 90 or smart_nvme_available_spare_percent < 10
           for: 5m
           labels:
             severity: critical
@@ -62,3 +62,17 @@ spec:
               This drive backs every k3s VM and every LXC on this single-disk host.
               Waiting for an actual failure past this threshold is not an acceptable
               risk -- see docs/HARDWARE.md's replacement trigger.
+        # Split from NVMeWearCritical: smart_device_healthy is a 0/1 flag, not
+        # a percentage -- sharing $value made a healthy-flag trip misread as
+        # "0% worn" instead of the critical condition it actually is.
+        - alert: NVMeUnhealthy
+          expr: smart_device_healthy == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Boot NVMe failed its own SMART self-assessment"
+            description: >
+              smartctl's smart_status.passed is false, or the metrics script
+              couldn't read the drive at all (both report as 0 here) -- check
+              `smartctl -a /dev/nvme0n1` on pve-mgmt-01 directly.
