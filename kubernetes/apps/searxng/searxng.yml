@@ -33,6 +33,17 @@ data:
       max_request_timeout: 4.0
       pool_connections: 100
       pool_maxsize: 20
+    # These four consistently CAPTCHA/rate-limit this instance's egress IP --
+    # every query paid their timeout for zero results either way.
+    engines:
+      - name: brave
+        disabled: true
+      - name: duckduckgo
+        disabled: true
+      - name: startpage
+        disabled: true
+      - name: wikidata
+        disabled: true
 ---
 apiVersion: apps/v1
 kind: Deployment
