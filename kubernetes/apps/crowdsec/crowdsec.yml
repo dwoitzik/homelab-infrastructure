@@ -189,12 +189,15 @@ spec:
           # resolved (see phase8/LEDGER.md Entries 6-8); this is a smaller, cheap,
           # separate hardening step so the same probe-flap doesn't recur under any
           # future I/O-pressure event, not a claim that today's root cause repeats.
+          # CPU limit 400m->700m: `kubectl top` showed this container sustained
+          # at/above its old ceiling (throttled), slowing LAPI response time for
+          # the Homepage widget and bouncer checks.
           resources:
             requests:
               cpu: 100m
               memory: 128Mi
             limits:
-              cpu: 400m
+              cpu: 700m
               memory: 256Mi
           livenessProbe:
             httpGet:
@@ -208,18 +211,9 @@ spec:
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
-        # 2026-08-16: idempotent LAPI machine re-registration for the Homepage
-        # dashboard widget. `local_api_credentials.yaml` (the pod's own self-auth)
-        # lives on the container's ephemeral root filesystem -- NOT on any mounted
-        # volume -- and `data` above (the local machine/decision DB) is an emptyDir.
-        # Both reset on every pod restart, so a one-off `cscli machines add ... --force`
-        # (what fixed this live earlier today) is wiped on the next restart and also
-        # overwrites the pod's own default self-registration while it's active. This
-        # sidecar re-registers a *separate*, stably-named machine with a fixed
-        # password (same value Homepage's widget already has via Vault, see
-        # kubernetes/apps/homepage/external-secret.yml) on every boot, entirely over
-        # the LAPI's own HTTP API -- it never touches local_api_credentials.yaml or
-        # the pod's default identity, so both survive independently of each other.
+        # Re-creates the Homepage widget's LAPI login on every boot (machine DB
+        # is an emptyDir, wiped on restart). Username/password come from the
+        # same Vault property the widget itself uses -- must stay in sync.
         - name: dashboard-machine-registrar
           image: crowdsecurity/crowdsec:latest
           command:
@@ -233,14 +227,14 @@ spec:
               # startup. cscli had nothing to read and failed every single time
               # ("open /etc/crowdsec/config.yaml: no such file or directory"),
               # silently, because of the `|| true` below -- confirmed live via
-              # `cscli machines list` never showing homepage-dashboard despite
+              # `cscli machines list` never showing the widget machine despite
               # this sidecar reporting healthy. Fixed by mounting config.yaml
               # directly (see volumeMounts) instead of relying on the entrypoint.
               # Logging the outcome explicitly now instead of swallowing it.
-              if cscli machines add homepage-dashboard --password "$DASHBOARD_MACHINE_PASSWORD" 2>&1; then
-                echo "registered homepage-dashboard"
+              if cscli machines add "$DASHBOARD_MACHINE_USERNAME" --password "$DASHBOARD_MACHINE_PASSWORD" --force 2>&1; then
+                echo "registered $DASHBOARD_MACHINE_USERNAME"
               else
-                echo "registration failed or machine already exists (see error above)"
+                echo "registration failed (see error above)"
               fi
               sleep infinity
           securityContext:
@@ -249,6 +243,11 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           env:
+            - name: DASHBOARD_MACHINE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: crowdsec-dashboard-machine
+                  key: username
             - name: DASHBOARD_MACHINE_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -304,6 +303,10 @@ spec:
     name: crowdsec-dashboard-machine
     creationPolicy: Owner
   data:
+    - secretKey: username
+      remoteRef:
+        key: secret/homepage
+        property: crowdsec-username
     - secretKey: password
       remoteRef:
         key: secret/homepage
