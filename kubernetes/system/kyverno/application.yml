@@ -17,6 +17,12 @@ spec:
         features:
           forceFailurePolicyIgnore:
             enabled: true
+          # Off by default in the chart -- PolicyException objects are
+          # otherwise silently ignored by the admission controller. Scoped
+          # to apps only, not cluster-wide, on purpose.
+          policyExceptions:
+            enabled: true
+            namespace: apps
         admissionController:
           replicas: 1
           tolerations:

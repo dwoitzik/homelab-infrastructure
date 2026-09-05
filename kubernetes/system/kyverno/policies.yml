@@ -152,9 +152,14 @@ spec:
     - policyName: disallow-privileged-containers
       ruleNames:
         - check-privileged
+        - autogen-check-privileged
   match:
     any:
       - resources:
           kinds: [Pod]
           namespaces: [apps]
           names: ["tailscale-subnet-router-*"]
+      - resources:
+          kinds: [Deployment]
+          namespaces: [apps]
+          names: ["tailscale-subnet-router"]
