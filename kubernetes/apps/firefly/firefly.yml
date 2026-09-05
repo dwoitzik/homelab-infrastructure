@@ -91,7 +91,7 @@ spec:
             - name: DB_CONNECTION
               value: pgsql
             - name: DB_HOST
-              value: postgres-firefly.database.svc.cluster.local
+              value: postgres-firefly-rw.database.svc.cluster.local
             - name: DB_PORT
               value: "5432"
             - name: DB_DATABASE
@@ -202,7 +202,7 @@ spec:
                 - name: DB_CONNECTION
                   value: pgsql
                 - name: DB_HOST
-                  value: postgres-firefly.database.svc.cluster.local
+                  value: postgres-firefly-rw.database.svc.cluster.local
                 - name: DB_PORT
                   value: "5432"
                 - name: DB_DATABASE
