@@ -224,7 +224,10 @@ spec:
               # only the main container ever has -- used as a readiness gate
               # here it never returns, wedging this sidecar forever.
               until wget -q -O /dev/null http://127.0.0.1:8080/health; do sleep 2; done
-              if cscli machines add "$DASHBOARD_MACHINE_USERNAME" --password "$DASHBOARD_MACHINE_PASSWORD" --force 2>&1; then
+              # -f redirects cscli's own credentials-file write (defaults to a
+              # read-only path here), which otherwise makes a successful add
+              # misreport as failed.
+              if cscli machines add "$DASHBOARD_MACHINE_USERNAME" --password "$DASHBOARD_MACHINE_PASSWORD" --force -f /tmp/unused-credentials.yaml 2>&1; then
                 echo "registered $DASHBOARD_MACHINE_USERNAME"
               else
                 echo "registration failed (see error above)"
