@@ -149,6 +149,25 @@ spec:
       ports:
         - protocol: UDP
 ---
+# The WAN rule above deliberately excludes 10.0.0.0/8 -- but nothing else
+# ever allowed egress to 10.0.20.0/24, the one subnet this pod exists to
+# route for (including DNS to the 10.0.20.5 resolver Headscale hands out).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-tailscale-subnet-route
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: tailscale-subnet-router
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.0/24
+---
 # Applied live 2026-08-26 (stopgap kubectl apply, not yet committed until
 # now) alongside the cloudflared fix below -- same root incident, a second
 # real gap in the same NetworkPolicy rollout. allow-egress-tailscale-
