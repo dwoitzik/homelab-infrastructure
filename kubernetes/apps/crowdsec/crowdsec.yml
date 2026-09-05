@@ -4,6 +4,11 @@ metadata:
   name: security
   labels:
     app.kubernetes.io/part-of: security
+    # Must match kubernetes/system/infrastructure/pod-security-standards.yml's
+    # security namespace exactly -- two Applications declaring this same
+    # object with different specs meant this one could never reach Synced.
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: ConfigMap
