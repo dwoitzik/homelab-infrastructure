@@ -220,17 +220,10 @@ spec:
             - sh
             - -c
             - |
-              until cscli lapi status > /dev/null 2>&1; do sleep 2; done
-              # 2026-08-16: first version of this had no config volume mount --
-              # overriding `command` skips the image's entrypoint, which is what
-              # actually generates /etc/crowdsec/config.yaml from env vars at
-              # startup. cscli had nothing to read and failed every single time
-              # ("open /etc/crowdsec/config.yaml: no such file or directory"),
-              # silently, because of the `|| true` below -- confirmed live via
-              # `cscli machines list` never showing the widget machine despite
-              # this sidecar reporting healthy. Fixed by mounting config.yaml
-              # directly (see volumeMounts) instead of relying on the entrypoint.
-              # Logging the outcome explicitly now instead of swallowing it.
+              # `cscli lapi status` needs local_api_credentials.yaml, which
+              # only the main container ever has -- used as a readiness gate
+              # here it never returns, wedging this sidecar forever.
+              until wget -q -O /dev/null http://127.0.0.1:8080/health; do sleep 2; done
               if cscli machines add "$DASHBOARD_MACHINE_USERNAME" --password "$DASHBOARD_MACHINE_PASSWORD" --force 2>&1; then
                 echo "registered $DASHBOARD_MACHINE_USERNAME"
               else
@@ -257,6 +250,12 @@ spec:
             - name: config
               mountPath: /etc/crowdsec/config.yaml
               subPath: config.yaml
+            # cscli machines add loads the LAPI profile config too, not just
+            # config.yaml -- missing this made every add fail silently until
+            # caught via a manual exec (profiles.yaml: no such file or dir).
+            - name: config
+              mountPath: /etc/crowdsec/profiles.yaml
+              subPath: profiles.yaml
             - name: registrar-tmp
               mountPath: /tmp
             # cscli itself (not just the crowdsec daemon) writes a trace dir
