@@ -33,8 +33,9 @@ data:
       max_request_timeout: 4.0
       pool_connections: 100
       pool_maxsize: 20
-    # These four consistently CAPTCHA/rate-limit this instance's egress IP --
-    # every query paid their timeout for zero results either way.
+    # brave/duckduckgo/startpage/wikidata CAPTCHA or rate-limit this egress
+    # IP outright. google alone was too unreliable on top of that (silent
+    # empty results, no error) -- enabling engines disabled by default.
     engines:
       - name: brave
         disabled: true
@@ -44,6 +45,14 @@ data:
         disabled: true
       - name: wikidata
         disabled: true
+      - name: bing
+        disabled: false
+      - name: qwant
+        disabled: false
+      - name: mojeek
+        disabled: false
+      - name: yahoo
+        disabled: false
 ---
 apiVersion: apps/v1
 kind: Deployment
