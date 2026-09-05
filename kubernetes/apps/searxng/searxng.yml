@@ -33,26 +33,35 @@ data:
       max_request_timeout: 4.0
       pool_connections: 100
       pool_maxsize: 20
-    # brave/duckduckgo/startpage/wikidata CAPTCHA or rate-limit this egress
-    # IP outright. google alone was too unreliable on top of that (silent
-    # empty results, no error) -- enabling engines disabled by default.
+    # brave/startpage/wikidata CAPTCHA or rate-limit this egress IP
+    # outright. duckduckgo re-enabled for a retest -- self-hosted SearXNG
+    # reports generally list it as one of the more reliable engines.
     engines:
       - name: brave
         disabled: true
       - name: duckduckgo
-        disabled: true
+        disabled: false
       - name: startpage
         disabled: true
       - name: wikidata
         disabled: true
+      # Documented SearXNG option: routes through Google's mobile UI, which
+      # isn't subject to the same rate-limiting as the desktop endpoint --
+      # the actual fix for silent empty results, not just a toggle.
+      - name: google
+        use_mobile_ui: true
+      # bing scrapes its own low-confidence "related content" widgets as if
+      # they were organic results for niche queries -- fine for common
+      # terms, actively wrong (off-topic, wrong language) for anything else.
       - name: bing
-        disabled: false
+        disabled: true
       - name: qwant
         disabled: false
       - name: mojeek
         disabled: false
+      # HTTP protocol error on every request -- broken, not just rate-limited.
       - name: yahoo
-        disabled: false
+        disabled: true
 ---
 apiVersion: apps/v1
 kind: Deployment
