@@ -38,7 +38,7 @@ metadata:
   name: drift-checker-extra-read
 rules:
   - apiGroups: ["kyverno.io"]
-    resources: ["clusterpolicies", "policies"]
+    resources: ["clusterpolicies", "policies", "policyexceptions"]
     verbs: ["get", "list"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
