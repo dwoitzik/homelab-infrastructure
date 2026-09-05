@@ -1,0 +1,86 @@
+# firefly-iii's postgres was a plain, unmanaged StatefulSet -- no CNPG
+# operator, no ScheduledBackup, no failover, unlike every sibling database
+# in this namespace. Database was empty at migration, no data risk.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: postgres-firefly-cnpg-user
+  namespace: database
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault
+    kind: ClusterSecretStore
+  target:
+    name: postgres-firefly-cnpg-user
+    creationPolicy: Owner
+  data:
+    - remoteRef:
+        key: secret/firefly
+        property: postgres-user
+      secretKey: username
+    - remoteRef:
+        key: secret/firefly
+        property: postgres-password
+      secretKey: password
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-firefly
+  namespace: database
+spec:
+  instances: 1
+
+  postgresql:
+    parameters:
+      max_connections: "50"
+      shared_buffers: "64MB"
+
+  bootstrap:
+    initdb:
+      database: firefly
+      owner: firefly
+      secret:
+        name: postgres-firefly-cnpg-user
+
+  storage:
+    size: 2Gi
+    storageClass: local-path
+
+  affinity:
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 50m
+    limits:
+      memory: 256Mi
+      cpu: 250m
+
+  monitoring:
+    enablePodMonitor: false
+
+  backup:
+    retentionPolicy: "7d"
+    barmanObjectStore:
+      destinationPath: s3://cnpg-backups/firefly
+      endpointURL: http://garage.apps.svc.cluster.local:3900
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-garage-backup
+          key: access-key-id
+        secretAccessKey:
+          name: cnpg-garage-backup
+          key: secret-access-key
+        region:
+          name: cnpg-backup-config
+          key: region
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
