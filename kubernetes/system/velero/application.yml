@@ -85,7 +85,7 @@ spec:
             # move back to a tagged release once v1.14.3+ (or whatever
             # ships this fix) is out -- check the plugin's release notes
             # for a `tagging`/`x-amz-tagging` fix mention before bumping.
-            image: velero/velero-plugin-for-aws:release-1.14-dev@sha256:cf0eaabef943c5780f23741194bec77c30fd4590be3203b5afed49c9e6dddb36
+            image: velero/velero-plugin-for-aws:release-1.14-dev@sha256:3c063eadb8e4be761a902b64ed3be362b904bfe09118e09a531f4dfc3ef5eebf
             imagePullPolicy: IfNotPresent
             volumeMounts:
               - mountPath: /target
