@@ -1,6 +1,11 @@
 version: 2
 
 secret:
+  # gitleaks' own baseline report -- stores the literal matched text of
+  # every already-triaged finding by design, so it inherently contains
+  # password-shaped strings GitGuardian's generic detector flags as new.
+  ignored_paths:
+    - .gitleaks-baseline.json
   # False positives on ${VAR:?...} shell-interpolation syntax -- these are
   # not literal secrets, they're env-var references with a required-value
   # error message (see docs/wazuh/DEPLOY.md). GitGuardian's generic
