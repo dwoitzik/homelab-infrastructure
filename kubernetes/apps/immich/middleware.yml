@@ -17,10 +17,8 @@ spec:
     average: 50
     burst: 100
     period: 1s
-    # No explicit sourceCriterion/ipStrategy -- Traefik resolves the real
-    # client IP from X-Forwarded-For using the entrypoint's already-configured
-    # trustedIPs (10.42.0.0/16, 10.0.0.0/8, see traefik's
-    # forwardedHeaders.trustedIPs arg), so an explicit depth here risked
-    # getting the hop-count wrong and bucketing every user behind the
-    # Cloudflare Tunnel as one shared IP -- a functional bug, not just
-    # cosmetic, since that would rate-limit all real users together.
+    # Every request through the tunnel logged as cloudflared's own pod IP,
+    # so all real visitors shared one rate-limit bucket. Cf-Connecting-Ip is
+    # Cloudflare's own definitive per-client header, no hop-counting needed.
+    sourceCriterion:
+      requestHeaderName: Cf-Connecting-Ip
