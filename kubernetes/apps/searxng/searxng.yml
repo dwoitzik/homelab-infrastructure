@@ -33,33 +33,27 @@ data:
       max_request_timeout: 4.0
       pool_connections: 100
       pool_maxsize: 20
-    # brave/startpage/wikidata CAPTCHA or rate-limit this egress IP
-    # outright. duckduckgo re-enabled for a retest -- self-hosted SearXNG
-    # reports generally list it as one of the more reliable engines.
+    # Every scraped general-web engine below is blocked by request-
+    # fingerprint bot detection, not IP reputation -- see ADR-041.
     engines:
       - name: brave
         disabled: true
       - name: duckduckgo
-        disabled: false
+        disabled: true
       - name: startpage
         disabled: true
       - name: wikidata
         disabled: true
-      # Documented SearXNG option: routes through Google's mobile UI, which
-      # isn't subject to the same rate-limiting as the desktop endpoint --
-      # the actual fix for silent empty results, not just a toggle.
+      # google (mobile UI) is the sole general-web engine still enabled --
+      # unreliable, but the least broken of everything tried.
       - name: google
         use_mobile_ui: true
-      # bing scrapes its own low-confidence "related content" widgets as if
-      # they were organic results for niche queries -- fine for common
-      # terms, actively wrong (off-topic, wrong language) for anything else.
       - name: bing
         disabled: true
       - name: qwant
-        disabled: false
+        disabled: true
       - name: mojeek
-        disabled: false
-      # HTTP protocol error on every request -- broken, not just rate-limited.
+        disabled: true
       - name: yahoo
         disabled: true
 ---
@@ -87,7 +81,7 @@ spec:
             value: "1"
       containers:
       - name: searxng
-        image: searxng/searxng:2026.7.1-c5d8d05f0
+        image: searxng/searxng:2026.9.4-15b0c8ef3
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true

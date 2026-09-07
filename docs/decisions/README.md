@@ -40,6 +40,7 @@ skipped by accident.
 | [032](ADR-032-claude-agent-dedicated-tunnel.md) | claude.woitzik.dev gets its own Cloudflare Tunnel, not a firewall hole | Superseded 2026-08-27 |
 | [033](ADR-033-public-exposure-allowlist.md) | Public exposure is an explicit allowlist of two hostnames, not a wildcard | Accepted |
 | [035](ADR-035-scanopy-topology-mapping.md) | Scanopy for network topology mapping | Accepted |
+| [041](ADR-041-searxng-egress-fingerprint-blocking.md) | SearXNG general-web engines blocked by request-fingerprint detection | Accepted |
 
 ## In review, not yet in this table
 
