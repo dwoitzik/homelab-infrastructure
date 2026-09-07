@@ -31,15 +31,6 @@ data:
             # public routes -- a server-side widget request through
             # pve.woitzik.dev would just get redirected to the Authelia login
             # page and fail the same way.
-            # TODO: secret/homepage in Vault needs `proxmox-token-id` /
-            # `proxmox-token` properties (a real Proxmox API token, e.g. via
-            # `pveum user token add homepage@pve homepage --privsep 1` scoped
-            # read-only) before this widget will actually render. This agent has
-            # no Vault write access in this session (no VAULT_TOKEN available,
-            # and minting one is out of scope for a dashboard-config PR) -- the
-            # ExternalSecret/widget plumbing below is ready, only the Vault-side
-            # value is missing. Until then this widget shows an API error;
-            # Proxmox's own login is unaffected either way.
             widget:
               type: proxmox
               url: https://10.0.10.10:8006
@@ -158,11 +149,8 @@ data:
             #    this widget needs doesn't exist yet in the LAPI (no `cscli
             #    machines add` has been run for it -- only a bouncer key,
             #    BOUNCER_KEY_traefik, is registered, and it isn't reusable here).
-            # TODO: run `cscli machines add homepage-widget --auto` inside a
-            # crowdsec pod, then store the resulting login/password in Vault at
-            # secret/homepage (`crowdsec-username` / `crowdsec-password`). Not
-            # done here -- this agent has no Vault write access this session.
-            # Fixing (1) alone won't make the widget work; both are required.
+            # 3) allow-egress-homepage-lan only covers 10.0.0.0/8; this Service's
+            #    ClusterIP doesn't. See allow-egress-homepage-crowdsec.
             widget:
               type: crowdsec
               url: http://crowdsec.security.svc.cluster.local:8080
