@@ -19,6 +19,19 @@ spec:
         dashboard:
           create: true
           securityMode: false
+        # Chart default self-generates a new random self-signed cert on
+        # every render (no stable seed), so ArgoCD's selfHeal saw these
+        # Secrets and the webhook configs referencing them as permanently
+        # OutOfSync and kept re-applying them. Delegating to cert-manager
+        # (already deployed cluster-wide) makes the certs stable across
+        # renders. Chart limitation: chaos-mesh-chaosd-client-certs has no
+        # cert-manager equivalent in 2.8.3 and will keep regenerating
+        # regardless -- it's only used for the optional chaosd CLI's mTLS
+        # to the controller manager, not the admission webhooks, so it
+        # doesn't carry the same blast radius as the ones fixed here.
+        webhook:
+          certManager:
+            enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: chaos-mesh
