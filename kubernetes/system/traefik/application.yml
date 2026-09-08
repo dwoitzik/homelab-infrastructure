@@ -96,24 +96,30 @@ spec:
             mountPath: /etc/traefik/crowdsec
             type: secret
             secretName: crowdsec-bouncer-key
-        tolerations:
-        - key: "storage"
-          operator: "Equal"
-          value: "sdcard"
-          effect: "NoSchedule"
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
+        # Two replicas for real HA -- previously single-replica, a
+        # cluster-wide ingress outage on any restart/crash/node-drain
+        # (ADR-040 flagged this as "worth revisiting separately"). Certs
+        # come from cert-manager via tlsStore.defaultCertificate above, not
+        # Traefik's own ACME resolver, so there's no local state that
+        # multiple replicas would fragment.
+        deployment:
+          replicas: 2
+        # Soft anti-affinity so the two replicas prefer different nodes --
+        # actually protects against a node failure, not just a pod crash.
+        # Soft, not hard: a 3-node cluster with uneven node roles shouldn't
+        # risk one replica going Pending over a scheduling preference.
         affinity:
-          nodeAffinity:
+          podAntiAffinity:
             preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              preference:
-                matchExpressions:
-                - key: node-type
-                  operator: In
-                  values:
-                  - rpi
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: traefik
+                  topologyKey: kubernetes.io/hostname
+        podDisruptionBudget:
+          enabled: true
+          minAvailable: 1
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system
