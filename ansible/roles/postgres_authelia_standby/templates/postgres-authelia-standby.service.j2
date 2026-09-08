@@ -1,0 +1,21 @@
+[Unit]
+Description=Authelia Postgres warm-standby (ADR-030) -- physical streaming replica
+Documentation=https://github.com/dwoitzik/homelab-infrastructure/blob/main/docs/decisions/ADR-030-authelia-postgres-warm-standby.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=postgres
+Group=postgres
+Environment=PGDATA={{ postgres_authelia_standby_data_dir }}
+ExecStart=/usr/lib/postgresql/{{ postgres_authelia_standby_pg_version }}/bin/postgres -D {{ postgres_authelia_standby_data_dir }}
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGINT
+TimeoutSec=300
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
