@@ -1,0 +1,6 @@
+---
+- name: Reload systemd and restart postgres-authelia-standby
+  ansible.builtin.systemd:
+    name: postgres-authelia-standby
+    daemon_reload: true
+    state: restarted
