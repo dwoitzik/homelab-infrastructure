@@ -136,3 +136,72 @@ limitation stated plainly rather than glossed over:
 Added to this agent's standing regular-check list (per David's separate
 request) so the route-approval state gets re-verified on a schedule going
 forward, not just once here.
+
+## Update (2026-09-09, same day): the fix above caused a real regression, rolled back
+
+David tested from his actual Pixel after the route-approval change above and
+reported a genuine regression, not an improvement: `home.woitzik.dev` and
+`analytics.woitzik.dev` failed to load outright (not slow), and general
+internet-bound traffic (tested with Snapchat) hung while connected to the
+tailnet and recovered within ~2 minutes of disconnecting.
+
+**Root cause, confirmed against tailscale's own CLI source
+(`cmd/tailscale/cli/set.go`, `net/netutil/routes.go`), not assumed**:
+`--advertise-exit-node` is not separable into IPv4-only and IPv6-only halves.
+`calcAdvertiseRoutesForSet` unconditionally adds both `tsaddr.AllIPv4()`
+(`0.0.0.0/0`) and `tsaddr.AllIPv6()` (`::/0`) together, and
+`netutil.CalcAdvertiseRoutes` actively rejects the alternative
+(`--advertise-routes=0.0.0.0/0` alone errors with "0.0.0.0/0 advertised
+without its IPv6 counterpart, please also advertise ::/0"). There is no
+supported tailscale configuration for "exit node, IPv4 only."
+
+This means narrowing `homelab-router-1`'s route *approval* in headscale
+(the fix applied earlier in this document) could never actually stick: the
+subnet-router pod itself keeps *advertising* both `0.0.0.0/0` and `::/0`
+(the flag hasn't changed), and this tailnet's ACL policy
+(`kubernetes/apps/headscale/config.yml`'s `policy.hujson`,
+`autoApprovers.exitNode: ["tag:subnet-router"]`) auto-re-approves anything
+`tag:subnet-router` advertises on every policy reconcile -- confirmed live:
+a manual `approve-routes --identifier 2 --routes "0.0.0.0/0,10.0.20.0/24"`
+(attempting to drop `::/0`) reported success but `list-routes` still showed
+`::/0` approved seconds later, unchanged, on repeated attempts.
+
+So the actual live topology after the earlier "fix" was never
+"`homelab-router-1` IPv4-only exit, `rpi-srv-02` LAN-only" as intended --
+it was "`homelab-router-1` sole exit-node candidate for *both* `0.0.0.0/0`
+and `::/0`," full stop, because the approval narrowing silently failed to
+hold. Since `homelab-router-1`'s pod network has no real IPv6 uplink (per
+this ADR's original Context), every IPv6-preferring connection attempt
+through it now hit a hard structural dead end -- not a slow/degraded path,
+a genuine black hole -- which plausibly explains both symptoms: dual-stack
+sites (`analytics.woitzik.dev` has real AAAA records via Cloudflare) and
+apps that try IPv6 first hang rather than falling back cleanly, and
+`home.woitzik.dev` (an internal-only AdGuard-rewritten name, verified still
+correctly resolving to `10.0.20.200` and verified independently reachable
+over plain TCP/HTTPS from the LAN throughout this investigation --
+Traefik/MetalLB were ruled out as a cause) plausibly degraded as a
+side effect of the same broken tailnet path, not a separate outage.
+
+**Rolled back**, restoring the exact pre-incident topology (both nodes
+again approved for all three routes, matching this document's original,
+already-accepted state before today's narrowing attempt):
+
+```bash
+headscale nodes approve-routes --identifier 7 --routes "0.0.0.0/0,::/0,10.0.20.0/24" --force
+```
+
+Verified immediately after: `rpi-srv-02` (id 7) `approved_routes` back to
+all three; `homelab-router-1` (id 2) unchanged, still approved for all
+three. This is a deliberate regression rollback, not a fix of the
+underlying problem -- the underlying problem (this tailnet cannot offer a
+real, working IPv6 exit path from either candidate node, and tailscale
+provides no way to advertise IPv4-only exit-node capability) is still
+unresolved. See `phase8/QUESTIONS.md` for the follow-up decision this
+needs: either accept the bundled-but-partially-broken v4+v6 exit-node
+status quo (what's restored now, matches the original slow-but-working
+complaint this ADR started from), drop `--advertise-exit-node` from
+`homelab-router-1` entirely (loses exit-node capability tailnet-wide, but
+removes the black-hole risk structurally), or do the real dual-stack CNI
+work to give the k3s pod genuine IPv6 egress (bigger, not attempted here).
+Not a same-day emergency call -- restoring David's phone took priority over
+picking the permanent answer.
