@@ -68,3 +68,21 @@ Not wired up here -- that's the owner's call, not something to activate
 unilaterally. If accepted, add `- name: brave` with an `api_key` (via Vault/
 ExternalSecret, not inline) rather than re-enabling the scraped `brave`
 engine.
+
+## Update (2026-09-09): the images category had the exact same problem, never checked
+
+This ADR's investigation was scoped to general-web engines; nobody had
+checked whether the same fingerprinting problem also hit the separate
+`images` category engine list. It did. SearXNG's `/stats/errors` endpoint
+(real, structured, machine-readable failure data, not a guess) showed
+`brave.images` and `startpage images` at a sustained 100% failure rate
+(rate-limit suspension and CAPTCHA redirect respectively) and `openverse`
+at 100% timeout. `duckduckgo images` never appeared in any live search
+response's per-engine timing breakdown despite being nominally enabled --
+consistent with the same duckduckgo-family fingerprinting block already
+established for the web engine, just not yet caught by the error-stats
+snapshot. All four disabled, same treatment as the general engines above.
+Image search still has 10 working engines left (bing images, google cse
+images, pinterest, unsplash, flickr, wikicommons.images, pexels, artic,
+plus the icon-set engines devicons/lucide), so this narrows rather than
+guts image coverage.
