@@ -9,11 +9,14 @@ pve_power_amd_pstate: active
 # ZFS module tuning for a single shared, DRAM-less NVMe. See ADR-034 --
 # zfs_vdev_async_write_max_active keeps bulk async writes from starving a
 # latency-sensitive synchronous writer's I/O queue priority.
-# 2026-08-29 (ADR-037): lowered 16 GiB -> 8 GiB after the vm-srv-k3s-11
-# wedge incident found the host memory-starved with ARC quietly holding
-# ~13 GB of its old 16 GB cap -- real host RAM that could otherwise relieve
-# the k3s VMs' ballooning. Freed ~5 GB immediately, live-verified.
-pve_power_zfs_arc_max_bytes: 8589934592
+# ADR-037/ADR-042: lowered 16 GiB -> 8 GiB -> 4 GiB. Each cut freed real
+# host RAM that k3s VM ballooning needed. The second cut isn't a temporary
+# spike response -- by the second incident all 3 k3s VMs were genuinely
+# using their full memory ceiling (not just squeezed by ballooning like
+# the first incident), reflecting real workload growth on the cluster
+# since the 8 GiB baseline was set. 8 GiB is stale; this is the new
+# baseline until growth or a hardware change revisits it.
+pve_power_zfs_arc_max_bytes: 4294967296
 pve_power_zfs_prefetch_disable: 1
 pve_power_zfs_dirty_data_max_bytes: 268435456
 pve_power_zfs_txg_timeout: 5
