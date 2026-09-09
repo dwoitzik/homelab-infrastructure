@@ -33,12 +33,19 @@ spec:
             size: 5Gi
             storageClass: local-path
             accessMode: ReadWriteOnce
+          # Bumped after a live incident: vault-0 was chronically running at
+          # 511Mi against a 512Mi limit for 9+ days (readiness probe timing
+          # out thousands of times), and during a host-wide memory-pressure
+          # spike its raft barrier writes started failing outright
+          # ("failed to persist keyring: context deadline exceeded"). Real
+          # host RAM was scarce that day too, but this container had zero
+          # margin of its own regardless of host state.
           resources:
             requests:
-              memory: 256Mi
+              memory: 384Mi
               cpu: 100m
             limits:
-              memory: 512Mi
+              memory: 1Gi
               cpu: 500m
           readinessProbe:
             enabled: true
