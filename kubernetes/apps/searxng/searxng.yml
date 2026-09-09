@@ -56,6 +56,20 @@ data:
         disabled: true
       - name: yahoo
         disabled: true
+      # Same root cause as the general engines above, different category --
+      # ADR-041 never checked images. /stats/errors showed these three at a
+      # sustained 100% failure rate (rate-limit suspension, CAPTCHA
+      # redirect, and timeout respectively); duckduckgo images never
+      # appears in a live response's engine timing at all despite being
+      # nominally enabled, same fingerprinting problem as duckduckgo web.
+      - name: brave.images
+        disabled: true
+      - name: openverse
+        disabled: true
+      - name: startpage images
+        disabled: true
+      - name: duckduckgo images
+        disabled: true
 ---
 apiVersion: apps/v1
 kind: Deployment
