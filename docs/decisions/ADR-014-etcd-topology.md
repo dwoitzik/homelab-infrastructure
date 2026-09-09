@@ -1,9 +1,20 @@
 # ADR-014: etcd Topology — Restore Single-Server, or Commit to Real 3-Node HA
 
-**Status:** Proposed — awaiting a decision. No changes made. This is a live finding, not
-a hypothetical: the cluster's actual running configuration currently contradicts both
-this repo's Terraform/Ansible source of truth and a previous ADR-level decision, and it
-directly contributed to a real outage on 2026-07-09.
+**Status:** Superseded by ADR-015 (2026-08-13). The cluster this ADR describes no
+longer exists — the 2026-08-13 disaster recovery rebuilt it clean, and that rebuild
+runs single-server SQLite from the start (ADR-015), not etcd at all, on any node.
+Checked live 2026-09-09: `vm-srv-k3s-13` carries no `etcd`/`control-plane` role, only
+`vm-srv-k3s-11` does, and all 3 nodes share the same 27-day age (a clean simultaneous
+rebuild, not the drift signature this ADR originally found). There is no live etcd
+quorum on this cluster for the "next attempt" plan below to ever apply to — left
+in place as historical record of a real incident and a real failed remediation
+attempt, not as an open decision.
+
+**Original status (superseded, kept for history):** Proposed — awaiting a decision. No
+changes made. This is a live finding, not a hypothetical: the cluster's actual running
+configuration currently contradicts both this repo's Terraform/Ansible source of truth
+and a previous ADR-level decision, and it directly contributed to a real outage on
+2026-07-09.
 
 ## Context
 
