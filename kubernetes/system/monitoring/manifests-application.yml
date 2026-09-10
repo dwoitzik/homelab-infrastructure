@@ -35,6 +35,41 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
+  # 2026-09-10: these 3 Secrets are ExternalSecret targets with
+  # creationPolicy: Merge (same object name as their ExternalSecret CR).
+  # Found live with ArgoCD's own tracking-id/last-applied-configuration
+  # annotations describing the *ExternalSecret* stamped onto the *Secret*
+  # object itself (confirmed via `kubectl get secret ... -o
+  # jsonpath='{.metadata.annotations}'` -- a real kind mismatch, not a
+  # parsing artifact). That made every comparison unresolvable: ArgoCD kept
+  # diffing the Secret's actual fields against a rendered ExternalSecret
+  # schema, self-healing every ~5min for 19+ hours straight
+  # (autoHealAttemptsCount 240+, see phase8/LEDGER.md) and contributing to
+  # controller-wide churn. Ignoring data + annotations on these three stops
+  # ArgoCD from re-litigating fields ESO legitimately owns, regardless of
+  # how the cross-kind annotation corruption happened.
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: grafana-admin-secret
+      namespace: monitoring
+      jsonPointers:
+        - /data
+        - /metadata/annotations
+    - group: ""
+      kind: Secret
+      name: grafana-oidc-secret
+      namespace: monitoring
+      jsonPointers:
+        - /data
+        - /metadata/annotations
+    - group: ""
+      kind: Secret
+      name: alertmanager-discord-webhook
+      namespace: monitoring
+      jsonPointers:
+        - /data
+        - /metadata/annotations
   syncPolicy:
     automated:
       prune: true

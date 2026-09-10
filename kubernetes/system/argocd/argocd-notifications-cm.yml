@@ -41,8 +41,20 @@ data:
   # Debounced: raw health-flip fires before ArgoCD's own reconcile/self-heal
   # gets a chance to recover it -- most Degraded states here are seconds-
   # long blips. 5m covers at least one full reconcile pass (~3m default).
+  #
+  # 2026-09-10: also requires a real child resource to be reporting Degraded,
+  # not just the app's own top-level status. Root-caused a controller bug
+  # (health_ms:0 in controller logs -- health assessment silently not
+  # running for some apps, root cause traced to a broader self-heal churn
+  # problem, see phase8/LEDGER.md) that leaves an app's top-level health
+  # stuck reporting Degraded indefinitely while every actual child resource
+  # is genuinely fine -- paged for velero-manifests with this exact
+  # signature (all resources Synced/Healthy, top-level status stuck).
+  # Verified with `argocd admin notifications trigger run` against both the
+  # live false-positive app (now false) and a synthetic app with a real
+  # Degraded resource (still true) before shipping this.
   trigger.on-health-degraded: |
-    - when: app.status.health.status == 'Degraded' && time.Now().Sub(time.Parse(app.status.health.lastTransitionTime)).Minutes() >= 5
+    - when: app.status.health.status == 'Degraded' && time.Now().Sub(time.Parse(app.status.health.lastTransitionTime)).Minutes() >= 5 && any(app.status.resources, {.health != nil && .health.status == 'Degraded'})
       send: [app-degraded]
   trigger.on-sync-failed: |
     - when: app.status.operationState != nil && app.status.operationState.phase in ['Error', 'Failed']
