@@ -31,7 +31,7 @@ spec:
     targetRevision: main
     path: kubernetes/system/monitoring
     directory:
-      include: '{alertmanager-config,blackbox-exporter,snmp-exporter,control-plane-alerts,slo-rules,hardware-temp-alerts,storage-capacity-alerts,postgres-alerts,cert-manager-alerts,velero-alerts,silent-failure-alerts,argocd-servicemonitor,pve-exporter,alertmanager-discord,external-secret,ingressroute,network-policies,network-policies-egress,loki-dashboard,slo-dashboard,application,manifests-application}.yml'
+      include: '{alertmanager-config,blackbox-exporter,snmp-exporter,control-plane-alerts,slo-rules,hardware-temp-alerts,storage-capacity-alerts,postgres-alerts,cert-manager-alerts,velero-alerts,silent-failure-alerts,argocd-servicemonitor,pve-exporter,alertmanager-discord,external-secret,ingressroute,network-policies,network-policies-egress,loki-dashboard,slo-dashboard,application,manifests-application,tailnet-route-drift-check}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
