@@ -480,6 +480,31 @@ spec:
                     target_label: instance
                   - target_label: __address__
                     replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+              # 2026-09-10: Vaultwarden had zero synthetic monitoring, found
+              # while chasing a client-reported sync failure with a
+              # perfectly clean server side (ArgoCD Synced/Healthy, litestream
+              # current, app logs all 200s). Same ClusterIP-direct pattern as
+              # Authelia above, not the public blackbox-http job -- vault.woitzik.dev
+              # has no public DNS record by design (ADR-033), so a
+              # public-resolver probe would just permanently fail. This
+              # catches "Vaultwarden itself is down or unhealthy"; it can't
+              # catch "the tailnet path to it is broken" -- see
+              # tailnet-route-drift-check.yml for that half of the gap.
+              - job_name: 'blackbox-vaultwarden-health'
+                scrape_interval: 60s
+                metrics_path: /probe
+                params:
+                  module: [http_2xx]
+                static_configs:
+                  - targets:
+                      - http://10.43.186.87:80/alive
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - source_labels: [__param_target]
+                    target_label: instance
+                  - target_label: __address__
+                    replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

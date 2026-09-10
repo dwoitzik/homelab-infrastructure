@@ -1,0 +1,166 @@
+# Closes a real blind spot found 2026-09-10: a tailnet exit-node route-
+# approval drift (see ADR-043) left one subnet-router node as the sole
+# candidate for a route it couldn't actually serve, breaking client
+# connectivity (Vaultwarden "sync failed", Snapchat hangs, internal sites
+# failing to load) for a full day before it was noticed -- purely because
+# nobody was watching it, not because any alert fired. Headscale's own
+# /metrics has no per-node/per-route state at all (checked live before
+# building this, not assumed) and ArgoCD/Prometheus have no visibility into
+# headscale's route-approval table either -- this is a genuine gap none of
+# the existing monitoring covers, not a duplicate of anything.
+#
+# Baseline this checks against matches ADR-043's 2026-09-10 decision (both
+# subnet-router-capable nodes approved for the same route set) -- if that
+# decision changes (e.g. real dual-stack CNI work lands), update EXPECTED
+# below to match, or this will alert on its own now-intentional drift.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tailnet-route-drift-checker
+  namespace: monitoring
+---
+# `pods/exec create` is broader than ideal (headscale's pod name changes on
+# every rollout, so RBAC can't scope this to one resourceName) but matches
+# this repo's existing risk tolerance for narrow-purpose CronJob
+# ServiceAccounts -- dr-game-day-runner already grants unscoped `pods`
+# `delete` in this same namespace under the same reasoning. This
+# ServiceAccount is single-purpose and used nowhere else.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tailnet-route-drift-checker
+  namespace: apps
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tailnet-route-drift-checker
+  namespace: apps
+subjects:
+  - kind: ServiceAccount
+    name: tailnet-route-drift-checker
+    namespace: monitoring
+roleRef:
+  kind: Role
+  name: tailnet-route-drift-checker
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tailnet-route-drift-check-script
+  namespace: monitoring
+data:
+  check.sh: |
+    #!/bin/sh
+    set -u
+
+    NAMESPACE=apps
+    EXPECTED='["0.0.0.0/0","10.0.20.0/24","::/0"]'
+    # given_name -> headscale node id, both currently tagged as the
+    # subnet-router-capable pair (see ADR-043). Matched by given_name, not
+    # id, since ids are stable but names are what a human actually recognizes
+    # in an alert.
+    NODES="homelab-router-1 rpi-srv-02"
+
+    log() { echo "[tailnet-route-drift] $(date -u +%FT%TZ) $*"; }
+
+    post_discord() {
+      MSG="$1"
+      PAYLOAD=$(jq -n --arg content "$MSG" '{content: $content}')
+      curl -fsS -m 20 -X POST -H "Content-Type: application/json" \
+        -d "$PAYLOAD" "$DISCORD_WEBHOOK_URL" >/dev/null
+    }
+
+    HEADSCALE_POD=$(kubectl get pods -n "$NAMESPACE" -l app=headscale -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [ -z "$HEADSCALE_POD" ]; then
+      log "FAIL: no headscale pod found in $NAMESPACE"
+      post_discord "@here **Tailnet route drift check**: no headscale pod found in \`$NAMESPACE\` -- headscale itself may be down. Check \`kubectl get pods -n apps -l app=headscale\`."
+      exit 1
+    fi
+
+    ROUTES_JSON=$(kubectl exec -n "$NAMESPACE" "$HEADSCALE_POD" -c headscale -- headscale nodes list-routes --output json 2>/dev/null)
+    if [ -z "$ROUTES_JSON" ]; then
+      log "FAIL: could not read route state from headscale"
+      post_discord "@here **Tailnet route drift check**: could not read route state from the headscale pod (\`headscale nodes list-routes\` returned nothing). Check headscale's own health first."
+      exit 1
+    fi
+
+    DRIFT=""
+    for NAME in $NODES; do
+      NODE=$(echo "$ROUTES_JSON" | jq -c --arg name "$NAME" '[.[] | select(.given_name == $name)][0]')
+      if [ "$NODE" = "null" ] || [ -z "$NODE" ]; then
+        DRIFT="${DRIFT}\n- \`$NAME\` is missing from headscale's node list entirely."
+        continue
+      fi
+      ONLINE=$(echo "$NODE" | jq -r '.online // false')
+      APPROVED=$(echo "$NODE" | jq -c '.approved_routes // [] | sort')
+      EXPECTED_SORTED=$(echo "$EXPECTED" | jq -c 'sort')
+      if [ "$ONLINE" != "true" ]; then
+        DRIFT="${DRIFT}\n- \`$NAME\` is offline."
+      fi
+      if [ "$APPROVED" != "$EXPECTED_SORTED" ]; then
+        DRIFT="${DRIFT}\n- \`$NAME\` approved_routes is $APPROVED, expected $EXPECTED_SORTED."
+      fi
+    done
+
+    if [ -n "$DRIFT" ]; then
+      log "DRIFT DETECTED:$DRIFT"
+      post_discord "@here **Tailnet route drift detected** -- this is exactly the failure class that broke Vaultwarden/general tailnet traffic on 2026-09-09 (see ADR-043), caught automatically this time instead of waiting for someone to notice:$DRIFT
+
+    Check: \`headscale nodes list-routes --output json\` (exec into the headscale pod). Fix with \`headscale nodes approve-routes --identifier <id> --routes \"<csv>\" --force\` to restore the expected set."
+      exit 1
+    fi
+
+    log "OK: both nodes online and approved_routes match the expected baseline"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tailnet-route-drift-check
+  namespace: monitoring
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 60
+      backoffLimit: 0
+      template:
+        spec:
+          serviceAccountName: tailnet-route-drift-checker
+          restartPolicy: Never
+          containers:
+            - name: tailnet-route-drift-check
+              image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+              command: ["/bin/sh", "-c", "apk add --no-cache curl jq kubectl >/dev/null && sh /scripts/check.sh"]
+              env:
+                - name: DISCORD_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: alertmanager-discord-webhook
+                      key: url
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+              resources:
+                requests:
+                  cpu: 20m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+          volumes:
+            - name: script
+              configMap:
+                name: tailnet-route-drift-check-script
+                defaultMode: 0755
