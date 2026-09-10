@@ -196,12 +196,28 @@ three. This is a deliberate regression rollback, not a fix of the
 underlying problem -- the underlying problem (this tailnet cannot offer a
 real, working IPv6 exit path from either candidate node, and tailscale
 provides no way to advertise IPv4-only exit-node capability) is still
-unresolved. See `phase8/QUESTIONS.md` for the follow-up decision this
-needs: either accept the bundled-but-partially-broken v4+v6 exit-node
-status quo (what's restored now, matches the original slow-but-working
-complaint this ADR started from), drop `--advertise-exit-node` from
-`homelab-router-1` entirely (loses exit-node capability tailnet-wide, but
-removes the black-hole risk structurally), or do the real dual-stack CNI
-work to give the k3s pod genuine IPv6 egress (bigger, not attempted here).
-Not a same-day emergency call -- restoring David's phone took priority over
-picking the permanent answer.
+unresolved.
+
+## Decision (2026-09-10): keep the restored status quo, defer the real fix
+
+Picked between the three options above rather than leaving this parked (see
+`phase8/QUESTIONS.md` for the full reasoning): keeping the
+bundled-but-partially-broken v4+v6 status quo, same topology that was live
+before this whole investigation started and that David originally described
+as slow, not broken. A fourth, more surgical option was checked first --
+reject forwarded IPv6 at the pod firewall so it fails fast instead of
+hanging, keeping IPv4 exit-node function intact -- but isn't implementable
+here: `ip6tables` has no `filter` table inside this pod's container runtime
+(confirmed live: `modprobe: can't change directory to '/lib/modules'`), not
+just assumed unavailable. Dropping `--advertise-exit-node` from
+`homelab-router-1` alone was also checked and rejected: `rpi-srv-02`
+independently advertises the same bundled `::/0`+`0.0.0.0/0` pair on its own
+(confirmed via its `available_routes`), so removing only the k3s router's
+advertisement doesn't close the false-v6 gap -- it just forces all exit
+traffic permanently onto the weaker Pi.
+
+The real fix -- genuine dual-stack IPv6 egress for the k3s subnet-router pod,
+likely needing a network-mode change away from the CNI-default pod network
+(`hostNetwork` or a macvlan-style attachment) -- is real project work, not
+squeezed into this already twice-touched-today session. Tracked as a
+concrete follow-up, not left as an open question.
