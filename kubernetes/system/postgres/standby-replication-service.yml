@@ -1,0 +1,20 @@
+# ADR-030: dedicated entry point for rpi-srv-02's warm standby, restricted
+# to its LAN IP three independent ways (loadBalancerSourceRanges here,
+# network-policies.yml's ipBlock, cluster.yml's pg_hba) -- see the ADR.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-authelia-standby-replication
+  namespace: database
+spec:
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - 10.0.20.3/32
+  selector:
+    cnpg.io/cluster: postgres-authelia
+    cnpg.io/instanceRole: primary
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgresql

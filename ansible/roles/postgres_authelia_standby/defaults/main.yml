@@ -1,0 +1,17 @@
+---
+
+# Physical streaming-replication warm standby for Authelia's Postgres
+# (docs/decisions/ADR-030-authelia-postgres-warm-standby.md). Runs
+# continuously in recovery mode, unlike the stopped-by-default docker-compose standbys.
+
+postgres_authelia_standby_pg_version: "17"
+postgres_authelia_standby_data_dir: /mnt/ssd/postgres-authelia-standby/17/main
+
+# MetalLB-assigned once standby-replication-service.yml is applied, not
+# knowable ahead of time. Set for real via `kubectl get svc
+# postgres-authelia-standby-replication -n database`; a placeholder just fails fast.
+postgres_authelia_standby_primary_host: "REPLACE-ME-with-the-real-LoadBalancer-IP"
+postgres_authelia_standby_primary_port: 5432
+
+postgres_authelia_standby_replication_user: rpi02_replica
+postgres_authelia_standby_replication_slot: rpi02_standby_slot
