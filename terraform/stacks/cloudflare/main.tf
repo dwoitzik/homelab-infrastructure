@@ -200,5 +200,5 @@ resource "cloudflare_dns_record" "mc_playit" {
 # =============================================================================
 # Immich SSO via CF Access OIDC IdP (sign-in only, immich#8299). NOT
 # TF-managed: stack token lacks Zero Trust Access (403); app + Immich OAuth
-# client values created via admin API, recorded in phase8/LEDGER.md.
+# client values created via admin API, documented in docs/SSO_SETUP.md.
 # =============================================================================
