@@ -198,50 +198,43 @@ resource "cloudflare_dns_record" "mc_playit" {
 # it.
 
 # =============================================================================
-# Cloudflare Access (Zero Trust) in front of photos.woitzik.dev.
-# 2026-08-17: BRIEFING-V4.md Section 1.4 / Section B. Immich has no external
-# auth of its own in front of it (the rate limit in kubernetes/apps/immich/
-# middleware.yml is abuse mitigation, not authentication) -- this puts a real
-# identity gate at Cloudflare's edge, before any request reaches the tunnel
-# at all. One-time PIN (email OTP) is Cloudflare's built-in identity method,
-# no separate IdP needed.
-#
-# Known, accepted trade-off (documented, not silently worked around): this
-# gates the ENTIRE app, including the API paths the Immich mobile app calls
-# directly with its own bearer-token auth, not a browser session Access can
-# recognize. The brief's own instruction ("Immich itself is invisible to
-# everyone else") does not carve out an exception for the mobile app, so this
-# implements it literally. Practical effect: family members can still use the
-# mobile app freely from inside the LAN or over Tailscale (this Access
-# Application only ever sees traffic that comes in through the public
-# Cloudflare Tunnel, not LAN/VPN traffic, which never touches Cloudflare at
-# all -- see the tunnel-scoping comment at the top of this file). External
-# mobile-app access (cellular data, off the family WiFi and off Tailscale)
-# will need either a one-time browser-based Access login first (session
-# persists) or the family member on Tailscale. If this proves too disruptive
-# in practice, the fix is a second, path-scoped Access Application or a
-# Service Token for the app specifically -- a deliberate follow-up, not
-# implemented blind here.
+# Immich SSO via Cloudflare Access OIDC IdP: edge request-gate can't satisfy
+# mobile bearer-token API calls, so Access only emits OIDC tokens at sign-in.
+# =============================================================================
 resource "cloudflare_zero_trust_access_application" "immich" {
-  account_id                = var.account_id
-  name                      = "Immich (photos.woitzik.dev)"
-  domain                    = "photos.woitzik.dev"
-  type                      = "self_hosted"
-  session_duration          = "24h"
-  auto_redirect_to_identity = true
-  allowed_idps              = [] # empty = all IdPs enabled on the account, incl. One-time PIN
+  account_id       = var.account_id
+  name             = "Immich OIDC (photos.woitzik.dev)"
+  type             = "saas"
+  session_duration = "24h"
 
-  # v5 schema: policies are defined inline on the application (a nested list
-  # attribute), not as a separate resource linked by an application_id --
-  # confirmed against the actual provider schema (`terraform providers
-  # schema -json`), not guessed; there is no `application_id` argument on
-  # cloudflare_zero_trust_access_policy in this provider version.
+  # Not a request gate: no domain/auto_redirect_to_identity, delivery is the
+  # tunnel ingress at the top of this file. client_id/secret/sso_endpoint are
+  # computed on create -- read from remote state after apply for Immich OAuth.
+  saas_app = {
+    auth_type        = "oidc"
+    app_launcher_url = "https://photos.woitzik.dev/"
+    # openid identity + email claims are enough to match users by email.
+    scopes = ["openid", "email"]
+    # Plain authorization_code, no PKCE -- Immich sends client_secret on the
+    # token endpoint; keep this so the native mobile app stays compatible.
+    grant_types = ["authorization_code"]
+    # Immich callbacks: default login/settings endpoints plus the documented
+    # mobile redirect override so native apps work off-LAN without a browser
+    # Access session (the whole point versus the old request-gate).
+    redirect_uris = [
+      "https://photos.woitzik.dev/auth/login",
+      "https://photos.woitzik.dev/user-settings",
+      "https://photos.woitzik.dev/api/oauth/mobile-redirect",
+    ]
+  }
+
+  # Same allowlist as before -- only the family's email addresses can go
+  # through the One-time PIN flow, so only they can obtain an OIDC token for
+  # Immich. Every rule is OR'd; one entry per address.
   policies = [
     {
-      name     = "Family email OTP"
+      name     = "Family email OTP (Immich OIDC)"
       decision = "allow"
-      # Each `include` entry is OR'd; an `email` rule takes exactly one
-      # address -- one entry per family member, not a list inside one rule.
       include = [
         for addr in var.immich_access_family_emails : {
           email = { email = addr }
