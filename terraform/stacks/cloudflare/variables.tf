@@ -27,22 +27,3 @@ variable "mc_playit_hostname" {
   description = "playit.gg tunnel hostname for mc.woitzik.dev CNAME."
   default     = "doing-sigma.gl.joinmc.link"
 }
-
-variable "immich_access_family_emails" {
-  type        = list(string)
-  description = <<-EOT
-    Email addresses allowed to run the Cloudflare One-time-PIN (OTP) flow and
-    obtain an OIDC token for Immich. These match the "primary email addresses
-    of the family Immich accounts" (operator, 2026-09-17: the current set is
-    complete, no more will be added) -- the OIDC identity must match an
-    existing Immich account email, or login will fail. Enforced on the
-    Access SaaS application's allow policy; one entry per address.
-  EOT
-  # Known Immich account addresses (DB user table), matched by OIDC email
-  # claim: David (admin), Adrian, Katharina.
-  default = [
-    "woitzikdavid18@gmail.com",
-    "goraadrian28@gmail.com",
-    "dwoitzik50@gmail.com",
-  ]
-}

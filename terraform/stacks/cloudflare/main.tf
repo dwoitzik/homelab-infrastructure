@@ -198,48 +198,7 @@ resource "cloudflare_dns_record" "mc_playit" {
 # it.
 
 # =============================================================================
-# Immich SSO via Cloudflare Access OIDC IdP: edge request-gate can't satisfy
-# mobile bearer-token API calls, so Access only emits OIDC tokens at sign-in.
+# Immich SSO via CF Access OIDC IdP (sign-in only, immich#8299). NOT
+# TF-managed: stack token lacks Zero Trust Access (403); app + Immich OAuth
+# client values created via admin API, recorded in phase8/LEDGER.md.
 # =============================================================================
-resource "cloudflare_zero_trust_access_application" "immich" {
-  account_id       = var.account_id
-  name             = "Immich OIDC (photos.woitzik.dev)"
-  type             = "saas"
-  session_duration = "24h"
-
-  # Not a request gate: no domain/auto_redirect_to_identity, delivery is the
-  # tunnel ingress at the top of this file. client_id/secret/sso_endpoint are
-  # computed on create -- read from remote state after apply for Immich OAuth.
-  saas_app = {
-    auth_type        = "oidc"
-    app_launcher_url = "https://photos.woitzik.dev/"
-    # openid identity + email claims are enough to match users by email.
-    scopes = ["openid", "email"]
-    # Plain authorization_code, no PKCE -- Immich sends client_secret on the
-    # token endpoint; keep this so the native mobile app stays compatible.
-    grant_types = ["authorization_code"]
-    # Immich callbacks: default login/settings endpoints plus the documented
-    # mobile redirect override so native apps work off-LAN without a browser
-    # Access session (the whole point versus the old request-gate).
-    redirect_uris = [
-      "https://photos.woitzik.dev/auth/login",
-      "https://photos.woitzik.dev/user-settings",
-      "https://photos.woitzik.dev/api/oauth/mobile-redirect",
-    ]
-  }
-
-  # Same allowlist as before -- only the family's email addresses can go
-  # through the One-time PIN flow, so only they can obtain an OIDC token for
-  # Immich. Every rule is OR'd; one entry per address.
-  policies = [
-    {
-      name     = "Family email OTP (Immich OIDC)"
-      decision = "allow"
-      include = [
-        for addr in var.immich_access_family_emails : {
-          email = { email = addr }
-        }
-      ]
-    }
-  ]
-}
