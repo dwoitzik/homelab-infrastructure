@@ -117,11 +117,14 @@ resource "routeros_ip_firewall_filter" "fwd_vpn_laptop_full" {
   }
 }
 
+# src_address was a single host (ct-srv-docker-01) from before Prometheus
+# moved into k3s -- the actual scraper (a pod on vm-srv-k3s-12) was never
+# covered by this rule, causing a permanent TargetDown for these exporters.
 resource "routeros_ip_firewall_filter" "fwd_monitoring_dmz_scrape" {
   action       = "accept"
   chain        = "forward"
   protocol     = "tcp"
-  src_address  = "10.0.20.252"
+  src_address  = "10.0.20.0/24"
   dst_address  = "10.0.30.0/24"
   dst_port     = "9100,9080"
   place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
