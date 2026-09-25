@@ -28,7 +28,7 @@ data:
       # that is what endpoint monitoring cares about, not the auth result.
       http_auth_ok:
         prober: http
-        timeout: 5s
+        timeout: 15s
         http:
           valid_status_codes: [200, 301, 302, 401, 403]
           method: GET
