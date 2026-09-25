@@ -341,6 +341,10 @@ import {
   to = routeros_ip_firewall_nat.srcnat_masquerade_mgmt_to_srv
   id = "*8"
 }
+import {
+  to = routeros_ip_firewall_nat.srcnat_masquerade_heimnetz_to_srv
+  id = "*D"
+}
 
 # --- Firewall filters: anchors & deterministic chain (firewall_deterministic.tf) ---
 import {

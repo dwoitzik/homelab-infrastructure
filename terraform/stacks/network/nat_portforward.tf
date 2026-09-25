@@ -32,12 +32,15 @@ removed {
 # to headscale's dedicated LoadBalancer IP (10.0.20.201), bypassing Traefik
 # for the same reason. FritzBox's own forward is out of Terraform's reach
 # (ISP router, not IaC-managed) -- configured manually.
+# dst_address pinned to ether1's IP: only the FritzBox forward target matches
+# (else every TCP/443 on ether1 hit the DMZ proxy, hijacking LAN HTTPS).
 ###############################################################################
 
 resource "routeros_ip_firewall_nat" "dstnat_headscale_dmz" {
   chain        = "dstnat"
   action       = "dst-nat"
   in_interface = "ether1"
+  dst_address  = "192.168.178.10"
   protocol     = "tcp"
   dst_port     = "443"
   to_addresses = "10.0.30.2"
@@ -102,4 +105,15 @@ resource "routeros_ip_firewall_nat" "srcnat_masquerade_admin_to_srv" {
   src_address = "10.0.100.0/24"
   dst_address = "10.0.20.0/24"
   comment     = "NAT: Masquerade Admin to SRV for return traffic"
+}
+
+# Same return-traffic problem as Admin->SRV above, for the FritzBox LAN:
+# Wi-Fi clients reach SRV via FritzBox static route 10.0.0.0/8->192.168.178.10,
+# so SRV return traffic must be masqueraded back through ether1.
+resource "routeros_ip_firewall_nat" "srcnat_masquerade_heimnetz_to_srv" {
+  chain       = "srcnat"
+  action      = "masquerade"
+  src_address = "192.168.178.0/24"
+  dst_address = "10.0.20.0/24"
+  comment     = "NAT: Masquerade Heimnetz to SRV for return traffic"
 }
