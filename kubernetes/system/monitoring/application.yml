@@ -318,6 +318,7 @@ spec:
                 - name: ndots
                   value: "1"
             retention: 30d
+            retentionSize: 12GiB
             storageSpec:
               volumeClaimTemplate:
                 spec:
