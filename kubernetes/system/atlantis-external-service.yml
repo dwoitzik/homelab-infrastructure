@@ -18,6 +18,7 @@ metadata:
 spec:
   ports:
     - port: 4141
+      protocol: TCP
       targetPort: 4141
 ---
 apiVersion: v1
@@ -30,3 +31,4 @@ subsets:
       - ip: 10.0.20.250
     ports:
       - port: 4141
+        protocol: TCP
