@@ -54,7 +54,7 @@ services:
         condition: service_healthy
 
   wazuh.indexer:
-    image: wazuh/wazuh-indexer:4.12.0
+    image: wazuh/wazuh-indexer:4.14.8@sha256:929179d223dc44e40c2e5c8bdbd1df19c6f68ab8f4ac255dfce98d92ee831a17
     container_name: wazuh.indexer
     hostname: wazuh.indexer
     restart: unless-stopped
