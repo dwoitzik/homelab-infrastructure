@@ -4,6 +4,9 @@ metadata:
   name: trivy-system
   labels:
     app.kubernetes.io/part-of: trivy
+    # The apiserver stamps this on every Namespace and treats it as
+    # immutable, so leaving it undeclared reads as permanent ArgoCD drift.
+    kubernetes.io/metadata.name: trivy-system
 ---
 # REL-012c: catch-up scan storms after a node reboot were pushing etcd
 # apply latency past its 100ms budget on the control-plane node and
