@@ -4,6 +4,28 @@ All notable changes to this infrastructure are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **KubeAPIServerHighLatency alert fires were restart artifacts** (PR #771): raised the
+  rule's `for` 2m→10m after every recent fire (2026-09-27 03:48/07:48/09:12 CEST)
+  correlated 1:1 with a Prometheus pod restart — the `rate([5m])` window spanning a
+  restart gap fabricates a junk p99 from sparse histogram buckets. 10m sheds the
+  artifact while a genuine sustained REL-012 latency episode still fires. Also corrected
+  stale etcd claims in the rule's comments/descriptions (this cluster runs kine/SQLite
+  per ADR-015).
+- **Quality-of-life repo cleanup**: removed ~57 dead branches (merged/closed PR leftovers,
+  incl. `@claude` co-author trailer branches), closed 3 stale Renovate PRs whose branches
+  had diverged ~887 commits from main (Renovate re-opened fresh ones), deleted a stray
+  local worktree/branch, dropped untracked scratch dirs (`monitoring/`,
+  `sops/incident-log.md`).
+
+### Added
+
+- **REL-074 incident record** (`docs/incidents/REL-074-2026-09-21-alert-storm.md`):
+  the 2026-09-21 overnight alert storm (8 alerts, k3s-13 memory pressure, API p99 8.5s)
+  was previously only in an untracked scratch log — consolidated as a proper incident
+  doc and cross-referenced from `docs/HOMELAB-AUDIT.md`.
+
 ## [0.8.0] — 2026-06-28
 
 ### Added
