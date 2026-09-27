@@ -110,3 +110,24 @@ spec:
       ports:
         - port: 8000
           protocol: TCP
+---
+# ADR-030: rpi-srv-02 streams replication from outside the cluster, so this
+# is an ipBlock rule, not a namespaceSelector. One of three restriction layers.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-rpi02-replication
+  namespace: database
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: postgres-authelia
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.20.3/32
+      ports:
+        - port: 5432
+          protocol: TCP

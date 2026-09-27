@@ -17,6 +17,9 @@
 #   kubectl create secret generic postgres-authelia-user -n database \
 #     --from-literal=username=authelia \
 #     --from-literal=password=<same password as in authelia-secrets/storage-password>
+#
+# ADR-030 prerequisite: postgres-authelia-rpi02-replica k8s Secret + matching
+# Vault password entry, both already generated -- see ansible/roles/postgres_authelia_standby.
 
 ---
 apiVersion: postgresql.cnpg.io/v1
@@ -31,6 +34,23 @@ spec:
     parameters:
       max_connections: "100"
       shared_buffers: "64MB"
+    # ADR-030: password-authenticated replication for the rpi-srv-02 warm
+    # standby, restricted to its exact LAN IP -- CNPG's own default pg_hba
+    # rules are cert-authenticated and don't cover an external standby.
+    pg_hba:
+      - hostssl replication rpi02_replica 10.0.20.3/32 scram-sha-256
+
+  managed:
+    roles:
+      # ADR-030: minimal-privilege role for rpi-srv-02's standby only --
+      # replication only, no login to any real database, no superuser.
+      - name: rpi02_replica
+        ensure: present
+        login: true
+        replication: true
+        superuser: false
+        passwordSecret:
+          name: postgres-authelia-rpi02-replica
 
   bootstrap:
     initdb:
