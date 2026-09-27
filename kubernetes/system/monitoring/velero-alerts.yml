@@ -51,3 +51,22 @@ spec:
           annotations:
             summary: "Velero backup partially failed"
             description: "At least one Velero backup completed with PartialFailure in the last hour ({{ $labels.schedule }}) -- some resources were skipped. Check `velero backup describe` before assuming the backup is complete."
+        # The silent case the two above cannot catch: counters only move when
+        # a run happens and breaks. Pinned to daily-backup because the metric
+        # has no paused label -- all-schedules matching pages on paused ones.
+        - alert: VeleroBackupStale
+          expr: |
+            time() - max by (schedule) (velero_backup_last_successful_timestamp{schedule="daily-backup"}) > 30 * 3600
+          labels:
+            severity: critical
+          annotations:
+            summary: "Velero backup is stale"
+            description: "The daily-backup schedule ({{ $labels.schedule }}) has not completed successfully in over 30h. A daily 05:00 schedule that has not run means the schedule is paused, the controller is wedged, or runs are failing before Velero counts them. Check `kubectl get schedules.velero.io -n velero` and `velero backup logs`."
+        - alert: VeleroBackupMetricAbsent
+          expr: |
+            absent(velero_backup_last_successful_timestamp{schedule="daily-backup"})
+          labels:
+            severity: critical
+          annotations:
+            summary: "Velero backup metrics are gone"
+            description: "velero_backup_last_successful_timestamp is absent for the daily-backup schedule, so backup age cannot be assessed at all. The Velero controller pod is likely down or the ServiceMonitor stopped scraping it. Check the velero namespace and the ServiceMonitor in kubernetes/system/monitoring/velero-alerts.yml."
