@@ -4,6 +4,10 @@ already asks not to do (see "Comment style"). Scans added lines in the staged
 diff for a comment containing a date, an investigation-narration phrase, or
 a comment block longer than 3 lines.
 
+Markdown docs are exempt: a `#` there is a heading, not a comment, and dated
+narration is the legitimate home of incident records (docs/incidents/) --
+the rule is about comments in code, not prose in docs.
+
 This exists because asking for it in CLAUDE.local.md alone didn't hold --
 it got violated again the same day it was written, and twice more after
 that. A mechanical gate outlasts a session's memory of the rule.
@@ -72,6 +76,9 @@ def main() -> int:
         if not is_added:
             flush_block()
             block = []
+            continue
+
+        if current_file and current_file.endswith(".md"):
             continue
 
         content = line[1:]
