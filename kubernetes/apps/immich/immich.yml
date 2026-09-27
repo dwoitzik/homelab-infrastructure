@@ -166,7 +166,7 @@ spec:
             value: "1"
       containers:
       - name: valkey
-        image: valkey/valkey:9.1.0-alpine
+        image: valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
         command: ["valkey-server", "--save", "", "--appendonly", "no"]
         securityContext:
           allowPrivilegeEscalation: false
