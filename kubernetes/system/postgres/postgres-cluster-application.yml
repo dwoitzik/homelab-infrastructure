@@ -27,6 +27,25 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: database
+  # CNPG writes its defaults back into .spec, so a spec declaring only what it
+  # means diffs forever and selfHeal chases it in a loop. Ignore only the
+  # operator-owned fields; storage/backup/monitoring/postgresql stay diffable.
+  ignoreDifferences:
+    - group: postgresql.cnpg.io
+      kind: Cluster
+      jsonPointers:
+        - /spec/enablePDB
+        - /spec/enableSuperuserAccess
+        - /spec/failoverDelay
+        - /spec/imageName
+        - /spec/logLevel
+        - /spec/affinity/podAntiAffinityType
+        - /spec/backup/target
+        - /spec/bootstrap/initdb/encoding
+        - /spec/bootstrap/initdb/localeCType
+        - /spec/bootstrap/initdb/localeCollate
+        - /spec/managed/roles/0/connectionLimit
+        - /spec/managed/roles/0/inherit
   syncPolicy:
     automated:
       prune: true
