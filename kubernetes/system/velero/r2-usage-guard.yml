@@ -76,15 +76,17 @@ data:
     USAGE_GB=$(awk -v b="$USAGE_BYTES" 'BEGIN { printf "%.2f", b / 1024 / 1024 / 1024 }')
     log "current usage: ${USAGE_BYTES} bytes (${USAGE_GB} GiB), threshold ${THRESHOLD_BYTES} bytes"
 
-    ALREADY_PAUSED=$(kubectl get schedule daily-offsite -n velero -o jsonpath='{.spec.paused}' 2>/dev/null || echo "false")
+    # Schedule collides across API groups (velero.io and chaos-mesh.org both
+    # define it) and the bare alias resolves to the wrong one.
+    ALREADY_PAUSED=$(kubectl get schedule.velero.io daily-offsite -n velero -o jsonpath='{.spec.paused}' 2>/dev/null || echo "false")
 
     if [ "$USAGE_BYTES" -ge "$THRESHOLD_BYTES" ]; then
       if [ "$ALREADY_PAUSED" != "true" ]; then
         log "over threshold -- pausing daily-offsite Schedule"
-        kubectl patch schedule daily-offsite -n velero --type merge -p '{"spec":{"paused":true}}'
+        kubectl patch schedule.velero.io daily-offsite -n velero --type merge -p '{"spec":{"paused":true}}'
         curl -fsS -H "Title: R2 offsite backup PAUSED -- near free-tier cap" -H "Priority: high" \
           -H "Tags: warning,moneybag" \
-          -d "R2 usage hit ${USAGE_GB} GiB (cap ${THRESHOLD_BYTES} bytes). daily-offsite Schedule paused automatically -- not resuming on its own. Free up space (shorten TTL, drop a namespace from scope) or accept overage cost, then unpause: kubectl patch schedule daily-offsite -n velero --type merge -p '{\"spec\":{\"paused\":false}}'" \
+          -d "R2 usage hit ${USAGE_GB} GiB (cap ${THRESHOLD_BYTES} bytes). daily-offsite Schedule paused automatically -- not resuming on its own. Free up space (shorten TTL, drop a namespace from scope) or accept overage cost, then unpause: kubectl patch schedule.velero.io daily-offsite -n velero --type merge -p '{\"spec\":{\"paused\":false}}'" \
           "$NTFY_URL" || true
       else
         log "over threshold, already paused -- no action, not re-alerting"
