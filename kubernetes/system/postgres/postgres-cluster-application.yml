@@ -23,7 +23,9 @@ spec:
     targetRevision: HEAD
     path: kubernetes/system/postgres
     directory:
-      include: '{cluster,cluster-n8n,cluster-synapse,cluster-firefly,external-secret,scheduled-backup,backup-config,network-policies,postgres-monitoring,standby-replication-service}.yml'
+      # cluster-scanopy was missing here, so the live postgres-scanopy Cluster
+      # carried no tracking-id and a rebuild would have dropped it silently.
+      include: '{cluster,cluster-n8n,cluster-synapse,cluster-firefly,cluster-scanopy,external-secret,scheduled-backup,backup-config,network-policies,postgres-monitoring,standby-replication-service}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: database
