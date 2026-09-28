@@ -250,15 +250,16 @@ jobs:
           promtool --version
           yq --version
 
-      # 'ea' because several of these files hold more than one PrometheusRule
-      # document, and promtool only understands the bare rule group, not the
-      # CRD wrapper -- hence .spec before the pipe.
+      # 'ea' for the multi-document files, and select() because some mix in a
+      # ServiceMonitor alongside the rule (velero-alerts.yml does) -- its spec
+      # would otherwise be reported as rule errors.
       - name: Check alerting rule syntax
         run: |
           status=0
           while IFS= read -r f; do
             printf '=== %s\n' "$f"
-            yq ea '.spec' "$f" | promtool check rules /dev/stdin || status=1
+            yq ea 'select(.kind == "PrometheusRule") | .spec' "$f" \
+              | promtool check rules /dev/stdin || status=1
           done < <(grep -rl 'kind: PrometheusRule' kubernetes/ --include='*.yml' --include='*.yaml')
           exit $status
 
