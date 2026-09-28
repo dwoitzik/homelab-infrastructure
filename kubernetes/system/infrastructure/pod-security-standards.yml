@@ -114,6 +114,10 @@ kind: Namespace
 metadata:
   name: trivy-system
   labels:
+    app.kubernetes.io/part-of: trivy
+    # The apiserver stamps this on every Namespace and treats it as
+    # immutable, so leaving it undeclared reads as permanent ArgoCD drift.
+    kubernetes.io/metadata.name: trivy-system
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
