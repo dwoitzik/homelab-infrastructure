@@ -39,13 +39,9 @@
 # the live ArgoCD instance yet either. Needs an explicit go before applying,
 # same as any other change with cluster-wide reach.
 #
-# APPLIED and live 2026-08-08 extension: include pattern widened to also take
-# the top-level system manifest files apps-ingressroute.yml and
-# other-ingressroute.yml (the IngressRoute/Service/Endpoints layer that had
-# NO ArgoCD owner before -- those routes were re-applied manually after the
-# 2026-08-08 CRD-loss incident). These files use fully-qualified namespace:
-# fields, so destination.namespace (argocd) is overridden per-resource and
-# routes land in their real namespaces (apps, monitoring, vault, kube-system).
+# apps-ingressroute.yml and other-ingressroute.yml are NOT included:
+# system-manifests already owns them, and two selfHeal+prune Applications
+# owning the same objects overwrite each other forever (~48 GB/day NVMe).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -59,7 +55,7 @@ spec:
     path: kubernetes/system
     directory:
       recurse: true
-      include: '{*/application.yml,*/manifests-application.yml,manifests-application.yml,postgres/postgres-cluster-application.yml,monitoring/loki.yml,apps-ingressroute.yml,other-ingressroute.yml,external-secrets/cluster-secret-store.yml}'
+      include: '{*/application.yml,*/manifests-application.yml,manifests-application.yml,postgres/postgres-cluster-application.yml,monitoring/loki.yml,external-secrets/cluster-secret-store.yml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
