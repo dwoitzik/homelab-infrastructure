@@ -126,26 +126,3 @@ spec:
     kind: Rule
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: onlyoffice, port: 80}]
----
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: onlyoffice
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/manifest-generate-paths: /kubernetes/apps/onlyoffice
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/dwoitzik/homelab-infrastructure.git
-    targetRevision: main
-    path: kubernetes/apps/onlyoffice
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: apps
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
