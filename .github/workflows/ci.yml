@@ -224,6 +224,44 @@ jobs:
                 -summary \
                 -exit-on-error
 
+  prometheus-rules:
+    # PrometheusRule CRDs are skipped by kubeconform (no upstream schema), so
+    # nothing validated the rule bodies until now. A typo in an expr, a missing
+    # 'for', or a bad label only surfaces as a silently dead alert at runtime.
+    name: Prometheus rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install promtool and yq
+        run: |
+          curl -sL --fail \
+            https://github.com/prometheus/prometheus/releases/download/v3.5.0/prometheus-3.5.0.linux-amd64.tar.gz \
+            -o /tmp/prometheus.tar.gz
+          tar xzf /tmp/prometheus.tar.gz -C /tmp
+          sudo install -m 0755 /tmp/prometheus-3.5.0.linux-amd64/promtool /usr/local/bin/promtool
+          # Installed explicitly rather than relying on the runner image: a
+          # yq major bump changes 'ea' semantics and would silently alter what
+          # gets validated here.
+          curl -sL --fail \
+            https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64 \
+            -o /usr/local/bin/yq
+          sudo chmod 0755 /usr/local/bin/yq
+          promtool --version
+          yq --version
+
+      # 'ea' because several of these files hold more than one PrometheusRule
+      # document, and promtool only understands the bare rule group, not the
+      # CRD wrapper -- hence .spec before the pipe.
+      - name: Check alerting rule syntax
+        run: |
+          status=0
+          while IFS= read -r f; do
+            printf '=== %s\n' "$f"
+            yq ea '.spec' "$f" | promtool check rules /dev/stdin || status=1
+          done < <(grep -rl 'kind: PrometheusRule' kubernetes/ --include='*.yml' --include='*.yaml')
+          exit $status
+
   security-scan:
     name: Security / Trivy
     runs-on: ubuntu-latest
