@@ -30,6 +30,13 @@ spec:
           kind: StatefulSet
           jsonPointers:
             - /spec/volumeClaimTemplates
+        # Every Namespace carries the API server's own "kubernetes" finalizer,
+        # which no manifest can declare and ArgoCD can never sync out, so any
+        # app here that owns a Namespace reads OutOfSync forever without this.
+        - group: ""
+          kind: Namespace
+          jsonPointers:
+            - /spec/finalizers
       syncPolicy:
         automated:
           prune: true
