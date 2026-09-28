@@ -6,7 +6,7 @@
 #
 # Root cause, confirmed via a full sweep of all 41 live ArgoCD Applications
 # (2026-07-10): kubernetes/apps/* is auto-discovered by
-# apps-applicationset.yaml, but nothing equivalent exists for
+# apps-applicationset.yml, but nothing equivalent exists for
 # kubernetes/system/* -- each of those Applications needed one manual
 # bootstrap apply, and most were never added to any sibling's
 # directory.include afterward. 18 of 41 live Applications' own defining
@@ -24,7 +24,7 @@
 # also defines promtail).
 #
 # Deliberately does NOT include ArgoCD's own core config (argocd-cm.yml,
-# argocd-cmd-params-cm.yml, argocd-rbac-cm.yml, apps-applicationset.yaml) --
+# argocd-cmd-params-cm.yml, argocd-rbac-cm.yml, apps-applicationset.yml) --
 # those stay excluded on purpose, same reasoning argocd-manifests.yml's own
 # header already gives: selfHeal+prune on ArgoCD's own bootstrap config has
 # cluster-wide blast radius if git and live have drifted, and that
