@@ -50,7 +50,7 @@ the NVMe.
    etcd — `kubectl` behaves the same either way, but `docs/decisions/ADR-015` explains
    why this matters for the hardware.
 4. Apply CNI/MetalLB/Traefik/cert-manager, then bootstrap ArgoCD.
-5. **Do not bulk-apply `kubernetes/system/argocd/apps-applicationset.yaml` or
+5. **Do not bulk-apply `kubernetes/system/argocd/apps-applicationset.yml` or
    `system-app-bootstrap.yml` yet.** Apply core system components
    (`kubernetes/system/*/application.yml`) individually, in dependency order (Vault →
    ExternalSecrets → everything else), verifying each is healthy before the next. Bulk
@@ -111,7 +111,7 @@ before assuming a restore is needed.
 2. Deploy Velero + Garage, prove a real restore into a scratch namespace before trusting
    the schedule (brief §8's own explicit requirement — "a scheduled backup is not a
    restorable backup").
-3. **Now** apply `kubernetes/system/argocd/apps-applicationset.yaml` to bring up the
+3. **Now** apply `kubernetes/system/argocd/apps-applicationset.yml` to bring up the
    remaining workload catalog. Before doing this, check for any Tier-1 data (from step 2)
    that belongs to an app under `kubernetes/apps/*` and hasn't been restored yet — do
    that first, or immediately after first sync via the pattern in step 5, so a fresh

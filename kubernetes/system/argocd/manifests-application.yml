@@ -6,13 +6,9 @@
 # live effect via GitOps; a fully untracked duplicate (argo-final, no auth)
 # was the only live route until it was found and manually removed.
 #
-# Only ingressroute.yml and external-secret.yml are included here -- both
-# simple, already-verified-matching-live objects. argocd-cm.yml,
-# argocd-cmd-params-cm.yml, argocd-rbac-cm.yml, and apps-applicationset.yaml
-# (ArgoCD's own bootstrap/RBAC config and the ApplicationSet that generates
-# every other Application) are deliberately left out of automated sync until
-# each has been individually diffed against live state -- selfHeal+prune on
-# those objects has cluster-wide blast radius if git and live have drifted.
+# argocd-cm.yml, argocd-cmd-params-cm.yml and argocd-rbac-cm.yml (ArgoCD's own
+# bootstrap/RBAC config) stay out of automated sync until each is individually
+# diffed against live -- selfHeal+prune there has cluster-wide blast radius.
 #
 # argocd-notifications-cm.yml and notifications-external-secret.yml added
 # 2026-07-07 (autonomy-readiness task 2): argocd-notifications-cm existed
@@ -41,9 +37,9 @@ spec:
     targetRevision: main
     path: kubernetes/system/argocd
     directory:
-      # apps-applicationset.yaml was unmanaged: the ApplicationSet that
-      # generates every app under kubernetes/apps/* had no owner, so a rebuild
-      # would have come up with none of them.
+      # Included after the diff its own header demanded: every field is
+      # identical to live, so selfHeal has nothing to revert. Renamed .yaml ->
+      # .yml because a brace glob ending in .yml cannot match it.
       include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret,network-policies,system-app-bootstrap,apps-applicationset}.yml'
   destination:
     server: https://kubernetes.default.svc
