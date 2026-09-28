@@ -41,7 +41,10 @@ spec:
     targetRevision: main
     path: kubernetes/system/argocd
     directory:
-      include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret,network-policies,system-app-bootstrap}.yml'
+      # apps-applicationset.yaml was unmanaged: the ApplicationSet that
+      # generates every app under kubernetes/apps/* had no owner, so a rebuild
+      # would have come up with none of them.
+      include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret,network-policies,system-app-bootstrap,apps-applicationset}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
