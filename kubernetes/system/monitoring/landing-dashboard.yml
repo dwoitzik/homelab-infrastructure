@@ -223,8 +223,9 @@ data:
           "id": 51,
           "type": "timeseries",
           "title": "CPU Package Power Draw (W, RAPL -- not full-system)",
+          "description": "max() collapses the node-exporter-pve, node-exporter-ai and node-exporter-app jobs: all three read this one host's powercap, so an uncollapsed or summed reading would triple it.",
           "gridPos": {"x": 0, "y": 30, "w": 12, "h": 5},
-          "targets": [{"expr": "rate(node_rapl_package_joules_total[5m]) or vector(0)"}],
+          "targets": [{"expr": "max(rate(node_rapl_package_joules_total[5m])) or vector(0)"}],
           "fieldConfig": {"defaults": {"unit": "watt"}}
         },
         {
@@ -239,7 +240,7 @@ data:
           "type": "stat",
           "title": "Est. CPU-Only Cost (EUR/month @ 0.30/kWh)",
           "gridPos": {"x": 18, "y": 30, "w": 6, "h": 5},
-          "targets": [{"expr": "(avg_over_time(rate(node_rapl_package_joules_total[5m])[24h:5m]) * 24 * 30 / 1000) * 0.30 or vector(0)"}],
+          "targets": [{"expr": "(max(avg_over_time(rate(node_rapl_package_joules_total[5m])[24h:5m])) * 24 * 30 / 1000) * 0.30 or vector(0)"}],
           "fieldConfig": {"defaults": {"unit": "currencyEUR"}}
         }
       ]
