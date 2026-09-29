@@ -216,10 +216,12 @@
     group: root
     mode: '0700'
 
-- name: Schedule weekly fstrim-all.sh (Sunday 04:30, off the PBS backup window)
+- name: Schedule daily fstrim-all.sh (04:30, off the PBS backup window)
+  # Daily, not weekly: pve/data sits on an NVMe whose partition has no free
+  # extents (PFree=0), so the pool cannot autoextend and only TRIM returns
+  # space. Weekly left 20.8 GiB stranded on pve/root across two days.
   ansible.builtin.cron:
     name: fstrim-all
-    weekday: "0"
     hour: "4"
     minute: "30"
     job: /usr/local/bin/fstrim-all.sh >> /var/log/fstrim-all.log 2>&1
