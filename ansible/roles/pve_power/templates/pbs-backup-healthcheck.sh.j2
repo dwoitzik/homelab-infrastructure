@@ -21,8 +21,20 @@ PHASE="${1:-}"
 
 STOREID="${STOREID:-{{ pve_power_pbs_healthcheck_storeid }}}"
 NTFY_URL="https://ntfy.sh/{{ pve_power_pbs_healthcheck_ntfy_topic }}"
+TEXTFILE_DIR="{{ pve_power_node_exporter_textfile_dir }}"
+PROM_FILE="${TEXTFILE_DIR}/pbs_backup_health.prom"
 MIN_SIZE_BYTES=$(({{ pve_power_pbs_healthcheck_min_size_mib }} * 1024 * 1024))
 MAX_AGE_SECONDS=$(({{ pve_power_pbs_healthcheck_max_age_hours }} * 3600))
+
+# Written to the node_exporter textfile collector, because the landing
+# dashboard has always queried pve_pbs_backup_healthy and this script is
+# the only thing that could produce it.
+METRICS=""
+
+metric() {
+	METRICS="${METRICS}$1
+"
+}
 
 alert() {
 	curl -s -H "Title: $1" -H "Priority: high" --data-binary "$2" "$NTFY_URL" >/dev/null || true
@@ -56,6 +68,9 @@ for VMID in $ALL_VMIDS; do
 	TS=$(date -d "$TSTR" +%s 2>/dev/null || echo 0)
 	AGE=$((NOW - TS))
 
+	metric "pve_pbs_backup_age_seconds{vmid=\"${VMID}\"} ${AGE}"
+	metric "pve_pbs_backup_size_bytes{vmid=\"${VMID}\"} ${SIZE:-0}"
+
 	if [ "$TS" -eq 0 ]; then
 		FAILURES="${FAILURES}VMID ${VMID}: could not parse timestamp from ${VOLID}\n"
 	elif [ "$AGE" -gt "$MAX_AGE_SECONDS" ]; then
@@ -65,8 +80,20 @@ for VMID in $ALL_VMIDS; do
 	fi
 done
 
+# A timestamped companion series is what distinguishes "backups are healthy"
+# from "this hook has not run in a week" -- without it, a stale file reads as
+# a stale green rather than as an absence.
 if [ -n "$FAILURES" ]; then
 	alert "PBS backup healthcheck FAILED" "$(printf '%b' "$FAILURES")"
+	metric "pve_pbs_backup_healthy 0"
+else
+	metric "pve_pbs_backup_healthy 1"
 fi
+metric "pve_pbs_backup_healthcheck_timestamp_seconds ${NOW}"
+
+install -d -m 0755 "$TEXTFILE_DIR"
+printf '# HELP pve_pbs_backup_healthy 1 if every non-excluded guest has a recent, plausibly sized PBS backup.\n# TYPE pve_pbs_backup_healthy gauge\n%s' "$METRICS" > "$PROM_FILE.tmp"
+chmod 0644 "$PROM_FILE.tmp"
+mv "$PROM_FILE.tmp" "$PROM_FILE"
 
 exit 0
