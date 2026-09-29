@@ -143,6 +143,15 @@
     group: root
     mode: '0700'
 
+- name: Remove legacy duplicate PBS hook block from vzdump.conf
+  # A separate block with its own markers ("phase8 Entry 68") sits alongside
+  # the one blockinfile manages below, so the healthcheck was registered twice
+  # and ran twice per job.
+  ansible.builtin.replace:
+    path: /etc/vzdump.conf
+    regexp: '(?ms)^# BEGIN ANSIBLE MANAGED HOOK SCRIPT \(pve_power role, phase8 Entry 68\)\n.*?^# END ANSIBLE MANAGED HOOK SCRIPT \(pve_power role, phase8 Entry 68\)\n'
+    replace: ''
+
 - name: Register the health-check script as vzdump's job-end hook
   ansible.builtin.blockinfile:
     path: /etc/vzdump.conf
