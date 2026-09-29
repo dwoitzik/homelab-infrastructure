@@ -3,6 +3,19 @@
 # pushes pve/data's data_percent toward REL-019's ENOSPC territory.
 set -u
 
+# cron's PATH omits /usr/sbin, where fstrim/pct/qm live on PVE. Without this
+# the whole script exits "command not found" while still looking scheduled.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+# A silent no-op is exactly the failure this script exists to prevent, so
+# treat a missing binary as a hard error rather than continuing.
+for cmd in fstrim pct qm; do
+  command -v "$cmd" >/dev/null || {
+    echo "ERROR: $cmd not found in PATH=$PATH" >&2
+    exit 1
+  }
+done
+
 fstrim -a 2>&1
 
 for id in $(pct list | tail -n +2 | awk '{print $1}'); do
