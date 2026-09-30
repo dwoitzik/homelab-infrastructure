@@ -28,9 +28,12 @@ data:
     # one slow/unreachable engine drags out the whole response. Capping
     # request_timeout bounds worst-case page latency regardless of which
     # engines are slow that day.
+    # 4.0s/6.0s, not 2.0s/4.0s: the old cap sat exactly on google cse's real
+    # latency, and a timeout there discards results the page already holds
+    # (ADR-045), so a slow engine renders as zero hits instead of an error.
     outgoing:
-      request_timeout: 2.0
-      max_request_timeout: 4.0
+      request_timeout: 4.0
+      max_request_timeout: 6.0
       pool_connections: 100
       pool_maxsize: 20
     # Every scraped general-web engine below is blocked by request-
