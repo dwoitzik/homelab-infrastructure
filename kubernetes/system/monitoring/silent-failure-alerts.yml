@@ -54,6 +54,27 @@ spec:
 
     - name: crowdsec
       rules:
+        # These rules can only fire if this series exists, and it never has: the
+        # router's inter-VLAN ACL lets internal VLANs reach the DMZ on 443 only,
+        # so scraping 10.0.30.2:9100 was always refused (0/366 up-samples, 30d).
+        - alert: CrowdSecDMZMetricsAbsent
+          expr: |
+            absent(crowdsec_container_up{instance=~"10.0.30.2.*"})
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "No CrowdSec metrics arrive from ct-dmz-proxy-01 -- its alerts below cannot fire"
+            description: >
+              The DMZ proxy is unreachable on the node_exporter port, so neither
+              CrowdSecContainerDown nor CrowdSecAcquisitionSourceMissing can ever evaluate:
+              both match on crowdsec_* series that Prometheus has never received. The bouncer
+              on this WAN-adjacent host is therefore unmonitored, which is the exact silent
+              failure this file exists to prevent. Cause is the router inter-VLAN ACL
+              (internal -> DMZ allows 443 only), not a stopped exporter -- the container has
+              been up for 4+ weeks. Closing this needs either an ACL exception for 9100 or
+              a push-based path; until then treat the two crowdsec alerts as non-functional.
+
         - alert: CrowdSecContainerDown
           expr: |
             crowdsec_container_up{instance=~"10.0.30.2.*"} == 0
