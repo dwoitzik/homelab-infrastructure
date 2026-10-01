@@ -92,14 +92,29 @@ tens of seconds; the observed 97s is pathological, but 10-40s is routine for a
 
 ## Decision
 
-Relax the Prometheus liveness probe via `prometheusSpec.livenessProbe`:
+**The mechanism is confirmed but the obvious remedy is not available, so no config
+change is made by this ADR.**
 
-| Setting | Operator default | New value |
-| --- | --- | --- |
-| `timeoutSeconds` | 3 | 10 |
-| `periodSeconds` | 5 | 15 |
-| `failureThreshold` | 6 | 14 |
-| Kill budget | ~30s | ~3.5 min |
+The first attempt was to relax the probe via `prometheusSpec.livenessProbe`. It was
+implemented, merged, and then found on live inspection to have had **no effect**: the
+`prometheuses.monitoring.coreos.com` CRD in this cluster exposes only
+`probeSelector` and `probeNamespaceSelector`, and neither is a container probe.
+There is no `spec.livenessProbe` to set, and kube-prometheus-stack 87.2.1 does not
+offer the value either:
+
+```text
+prometheusSpec probe fields in chart 87.2.1:
+  probeNilUsesHelmValues, probeSelector, probeNamespaceSelector
+```
+
+The operator hardcodes `/-/healthy` at `timeoutSeconds: 3, periodSeconds: 5,
+failureThreshold: 6` into the generated StatefulSet. That no-op change was reverted
+rather than left in place, since a config key that appears to tune the probe but
+does nothing is worse than no key.
+
+The measurement below is therefore recorded as a **diagnosis, not a completed
+remediation**. The kill budget of ~30s stays. What remains open is reducing the
+stalls it is reacting to, which is pursued separately under the load investigation.
 
 `timeoutSeconds` alone does most of the work. A stalled Prometheus still gets a full
 10s to answer before a failure is even recorded, which covers the compaction window
@@ -111,16 +126,35 @@ The CPU limit (`limits.cpu: 1000m`) is deliberately left alone. Throttling does 
 correlate with the restarts, so raising it would be treating a symptom the evidence
 does not implicate.
 
-### What this costs, stated plainly
+### Memory was checked and ruled out as well
 
-A genuinely wedged Prometheus now takes roughly 3.5 minutes to be replaced by kubelet
-instead of 30 seconds. That is the real tradeoff and it should not be waved away. It
-is acceptable here because **the readiness probe is unchanged**: a wedged Prometheus
-immediately reports not-ready and stops being scraped as a live target, so alerting
-on a stalled Prometheus is not delayed by this change. Only the automatic container
-replacement is slower.
+Because the container exits 0 rather than 137, OOM was unlikely, but it was
+confirmed rather than assumed, and it matters because the resource limit is the one
+thing that could otherwise be tuned:
+
+| Measurement | Value | Reading |
+| --- | --- | --- |
+| `container_oom_events_total` | 0 | never OOM-killed |
+| `container_memory_working_set_bytes` | 1336 MiB of a 2Gi limit | 65%, no pressure |
+| `go_gc_duration_seconds` (GC time fraction) | mean 0.0000, max 0.0001 | GC is not the stall |
+| `go_memstats_heap_inuse_bytes` over 48h | mean 669 MiB, max 830 MiB | stable, no heap churn |
+
+The stalls are therefore work-bound, not memory-bound, which removes the most
+attractive-looking lever (raising the memory limit) from consideration.
 
 ## Alternatives rejected
+
+- **Leave a `prometheusSpec.livenessProbe` value in the manifest anyway.** Rejected:
+  verified inert against the live CRD. See Decision.
+- **Patch the operator-generated StatefulSet directly.** Rejected: ArgoCD owns it
+  and would revert the edit on the next sync, producing a config that appears to work
+  until it silently does not.
+- **Raise the memory limit.** Rejected: memory and GC are demonstrably not the cause.
+- **Downgrade `kube-prometheus-stack`/`prometheus-operator` to a version whose CRD
+  still exposes `spec.livenessProbe`.** Technically possible, and the only path to a
+  genuinely relaxed probe. Rejected as disproportionate: pinning two chart and
+  operator versions backwards to widen a probe is a worse trade than the restarts,
+  especially since the restarts are recovered automatically with no data loss.
 
 - **Disable the liveness probe entirely.** Common advice, and it does remove the
   restart loop, but it also removes kubelet's ability to recover a wedged process.
@@ -135,10 +169,13 @@ replacement is slower.
 
 ## Consequences
 
-- Expected outcome: the restart count on `prometheus-...-0` stops climbing during
-  compaction-heavy windows. The counter will not reset on its own, so verification
-  is "no new increments", not "returns to 0".
-- The `promtail`, `node-exporter` and `kube-state-metrics` churn is **not** fixed by
-  this and remains open. Their probes were not investigated here.
-- A future Prometheus stall should now be visible as a scrape gap rather than being
-  silently papered over by a restart, which is the intended signal behaviour.
+- **No behaviour change ships with this ADR.** The restarts continue at the observed
+  1-3 per day until the underlying stalls are addressed.
+- Restarts remain benign in effect: the pod self-recovers with no data loss, but they
+  do hide short monitoring gaps and they are the reason a real outage in this cluster
+  could look like noise.
+- The `promtail`, `node-exporter` and `kube-state-metrics` churn is **not** addressed
+  here and remains open. Their probes were not investigated.
+- Follow-up: quantify compaction share versus scrape share versus rule evaluation
+  before tuning anything. Tuning the wrong component would be the same mistake as
+  tuning the probe.
