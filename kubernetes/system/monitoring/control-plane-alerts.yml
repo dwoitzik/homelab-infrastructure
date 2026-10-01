@@ -15,9 +15,11 @@ spec:
   groups:
     - name: control-plane.health
       rules:
+        # 30s equals one scrape interval, so a single failed scrape pages
+        # even though the API server itself was healthy throughout.
         - alert: KubeAPIServerDown
           expr: up{job="apiserver"} == 0
-          for: 30s
+          for: 5m
           labels:
             severity: critical
           annotations:
