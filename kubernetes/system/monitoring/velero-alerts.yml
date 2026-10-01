@@ -62,9 +62,13 @@ spec:
           annotations:
             summary: "Velero backup is stale"
             description: "The daily-backup schedule ({{ $labels.schedule }}) has not completed successfully in over 30h. A daily 05:00 schedule that has not run means the schedule is paused, the controller is wedged, or runs are failing before Velero counts them. Check `kubectl get schedules.velero.io -n velero` and `velero backup logs`."
+        # absent() is also true before Prometheus has scraped the target
+        # once after its own restart, so without a hold this pages critical
+        # on every Prometheus restart while velero itself is fine.
         - alert: VeleroBackupMetricAbsent
           expr: |
             absent(velero_backup_last_successful_timestamp{schedule="daily-backup"})
+          for: 15m
           labels:
             severity: critical
           annotations:
