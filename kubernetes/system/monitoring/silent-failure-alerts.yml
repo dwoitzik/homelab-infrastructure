@@ -57,12 +57,15 @@ spec:
         # These rules can only fire if this series exists, and it never has: the
         # router's inter-VLAN ACL lets internal VLANs reach the DMZ on 443 only,
         # so scraping 10.0.30.2:9100 was always refused (0/366 up-samples, 30d).
+        # warning, not critical: the gap is real and permanent until the router
+        # ACL changes, so a critical here would page every night about something
+        # that cannot be fixed from this repo and cannot self-resolve.
         - alert: CrowdSecDMZMetricsAbsent
           expr: |
             absent(crowdsec_container_up{instance=~"10.0.30.2.*"})
           for: 15m
           labels:
-            severity: critical
+            severity: warning
           annotations:
             summary: "No CrowdSec metrics arrive from ct-dmz-proxy-01 -- its alerts below cannot fire"
             description: >
@@ -74,6 +77,9 @@ spec:
               (internal -> DMZ allows 443 only), not a stopped exporter -- the container has
               been up for 4+ weeks. Closing this needs either an ACL exception for 9100 or
               a push-based path; until then treat the two crowdsec alerts as non-functional.
+              Severity is warning by design: the condition holds permanently until the router
+              is reconfigured, so as a critical it would page nightly with no action available
+              on the cluster side. Raise it back to critical once 9100 is reachable.
 
         - alert: CrowdSecContainerDown
           expr: |
