@@ -3,14 +3,14 @@
 
 A file added to kubernetes/system/monitoring/ but missing from the
 monitoring-manifests include glob is silently never deployed: ArgoCD reports
-Synced because it deployed exactly what it was told to, CI passes, and the
+Synced because it deployed exactly what it was told, CI passes, and the
 manifest sits in git having no effect. That has happened four times in this
 directory (REL-014, REL-042, network-policies-egress.yml, and the Prometheus
 restart alert), so it is checked mechanically rather than remembered.
 
-Known-uncovered files are listed below with the reason, which keeps this a
-ratchet: a newly added file fails until someone either adds it to the glob or
-records why it belongs elsewhere.
+Exclusions are listed below with the reason, which keeps this a ratchet: a newly
+added file fails until someone either adds it to the glob or records why it is
+rendered by another Application instead.
 """
 
 import fnmatch
@@ -23,24 +23,14 @@ import yaml
 APP = pathlib.Path("kubernetes/system/monitoring/manifests-application.yml")
 WATCHED_DIR = APP.parent
 
-# Not deployed by monitoring-manifests, and why. application.yml and loki.yml
-# are rendered by system-app-bootstrap's */application.yml glob; adding them
-# here would make two apps render Application objects owned by the other.
-OWNED_ELSEWHERE = {"application.yml", "loki.yml", "manifests-application.yml"}
-
-# Live in the cluster but not managed by ArgoCD. Adopted separately rather than
-# silently here, because taking over 14 untracked objects is a change that needs
-# its own diff review.
-ADOPTION_BACKLOG = {
-    "blackbox-alerts.yml",
-    "cadence-alerts.yml",
-    "dead-mans-switch.yml",
-    "dr-game-day.yml",
-    "loki-external-secret.yml",
-    "weekly-report.yml",
+# Rendered by system-app-bootstrap via its */application.yml glob, not by
+# monitoring-manifests. Adding these here would make two Applications render
+# Application objects that the other one owns.
+OWNED_ELSEWHERE = {
+    "application.yml",
+    "loki.yml",
+    "manifests-application.yml",
 }
-
-KNOWN_UNCOVERED = OWNED_ELSEWHERE | ADOPTION_BACKLOG
 
 
 def covered_globs():
@@ -56,10 +46,7 @@ def main() -> int:
         for path in sorted(WATCHED_DIR.glob("*.yml"))
         if not any(fnmatch.fnmatch(path.name, pat) for pat in patterns)
     ]
-    unknown = [name for name in uncovered if name not in KNOWN_UNCOVERED]
-
-    for name in sorted(set(uncovered) & ADOPTION_BACKLOG):
-        print(f"  backlog (live but not ArgoCD-managed): {name}")
+    unknown = [name for name in uncovered if name not in OWNED_ELSEWHERE]
 
     if not unknown:
         return 0
