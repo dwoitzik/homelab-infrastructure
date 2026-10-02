@@ -301,8 +301,16 @@ jobs:
           output: trivy-results.sarif
           trivyignores: .trivyignore
           # Must match the two table steps above: an unfiltered SARIF buries the
-          # 19 enforced findings under 459 advisory ones. Backlog: ADR-049.
+          # enforced findings under ~459 advisory ones. Backlog: ADR-049.
           severity: CRITICAL,HIGH
+          # Measured redundant (severity alone filters, via TRIVY_SEVERITY) but
+          # set anyway: the action logs "all severities" without it, and this
+          # should not depend on env-var handling surviving the next bump.
+          limit-severities-for-sarif: CRITICAL,HIGH
+          # Default is v0.70.0. Stated explicitly so the enforced finding set is
+          # auditable, and so Renovate bumps it deliberately instead of it
+          # shifting when the action itself is updated.
+          version: v0.70.0
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
@@ -310,6 +318,12 @@ jobs:
         continue-on-error: true
         with:
           sarif_file: trivy-results.sarif
+
+      # Runs after the upload and under if: always(), so a regression both updates
+      # the Security tab and turns CI red. Only a .trivyignore entry clears it.
+      - name: Assert code scanning stays clean
+        if: always()
+        run: python3 scripts/check-trivy-sarif.py
 
   gitleaks:
     name: Security / Gitleaks
