@@ -184,7 +184,7 @@ Performed 2026-08-15. **No evidence of compromise found.**
   200/302/401 depending on the app's own auth requirement) — no anomalous paths, no
   unexpected 2xx on an admin/sensitive path.
 - **ArgoCD** (`kubectl get applications -n argocd`): 3 apps (`firefly`, `onlyoffice`,
-  `scrutiny`) are `OutOfSync` but `Healthy` — ordinary GitOps drift (unreconciled
+  ``) are `OutOfSync` but `Healthy` — ordinary GitOps drift (unreconciled
   Renovate-driven image bumps), not evidence of an out-of-band change. No apps in a
   `Degraded`/`Unknown` state.
 - **cloudflared** connector: single pod, `Running`, zero restarts in 44h — no evidence

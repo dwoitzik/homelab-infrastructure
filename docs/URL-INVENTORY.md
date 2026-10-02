@@ -117,7 +117,6 @@ each is still fully reachable via LAN/VPN through the same Traefik instance.
 | `rss.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `s3.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `sabnzbd.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
-| `scrutiny.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `search.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `secrets.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `sonarr.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |

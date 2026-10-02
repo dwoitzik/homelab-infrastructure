@@ -16,9 +16,9 @@
 # break on a future pod restart.
 #
 # `apps` and `monitoring` are deliberately audit/warn only, NOT enforce:
-# `apps` runs kube-bench and scrutiny-collector with hostPID (legitimate --
-# they need to see host processes), `monitoring` runs node-exporter with
-# hostNetwork+hostPID (legitimate -- needs host network/process metrics).
+# `apps` runs kube-bench with hostPID (legitimate -- needs to see host
+# processes), `monitoring` runs node-exporter with hostNetwork+hostPID
+# (legitimate -- needs host network/process metrics).
 # Enforcing baseline there would block both. `restricted` (audit/warn only,
 # still non-blocking) surfaces everything else in those namespaces that
 # isn't yet baseline-clean, without breaking the pods that have a real
