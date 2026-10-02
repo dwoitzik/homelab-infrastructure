@@ -78,6 +78,47 @@ separates its `KSV-0014` block into three evidence classes — confirmed live,
 provable from the committed script, and **not yet proven incompatible** — so the
 last group is visibly weaker and stays on the books.
 
+**4. Make "clean" mean something mechanically.** Trivy runs with
+`exit-code: 0`, so a new HIGH finding from a Trivy upgrade would land on the tab
+without failing anything. `scripts/check-trivy-sarif.py` runs after the upload
+under `if: always()` and fails the build if the SARIF carries results — so the
+tab updates *and* CI goes red. Findings get resolved the same way as the
+existing 19: a documented `.trivyignore` entry.
+
+## What the CI log revealed, and what it did not
+
+Worth recording, because the log reads alarming and is not:
+
+- It prints `Building SARIF report with all severities`. That is the action
+  announcing its *optional* `limit-severities-for-sarif` post-processing was
+  skipped — not a statement about the report contents.
+- It prints the invocation as `trivy config kubernetes/`, with no `--severity`
+  flag. Filtering arrives via the `TRIVY_SEVERITY` environment variable instead.
+
+Neither line proves the report was filtered, and `Successfully uploaded results`
+carries no count. So the question was settled by reproduction, using Trivy
+**0.70.0** to match what CI actually runs:
+
+```console
+TRIVY_SEVERITY=CRITICAL,HIGH trivy config kubernetes/ --format sarif --ignorefile .trivyignore
+  -> 0 results
+```
+
+So `severity` alone does filter the SARIF. `limit-severities-for-sarif` is added
+anyway, because relying on env-var handling alone is exactly the kind of thing
+that changes silently when Renovate bumps the action.
+
+The log also exposed that CI runs Trivy **0.70.0** (the action's default) while
+0.75.0 exists. That is now pinned explicitly, so the enforced finding set is
+auditable and a bump is deliberate rather than a side effect of updating the
+action.
+
+**Not verified:** the actual state of the Security tab. Both available tokens
+return `403` for the code-scanning API, so convergence rests on GitHub's
+documented behaviour — an alert absent from a later upload for the same analysis
+is closed as fixed — plus the reproduction above. The upload itself succeeded and
+analysis processing completed.
+
 ## Why not just set `readOnlyRootFilesystem`
 
 For the twelve documented workloads it would re-break failures that were already
