@@ -40,8 +40,18 @@ terraform.rc
 .ansible_vault_pass
 .aider*
 
+# Compiled binaries: nothing executable belongs in git. A 57 MB `kubectl` was
+# tracked under ansible/k3s-cluster/ (a vendored upstream copy), making the repo
+# ~80x larger and putting a third-party build in a public repo's supply chain.
+ansible/k3s-cluster/kubectl
+
+# Agent session notes: local-only by design. It was tracked and therefore public
+# for the repo's life (see ADR-048). Its engineering standards moved to CLAUDE.md
+# and its hardware detail to docs/HARDWARE.md; nothing tracked is lost.
+CLAUDE.local.md
+
 # Internal operational trackers (2026-07-09): this repo is also a public
-# portfolio artifact (see CLAUDE.local.md). AUDIT.md/AUTONOMY-STATUS.md/
+# portfolio artifact (see ADR-048). AUDIT.md/AUTONOMY-STATUS.md/
 # IAC-GAPS.md are working incident/audit logs -- REL-0xx findings, live
 # credential rotation narratives, internal investigation detail -- useful
 # for day-to-day ops but not portfolio material and not something that

@@ -235,7 +235,7 @@ Noted for completeness per the survey instructions, no action recommended.
 
 ### Nothing else concerning found in the working tree
 
-Checked `.md` docs, `scripts/`, `README.md`, `CLAUDE.md`/`CLAUDE.local.md`
+Checked `.md` docs, `scripts/`, `README.md`, `CLAUDE.md`
 for personal info (home address, personal phone) beyond the WAN IP above —
 found none. The password-shaped strings already in `.gitleaks-baseline.json`
 were spot-checked against their current file content; all except the

@@ -6,7 +6,7 @@ work; nothing in it has been run against the live cluster.**
 ## Why these are batched together
 
 Four pending changes each need a restart to take effect, and this host has zero HA
-(single Proxmox box under all 3 k3s VMs, see `CLAUDE.local.md`'s Hardware inventory
+(single Proxmox box under all 3 k3s VMs, see `docs/HARDWARE.md`'s Hardware inventory
 section) — every restart here means real downtime for something. Rather than taking
 that downtime four separate times, this window does the host reboot once (which
 naturally restarts k3s on all three guests as a side effect) and applies the k3s
@@ -43,7 +43,7 @@ dedicated section at the end.
 ```
 
    Cross-check the result against the three real k3s VMIDs (211/212/213 per
-   `CLAUDE.local.md`) and the known LXC IDs — anything else with `onboot=1` sharing a
+   `docs/HARDWARE.md`) and the known LXC IDs — anything else with `onboot=1` sharing a
    VLAN20 IP with a real host is the same failure mode and should be stopped +
    `onboot` disabled before proceeding, same as tonight.
 2. **Confirm the grub fix is actually what will boot.** Already verified live tonight
@@ -70,7 +70,7 @@ dedicated section at the end.
 5. **Confirm recent PBS backups exist** for all 3 k3s VMs and the host's own config
    (this is a host reboot on the only physical box everything runs on — standard
    "snapshot before any change that can affect running state" guardrail from
-   `CLAUDE.local.md` #1, at host granularity since PVE itself is what's changing).
+   `CLAUDE.md guardrail 1, at host granularity since PVE itself is what's changing).
 
 ## Downtime estimate
 
@@ -88,7 +88,7 @@ dedicated section at the end.
   if kube-bench/CIS verification (step 3 below) turns into an actual fix rather than
   a no-op.
 - User-facing impact: everything is down for the reboot portion (single point of
-  failure, no HA — `CLAUDE.local.md`'s own framing: "Target recovery, not HA"). Pick
+  failure, no HA — `docs/physical-topology.md`'s framing: "Target recovery, not HA"). Pick
   a low-usage window.
 
 ## Fallback boot entry
@@ -240,7 +240,7 @@ chown root:root /var/lib/rancher/k3s/agent/client-ca.crt
 
 This agent can't run this (no SSH/Ansible access to any k3s VM — confirmed live
 tonight, `ansible -m ping vm-srv-k3s-11` fails with `Permission denied (publickey)`,
-consistent with `CLAUDE.local.md`'s access list which only names `pve`/
+consistent with `docs/HARDWARE.md`'s access list which only names `pve`/
 `rpi-srv-01`/`rpi-srv-02`/GitHub for this agent's key). Whoever has real access —
 the operator directly, or a future session with a properly-scoped key added to the
 k3s VMs — should just run this whenever convenient. It's genuinely independent of

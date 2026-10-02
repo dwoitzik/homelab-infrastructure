@@ -140,13 +140,27 @@ repos:
         name: Comment narration guard
         description: >-
           Blocks dated or "confirmed via/live"-style investigation-diary
-          comments (CLAUDE.local.md's Comment style section) -- see
+          comments (CLAUDE.md's Comment style section) -- see
           scripts/check-comment-narration.py.
         entry: python3 scripts/check-comment-narration.py
         language: system
         always_run: true
         pass_filenames: false
         stages: [pre-commit]
+
+      - id: disclosure-guard
+        name: Disclosure guard (public repo)
+        description: >-
+          Blocks committing NEW credential-shaped material and NEW
+          infrastructure identifiers into this public repo. Credential-shaped
+          findings can never be baselined; identifiers already required by the
+          live manifests live in .disclosure-baseline.json -- see
+          scripts/check-disclosure.py and docs/decisions/ADR-048-public-repo-disclosure-policy.md.
+        entry: python3 scripts/check-disclosure.py
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
 
       - id: gitleaks-staged
         name: Gitleaks (staged changes)

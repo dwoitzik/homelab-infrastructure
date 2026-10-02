@@ -28,7 +28,7 @@ This version splits the guard in two:
      pre-allocate anything, so they must never block a build.
 
 Why this guard exists at all: `mini` is the only physical host this entire
-homelab runs on (no failover, see CLAUDE.local.md). REL-016 froze the host
+homelab runs on (no failover, see docs/HARDWARE.md). REL-016 froze the host
 solid during ordinary load because RAM pressure pushed ZFS into a stall-wait
 state on this host's single shared NVMe -- not CPU starvation, ZFS I/O stall
 under memory pressure. The hard gate is a blast-radius guard against a repeat

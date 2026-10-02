@@ -6,7 +6,7 @@
 ## Context
 
 `pve-mgmt-01` is a documented single point of failure for the whole k3s cluster
-(`CLAUDE.local.md`: "Zero-downtime HA is NOT achievable with this hardware — do not
+(`docs/physical-topology.md`: "Zero-downtime HA is NOT achievable with this hardware — do not
 pretend otherwise"). This has been a real, recurring pain point, not a hypothetical
 one — a NetworkPolicy drift this same day took `cloudflared` and the Tailscale
 subnet-router down for days, and every such incident requires someone noticing and
@@ -103,7 +103,7 @@ Implemented and merged:
   `vaultwarden-standby`), present but stopped.
 - Item 4: the failover runbook itself
   (`docs/runbooks/failover-headscale-vaultwarden.md`).
-- Item 5: `docs/DISASTER-RECOVERY.md` / `CLAUDE.local.md` updates reflecting the new
+- Item 5: `docs/DISASTER-RECOVERY.md` / `docs/HARDWARE.md` updates reflecting the new
   standby capability.
 - Item 6: the induced-failure verification pass (stop the primaries, confirm the
   standby serves real traffic, confirm failback is clean).
@@ -183,7 +183,7 @@ a separate infrastructure issue from this ADR's own scope.
   `litestream restore`, start the standby, flip AdGuard DNS rewrites +
   Cloudflare Tunnel target, verify against a real client, and the mirror-image
   failback.
-- `DISASTER-RECOVERY.md` (§7b) and `CLAUDE.local.md` (Topology reality) updated to
+- `DISASTER-RECOVERY.md` (§7b) and `docs/physical-topology.md` updated to
   point at this ADR and the runbook as the one narrow exception to
   "recovery, not HA" (item 6).
 - **Still open**: item 6's actual induced-failure verification pass (a real

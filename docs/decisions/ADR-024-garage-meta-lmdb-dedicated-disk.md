@@ -70,7 +70,7 @@ network-filesystem locking/coherency hazards as SQLite's own WAL, likely more
 strengthens it.
 
 **Move to the USB-attached `archive` HDD.** Rejected outright by
-`CLAUDE.local.md`'s own hard rule: "Never place stateful PVs or databases on
+`docs/HARDWARE.md`'s own hard rule: "Never place stateful PVs or databases on
 USB-attached storage or SD cards." `garage-data` (the actual object blobs)
 already lives there deliberately (`ADR-` implicit in `garage.yml`'s own
 `REL-019` comment — large sequential writes, slow-is-fine); metadata is the

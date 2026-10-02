@@ -7,7 +7,7 @@
 
 The whole cluster runs as 3 KVM VMs (`vm-srv-k3s-11/12/13`) on a single Proxmox host
 (`pve-mgmt-01`, Ryzen 5825U, 8C/16T, 64GB RAM, one 512GB NVMe). This was already
-documented as a hardware constraint (`CLAUDE.local.md`'s Hardware Inventory section:
+documented as a hardware constraint (`docs/HARDWARE.md`'s Hardware Inventory section:
 "pve-mgmt-01 is a single point of failure for everything... Zero-downtime HA is NOT
 achievable with this hardware"), but the *overhead* of splitting one host's resources
 into 3 virtualized nodes, versus running k3s on fewer VMs (or bare-metal on the host
@@ -107,7 +107,7 @@ which would free real host-level headroom without touching the 3-VM structure it
 ## Consequences
 
 - No topology change. The single-host SPOF remains exactly as already documented in
-  `CLAUDE.local.md` — this ADR doesn't change that, it just confirms consolidating
+  `docs/HARDWARE.md` — this ADR doesn't change that, it just confirms consolidating
   VMs wouldn't have helped either of the two real incidents seen so far.
 - Future disk-contention mitigation work should keep targeting the shared thin-pool
   directly (I/O guards, concurrency caps on bulk jobs, git-tracked pauses for

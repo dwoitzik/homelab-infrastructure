@@ -6,7 +6,7 @@
 # Deliberately scoped to a SAFE kill-and-recover test, not a fully
 # unattended job that takes down a stateful production service on a
 # schedule with no human in the loop. This repo's own guardrails
-# (CLAUDE.local.md: "Destructive ops... require explicit human confirmation
+# (CLAUDE.md: "Destructive ops... require explicit human confirmation
 # in the PR") apply here -- an automated quarterly job that deletes a
 # stateful service's data without a human reviewing each run would violate
 # that guardrail, not exercise it responsibly. `homepage` was chosen

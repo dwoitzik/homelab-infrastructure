@@ -35,7 +35,7 @@ available *and currently serving* candidate for `::/0` -- advertising
 IPv6 exit capability it cannot actually deliver.
 
 Separately, `rpi-srv-02` -- documented elsewhere in this repo (per
-`CLAUDE.local.md`) as a deliberate manual-failover peer, not a
+`docs/HARDWARE.md`) as a deliberate manual-failover peer, not a
 concurrently-active standby, matching the same "human runs the runbook on
 purpose" philosophy ADR-029 established for headscale/vaultwarden -- is
 *also* currently approved and serving as primary for all three routes

@@ -10,7 +10,7 @@ everything: the 3 k3s VM disks (including `vm-srv-k3s-11`, the sole control-plan
 etcd-equivalent `kine`/SQLite writes and the apiserver live there), every LXC, and
 every `local-path`-backed Kubernetes PV, including Garage's own metadata store
 (`garage-meta`). This is a known, documented, unavoidable constraint on this hardware
-(see `CLAUDE.local.md`'s Hardware inventory section and `docs/HARDWARE.md`) — there is
+(see `docs/HARDWARE.md`) — there is
 no separate disk to move any of this onto today.
 
 This single shared disk has now caused **two separate host-wide incidents in one day**
