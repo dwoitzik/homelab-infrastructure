@@ -300,6 +300,9 @@ jobs:
           format: sarif
           output: trivy-results.sarif
           trivyignores: .trivyignore
+          # Must match the two table steps above: an unfiltered SARIF buries the
+          # 19 enforced findings under 459 advisory ones. Backlog: ADR-049.
+          severity: CRITICAL,HIGH
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
