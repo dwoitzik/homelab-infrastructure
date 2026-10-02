@@ -7,4 +7,6 @@ config:
 ignores:
   - "terraform/**"
   - "ansible/k3s-cluster/**"
+  # Untracked local agent notes (see ADR-048): present on the operator's machine,
+  # absent from a CI checkout, and deliberately not held to repo markdown rules.
   - "CLAUDE.local.md"

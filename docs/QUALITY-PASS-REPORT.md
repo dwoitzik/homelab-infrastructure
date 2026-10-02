@@ -144,7 +144,7 @@ execute as part of a documentation pass.
 - `DISASTER-RECOVERY.md` (root) vs `docs/RECOVERY.md`: two independently
   diverged documents describing the same thing, one of them stale
   (pre-dated the current architecture by name). Consolidated to one, at
-  the location `CLAUDE.local.md` itself already said should exist.
+  the location `CLAUDE.md` itself already said should exist.
 - `ADR-001`/`ADR-002` given descriptive slugs, matching every ADR from
   003 onward.
 

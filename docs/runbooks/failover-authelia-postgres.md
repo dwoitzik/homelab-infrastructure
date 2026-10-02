@@ -41,7 +41,7 @@ kubectl get pods -n database -l cnpg.io/cluster=postgres-authelia
 ```
 
 If the whole k3s cluster is unreachable, that's the signal — all 3 VMs
-are guests on `pve-mgmt-01` (`CLAUDE.local.md`).
+are guests on `pve-mgmt-01` (`docs/HARDWARE.md`).
 
 ## 2. Promote the standby
 

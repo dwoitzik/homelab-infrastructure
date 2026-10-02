@@ -68,7 +68,7 @@ Two changes, applied together because neither is safe alone:
 Deliberately **not** done: fully disabling ballooning on all 3 VMs at once.
 Doing that without first freeing real host RAM would trade a graceful guest
 squeeze for a real host-level OOM risk — worse, on a host with zero
-failover (`CLAUDE.local.md`). Sequencing matters: free real headroom first
+failover (`docs/HARDWARE.md`). Sequencing matters: free real headroom first
 (ARC), then spend it (raised floors).
 
 ## Verification
@@ -106,7 +106,7 @@ failover (`CLAUDE.local.md`). Sequencing matters: free real headroom first
 
 - ARC hit rate for PBS/archive-pool reads (Jellyfin media, backups) will be
   lower with an 8 GiB cap than 16 GiB. Accepted: this host's ZFS pool
-  serves large sequential media/backup reads (`CLAUDE.local.md`), which
+  serves large sequential media/backup reads (`docs/HARDWARE.md`), which
   tolerate a smaller cache far better than a starved apiserver tolerates
   memory pressure.
 - `vm-srv-k3s-11` no longer participates in ballooning at all — if host

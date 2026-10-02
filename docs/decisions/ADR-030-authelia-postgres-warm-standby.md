@@ -132,7 +132,7 @@ similar WAL-shipping tool, or continuous barman/pgBackRest archiving to
 ## Trade-offs (accepted)
 
 - A continuously-running Postgres process on `rpi-srv-02`'s SD card
-  (`CLAUDE.local.md`'s hard storage rule: "RPi SD cards are write-fragile,
+  (`docs/HARDWARE.md`'s hard storage rule: "RPi SD cards are write-fragile,
   keep databases... off them; prefer attached-SSD storage where available")
   — this ADR puts the standby's PGDATA on the USB SSD
   (`/mnt/ssd/postgres-authelia-standby`), same storage already used for the

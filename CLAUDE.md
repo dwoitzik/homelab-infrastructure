@@ -1,9 +1,10 @@
 # CLAUDE.md
 
 Working conventions for any Claude Code session (or other AI agent) operating in this
-repository — how to approach a task here, not what the infrastructure is. For the
-project's purpose, hardware constraints, stack, and full guardrail list, read
-`CLAUDE.local.md` first; this file is the process layer on top of it.
+repository — how to approach a task here, not what the infrastructure is. Hardware and
+topology constraints live in `docs/HARDWARE.md` and `docs/physical-topology.md`,
+recovery in `DISASTER-RECOVERY.md`, and the internet-reachable allowlist in
+`docs/EXPOSURE.md`; this file is the process layer on top of them.
 
 These conventions were adapted from a general team/services-oriented template and cut
 down to fit reality: this is a solo homelab, not a services monorepo. Anything about
@@ -118,7 +119,8 @@ someone other than the person who just asked the question.
 
 ## Safety rules (infra), restated
 
-The full list lives in `CLAUDE.local.md`'s Guardrails section — this is the short form:
+The full list is this section; `docs/HARDWARE.md` and `docs/physical-topology.md` supply
+the constraints these rules exist because of:
 
 1. **Snapshot before anything that touches running state.** Proxmox VM/CT snapshot, or a
    manual PVC data copy where there's no snapshot-capable CSI driver. No snapshot, no
@@ -139,3 +141,55 @@ The full list lives in `CLAUDE.local.md`'s Guardrails section — this is the sh
    "decide and act" as blanket permission: GitHub's required-reviewer check on the
    `terraform-apply` Environment is not a convention this file could waive even if it
    tried.
+
+## Stack
+
+K3s (SQLite/kine datastore, not etcd -- see ADR-015) · ArgoCD (app-of-apps GitOps) ·
+`local-path`/`nfs-client` storage (NOT Longhorn) · Traefik (ingress) · MetalLB (LB) ·
+cert-manager · Authelia (auth) · Vaultwarden. Terraform via **Atlantis** (PR-driven
+plan/apply). Object storage via **Garage** (NOT MinIO). Secrets via **Ansible Vault** +
+Kubernetes Secrets.
+
+## Target useful workloads
+
+Jellyfin, Immich, Minecraft server — each fully GitOps-managed, backed up, and documented.
+Real daily usefulness is a first-class goal, not just demo cleanliness.
+
+## Comment style
+
+Recent commits piled dated, narrated investigation-diary comments into code ("2026-08-20:
+root-caused X, confirmed via Y, checked Z, here's the whole story") -- multiple per file,
+sometimes 20%+ of a file's lines. Reads as agent narration dumped into code, not
+engineering context a human would leave. For a portfolio repo this is a liability, not a
+flex.
+
+- Inline comments: one to three lines, WHY only (a non-obvious constraint, a workaround, a
+  real gotcha). No dates, no "confirmed via", no step-by-step investigation replay.
+- The investigation itself (what was tried, what was ruled out, evidence) belongs in an ADR
+  in `docs/decisions/` or `docs/incidents/`, not in the diff.
+- PR descriptions carry the blast radius / rationale / rollback. Don't duplicate that into
+  the diff as a comment block.
+- Before adding a comment, ask: would a human engineer, mid-incident, have written this
+  exact thing in the code? If it reads like a changelog entry, it goes in the PR/ADR.
+- This got violated again after being written, so it is mechanically enforced too:
+  `comment-narration-guard` (pre-commit hook, `scripts/check-comment-narration.py`) blocks
+  dated or "confirmed via/live" comments in the staged diff. If it fires, rewrite the
+  comment -- don't bypass the hook.
+
+## Quality bar (portfolio repo)
+
+- Every component has a README/runbook: what it is, how to deploy, how to restore,
+  dependencies.
+- Architecture documented with a Mermaid diagram kept in sync with reality.
+- Decisions recorded as lightweight ADRs in `docs/decisions/`.
+- Pre-commit hooks enforce gitleaks + all linters locally.
+- CI (GitHub Actions) runs lint + validate + plan on every PR; status must be green to
+  merge.
+- A top-level `DISASTER-RECOVERY.md` describes full-rebuild + per-service restore, kept
+  current.
+
+## Definition of done (every change)
+
+Snapshot taken · code only (no manual drift) · gitleaks + linters green · validated/dry-run ·
+docs + runbook updated · ADR added if it's a decision · PR states blast radius + rollback ·
+backup taken if stateful.

@@ -142,7 +142,7 @@ WAL streaming) and can fail over there in minutes without waiting on `pve-mgmt-0
 all — see `docs/decisions/ADR-029-warm-standby-ha-headscale-vaultwarden.md` for the
 design and `docs/runbooks/failover-headscale-vaultwarden.md` for the actual failover
 steps. This is a narrow, deliberate exception to "recovery, not HA" (see
-`CLAUDE.local.md`'s Topology reality section) — every other component still follows
+`docs/physical-topology.md`) — every other component still follows
 this document's full-rebuild path.
 
 ## 8. Prove it, don't assume it

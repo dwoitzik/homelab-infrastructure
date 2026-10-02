@@ -45,7 +45,7 @@ install is attack surface and confusion for no benefit.
   that gap explicitly.
 - **SD-card write fragility is real even without etcd.** k3s agents still write kubelet
   state, container logs, and image layers locally — meaningfully less write pressure than
-  running etcd, but not zero, and `CLAUDE.local.md` already treats RPi SD cards as a hard
+  running etcd, but not zero, and `docs/HARDWARE.md` already treats RPi SD cards as a hard
   guardrail ("write-fragile... treat RPi nodes as disposable"), not a soft preference. There
   is no USB-SSD boot in place for either Pi today — that would be a real prerequisite
   project (per ADR-014's own note on Option B), not a config flag, and hasn't been done.
@@ -53,7 +53,7 @@ install is attack surface and confusion for no benefit.
   capacity on the host's own fast local storage. Adding the Pis as workers doesn't relieve
   any actual resource pressure — it just adds two low-powered, high-latency, write-fragile
   nodes to the scheduler's pool for marginal benefit.
-- **Simplicity matches the brief's own target state.** `CLAUDE.local.md`: "Target recovery,
+- **Simplicity matches the brief's own target state.** `docs/physical-topology.md`: "Target recovery,
   not HA... do not pretend otherwise." Keeping the Pis single-purpose (DNS) is the simpler,
   more legible design and avoids a second critical-path coupling for no demonstrated need.
 

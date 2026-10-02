@@ -8,7 +8,7 @@
 
 `pve-mgmt-01` is a single Ryzen 5825U host on one DRAM-less consumer NVMe
 carrying every VM, LXC, and container workload in this homelab (see
-`CLAUDE.local.md`'s hardware inventory — there is no second host, no
+`docs/HARDWARE.md`'s hardware inventory — there is no second host, no
 second disk to isolate noisy jobs onto). That constraint drove a series of
 related host-level tuning decisions, applied incrementally as each gap was
 found rather than all at once. This ADR is the single place they're

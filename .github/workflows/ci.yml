@@ -189,7 +189,7 @@ jobs:
         run: npm install -g markdownlint-cli2
 
       - name: Lint Markdown
-        run: markdownlint-cli2 "**/*.md" "!terraform/**" "!ansible/k3s-cluster/**" "!CLAUDE.local.md"
+        run: markdownlint-cli2 "**/*.md" "!terraform/**" "!ansible/k3s-cluster/**"
 
   kubeconform:
     name: Kubeconform
@@ -280,6 +280,7 @@ jobs:
           format: table
           exit-code: 0
           severity: CRITICAL,HIGH
+          trivyignores: .trivyignore
 
       - name: Scan Terraform for misconfigurations
         uses: aquasecurity/trivy-action@v0.36.0
@@ -289,6 +290,7 @@ jobs:
           format: table
           exit-code: 0
           severity: CRITICAL,HIGH
+          trivyignores: .trivyignore
 
       - name: Scan k8s manifests (SARIF for GitHub Security tab)
         uses: aquasecurity/trivy-action@v0.36.0
@@ -297,6 +299,7 @@ jobs:
           scan-ref: kubernetes/
           format: sarif
           output: trivy-results.sarif
+          trivyignores: .trivyignore
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
@@ -321,3 +324,26 @@ jobs:
 
       - name: Scan for secrets (against known-leak baseline)
         run: gitleaks detect --baseline-path .gitleaks-baseline.json --no-banner -v
+
+  disclosure:
+    name: Security / Disclosure guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Scans the full PR diff rather than the staged index the local hook sees, so a
+      # bypass of pre-commit still fails here. Credential-shaped findings are never
+      # baselined; identifiers the live manifests already need are allowlisted.
+      - name: Check PR diff for new disclosure
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          git diff --unified=0 "${{ github.event.pull_request.base.sha }}...HEAD" > /tmp/pr.diff
+          python3 scripts/check-disclosure.py --diff-file /tmp/pr.diff
+
+      - name: Report current disclosure baseline size
+        run: |
+          echo "Baselined identifiers: $(python3 -c "import json;print(len(json.load(open('.disclosure-baseline.json'))))")"
+          echo "This count must only go down. Growing it means new infrastructure"
+          echo "detail was added to a public repo; see ADR-048."

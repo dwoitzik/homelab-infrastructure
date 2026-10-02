@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Blocks the dated/narrated investigation-diary comment style CLAUDE.local.md
+"""Blocks the dated/narrated investigation-diary comment style CLAUDE.md
 already asks not to do (see "Comment style"). Scans added lines in the staged
 diff for a comment containing a date, an investigation-narration phrase, or
 a comment block longer than 3 lines.
@@ -8,7 +8,7 @@ Markdown docs are exempt: a `#` there is a heading, not a comment, and dated
 narration is the legitimate home of incident records (docs/incidents/) --
 the rule is about comments in code, not prose in docs.
 
-This exists because asking for it in CLAUDE.local.md alone didn't hold --
+This exists because asking for it in CLAUDE.md alone didn't hold --
 it got violated again the same day it was written, and twice more after
 that. A mechanical gate outlasts a session's memory of the rule.
 """
@@ -96,7 +96,7 @@ def main() -> int:
 
     if violations:
         print("Comment-narration guard: found dated/investigation-diary comments.")
-        print("Per CLAUDE.local.md's Comment style section: WHY only, 1-3 lines,")
+        print("Per CLAUDE.md's Comment style section: WHY only, 1-3 lines,")
         print("no dates, no \"confirmed via/live\" narration. Put the investigation")
         print("in phase8/LEDGER.md or an ADR instead.\n")
         for f, hit, text in violations:

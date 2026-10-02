@@ -31,7 +31,7 @@ If either is still blank, do them now, not mid-incident.
 - `kubectl get pods -n apps -l app=headscale` / `-l app=vaultwarden` from
   wherever your kubeconfig still works. If the whole cluster is
   unreachable, that itself is the signal — all 3 k3s VMs are guests on
-  `pve-mgmt-01` (`CLAUDE.local.md`), so a `pve-mgmt-01` outage takes all of
+  `pve-mgmt-01` (`docs/HARDWARE.md`), so a `pve-mgmt-01` outage takes all of
   them at once, headscale/vaultwarden included.
 - Check the Proxmox host itself (console, IPMI/power state, ping) if
   `kubectl` is unreachable — don't fail over because of a laptop network

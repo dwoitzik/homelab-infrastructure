@@ -750,7 +750,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
   }
 
   # REL-019: Garage's bulk S3 data (115GB+) was found living on rpool via the
-  # /nfs-data mount above, despite CLAUDE.local.md stating the archive pool
+  # /nfs-data mount above, despite docs/HARDWARE.md stating the archive pool
   # (this host's 2TB USB HDD) is the intended Garage/backup target -- the
   # most likely dominant contributor to the chronic disk I/O contention
   # behind REL-005/REL-012/REL-016/REL-019. A second mount_point block here

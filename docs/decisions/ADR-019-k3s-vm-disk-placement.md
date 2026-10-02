@@ -16,7 +16,7 @@ thin-pool — but that placement was a deliberate Phase 1 safety choice (inspect
 never-boot, keep write pressure off the wear-sensitive NVMe during a read-only forensic
 pass), not a proposal for where the real, rebuilt VMs should live in Phase 4.
 
-`CLAUDE.local.md`'s hard storage rules are direct on this point already: *"The only
+`docs/HARDWARE.md`'s hard storage rules are direct on this point already: *"The only
 reliable disk is the 512 GB SSD... All critical persistent state (Longhorn replicas,
 Immich Postgres, Vaultwarden DB) lives there"* and *"The 2 TB USB HDD is for backup
 (Garage) and Jellyfin media... slow is fine."* This ADR exists to confirm that rule still

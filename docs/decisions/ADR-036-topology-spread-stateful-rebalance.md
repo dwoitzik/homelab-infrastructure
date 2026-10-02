@@ -126,7 +126,7 @@ one-off.
    (`postgres-n8n-1`, `postgres-authelia-1`, `data-vault-0`, and the other
    three on `-11`). They're a real but modest contributor (6 of 14 total
    `local-path` PVCs), already not wildly unbalanced, and migrating them
-   requires the higher-risk manual-copy procedure (`CLAUDE.local.md`'s own
+   requires the higher-risk manual-copy procedure (`docs/HARDWARE.md`'s own
    guardrail for PV-level changes: snapshot first, no CSI snapshot
    capability on this cluster, so a real data copy via a throwaway pod).
    Revisit only if `-11` is still hot after step 1-2 land and are proven
@@ -139,7 +139,7 @@ deliberately low-traffic window, not as a single bulk operation:
 
 1. Confirm a recent Velero backup exists and actually completed (see
    Verification below for today's — do not skip this because "it's just a
-   reschedule," per `CLAUDE.local.md` guardrail 1).
+   reschedule," per `CLAUDE.md` guardrail 1).
 2. Delete the pod (or `kubectl rollout restart deployment/<name> -n
    <namespace>` for Deployments; for the ArgoCD `application-controller`
    StatefulSet specifically, a plain pod delete is the equivalent — it has

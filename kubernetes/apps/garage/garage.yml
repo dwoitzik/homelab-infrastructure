@@ -1,5 +1,5 @@
 # REL-019: garage-data migrated off rpool (the fast SSD shared by every
-# VM/LXC) onto the archive pool's 2TB USB HDD -- the storage CLAUDE.local.md
+# VM/LXC) onto the archive pool's 2TB USB HDD -- the storage docs/HARDWARE.md
 # always intended for Garage/backups, and the structural fix for the chronic
 # disk I/O contention behind REL-005/REL-012/REL-016/REL-019. Data moved
 # live via rsync --remove-source-files directly on the host (~176GB,
@@ -56,7 +56,7 @@ spec:
 # behavior, independent of what else is running on that node. Still the same
 # physical NVMe thin pool (no second fast disk exists on this hardware, see
 # docs/HARDWARE.md) and NOT NFS/USB (both are databases-on-network/USB-storage,
-# explicitly ruled out by CLAUDE.local.md's hard storage rules, and the
+# explicitly ruled out by docs/HARDWARE.md's storage rules, and the
 # 07-12 SQLite-on-NFS corruption incident documented in
 # docs/garage-velero-design-2026-07-17.md already proved NFS locking isn't
 # safe for a metadata DB -- LMDB's mmap-based storage would be at least as
