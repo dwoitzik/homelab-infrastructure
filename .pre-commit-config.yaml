@@ -148,6 +148,20 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: argocd-include-coverage
+        name: ArgoCD include coverage
+        description: >-
+          Fails when a manifest added to kubernetes/system/monitoring/ is missing
+          from the monitoring-manifests include glob, which means ArgoCD silently
+          never deploys it while still reporting Synced. This directory has hit
+          that exact bug four times -- see
+          scripts/check-argocd-include-coverage.py.
+        entry: python3 scripts/check-argocd-include-coverage.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
       - id: disclosure-guard
         name: Disclosure guard (public repo)
         description: >-

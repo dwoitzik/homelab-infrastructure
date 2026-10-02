@@ -325,6 +325,22 @@ jobs:
       - name: Scan for secrets (against known-leak baseline)
         run: gitleaks detect --baseline-path .gitleaks-baseline.json --no-banner -v
 
+  argocd-include-coverage:
+    name: GitOps / ArgoCD include coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A manifest missing from an ArgoCD app's include glob is never deployed.
+      # ArgoCD reports Synced regardless, because it did exactly what it was told.
+      - name: Check manifests are inside the monitoring include glob
+        run: python3 scripts/check-argocd-include-coverage.py
+
+      - name: Report adoption backlog
+        run: |
+          echo "Files live in the cluster but not managed by ArgoCD are listed"
+          echo "above as backlog. Adopting them needs its own diff review."
+
   disclosure:
     name: Security / Disclosure guard
     runs-on: ubuntu-latest
