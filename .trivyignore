@@ -62,3 +62,9 @@ AWS-0087 path:terraform/stacks/garage/main.tf
 AWS-0091 path:terraform/stacks/garage/main.tf
 AWS-0093 path:terraform/stacks/garage/main.tf
 AWS-0132 path:terraform/stacks/garage/main.tf
+
+# vault-server Role: both grants are documented requirements of Vault's Kubernetes
+# auth backend (service_registration.kubernetes is enabled; Vault 1.17.2 execs the
+# SA token helper). IDs verified with trivy 0.75.0 against this exact file.
+KSV-0053 path:kubernetes/system/vault/rbac.yml
+KSV-0056 path:kubernetes/system/vault/rbac.yml
