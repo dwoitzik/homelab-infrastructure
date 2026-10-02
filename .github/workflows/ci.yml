@@ -303,10 +303,10 @@ jobs:
           # Must match the two table steps above: an unfiltered SARIF buries the
           # enforced findings under ~459 advisory ones. Backlog: ADR-049.
           severity: CRITICAL,HIGH
-          # Measured redundant (severity alone filters, via TRIVY_SEVERITY) but
-          # set anyway: the action logs "all severities" without it, and this
-          # should not depend on env-var handling surviving the next bump.
-          limit-severities-for-sarif: CRITICAL,HIGH
+          # Boolean, not a list: unless exactly "true" the action unsets
+          # TRIVY_SEVERITY (entrypoint.sh), so the SARIF carries every severity
+          # no matter what the input above says.
+          limit-severities-for-sarif: true
           # Default is v0.70.0. Stated explicitly so the enforced finding set is
           # auditable, and so Renovate bumps it deliberately instead of it
           # shifting when the action itself is updated.

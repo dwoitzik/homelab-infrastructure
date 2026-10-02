@@ -85,39 +85,53 @@ under `if: always()` and fails the build if the SARIF carries results — so the
 tab updates *and* CI goes red. Findings get resolved the same way as the
 existing 19: a documented `.trivyignore` entry.
 
-## What the CI log revealed, and what it did not
+## Why `severity` alone did not work, and what the log looked like
 
-Worth recording, because the log reads alarming and is not:
+The first attempt at this set `severity: CRITICAL,HIGH` on the SARIF step and
+declared the Security tab clean on the strength of a local run returning zero
+results. That was wrong, and the reason is worth keeping.
 
-- It prints `Building SARIF report with all severities`. That is the action
-  announcing its *optional* `limit-severities-for-sarif` post-processing was
-  skipped — not a statement about the report contents.
-- It prints the invocation as `trivy config kubernetes/`, with no `--severity`
-  flag. Filtering arrives via the `TRIVY_SEVERITY` environment variable instead.
+`aquasecurity/trivy-action`'s `entrypoint.sh` contains:
 
-Neither line proves the report was filtered, and `Successfully uploaded results`
-carries no count. So the question was settled by reproduction, using Trivy
-**0.70.0** to match what CI actually runs:
-
-```console
-TRIVY_SEVERITY=CRITICAL,HIGH trivy config kubernetes/ --format sarif --ignorefile .trivyignore
-  -> 0 results
+```bash
+if [ "${TRIVY_FORMAT:-}" = "sarif" ]; then
+  if [ "${INPUT_LIMIT_SEVERITIES_FOR_SARIF:-false,,}" != "true" ]; then
+    echo "Building SARIF report with all severities"
+    unset TRIVY_SEVERITY
+  fi
+fi
 ```
 
-So `severity` alone does filter the SARIF. `limit-severities-for-sarif` is added
-anyway, because relying on env-var handling alone is exactly the kind of thing
-that changes silently when Renovate bumps the action.
+So `severity` is not a filter on the SARIF at all — the action **deletes**
+`TRIVY_SEVERITY` before invoking Trivy unless `limit-severities-for-sarif` is
+exactly `true`. That input is a boolean despite its plural name; passing
+`CRITICAL,HIGH` is not a smaller severity list, it is a value that is not `true`,
+and so it selects the branch that drops the filter.
 
-The log also exposed that CI runs Trivy **0.70.0** (the action's default) while
-0.75.0 exists. That is now pinned explicitly, so the enforced finding set is
-auditable and a bump is deliberate rather than a side effect of updating the
-action.
+The uploaded report therefore contained all 459 advisory findings, and the first
+upload after this ADR did not clear the Security tab.
 
-**Not verified:** the actual state of the Security tab. Both available tokens
-return `403` for the code-scanning API, so convergence rests on GitHub's
-documented behaviour — an alert absent from a later upload for the same analysis
-is closed as fixed — plus the reproduction above. The upload itself succeeded and
-analysis processing completed.
+The mistake was in how it was checked. Reproducing with
+`TRIVY_SEVERITY=CRITICAL,HIGH trivy config kubernetes/ --format sarif` does
+return 0 results with Trivy 0.70.0 — but it measures a configuration the action
+never runs, because the action is explicitly written to remove that variable.
+The local number was true and irrelevant. Nothing in the log contradicted it
+either: `Building SARIF report with all severities` was the action announcing
+the filter had been dropped, and it had simply been read as noise.
+`Successfully uploaded results` carries no count, so the gap was invisible from
+CI output alone.
+
+Two things follow. The Trivy version is now pinned explicitly rather than
+inherited from the action default, so the enforced finding set is auditable
+instead of incidental. And `scripts/check-trivy-sarif.py` runs after the upload
+under `if: always()`, so a filtered-out-by-mistake SARIF is a red build instead of
+a quiet upload.
+
+**Not verified:** the resulting state of the Security tab. Both available tokens
+return `403` for the code-scanning API. The evidence for convergence is the
+local reproduction under the corrected setting, plus GitHub's documented
+behaviour that an alert absent from a later upload for the same analysis is
+closed as fixed.
 
 ## Why not just set `readOnlyRootFilesystem`
 
