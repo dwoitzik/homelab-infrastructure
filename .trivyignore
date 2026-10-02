@@ -68,3 +68,39 @@ AWS-0132 path:terraform/stacks/garage/main.tf
 # SA token helper). IDs verified with trivy 0.75.0 against this exact file.
 KSV-0053 path:kubernetes/system/vault/rbac.yml
 KSV-0056 path:kubernetes/system/vault/rbac.yml
+
+# KSV-0014 readOnlyRootFilesystem: each of these workloads writes to its own root
+# filesystem at run time. Evidence and evidence classes: ADR-049.
+# Applied and rolled back after breaking in production:
+KSV-0014 path:kubernetes/apps/authelia/authelia.yml
+KSV-0014 path:kubernetes/apps/firefly/firefly.yml
+KSV-0014 path:kubernetes/apps/scanopy/scanopy.yml
+KSV-0014 path:kubernetes/apps/scrutiny/scrutiny.yml
+KSV-0014 path:kubernetes/apps/homepage/homepage.yml
+KSV-0014 path:kubernetes/apps/open-webui/open-webui.yml
+# Writes to /usr or /usr/local/bin, provable from the script in the same file:
+KSV-0014 path:kubernetes/system/velero/restore-test.yml
+KSV-0014 path:kubernetes/system/velero/r2-usage-guard.yml
+KSV-0014 path:kubernetes/system/monitoring/dr-game-day.yml
+KSV-0014 path:kubernetes/system/monitoring/tailnet-route-drift-check.yml
+KSV-0014 path:kubernetes/system/monitoring/weekly-report.yml
+# NOT proven incompatible -- untested open questions, still owed an attempt:
+KSV-0014 path:kubernetes/apps/freshrss/deployment.yml
+KSV-0014 path:kubernetes/apps/crowdsec/crowdsec.yml
+KSV-0014 path:kubernetes/apps/onlyoffice/onlyoffice.yml
+KSV-0014 path:kubernetes/apps/myspeed/myspeed.yml
+
+# KSV-0119 NET_RAW: both are already privileged:true, so the capability is
+# redundant. subnet-router needs that privilege to set src_valid_mark; scanopy
+# needs raw sockets to scan. Details: ADR-049.
+KSV-0119 path:kubernetes/apps/headscale/subnet-router.yml
+KSV-0119 path:kubernetes/apps/scanopy/scanopy.yml
+
+# KSV-0121 disallowed volume type: kube-bench exists to read the node's kubelet
+# config, scrutiny-collector needs hostPID for host S.M.A.R.T. data. See ADR-049.
+KSV-0121 path:kubernetes/apps/kube-bench/kube-bench.yml
+KSV-0121 path:kubernetes/apps/scrutiny/scrutiny.yml
+
+# KSV-0041 cluster-wide secret read: the operator must read every Secret to find
+# image references inside them. Scoping it down stops it scanning those.
+KSV-0041 path:kubernetes/apps/trivy-operator/trivy-operator.yml
