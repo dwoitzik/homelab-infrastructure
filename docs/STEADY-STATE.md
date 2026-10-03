@@ -106,7 +106,7 @@ that keeps it that way.
   applied** — the host-side `smart_nvme_*` metrics and `NVMeWearWarning`/
   `NVMeWearCritical` rules exist but are blocked from reaching Prometheus by the
   same firewall gap below. The Scrutiny stack that used to sit in this role was
-  removed 2026-10-02 after being confirmed never to have collected anything: it
+  removed 2026-10-03 after being confirmed never to have collected anything: it
   cannot open a guest VM's virtual disks, and the physical NVMe it needed to watch
   is on the Proxmox host (`docs/decisions/ADR-050-scrutiny-collector-cannot-see-
   virtual-disks.md`). So this is now the *only* disk-wear coverage the lab has, and
@@ -123,6 +123,16 @@ that keeps it that way.
   Exact commands in `docs/RUNBOOK-maintenance-window-restart-batch.md`'s final section.
 - **A cluster-admin/wildcard RBAC audit** (CIS 5.1.1/5.1.3) — needs dedicated review
   time to distinguish genuine need from copy-pasted-too-broad, not something to rush.
+- **NFS-PVC deletion leaks a directory on `10.0.20.100` — `nfs-client` is
+  `reclaimPolicy: Retain`**, so removing a PVC deletes the PVC object but leaves the
+  PV behind as `Released` *and* leaves the backing
+  `/nfs-data/k8s-general/<ns>/<claim>` directory in place. Four such PVs are sitting
+  there now: three from the Scrutiny removal (ADR-050, one of them a duplicate left by
+  an earlier 2026-08-13 incarnation of the same claim) and one unrelated
+  `database/postgres-firefly-data`. Nothing is broken and nothing is serving them, but
+  actually reclaiming the space needs shell access to `10.0.20.100`, which this agent
+  does not have. Worth deciding deliberately whether `Retain` is still the right
+  default for this cluster.
 - **Watch SSD wear monthly** — real trigger conditions in `docs/HARDWARE.md`
   (warning at 80% used, replace-now at 90% or any media error). Currently 56%,
   projected to reach 90% somewhere between late September and mid-November 2026

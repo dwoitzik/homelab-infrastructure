@@ -46,7 +46,7 @@ plus comparison against the 50+ essential self-hosted services lists.
 
 | Priority | Tool | Category | Status |
 |---|---|---|---|
-| ❌ | Scrutiny | Disk Health (S.M.A.R.T.) | 🗑️ Removed 2026-10-02 — collector could not open the VMs' virtual disks and never once wrote a measurement; the physical NVMe it would need to watch lives on the Proxmox host and is already monitored from there (ADR-050). |
+| ❌ | Scrutiny | Disk Health (S.M.A.R.T.) | 🗑️ Removed 2026-10-03 — collector could not open the VMs' virtual disks and never once wrote a measurement; the physical NVMe it would need to watch lives on the Proxmox host and is already monitored from there (ADR-050). |
 | ✅ | OnlyOffice | Document Editing | ✅ Deployed |
 | 🔴 P1 | Wazuh | SIEM | ❌ Decommissioned (2026-08-31, #649) -- 0 agents ever enrolled in 8 days, zero detection value, real resource cost. CrowdSec's sshd/nginx/linux collections on ct-dmz-proxy-01 fill the log-monitoring gap instead (#654/#656). |
 | 🟡 P2 | Firefly III | Finance | ⏳ Pending |
@@ -70,10 +70,10 @@ plus comparison against the 50+ essential self-hosted services lists.
 
 ## Deployment Log
 
-### Scrutiny (S.M.A.R.T. disk monitoring) — removed 2026-10-02
+### Scrutiny (S.M.A.R.T. disk monitoring) — removed 2026-10-03
 
 - **Deployed**: 2026-07-20, hub/spoke across all 3 k3s nodes
-- **Removed**: 2026-10-02, see `docs/decisions/ADR-050-scrutiny-collector-cannot-see-virtual-disks.md`
+- **Removed**: 2026-10-03, see `docs/decisions/ADR-050-scrutiny-collector-cannot-see-virtual-disks.md`
 - **Why**: `smartctl` could not open the VMs' virtual block devices (device cgroup,
   `EPERM` even as root with `CAP_SYS_RAWIO`), and no device ever got registered —
   zero shards in all four InfluxDB buckets, no `scrutiny.db`, no POST in the web log
