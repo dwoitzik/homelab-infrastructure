@@ -102,6 +102,16 @@ that keeps it that way.
   session token — found loose on disk during ADR-028's sweep, moved somewhere
   mechanically protected rather than deleted unverified). See
   `phase8/QUESTIONS.md`'s 2026-08-23 entry for what each needs.
+- **Disk wear alerting has no live path until `fwd_04a_srv_monitoring` is
+  applied** — the host-side `smart_nvme_*` metrics and `NVMeWearWarning`/
+  `NVMeWearCritical` rules exist but are blocked from reaching Prometheus by the
+  same firewall gap below. The Scrutiny stack that used to sit in this role was
+  removed 2026-10-02 after being confirmed never to have collected anything: it
+  cannot open a guest VM's virtual disks, and the physical NVMe it needed to watch
+  is on the Proxmox host (`docs/decisions/ADR-050-scrutiny-collector-cannot-see-
+  virtual-disks.md`). So this is now the *only* disk-wear coverage the lab has, and
+  it is not firing yet — read the wear figure in `docs/HARDWARE.md` monthly until
+  the gap is closed.
 - **Fix the `fwd_04a_srv_monitoring` MikroTik/Terraform-state gap** — blocks
   `node-exporter-pve` from reaching Prometheus, which means NVMe wear alerts and host
   power/thermal metrics exist as code but don't actually fire yet. Needs real

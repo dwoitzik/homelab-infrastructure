@@ -75,7 +75,6 @@ KSV-0056 path:kubernetes/system/vault/rbac.yml
 KSV-0014 path:kubernetes/apps/authelia/authelia.yml
 KSV-0014 path:kubernetes/apps/firefly/firefly.yml
 KSV-0014 path:kubernetes/apps/scanopy/scanopy.yml
-KSV-0014 path:kubernetes/apps/scrutiny/scrutiny.yml
 KSV-0014 path:kubernetes/apps/homepage/homepage.yml
 KSV-0014 path:kubernetes/apps/open-webui/open-webui.yml
 # Writes to /usr or /usr/local/bin, provable from the script in the same file:
@@ -97,9 +96,8 @@ KSV-0119 path:kubernetes/apps/headscale/subnet-router.yml
 KSV-0119 path:kubernetes/apps/scanopy/scanopy.yml
 
 # KSV-0121 disallowed volume type: kube-bench exists to read the node's kubelet
-# config, scrutiny-collector needs hostPID for host S.M.A.R.T. data. See ADR-049.
+# config, needs hostPID for host process metrics. See ADR-049.
 KSV-0121 path:kubernetes/apps/kube-bench/kube-bench.yml
-KSV-0121 path:kubernetes/apps/scrutiny/scrutiny.yml
 
 # KSV-0041 cluster-wide secret read: the operator must read every Secret to find
 # image references inside them. Scoping it down stops it scanning those.

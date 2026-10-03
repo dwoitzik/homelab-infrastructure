@@ -62,7 +62,7 @@ spec:
       # racy under a read-only root -- 2 restarts before even reaching a
       # stable state (not a one-time fluke), which is not an acceptable
       # "verified working" bar per this session's own standing discipline.
-      # Not forcing it; same call as myspeed/scrutiny-collector.
+      # Not forcing it; same call as myspeed-collector.
       containers:
         - name: firefly-iii
           image: fireflyiii/core:version-6.6.6

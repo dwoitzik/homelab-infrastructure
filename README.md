@@ -147,7 +147,7 @@ browser session is looking at the dashboard.
 │   │   ├── open-webui/        # Local LLM interface (Ollama)
 │   │   ├── paperless/         # Document management + paperless-gpt
 │   │   ├── renovate/          # Dependency update bot
-│   │   ├── scrutiny/          # Disk S.M.A.R.T. monitoring UI
+
 │   │   ├── searxng/           # Self-hosted metasearch
 │   │   ├── trivy-operator/    # Continuous container vulnerability scanning
 │   │   ├── uptime-kuma/       # Uptime monitoring
@@ -236,7 +236,7 @@ the full external-reachability audit.
 | Wazuh (SIEM) | wazuh.woitzik.dev | Built-in | LAN/VPN only |
 | Vault | secrets.woitzik.dev | Built-in | LAN/VPN only |
 | Loki | loki.woitzik.dev | Authelia | LAN/VPN only |
-| Scrutiny | scrutiny.woitzik.dev | Authelia | LAN/VPN only |
+
 | Beszel | beszel.woitzik.dev | Authelia | LAN/VPN only |
 | Firefly III | finance.woitzik.dev | Authelia | LAN/VPN only |
 | FreshRSS | rss.woitzik.dev | Authelia | LAN/VPN only |

@@ -153,7 +153,7 @@ applies): `kubernetes/system/kyverno/policies.yml`,
 `kubernetes/system/postgres/postgres-monitoring.yml`,
 `kubernetes/system/monitoring/manifests-application.yml`,
 `kubernetes/system/cert-manager-config/external-secret.yml`,
-`kubernetes/apps/scrutiny/scrutiny.yml`, `kubernetes/apps/paperless/stack.yml`,
+`kubernetes/apps/paperless/stack.yml`,
 `kubernetes/apps/paperless/paperless.yml`, `kubernetes/apps/mealie/mealie.yml`,
 `ansible/k3s-cluster/inventory.yml`, `terraform/stacks/network/nat_portforward.tf`,
 `terraform/stacks/network/main.tf`, and roughly 70 more files not listed

@@ -46,7 +46,7 @@ plus comparison against the 50+ essential self-hosted services lists.
 
 | Priority | Tool | Category | Status |
 |---|---|---|---|
-| ✅ | Scrutiny | Disk Health (S.M.A.R.T.) | ✅ Deployed |
+| ❌ | Scrutiny | Disk Health (S.M.A.R.T.) | 🗑️ Removed 2026-10-02 — collector could not open the VMs' virtual disks and never once wrote a measurement; the physical NVMe it would need to watch lives on the Proxmox host and is already monitored from there (ADR-050). |
 | ✅ | OnlyOffice | Document Editing | ✅ Deployed |
 | 🔴 P1 | Wazuh | SIEM | ❌ Decommissioned (2026-08-31, #649) -- 0 agents ever enrolled in 8 days, zero detection value, real resource cost. CrowdSec's sshd/nginx/linux collections on ct-dmz-proxy-01 fill the log-monitoring gap instead (#654/#656). |
 | 🟡 P2 | Firefly III | Finance | ⏳ Pending |
@@ -70,15 +70,17 @@ plus comparison against the 50+ essential self-hosted services lists.
 
 ## Deployment Log
 
-### Scrutiny (S.M.A.R.T. disk monitoring)
+### Scrutiny (S.M.A.R.T. disk monitoring) — removed 2026-10-02
 
-- **Date**: 2026-07-20
-- **Dir**: `kubernetes/apps/scrutiny/`
-- **Image**: `ghcr.io/analogj/scrutiny:v0.9.2-web` (Web UI) + `ghcr.io/analogj/scrutiny:v0.9.2-collector` (Collector) + `influxdb:2.8`
-- **Layout**: Hub/Spoke — InfluxDB StatefulSet + Web Deployment + Collector DaemonSet (3 nodes)
-- **Storage**: nfs-client PVC (2Gi InfluxDB + 1Gi config)
-- **IngressRoute**: scrutiny.woitzik.dev (CrowdSec + Authelia)
-- **Notes**: Collector uses `hostPID: true` + `SYS_RAWIO` for smartctl. k3s containerd needs writable `/dev` mount + minimal securityContext (no seccompProfile, no drop ALL caps — collector image uses `su` internally). `system-manifests` stuck on resourceVersion conflicts for other IngressRoutes.
+- **Deployed**: 2026-07-20, hub/spoke across all 3 k3s nodes
+- **Removed**: 2026-10-02, see `docs/decisions/ADR-050-scrutiny-collector-cannot-see-virtual-disks.md`
+- **Why**: `smartctl` could not open the VMs' virtual block devices (device cgroup,
+  `EPERM` even as root with `CAP_SYS_RAWIO`), and no device ever got registered —
+  zero shards in all four InfluxDB buckets, no `scrutiny.db`, no POST in the web log
+  since deployment. Separately, the disk that actually matters
+  (`/dev/nvme0n1` on `pve-mgmt-01`) is not reachable from a guest VM at all.
+- **Replaced by**: host-side `ssd_wear_check` + `pve_power` roles exporting
+  `smart_nvme_*` into Prometheus, alerting as `NVMeWearWarning`/`NVMeWearCritical`.
 
 ### OnlyOffice (Document Server)
 
