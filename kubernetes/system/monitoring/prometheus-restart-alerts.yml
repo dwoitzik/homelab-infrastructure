@@ -11,20 +11,21 @@ spec:
   groups:
     - name: prometheus.restarts
       rules:
-          # Scoped to the prometheus container: config-reloader in the same pod restarts on
-          # every config reload, which is normal and would swamp this count. The 6h window
-          # tolerates one deploy restart; a fully dead Prometheus can't alert, hence dead-mans-switch.
+          # Scoped to the prometheus container: config-reloader restarts on
+          # every config reload and would swamp this count. A dead Prometheus
+          # can't alert at all. See ADR-051 for why the window is 1h, not 6h.
           - alert: PrometheusFrequentRestarts
             expr: |
-              changes(process_start_time_seconds{job="kube-prometheus-stack-prometheus", container="prometheus"}[6h]) >= 2
-            for: 15m
+              changes(process_start_time_seconds{job="kube-prometheus-stack-prometheus", container="prometheus"}[1h]) >= 2
+            for: 10m
             labels:
               severity: critical
             annotations:
               summary: "Prometheus restarted {{ $value | humanize }}x in the last hour on {{ $labels.pod }}"
               description: >
-                {{ $labels.pod }} recorded {{ $value | humanize }} process starts within an hour.
-                Historically this ran at a median of 180 minutes between restarts, which went
-                unnoticed because nothing alerted on it. Check the liveness probe timeout against
-                the self-scrape duration first: a probe that kills Prometheus during a slow scrape
-                is the failure mode that produced this in the first place.
+                {{ $labels.pod }} recorded {{ $value | humanize }} process starts within the last hour.
+                Check whether these are clean exit 0 (kubelet SIGTERM after liveness-probe
+                failures -- fix the probe's timeoutSeconds, it must exceed a slow
+                self-scrape) or exit 137 (OOMKill -- the CPU/memory limits are too tight
+                for the scrape load). A probe-induced restart storm and a genuinely
+                wedged process need different fixes, and the exit code tells them apart.
