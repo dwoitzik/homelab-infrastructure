@@ -31,7 +31,7 @@ Re-verified 2026-07-06 -- 2 rows below were stale and corrected.
 | ID | Hostname | Description |
 | :--- | :--- | :--- |
 | `100`| `pve-mgmt-01` | Primary Proxmox Node. |
-| `110`| `ct-mgmt-pbs-01` | Proxmox Backup Server. |
+| `110`| `ct-mgmt-pbs-01` | **Retired.** Proxmox Backup Server used to run in this LXC; it now runs host-native on `pve-mgmt-01` (10.0.10.10) via `proxmox-backup-proxy.service`. The container no longer exists. |
 | `200`| `ct-srv-docker-01`| Internal Docker host (Minio + monitoring agents) -- **not Vaultwarden**, which runs as a k8s Deployment; also **not Ansible-managed** at all currently, despite `app_nodes` existing in `inventory.ini` -- no play in `site.yml` targets it, a real IaC gap worth closing. |
 | `301`| `ct-dmz-proxy-01` | External Nginx Proxy Manager (DMZ). |
 

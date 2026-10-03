@@ -34,10 +34,10 @@ The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with
 
 ## Stage 2 — VM/LXC Snapshots (PBS)
 
-**What:** All Proxmox VMs and LXC containers (full disk images).
+**What:** All Proxmox VMs and LXC containers (full disk images), except the cloud-init template VM `9000` (`debian-13-cloudinit-template`), which is excluded as it holds no unique state.
 
-- **Tool:** Proxmox Backup Server (`ct-mgmt-pbs-01`, VLAN 10)
-- **Storage:** 2 TB HDD (`/dev/sdb1`) at `/mnt/pbs-storage`
+- **Tool:** Proxmox Backup Server, host-native on `pve-mgmt-01` (10.0.10.10, `proxmox-backup-proxy.service`) -- it used to be the `ct-mgmt-pbs-01` LXC, which no longer exists
+- **Storage:** ZFS dataset `archive` on `/dev/sda` (1.82 TB disk, ZFS pool `archive`), mounted at `/mnt/pbs-storage`
 - **Retention:** 7 daily / 4 weekly snapshots
 - **Schedule:** Daily at 03:00 (block-level deduplication, only changed chunks stored)
 - **Recovery:** Restore directly from PBS in the Proxmox web UI

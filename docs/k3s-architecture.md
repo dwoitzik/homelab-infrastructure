@@ -116,7 +116,6 @@ Prometheus scrapes from both in-cluster and external targets:
 | RPi-01, RPi-02 (10.0.20.2-3) | Static config | 9100 |
 | Docker LXC (10.0.20.252) | Static config | 9100 |
 | AI LXC (10.0.20.251) | Static config | 9100 |
-| PBS (10.0.10.110) | Static config | 9100 |
 | Media-acq, Jellyfin, Atlantis LXCs | Static config (`node_exporter_native`, added after this doc was first written -- see ADR-012 for the Atlantis LXC) | 9100 |
 | DMZ proxy + games LXCs (10.0.30.2-3) | Static config (`monitoring_agent` role's docker-based node_exporter, distinct from `node_exporter_native` used elsewhere) | 9100 |
 | Proxmox host (10.0.10.10) | PVE exporter in-cluster | 9221 |
