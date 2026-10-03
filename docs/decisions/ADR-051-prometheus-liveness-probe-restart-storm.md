@@ -88,6 +88,41 @@ there is no evidence to justify changing it, but CPU throttling on a
 single-threaded Prometheus under a load spike is the next thing to check if
 restarts continue after this change lands.
 
+## The fix was silently inert on the first attempt, and ArgoCD reported "Synced"
+
+The first version of this change set `prometheus.prometheusSpec.livenessProbe`,
+mirroring how Grafana's probe is configured in the same chart. It merged, all CI
+was green, ArgoCD reported `Synced`/`Healthy` across all 108 resources, and the
+StatefulSet never changed: still `periodSeconds 5, timeoutSeconds 3,
+failureThreshold 6`, `generation: 11`, restart count unmoved at 46.
+
+The `Prometheus` CRD has no `spec.livenessProbe`. It only supports probe overrides
+per container:
+
+```yaml
+spec:
+  containers:
+    - name: prometheus
+      livenessProbe: {...}
+```
+
+A flat `spec.livenessProbe` is a valid YAML key that the structural schema prunes
+away on apply. ArgoCD then compares rendered-against-applied, both sides equally
+pruned, and reports no difference. Grafana is unaffected by this: the `Grafana` CRD
+*does* expose `spec.livenessProbe`, which is why its 2026-08-14 values are live on
+the pod while the equivalent Prometheus keys never were.
+
+Two things this makes worth remembering:
+
+- **"Synced" is not evidence.** The only check that caught this was reading
+  `sts.spec.template` directly and comparing the numbers.
+- Schema-pruning failures are silent. An unknown key under a CRD is not an apply
+  error, it is a value that quietly becomes nothing.
+
+The values are now nested under `containers[]`, verified key-by-key against the
+live CRD's structural schema (and against upstream, where the same key set
+appears) before applying.
+
 ## Not addressed here
 
 The PBS health check firing in the same window is a separate problem and is not
