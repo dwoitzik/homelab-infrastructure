@@ -51,29 +51,45 @@ is_excluded() {
 FAILURES=""
 NOW=$(date +%s)
 
-# All VMIDs that have ANY backup history in this datastore - the real,
-# current fleet, not a hardcoded list that would drift.
-ALL_VMIDS=$(pvesm list "$STOREID" 2>/dev/null | awk 'NR>1{print $5}' | sort -u)
+# Enumerate the live fleet from qm/pct, not from PBS history: a history-derived
+# list reports deleted guests as failed backups until their snapshots are pruned.
+# See ADR-052.
+ALL_VMIDS=$({ qm list 2>/dev/null | awk 'NR>1 && $1 ~ /^[0-9]+$/ {print $1}'
+	pct list 2>/dev/null | awk 'NR>1 && $1 ~ /^[0-9]+$/ {print $1}'; } | sort -un)
+
+# Single pvesm pass, newest snapshot per VMID keyed on the timestamp inside the
+# volid: pvesm gives no ordering guarantee, so tail -1 could pick a stale one.
+declare -A LATEST_TS=() LATEST_SIZE=() LATEST_VOLID=()
+while read -r SIZE VOLID VMID; do
+	TSTR=$(printf '%s' "$VOLID" | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
+	[ -z "$TSTR" ] && continue
+	TS=$(date -d "$TSTR" +%s 2>/dev/null || echo 0)
+	[ "$TS" -gt "${LATEST_TS[$VMID]:-0}" ] && {
+		LATEST_TS[$VMID]=$TS
+		LATEST_SIZE[$VMID]=$SIZE
+		LATEST_VOLID[$VMID]=$VOLID
+	}
+done < <(pvesm list "$STOREID" 2>/dev/null | awk 'NR>1{print $4, $1, $5}')
 
 for VMID in $ALL_VMIDS; do
 	is_excluded "$VMID" && continue
 
-	LATEST=$(pvesm list "$STOREID" 2>/dev/null | awk -v id="$VMID" '$5==id')
-	[ -z "$LATEST" ] && continue
-	LATEST=$(echo "$LATEST" | tail -1)
+	VOLID=${LATEST_VOLID[$VMID]:-}
+	if [ -z "$VOLID" ]; then
+		FAILURES="${FAILURES}VMID ${VMID}: no backup in ${STOREID} at all - never backed up\n"
+		metric "pve_pbs_backup_age_seconds{vmid=\"${VMID}\"} -1"
+		metric "pve_pbs_backup_size_bytes{vmid=\"${VMID}\"} 0"
+		continue
+	fi
 
-	SIZE=$(echo "$LATEST" | awk '{print $4}')
-	VOLID=$(echo "$LATEST" | awk '{print $1}')
-	TSTR=$(echo "$VOLID" | grep -oP '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
-	TS=$(date -d "$TSTR" +%s 2>/dev/null || echo 0)
+	TS=${LATEST_TS[$VMID]}
+	SIZE=${LATEST_SIZE[$VMID]:-0}
 	AGE=$((NOW - TS))
 
 	metric "pve_pbs_backup_age_seconds{vmid=\"${VMID}\"} ${AGE}"
 	metric "pve_pbs_backup_size_bytes{vmid=\"${VMID}\"} ${SIZE:-0}"
 
-	if [ "$TS" -eq 0 ]; then
-		FAILURES="${FAILURES}VMID ${VMID}: could not parse timestamp from ${VOLID}\n"
-	elif [ "$AGE" -gt "$MAX_AGE_SECONDS" ]; then
+	if [ "$AGE" -gt "$MAX_AGE_SECONDS" ]; then
 		FAILURES="${FAILURES}VMID ${VMID}: latest backup is $((AGE / 3600))h old - missing or failed\n"
 	elif [ "$SIZE" -lt "$MIN_SIZE_BYTES" ]; then
 		FAILURES="${FAILURES}VMID ${VMID}: latest backup only $((SIZE / 1024 / 1024))MiB - suspiciously small, likely broken\n"
