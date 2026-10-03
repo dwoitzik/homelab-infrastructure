@@ -133,7 +133,25 @@ that keeps it that way.
   actually reclaiming the space needs shell access to `10.0.20.100`, which this agent
   does not have. Worth deciding deliberately whether `Retain` is still the right
   default for this cluster.
-- **Watch SSD wear monthly** — real trigger conditions in `docs/HARDWARE.md`
+  - **A stopped duplicate LXC (VMID `9200`) shadows `ct-srv-docker-01`** — it carries
+    the same hostname *and* the same MAC address (`BC:24:11:85:76:C5`, VLAN 20) as the
+    real container, VMID `200`. It is a leftover clone, not a second copy of anything: it
+    is `stopped`, nothing references it, and starting it would put an IP conflict on
+    VLAN 20. It is also not in the nightly job's `exclude` list, so it still consumes
+    backup slots (3 snapshots so far, most recent 2026-10-03). Needs a deliberate
+    decision: delete it, or at minimum exclude it so it stops being backed up.
+  - **Snapshots for deleted and excluded guests are never pruned, and now number 29** —
+    PBS retention (`7` daily / `4` weekly) only reaches guests still present in the
+    Proxmox config. Their newest snapshots are `2026-08-11` for the retired PBS LXC
+    (`110`, 15 snapshots) and `2026-06-25` for the cloud-init template (`9000`, 12
+    snapshots, excluded from the job since but never pruned); `9211` and `9213` each
+    hold one 2026-08-21 snapshot from the abandoned recovery-attempt clones. Their
+    logical size sums to roughly 300 GB, but because PBS deduplicates they account for
+    far less of the 212 GB the datastore actually references — deleting them is hygiene,
+    not a space reclaim. All of it is destructive and needs an explicit decision first;
+    the inventory is reproducible with
+    `pvesm list local-pbs --content backup | awk '{print $5}' | sort -n | uniq -c`.
+  - **Watch SSD wear monthly** — real trigger conditions in `docs/HARDWARE.md`
   (warning at 80% used, replace-now at 90% or any media error). Currently 56%,
   projected to reach 90% somewhere between late September and mid-November 2026
   depending on how much of the recent rate was recovery-mission-specific load.

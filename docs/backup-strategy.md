@@ -38,7 +38,7 @@ The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with
 
 - **Tool:** Proxmox Backup Server, host-native on `pve-mgmt-01` (10.0.10.10, `proxmox-backup-proxy.service`) -- it used to be the `ct-mgmt-pbs-01` LXC, which no longer exists
 - **Storage:** ZFS dataset `archive` on `/dev/sda` (1.82 TB disk, ZFS pool `archive`), mounted at `/mnt/pbs-storage`
-- **Retention:** 7 daily / 4 weekly snapshots
+- **Retention:** 7 daily / 4 weekly snapshots. Pruning only reaches guests present in the Proxmox config, so snapshots for deleted guests — and for guests added to the job's `exclude` list — are never pruned and accumulate indefinitely. Tracked in `docs/STEADY-STATE.md`.
 - **Schedule:** Daily at 03:00 (block-level deduplication, only changed chunks stored)
 - **Recovery:** Restore directly from PBS in the Proxmox web UI
 
