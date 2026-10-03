@@ -22,7 +22,6 @@ defined, and 3 LXCs added since the initial pass (`ct-srv-media-acq-01`,
 
 | Hostname | Type | Cores | RAM | Role |
 | :--- | :--- | :--- | :--- | :--- |
-| `ct-mgmt-pbs-01` | LXC | 2 | 2 GB | Proxmox Backup Server |
 | `ct-srv-docker-01` | LXC | 4 | 4 GB | Legacy Docker workloads |
 | `ct-srv-ai-01` | LXC | 6 | 32 GB | Ollama / LLM inference (GPU Passthrough) -- cores cut from 8 after host CPU overcommit |
 | `ct-srv-nfs-01` | LXC | 2 | 2 GB | NFS storage server (`/nfs-data` bind-mount, backed by the host's `local-lvm` root disk — not ZFS; the container's own root disk is on `local-lvm` too. `nfs-client` StorageClass for all k3s PVCs) |

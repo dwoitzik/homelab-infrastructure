@@ -255,7 +255,7 @@ the full external-reachability audit.
 
 | VLAN | Zone | Subnet | Key Hosts |
 |---|---|---|---|
-| 10 | Management | 10.0.10.0/24 | Proxmox (10.0.10.10), PBS (10.0.10.110), MikroTik API (10.0.10.1) |
+| 10 | Management | 10.0.10.0/24 | Proxmox + PBS (both 10.0.10.10), MikroTik API (10.0.10.1) |
 | 20 | Server | 10.0.20.0/24 | k3s (10.0.20.11-13), RPi (10.0.20.2-3), MetalLB (10.0.20.200) |
 | 30 | DMZ | 10.0.30.0/24 | Proxy (10.0.30.2), Games (10.0.30.3) |
 | 40 | IOT | 10.0.40.0/24 | Untrusted / smart-home devices, restricted internet only |
@@ -317,7 +317,7 @@ Prometheus scrapes metrics from all hosts:
 - k3s nodes: DaemonSet node_exporter (10.0.20.11-13)
 - Raspberry Pis: node_exporter Docker container (10.0.20.2-3)
 - Docker LXC: node_exporter Docker container (10.0.20.252)
-- AI LXC + PBS: node_exporter native binary (10.0.20.251, 10.0.10.110)
+- AI LXC: node_exporter native binary (10.0.20.251)
 - Proxmox host: prometheus-pve-exporter in-cluster (10.0.10.10)
 
 Grafana dashboards: Node Exporter Full (1860), Proxmox PVE (10347, 19022).

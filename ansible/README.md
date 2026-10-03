@@ -10,7 +10,7 @@ Manages the base OS and services that run outside the k3s cluster.
 | `app_nodes` | ct-srv-docker-01 (10.0.20.252) | common, docker, watchtower, monitoring_agent |
 | `dmz_proxies` | ct-dmz-proxy-01 (10.0.30.2) | common, docker, watchtower, monitoring_agent, nginx_proxy_manager, crowdsec_bouncer |
 | `dmz_games` | ct-dmz-games-01 (10.0.30.3) | common, docker, watchtower, monitoring_agent, minecraft |
-| `mgmt_nodes` | ct-mgmt-pbs-01 (10.0.10.110) | node_exporter_native, pbs |
+| `mgmt_nodes` | pve-mgmt-01 (10.0.10.10) | node_exporter_native, pbs |
 | `ai_nodes` | ct-srv-ai-01 (10.0.20.251) | node_exporter_native, ollama |
 | `k3s_nodes` | vm-srv-k3s-11/12/13 (10.0.20.11-13) | Not in `site.yml` — used only by the standalone `k3s-vip.yml` playbook (Keepalived HA VIP). k3s itself is provisioned separately, see "k3s provisioning" below. |
 
