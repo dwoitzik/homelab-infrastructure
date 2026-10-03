@@ -118,9 +118,9 @@ data:
       fi
 
       if [ "$OVER_THRESHOLD" = "true" ]; then
-        NEXT_STEP="still over the ${THRESHOLD_GIB} GiB cap -- free up space or accept overage, then unpause"
+        NEXT_STEP="still over the cap: free up space or accept overage, then unpause"
       else
-        NEXT_STEP="usage is back under the ${THRESHOLD_GIB} GiB cap, so the pause has outlived its reason"
+        NEXT_STEP="back under the cap: the pause has outlived its reason"
       fi
 
       if [ -n "$STALE_H" ] && [ "$STALE_H" -lt "$STALE_REMINDER_HOURS" ]; then
@@ -129,7 +129,7 @@ data:
         log "already paused -- reminding: offsite copy ${STALE_H:-unknown} h old"
         curl -fsS -H "Title: R2 offsite backup STILL PAUSED -- DR copy going stale" -H "Priority: high" \
           -H "Tags: warning,moneybag" \
-          -d "daily-offsite is still paused (usage now ${USAGE_GB} GiB against a ${THRESHOLD_GIB} GiB cap, ${NEXT_STEP}). Last successful offsite backup was ${STALE_H:-an unknown number of} hours ago, so the disaster-recovery copy is no longer refreshing. Unpause with: kubectl patch schedule.velero.io daily-offsite -n velero --type merge -p '{\"spec\":{\"paused\":false}}'" \
+          -d "daily-offsite is still paused at ${USAGE_GB} GiB of a ${THRESHOLD_GIB} GiB cap (${NEXT_STEP}). Last successful offsite backup was ${STALE_H:-an unknown number of} hours ago, so the disaster-recovery copy is no longer refreshing. Unpause with: kubectl patch schedule.velero.io daily-offsite -n velero --type merge -p '{\"spec\":{\"paused\":false}}'" \
           "$NTFY_URL" || true
       fi
     else
