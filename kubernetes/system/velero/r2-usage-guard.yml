@@ -60,6 +60,10 @@ data:
     # up between runs (a bigger-than-usual backup, a retried job).
     THRESHOLD_BYTES=$((9 * 1024 * 1024 * 1024))
     NTFY_URL="https://ntfy.sh/dw-homelab-a12a7b540943"
+    # A stale offsite copy only becomes a problem once it outlives the daily
+    # cadence by a grace period; below this stay quiet so a routine multi-day
+    # pause does not become a daily notification the operator learns to ignore.
+    STALE_REMINDER_HOURS=48
 
     log() { echo "[r2-usage-guard] $(date -u +%FT%TZ) $*"; }
 
@@ -89,7 +93,31 @@ data:
           -d "R2 usage hit ${USAGE_GB} GiB (cap ${THRESHOLD_BYTES} bytes). daily-offsite Schedule paused automatically -- not resuming on its own. Free up space (shorten TTL, drop a namespace from scope) or accept overage cost, then unpause: kubectl patch schedule.velero.io daily-offsite -n velero --type merge -p '{\"spec\":{\"paused\":false}}'" \
           "$NTFY_URL" || true
       else
-        log "over threshold, already paused -- no action, not re-alerting"
+        # Staying silent forever turns a one-day cost brake into an
+        # indefinitely stale DR copy: a paused Schedule never attempts a run,
+        # so nothing fails, and the backup-age metric has no paused label.
+        LAST_BACKUP=$(kubectl get schedule.velero.io daily-offsite -n velero \
+          -o jsonpath='{.status.lastBackup}' 2>/dev/null || true)
+        if [ -n "$LAST_BACKUP" ]; then
+          LAST_EPOCH=$(date -u -d "$LAST_BACKUP" +%s 2>/dev/null || true)
+        else
+          LAST_EPOCH=""
+        fi
+        if [ -n "$LAST_EPOCH" ]; then
+          STALE_H=$(( ( $(date -u +%s) - LAST_EPOCH ) / 3600 ))
+        else
+          STALE_H=""
+        fi
+
+        if [ -n "$STALE_H" ] && [ "$STALE_H" -lt "$STALE_REMINDER_HOURS" ]; then
+          log "over threshold, already paused -- offsite copy ${STALE_H}h old, within grace"
+        else
+          log "over threshold, already paused -- reminding: offsite copy ${STALE_H:-unknown} h old"
+          curl -fsS -H "Title: R2 offsite backup STILL PAUSED -- DR copy going stale" -H "Priority: high" \
+            -H "Tags: warning,moneybag" \
+            -d "daily-offsite still paused at ${USAGE_GB} GiB (cap ${THRESHOLD_BYTES} bytes). Last successful offsite backup was ${STALE_H:-an unknown number of} hours ago, so the disaster-recovery copy is no longer refreshing. Free up space or accept overage, then unpause: kubectl patch schedule.velero.io daily-offsite -n velero --type merge -p '{\"spec\":{\"paused\":false}}'" \
+            "$NTFY_URL" || true
+        fi
       fi
     else
       log "under threshold -- no action"
