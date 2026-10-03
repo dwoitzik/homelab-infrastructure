@@ -16,7 +16,20 @@ MAX_BACKOFF_MIN=240
 ALERT=""
 [ "${POOL%.*}" -ge 92 ] 2>/dev/null && ALERT="${ALERT}Pool ${POOL}% (>=92). "
 [ "$TEMP" -ge 90 ] && ALERT="${ALERT}CPU temp ${TEMP}C (>=90). "
-[ "$LOAD1_INT" -ge 30 ] && ALERT="${ALERT}Load ${LOAD1} (>=30). "
+
+# Nightly PBS backup (jobs.cfg `*-*-01/2 03:00`) drives load1 to 38-56 on this
+# 16-core host, so >=30 false-positives every other night. Evidence in ADR-053.
+VZDUMP_RUNNING=0
+# -x matches the process name only: pgrep -f also matches any shell whose
+# command line merely mentions vzdump, including the SSH session deploying this.
+pgrep -x vzdump >/dev/null 2>&1 && VZDUMP_RUNNING=1
+
+# Bar is 70 during a backup, not disabled: observed peak 56.36 still alerts, and load
+# still high once vzdump exits trips 30 again on the next 5-minute run.
+LOAD_THRESHOLD=30
+[ "$VZDUMP_RUNNING" -eq 1 ] && LOAD_THRESHOLD=70
+[ "$LOAD1_INT" -ge "$LOAD_THRESHOLD" ] && \
+  ALERT="${ALERT}Load ${LOAD1} (>=${LOAD_THRESHOLD}${VZDUMP_RUNNING:+ during backup}). "
 
 # Skip alerting while deliberate bulk work (ansible/kubectl/terraform runs
 # against the cluster, PR merges, etc.) is in progress -- that's the actual
@@ -45,7 +58,11 @@ fi
 # still alerts promptly -- deliberately not a blanket "quiet hours" window,
 # which would also silence a genuinely new problem that happens to start
 # overnight.
-read -r LAST BACKOFF < "$STATE" 2>/dev/null
+# -f guard: the redirect fails before read's own 2>/dev/null is applied, printing
+# 'No such file or directory' on every run where the state file is absent.
+if [ -f "$STATE" ]; then
+  read -r LAST BACKOFF < "$STATE"
+fi
 LAST=${LAST:-0}
 BACKOFF=${BACKOFF:-60}
 NOW=$(date +%s)
