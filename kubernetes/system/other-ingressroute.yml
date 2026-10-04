@@ -91,7 +91,10 @@ metadata:
 spec:
   entryPoints: [websecure]
   routes:
-  - match: Host(`loki.woitzik.dev`) && PathPrefix(`/loki`)
+  # Only the machine push endpoint skips Authelia -- the remote-write client
+  # cannot follow forwardAuth. Was PathPrefix(`/loki`), which left the whole
+  # query API (query, labels, series) readable with no authentication at all.
+  - match: Host(`loki.woitzik.dev`) && PathPrefix(`/loki/api/v1/push`)
     kind: Rule
     services: [{name: loki, port: 3100}]
   - match: Host(`loki.woitzik.dev`)
