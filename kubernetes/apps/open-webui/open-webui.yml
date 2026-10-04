@@ -93,6 +93,11 @@ spec:
           value: http://10.0.20.251:11434
         - name: WEBUI_AUTH
           value: "true"
+        # Auth is delegated to the Authelia forwardAuth middleware via the
+        # trusted-email header below; the local login form competes with it
+        # for the same session and traps the browser in a signin loop.
+        - name: ENABLE_LOGIN_FORM
+          value: "false"
         - name: ENABLE_OAUTH_SIGNUP
           value: "false"
         - name: ENABLE_SIGNUP
