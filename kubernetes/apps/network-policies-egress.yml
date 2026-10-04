@@ -392,6 +392,28 @@ spec:
         - ipBlock:
             cidr: 10.0.0.0/8
 ---
+# Same gap as cloudflared/tailscale-subnet-router/homepage/myspeed:
+# default-deny-egress plus an allow-egress-web that excludes 10.0.0.0/8 leaves
+# open-webui unable to reach its own Ollama backend, so /api/models is empty.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-open-webui-ollama
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: open-webui
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.251/32
+      ports:
+        - protocol: TCP
+          port: 11434
+---
 # Same root gap, found via Loki: myspeed has thrown "NoServers" on every
 # hourly test since the 2026-08-23 rollout (confirmed live -- server
 # discovery works fine on 443, but the actual test servers it's handed run
