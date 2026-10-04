@@ -98,6 +98,11 @@ spec:
         # for the same session and traps the browser in a signin loop.
         - name: ENABLE_LOGIN_FORM
           value: "false"
+        # Without this, ENABLE_PERSISTENT_CONFIG defaults to true and every
+        # ui.* flag is read from the DB, which silently overrides the env
+        # vars set here. Git has to be the source of truth for this app.
+        - name: ENABLE_PERSISTENT_CONFIG
+          value: "false"
         - name: ENABLE_OAUTH_SIGNUP
           value: "false"
         - name: ENABLE_SIGNUP
