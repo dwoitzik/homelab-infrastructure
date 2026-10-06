@@ -1,0 +1,185 @@
+#!/bin/bash
+# Heals indexers hydra permanently disabled by "unrecoverable error"; hydra
+# never re-enables those on its own.
+set -uo pipefail
+
+CFG="/opt/media-acq/nzbhydra2/config/nzbhydra.yml"
+STATE_DIR="/var/lib/media-acq-heal"
+WEBHOOK_URL="{{ media_acquisition_discord_webhook_url }}"
+COOLDOWN_DAYS=1
+MAX_STRIKES=2
+LOOP_SECONDS=120
+
+mkdir -p "$STATE_DIR"
+
+notify() {
+  local message="$1"
+  curl -s -X POST -H "Content-Type: application/json" \
+    -d "{\"content\": \"${message}\"}" \
+    "${WEBHOOK_URL}" > /dev/null 2>&1 || true
+}
+
+disabled_indexers() {
+  python3 - "$CFG" <<'PY'
+import sys
+cfg = sys.argv[1]
+blocks = []
+with open(cfg) as f:
+    cur = None
+    for line in f:
+        if line.startswith("- allCapsChecked:"):
+            if cur:
+                blocks.append(cur)
+            cur = {"_block": True}
+            continue
+        if cur and "  " == line[:2]:
+            k, _, v = line.strip().partition(":")
+            v = v.strip()
+            if k == "name":            cur["name"] = v.strip('"')
+            elif k == "host":          cur["host"] = v.strip('"')
+            elif k == "state":         cur["state"] = v.strip('"')
+            elif k == "configComplete":cur["complete"] = (v == "true")
+            elif k == "disabledAt":    cur["disabledAt"] = v.strip('"')
+            elif k == "disabledUntil": cur["disabledUntil"] = v.strip('"')
+    if cur:
+        blocks.append(cur)
+for b in blocks:
+    if b.get("disabledAt") not in (None, "null", "") and b.get("disabledUntil") in (None, "null") \
+            and b.get("complete") and b.get("state") == "DISABLED_SYSTEM":
+        print(b["name"], b["host"], sep="|")
+PY
+}
+
+clear_disabled_state() {
+  local name="$1"
+  python3 - "$CFG" "$name" <<'PY'
+import sys
+cfg, target = sys.argv[1], sys.argv[2]
+fix = {"disabledAt": "  disabledAt: null",
+       "disabledLevel": "  disabledLevel: 0",
+       "disabledUntil": "  disabledUntil: null",
+       "state": '  state: "ENABLED"'}
+lines = open(cfg).readlines()
+# collect per-block line ranges first so field order inside a block doesn't
+# matter (the name line sits between the disabled* fields and state:)
+bounds, cur = [], []
+for i, line in enumerate(lines):
+    if line.startswith("- allCapsChecked:"):
+        if cur:
+            bounds.append(cur)
+        cur = [i]
+    else:
+        cur.append(i)
+if cur:
+    bounds.append(cur)
+for block in bounds:
+    text = "".join(lines[i] for i in block)
+    if 'name: "%s"' % target not in text:
+        continue
+    for i in block:
+        key = lines[i].strip().split(":", 1)[0]
+        if key in fix:
+            lines[i] = fix[key] + "\n"
+    break
+open(cfg, "w").writelines(lines)
+PY
+  return $?
+}
+
+DRY=0
+[ "${1:-}" = "--dry-run" ] && DRY=1
+
+CANDIDATES=$(disabled_indexers)
+if [ -z "$CANDIDATES" ]; then
+  [ "${1:-}" = "--verbose" ] && echo "no disabled config-complete indexers"
+  exit 0
+fi
+
+while IFS='|' read -r NAME HOST; do
+  [ -z "$NAME" ] && continue
+  [ $DRY -eq 1 ] && { echo "CANDIDATE: $NAME ($HOST)"; continue; }
+
+  STRIKES=0
+  HEALED_AT=0
+  [ -f "$STATE_DIR/$NAME" ] && . "$STATE_DIR/$NAME"
+  echo "NAME=$NAME HOST=$HOST STRIKES=$STRIKES HEALED_AT=$HEALED_AT" >> /var/log/media-acq-indexer-heal.log
+
+  if [ "$STRIKES" -ge "$MAX_STRIKES" ]; then
+    echo "heal: $NAME quarantined (strikes=$STRIKES)" >> /var/log/media-acq-indexer-heal.log
+    continue
+  fi
+  NOW=$(date +%s)
+  # a previous heal whose indexer is back in DISABLED_SYSTEM is counted as a
+  # failed heal on the next run (recheck cycles outlive this script's wait
+  # window); cooldown just spaces re-attempts out to one per day
+  if [ "$HEALED_AT" -ne 0 ]; then
+    if [ $(( NOW - HEALED_AT )) -lt $(( COOLDOWN_DAYS * 86400 )) ]; then
+      echo "heal: $NAME in cooldown (previous heal pending verification)" >> /var/log/media-acq-indexer-heal.log
+      continue
+    fi
+    STRIKES=$(( STRIKES + 1 ))
+    HEALED_AT=0
+    if [ "$STRIKES" -ge "$MAX_STRIKES" ]; then
+      printf 'STRIKES=%s\nHEALED_AT=0\n' "$STRIKES" > "$STATE_DIR/$NAME"
+      echo "heal: $NAME quarantine reached (strikes=$STRIKES)" >> /var/log/media-acq-indexer-heal.log
+      notify "🚨 **media-acq**: Indexer **$NAME** stayed disabled through $MAX_STRIKES heal attempts. Quarantined - key or indexer account needs a manual fix."
+      continue
+    fi
+    notify "⚠️ **media-acq**: Indexer **$NAME** re-disabled after previous heal (strike $STRIKES/$MAX_STRIKES). Retrying on next run."
+    echo "heal: $NAME strikes=$STRIKES re-disabled since last heal" >> /var/log/media-acq-indexer-heal.log
+  fi
+
+  GATE_HTTP=$(curl -s -o /tmp/media-acq-gate.$$ -w '%{http_code}' --max-time 20 "${HOST}/api?t=search&q=recent&limit=1")
+  if [ "$GATE_HTTP" != "200" ] || ! grep -qE '<(error|rss|newznab)|<\?xml' /tmp/media-acq-gate.$$ 2>/dev/null; then
+    echo "heal: $NAME gate failed (http=$GATE_HTTP) -- server/API not newznab-alive, skipping" >> /var/log/media-acq-indexer-heal.log
+    rm -f /tmp/media-acq-gate.$$
+    continue
+  fi
+  rm -f /tmp/media-acq-gate.$$
+
+  cp "$CFG" "${CFG}.heal-bak"
+  if ! clear_disabled_state "$NAME"; then
+    echo "heal: $NAME edit failed, aborting" >> /var/log/media-acq-indexer-heal.log
+    mv "${CFG}.heal-bak" "$CFG"
+    continue
+  fi
+  chown 1000:1000 "$CFG"
+  docker compose -f /opt/media-acq/docker-compose.yml restart nzbhydra2 > /dev/null 2>&1
+
+  UP=0
+  for _ in $(seq 1 20); do
+    sleep 3
+    if curl -s -o /dev/null --max-time 5 http://localhost:5076/; then UP=1; break; fi
+  done
+  [ $UP -eq 0 ] && { echo "heal: $NAME hydra failed to come up" >> /var/log/media-acq-indexer-heal.log; continue; }
+
+  RE_DISABLED=0
+  ELAPSED=0
+  while [ $ELAPSED -lt $LOOP_SECONDS ]; do
+    sleep 20
+    ELAPSED=$(( ELAPSED + 20 ))
+    if ! disabled_indexers | grep -q "^${NAME}|"; then
+      break  # stayed enabled through a recheck cycle
+    fi
+  done
+  if disabled_indexers | grep -q "^${NAME}|"; then
+    RE_DISABLED=1
+  fi
+
+  if [ $RE_DISABLED -eq 1 ]; then
+    STRIKES=$(( STRIKES + 1 ))
+    printf 'STRIKES=%s\nHEALED_AT=%s\n' "$STRIKES" "$(date +%s)" > "$STATE_DIR/$NAME"
+    if [ "$STRIKES" -ge "$MAX_STRIKES" ]; then
+      notify "⚠️ **media-acq**: Indexer **$NAME** re-disabled after heal (strike $STRIKES/$MAX_STRIKES). Quarantined - key or config needs a manual fix."
+    else
+      notify "⚠️ **media-acq**: Indexer **$NAME** re-disabled after heal (strike $STRIKES/$MAX_STRIKES)."
+    fi
+    echo "heal: $NAME re-disabled after heal (strikes=$STRIKES)" >> /var/log/media-acq-indexer-heal.log
+  else
+    # keep strikes: the window can't prove health, a disabled state seen on a
+    # later run counts against the current strike ledger instead
+    printf 'STRIKES=%s\nHEALED_AT=%s\n' "$STRIKES" "$(date +%s)" > "$STATE_DIR/$NAME"
+    notify "🔧 **media-acq**: Indexer **$NAME** healed and running again."
+    echo "heal: $NAME healed" >> /var/log/media-acq-indexer-heal.log
+  fi
+done <<< "$CANDIDATES"

@@ -942,6 +942,23 @@
     minute: "15"
     job: /usr/local/bin/media-acq-missing-search.sh >> /var/log/media-acq-missing-search.log 2>&1
 
+# ── Indexer heal (auto-re-enable system-disabled indexers) ──────────
+# hydra never auto-re-enables an indexer it killed with an "unrecoverable
+# error"; a reachable-newznab gate + strike ledger holds the line on dead keys.
+
+- name: Deploy indexer heal script
+  ansible.builtin.template:
+    src: indexer-heal.sh.j2
+    dest: /usr/local/bin/media-acq-indexer-heal.sh
+    mode: '0755'
+
+- name: Schedule indexer heal daily
+  ansible.builtin.cron:
+    name: media-acq-indexer-heal
+    hour: "7"
+    minute: "45"
+    job: /usr/local/bin/media-acq-indexer-heal.sh >> /var/log/media-acq-indexer-heal.log 2>&1
+
 # ── GitOps converge + broken-release rollback (ADR-054) ─────────────
 # Pulls compose from git main every 5 min; rolls back an unhealthy release to
 # the last fully-healthy digest set after 3 checks.
