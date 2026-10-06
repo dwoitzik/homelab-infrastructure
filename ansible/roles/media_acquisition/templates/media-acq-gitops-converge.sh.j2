@@ -11,6 +11,8 @@ GOOD_DIR="$STATE_DIR/good"
 STREAK_FILE="$STATE_DIR/unhealthy-streak"
 CONTAINERS=(tor nzbhydra2 sabnzbd sonarr radarr bazarr jellyseerr)
 WEBHOOK_URL="{{ media_acquisition_discord_webhook_url }}"
+# jinja-proof literal for docker's Go-template: {{ '{{' }}.State.Health.Status{{ '}}' }}
+INSPECT_FMT="{{ '{{' }}.State.Health.Status{{ '}}' }}"
 
 mkdir -p "$GOOD_DIR"
 
@@ -23,7 +25,7 @@ notify() {
 all_healthy() {
   local c
   for c in "${CONTAINERS[@]}"; do
-    [ "$(docker inspect -f '{{.State.Health.Status}}' "$c" 2>/dev/null)" = "healthy" ] || return 1
+    [ "$(docker inspect -f "$INSPECT_FMT" "$c" 2>/dev/null)" = "healthy" ] || return 1
   done
 }
 
@@ -31,7 +33,7 @@ wait_healthy() {
   local c i
   for c in "${CONTAINERS[@]}"; do
     i=0
-    until [ "$(docker inspect -f '{{.State.Health.Status}}' "$c" 2>/dev/null)" = "healthy" ]; do
+    until [ "$(docker inspect -f "$INSPECT_FMT" "$c" 2>/dev/null)" = "healthy" ]; do
       i=$((i + 1))
       [ "$i" -ge 40 ] && return 1
       sleep 10
