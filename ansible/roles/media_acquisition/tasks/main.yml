@@ -40,7 +40,7 @@
 # git main on a timer; a Jinja template would not be Renovate-parseable.
 - name: Deploy media acquisition docker-compose configuration
   ansible.builtin.copy:
-    src: docker-compose.yml
+    src: "{{ playbook_dir }}/files/media-acquisition/docker-compose.yml"
     dest: "{{ media_acquisition_base_dir }}/docker-compose.yml"
     mode: '0640'
 
