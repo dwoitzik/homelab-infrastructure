@@ -41,6 +41,7 @@ skipped by accident.
 | [033](ADR-033-public-exposure-allowlist.md) | Public exposure is an explicit allowlist of two hostnames, not a wildcard | Accepted |
 | [035](ADR-035-scanopy-topology-mapping.md) | Scanopy for network topology mapping | Accepted |
 | [041](ADR-041-searxng-egress-fingerprint-blocking.md) | SearXNG general-web engines blocked by request-fingerprint detection | Accepted |
+| [054](ADR-054-media-acq-gitops-converge.md) | Media-acq stack converges to git main with automatic broken-release rollback | Accepted |
 
 ## In review, not yet in this table
 

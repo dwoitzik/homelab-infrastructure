@@ -1,0 +1,87 @@
+#!/bin/bash
+# Converges media-acq compose to git main every 5 min; after 3 consecutive
+# unhealthy checks, rolls back to the last fully-healthy digest set (ADR-054).
+set -uo pipefail
+
+REMOTE_URL="https://github.com/{{ media_acquisition_gitops_repo }}.git"
+WORK=/opt/media-acq/gitops
+COMPOSE=/opt/media-acq/docker-compose.yml
+STATE_DIR=/opt/media-acq/.gitops-state
+GOOD_DIR="$STATE_DIR/good"
+STREAK_FILE="$STATE_DIR/unhealthy-streak"
+CONTAINERS=(tor nzbhydra2 sabnzbd sonarr radarr bazarr jellyseerr)
+WEBHOOK_URL="{{ media_acquisition_discord_webhook_url }}"
+
+mkdir -p "$GOOD_DIR"
+
+notify() {
+  curl -s -X POST -H "Content-Type: application/json" \
+    -d "{\"content\": \"$1\"}" \
+    "$WEBHOOK_URL" > /dev/null 2>&1 || true
+}
+
+all_healthy() {
+  local c
+  for c in "${CONTAINERS[@]}"; do
+    [ "$(docker inspect -f '{{.State.Health.Status}}' "$c" 2>/dev/null)" = "healthy" ] || return 1
+  done
+}
+
+wait_healthy() {
+  local c i
+  for c in "${CONTAINERS[@]}"; do
+    i=0
+    until [ "$(docker inspect -f '{{.State.Health.Status}}' "$c" 2>/dev/null)" = "healthy" ]; do
+      i=$((i + 1))
+      [ "$i" -ge 40 ] && return 1
+      sleep 10
+    done
+  done
+}
+
+# --- 1. converge to git main (image-digest bumps land here) ----------------
+mkdir -p "$WORK"
+if [ ! -d "$WORK/.git" ]; then
+  git clone --depth 1 "$REMOTE_URL" "$WORK" || notify "⚠ **media-acq gitops**: clone fehlgeschlagen ($REMOTE_URL)"
+fi
+
+prev="$(git -C "$WORK" rev-parse HEAD 2>/dev/null || echo never)"
+git -C "$WORK" -c advice.detachedHead=false fetch --quiet --depth 1 origin main 2>/dev/null
+git -C "$WORK" -c advice.detachedHead=false checkout --quiet --force --detach FETCH_HEAD 2>/dev/null
+new="$(git -C "$WORK" rev-parse HEAD 2>/dev/null || echo never)"
+
+if [ "$prev" = "$new" ] && all_healthy; then
+  # Nothing to do and nothing is broken: refresh the healthy-state bookmark
+  # in case a previous bookmark predates the last manual change.
+  cp -f "$COMPOSE" "$GOOD_DIR/docker-compose.yml"
+  exit 0
+fi
+
+if [ "$prev" != "$new" ]; then
+  cp -f "$WORK/ansible/files/media-acquisition/docker-compose.yml" "$COMPOSE"
+  [ -n "$prev" ] && notify "▶ **media-acq gitops**: deploy $prev → $new"
+  docker compose -f "$COMPOSE" pull --quiet 2>/dev/null || notify "⚠ **media-acq gitops**: image pull fehlgeschlagen"
+  docker compose -f "$COMPOSE" up -d --remove-orphans 2>/dev/null || notify "⚠ **media-acq gitops**: compose up fehlgeschlagen"
+fi
+
+# --- 2. health gate: healthy -> bookmark, unhealthy x3 -> rollback ----------
+if wait_healthy; then
+  cp -f "$COMPOSE" "$GOOD_DIR/docker-compose.yml"
+  echo 0 > "$STREAK_FILE"
+else
+  streak=$(( $(cat "$STREAK_FILE" 2>/dev/null || echo 0) + 1 ))
+  echo "$streak" > "$STREAK_FILE"
+
+  if [ "$streak" -ge 3 ] && [ -f "$GOOD_DIR/docker-compose.yml" ]; then
+    if cmp -s "$COMPOSE" "$GOOD_DIR/docker-compose.yml"; then
+      notify "🟠 **media-acq gitops**: ${CONTAINERS[*]} mindestens einer unhealthy nach 15 min, kein Rollback-Bild verfügbar (letztes gutes = aktuelles)."
+    else
+      cp -f "$GOOD_DIR/docker-compose.yml" "$COMPOSE"
+      notify "🔄 **media-acq gitops**: Rollback auf letztes gesundes Image nach 3× unhealthy-Bewertung."
+      docker compose -f "$COMPOSE" up -d --remove-orphans 2>/dev/null
+      echo 0 > "$STREAK_FILE"
+    fi
+  elif [ "$streak" -ge 3 ]; then
+    notify "🟠 **media-acq gitops**: ${CONTAINERS[*]} unhealthy nach 15 min, kein guter Zustand im Bookmark — manueller Eingriff nötig."
+  fi
+fi

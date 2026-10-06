@@ -4,11 +4,21 @@
   "kubernetes": {
     "fileMatch": ["kubernetes/.+\\.yml$"]
   },
+  "docker-compose": {
+    "fileMatch": ["ansible/files/media-acquisition/docker-compose.yml$"]
+  },
   "minimumReleaseAge": "3 days",
   "packageRules": [
     {
       "description": "Stateless services + digest pins: patch/minor/digest/pin only, auto-merge after CI green + a 3-day soak so a bad upstream release doesn't land same-day. 'pin' covers first-time digest pinning (no prior digest to diff against), which otherwise sits stuck needing a manual merge forever -- same soak/CI gate applies. Rule order matters -- the stateful/critical rule below is listed last so it overrides this one for the specific packages it names.",
       "matchManagers": ["kubernetes"],
+      "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "Media-acquisition compose images (ADR-054): digest-pinned, applied by the LXC's 5-minute gitops converge with an automatic health-gated rollback to the last good image set -- so the same patch/minor/digest auto-merge policy that k8s stateless services use is safe here too. Major stays PR-only because a linuxserver major can carry a config-migration step.",
+      "matchManagers": ["docker-compose"],
       "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
       "automerge": true,
       "platformAutomerge": true
@@ -41,7 +51,7 @@
     },
     {
       "description": "Major updates, any package: always PR-only, one PR per package (not grouped -- each major is its own migration, shouldn't be bundled with an unrelated one).",
-      "matchManagers": ["kubernetes"],
+      "matchManagers": ["kubernetes", "docker-compose"],
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "labels": ["major-update"]
