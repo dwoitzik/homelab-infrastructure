@@ -24,18 +24,22 @@ radarr_search_missing() {
   local key="$1"
   [ -z "$key" ] && return 0
   [ "$(queue_slots 7878 "$key")" -ge 5 ] && return 0
-  local ids titles
-  ids=$(curl -s "http://localhost:7878/api/v3/wanted/missing?pageSize=200&sortKey=airDateUtc" -H "X-Api-Key: ${key}" \
-    | python3 -c "
-import sys,json
-rec=json.load(sys.stdin).get('records',[])[:15]
-print(','.join(str(m['id']) for m in rec))" 2>/dev/null)
+  local payload ids titles
+  payload=$(python3 - "$key" <<'PY'
+import sys, json, urllib.request
+key = sys.argv[1]
+req = urllib.request.Request("http://localhost:7878/api/v3/wanted/missing?pageSize=200&sortKey=airDateUtc",
+    headers={"X-Api-Key": key})
+rec = json.load(urllib.request.urlopen(req)).get("records", [])[:15]
+ids = ",".join(str(m["id"]) for m in rec)
+titles = "; ".join(m["title"] for m in rec) if rec else ""
+print(json.dumps({"ids": ids, "titles": titles}))
+PY
+)
+  [ -z "$payload" ] && return 0
+  ids=$(printf '%s' "$payload" | python3 -c "import sys,json;print(json.load(sys.stdin)['ids'])")
+  titles=$(printf '%s' "$payload" | python3 -c "import sys,json;print(json.load(sys.stdin)['titles'])")
   [ -z "$ids" ] && return 0
-  titles=$(curl -s "http://localhost:7878/api/v3/wanted/missing?pageSize=200" -H "X-Api-Key: ${key}" \
-    | python3 -c "
-import sys,json
-rec=json.load(sys.stdin).get('records',[])[:15]
-print('; '.join(m['title'] for m in rec))" 2>/dev/null)
   curl -s -X POST "http://localhost:7878/api/v3/command" -H "X-Api-Key: ${key}" \
     -H "Content-Type: application/json" \
     -d "{\"name\":\"MoviesSearch\",\"movieIds\":[${ids}]}" > /dev/null
@@ -46,18 +50,25 @@ sonarr_search_missing() {
   local key="$1"
   [ -z "$key" ] && return 0
   [ "$(queue_slots 8989 "$key")" -ge 5 ] && return 0
-  local ids titles
-  ids=$(curl -s "http://localhost:8989/api/v3/wanted/missing?pageSize=200&sortKey=airDateUtc" -H "X-Api-Key: ${key}" \
-    | python3 -c "
-import sys,json
-rec=json.load(sys.stdin).get('records',[])[:15]
-print(','.join(str(e['episodeId']) for e in rec))" 2>/dev/null)
+  local payload ids titles
+  payload=$(python3 - "$key" <<'PY'
+import sys, json, urllib.request
+key = sys.argv[1]
+def get(path):
+    return json.load(urllib.request.urlopen(urllib.request.Request(
+        "http://localhost:8989/api/v3" + path, headers={"X-Api-Key": key})))
+series = {s["id"]: s["title"] for s in get("/series")}
+rec = get("/wanted/missing?pageSize=200&sortKey=airDateUtc").get("records", [])[:15]
+ids = ",".join(str(r["id"]) for r in rec)
+titles = "; ".join("%s S%02dE%02d" % (series.get(r["seriesId"], "?"),
+    r["seasonNumber"], r["episodeNumber"]) for r in rec) if rec else ""
+print(json.dumps({"ids": ids, "titles": titles}))
+PY
+)
+  [ -z "$payload" ] && return 0
+  ids=$(printf '%s' "$payload" | python3 -c "import sys,json;print(json.load(sys.stdin)['ids'])")
+  titles=$(printf '%s' "$payload" | python3 -c "import sys,json;print(json.load(sys.stdin)['titles'])")
   [ -z "$ids" ] && return 0
-  titles=$(curl -s "http://localhost:8989/api/v3/wanted/missing?pageSize=200" -H "X-Api-Key: ${key}" \
-    | python3 -c "
-import sys,json
-rec=json.load(sys.stdin).get('records',[])[:15]
-print('; '.join(e['series']['title'] for e in rec))" 2>/dev/null)
   curl -s -X POST "http://localhost:8989/api/v3/command" -H "X-Api-Key: ${key}" \
     -H "Content-Type: application/json" \
     -d "{\"name\":\"EpisodeSearch\",\"episodeIds\":[${ids}]}" > /dev/null
