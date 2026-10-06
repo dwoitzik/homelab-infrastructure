@@ -45,6 +45,11 @@ Kubernetes side, without introducing a runner/secret dependency:
    container reports healthy, the current compose file is bookmarked; when any
    container stays unhealthy for three consecutive 5-minute runs, the previous
    good bookmark is restored and `up -d` re-creates from the older digest set.
+   Convergence is triggered by a change in the *compose content* versus the
+   deployed file (not by git HEAD alone), so the first clone deploys, a
+   docs-only commit is a no-op, and a rolled-back HEAD is pinned in
+   `$STATE_DIR/rolled_back` until a newer commit arrives — otherwise the next
+   cron tick would re-apply the exact broken release the gate just rejected.
    Both deploy and rollback notify the existing Discord webhook.
 4. **Ansible pulling option.** The role's compose task sets `pull: always`, so
    a manual/CI playbook run applies a merged digest bump immediately rather
