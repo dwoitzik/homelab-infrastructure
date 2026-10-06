@@ -49,24 +49,35 @@ prev="$(git -C "$WORK" rev-parse HEAD 2>/dev/null || echo never)"
 git -C "$WORK" -c advice.detachedHead=false fetch --quiet --depth 1 origin main 2>/dev/null
 git -C "$WORK" -c advice.detachedHead=false checkout --quiet --force --detach FETCH_HEAD 2>/dev/null
 new="$(git -C "$WORK" rev-parse HEAD 2>/dev/null || echo never)"
+REPO_COMPOSE="$WORK/ansible/files/media-acquisition/docker-compose.yml"
 
-if [ "$prev" = "$new" ] && all_healthy; then
-  # Nothing to do and nothing is broken: refresh the healthy-state bookmark
-  # in case a previous bookmark predates the last manual change.
-  cp -f "$COMPOSE" "$GOOD_DIR/docker-compose.yml"
-  exit 0
+# Converge only when the deployed compose differs from the repo's committed
+# one (first clone deploys, docs-only commits no-op). A rollback pins that
+# HEAD so the next tick does not re-apply the same broken digest set.
+deploy=0
+cmp -s "$COMPOSE" "$REPO_COMPOSE" 2>/dev/null || deploy=1
+[ "$(cat "$STATE_DIR/rolled_back" 2>/dev/null || echo never)" = "$new" ] && deploy=0
+
+if [ "$deploy" = 1 ]; then
+  [ -f "$REPO_COMPOSE" ] || { notify "⚠ **media-acq gitops**: Repo-Compose fehlt ($REPO_COMPOSE)"; deploy=0; }
 fi
 
-if [ "$prev" != "$new" ]; then
-  cp -f "$WORK/ansible/files/media-acquisition/docker-compose.yml" "$COMPOSE"
+if [ "$deploy" = 1 ]; then
+  cp -f "$REPO_COMPOSE" "$COMPOSE"
   [ -n "$prev" ] && notify "▶ **media-acq gitops**: deploy $prev → $new"
   docker compose -f "$COMPOSE" pull --quiet 2>/dev/null || notify "⚠ **media-acq gitops**: image pull fehlgeschlagen"
   docker compose -f "$COMPOSE" up -d --remove-orphans 2>/dev/null || notify "⚠ **media-acq gitops**: compose up fehlgeschlagen"
 fi
 
-# --- 2. health gate: healthy -> bookmark, unhealthy x3 -> rollback ----------
+if [ "$deploy" = 0 ] && all_healthy; then
+  cp -f "$COMPOSE" "$GOOD_DIR/docker-compose.yml"
+  exit 0
+fi
+
+# --- health gate: healthy -> bookmark, unhealthy x3 -> rollback ----------
 if wait_healthy; then
   cp -f "$COMPOSE" "$GOOD_DIR/docker-compose.yml"
+  rm -f "$STATE_DIR/rolled_back"
   echo 0 > "$STREAK_FILE"
 else
   streak=$(( $(cat "$STREAK_FILE" 2>/dev/null || echo 0) + 1 ))
@@ -77,7 +88,8 @@ else
       notify "🟠 **media-acq gitops**: ${CONTAINERS[*]} mindestens einer unhealthy nach 15 min, kein Rollback-Bild verfügbar (letztes gutes = aktuelles)."
     else
       cp -f "$GOOD_DIR/docker-compose.yml" "$COMPOSE"
-      notify "🔄 **media-acq gitops**: Rollback auf letztes gesundes Image nach 3× unhealthy-Bewertung."
+      echo "$new" > "$STATE_DIR/rolled_back"
+      notify "🔄 **media-acq gitops**: Rollback auf letztes gesundes Image nach 3× unhealthy-Bewertung (HEAD $new bis neuer Commit gepinnt)."
       docker compose -f "$COMPOSE" up -d --remove-orphans 2>/dev/null
       echo 0 > "$STREAK_FILE"
     fi
