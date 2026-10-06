@@ -925,6 +925,23 @@
     minute: "*/10"
     job: /usr/local/bin/media-acq-queue-watchdog.sh >> /var/log/media-acq-queue-watchdog.log 2>&1
 
+# ── Missing-search (auto-trigger for wanted backlog) ───────────────
+# Radarr/Sonarr only search at RSS time or on manual trigger; old wanted
+# titles would otherwise rot forever. Daily sweep keeps that manual step dead.
+
+- name: Deploy missing-search script
+  ansible.builtin.template:
+    src: missing-search.sh.j2
+    dest: /usr/local/bin/media-acq-missing-search.sh
+    mode: '0755'
+
+- name: Schedule missing-search daily
+  ansible.builtin.cron:
+    name: media-acq-missing-search
+    hour: "6"
+    minute: "15"
+    job: /usr/local/bin/media-acq-missing-search.sh >> /var/log/media-acq-missing-search.log 2>&1
+
 # ── GitOps converge + broken-release rollback (ADR-054) ─────────────
 # Pulls compose from git main every 5 min; rolls back an unhealthy release to
 # the last fully-healthy digest set after 3 checks.

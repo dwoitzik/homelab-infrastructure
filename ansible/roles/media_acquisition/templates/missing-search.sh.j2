@@ -1,0 +1,68 @@
+#!/bin/bash
+# Searches monitored-but-missing items daily so old titles don't rot in the
+# backlog waiting for an RSS hit instead of a manual trigger.
+set -uo pipefail
+
+WEBHOOK_URL="{{ media_acquisition_discord_webhook_url }}"
+RADARR_KEY=$(grep -oP '(?<=<ApiKey>)[^<]+' {{ media_acquisition_base_dir }}/radarr/config/config.xml 2>/dev/null)
+SONARR_KEY=$(grep -oP '(?<=<ApiKey>)[^<]+' {{ media_acquisition_base_dir }}/sonarr/config/config.xml 2>/dev/null)
+
+notify() {
+  local message="$1"
+  curl -s -X POST -H "Content-Type: application/json" \
+    -d "{\"content\": \"${message}\"}" \
+    "${WEBHOOK_URL}" > /dev/null 2>&1 || true
+}
+
+queue_slots() {
+  local port="$1" key="$2"
+  curl -s "http://localhost:${port}/api/v3/queue?pageSize=1" -H "X-Api-Key: ${key}" \
+    | python3 -c "import sys,json;print(json.load(sys.stdin).get('totalRecords',0))" 2>/dev/null
+}
+
+radarr_search_missing() {
+  local key="$1"
+  [ -z "$key" ] && return 0
+  [ "$(queue_slots 7878 "$key")" -ge 5 ] && return 0
+  local ids titles
+  ids=$(curl -s "http://localhost:7878/api/v3/wanted/missing?pageSize=200&sortKey=airDateUtc" -H "X-Api-Key: ${key}" \
+    | python3 -c "
+import sys,json
+rec=json.load(sys.stdin).get('records',[])[:15]
+print(','.join(str(m['id']) for m in rec))" 2>/dev/null)
+  [ -z "$ids" ] && return 0
+  titles=$(curl -s "http://localhost:7878/api/v3/wanted/missing?pageSize=200" -H "X-Api-Key: ${key}" \
+    | python3 -c "
+import sys,json
+rec=json.load(sys.stdin).get('records',[])[:15]
+print('; '.join(m['title'] for m in rec))" 2>/dev/null)
+  curl -s -X POST "http://localhost:7878/api/v3/command" -H "X-Api-Key: ${key}" \
+    -H "Content-Type: application/json" \
+    -d "{\"name\":\"MoviesSearch\",\"movieIds\":[${ids}]}" > /dev/null
+  notify "🔍 **media-acq**: Radarr-Suche für $titles"
+}
+
+sonarr_search_missing() {
+  local key="$1"
+  [ -z "$key" ] && return 0
+  [ "$(queue_slots 8989 "$key")" -ge 5 ] && return 0
+  local ids titles
+  ids=$(curl -s "http://localhost:8989/api/v3/wanted/missing?pageSize=200&sortKey=airDateUtc" -H "X-Api-Key: ${key}" \
+    | python3 -c "
+import sys,json
+rec=json.load(sys.stdin).get('records',[])[:15]
+print(','.join(str(e['episodeId']) for e in rec))" 2>/dev/null)
+  [ -z "$ids" ] && return 0
+  titles=$(curl -s "http://localhost:8989/api/v3/wanted/missing?pageSize=200" -H "X-Api-Key: ${key}" \
+    | python3 -c "
+import sys,json
+rec=json.load(sys.stdin).get('records',[])[:15]
+print('; '.join(e['series']['title'] for e in rec))" 2>/dev/null)
+  curl -s -X POST "http://localhost:8989/api/v3/command" -H "X-Api-Key: ${key}" \
+    -H "Content-Type: application/json" \
+    -d "{\"name\":\"EpisodeSearch\",\"episodeIds\":[${ids}]}" > /dev/null
+  notify "🔍 **media-acq**: Sonarr-Suche für $titles"
+}
+
+radarr_search_missing "$RADARR_KEY"
+sonarr_search_missing "$SONARR_KEY"
