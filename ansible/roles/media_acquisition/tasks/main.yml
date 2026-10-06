@@ -36,9 +36,11 @@
     - "{{ media_acquisition_base_dir }}/nzbhydra2/config"
     - "{{ media_acquisition_base_dir }}/jellyseerr/config"
 
+# Compose is a static, Renovate-digest-pinned file the LXC converges to from
+# git main on a timer; a Jinja template would not be Renovate-parseable.
 - name: Deploy media acquisition docker-compose configuration
-  ansible.builtin.template:
-    src: docker-compose.yml.j2
+  ansible.builtin.copy:
+    src: docker-compose.yml
     dest: "{{ media_acquisition_base_dir }}/docker-compose.yml"
     mode: '0640'
 
@@ -46,6 +48,10 @@
   community.docker.docker_compose_v2:
     project_src: "{{ media_acquisition_base_dir }}"
     state: present
+    # pull:always so a manual/an operator playbook run also picks up a merged
+    # Renovate digest bump instead of silently keeping the stale local image
+    # (the exact drift class that caused the 2026-08/10 outage).
+    pull: always
 
 # ── Sonarr quality profile + download client + indexer ────────────
 # Sonarr v4 requires auth on ALL endpoints (returns 401 without a key),
@@ -918,3 +924,19 @@
     name: media-acq-queue-watchdog
     minute: "*/10"
     job: /usr/local/bin/media-acq-queue-watchdog.sh >> /var/log/media-acq-queue-watchdog.log 2>&1
+
+# ── GitOps converge + broken-release rollback (ADR-054) ─────────────
+# Pulls compose from git main every 5 min; rolls back an unhealthy release to
+# the last fully-healthy digest set after 3 checks.
+
+- name: Deploy media-acq gitops converge script
+  ansible.builtin.template:
+    src: media-acq-gitops-converge.sh.j2
+    dest: /usr/local/bin/media-acq-gitops-converge.sh
+    mode: '0755'
+
+- name: Schedule gitops converge every 5 minutes
+  ansible.builtin.cron:
+    name: media-acq-gitops-converge
+    minute: "*/5"
+    job: /usr/local/bin/media-acq-gitops-converge.sh

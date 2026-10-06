@@ -4,6 +4,10 @@ media_acquisition_puid: "1000"
 media_acquisition_pgid: "1000"
 media_acquisition_tz: "Europe/Berlin"
 
+# Repo the host converges to on a 5-minute timer (ADR-054). Public repo, so
+# the LXC clones over HTTPS without credentials.
+media_acquisition_gitops_repo: dwoitzik/homelab-infrastructure
+
 # Eweka NNTP server -- SSL on port 563, credentials from Vault.
 # SABnzbd connects directly (no VPN): Usenet over SSL is encrypted at the
 # transport layer so the ISP sees only "connected to news.eweka.nl", not

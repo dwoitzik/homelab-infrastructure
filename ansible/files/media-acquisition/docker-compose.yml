@@ -1,18 +1,7 @@
 ---
-# Media acquisition stack — Sonarr/Radarr/Bazarr/SABnzbd/NZBHydra2/Jellyseerr
-#
-# Privacy model:
-#   SABnzbd  → Eweka directly over SSL (port 563). ISP sees encrypted NNTP
-#              traffic to eweka.nl only, not content. No VPN overhead on
-#              downloads preserves full line speed and avoids Eweka flagging
-#              the account for apparent IP-sharing (a known issue with VPN IPs
-#              shared across many subscribers).
-#   NZBHydra2 → Tor SOCKS5 (172.28.1.10:9050). Indexer search queries never
-#              expose the home IP to NZBGeek/DrunkenSlug/etc. Configured in
-#              NZBHydra2's proxy settings with "fail closed" (no fallback to
-#              direct) so a Tor outage blocks queries rather than leaking.
-#   Everything else (Sonarr/Radarr/Bazarr) communicates only within the
-#              media-acq-net bridge — no external internet access needed.
+# Privacy model: NZBHydra2 indexer search exits via Tor (fail-closed proxy in
+# Hydra config), SABnzbd downloads go direct to Eweka over SSL. Images are
+# Renovate-digest-pinned and converge from git main (ADR-054).
 networks:
   media-acq-net:
     driver: bridge
@@ -22,7 +11,7 @@ networks:
 
 services:
   tor:
-    image: peterdavehello/tor-socks-proxy:latest
+    image: peterdavehello/tor-socks-proxy:latest@sha256:0cc12d36d31265ce828c8422a7e163a0bf46755e90531f4c7d38a6149f071729
     container_name: tor
     networks:
       media-acq-net:
@@ -35,16 +24,16 @@ services:
     restart: unless-stopped
 
   nzbhydra2:
-    image: lscr.io/linuxserver/nzbhydra2:latest
+    image: lscr.io/linuxserver/nzbhydra2:latest@sha256:177bea1fb1246dcbba796862db09b716e6e77b9d534b12b2d5e3951bd407bcca
     container_name: nzbhydra2
     networks:
       - media-acq-net
     environment:
-      - PUID={{ media_acquisition_puid }}
-      - PGID={{ media_acquisition_pgid }}
-      - TZ={{ media_acquisition_tz }}
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
     volumes:
-      - {{ media_acquisition_base_dir }}/nzbhydra2/config:/config
+      - /opt/media-acq/nzbhydra2/config:/config
     ports:
       - "5076:5076"
     depends_on:
@@ -60,16 +49,16 @@ services:
     restart: unless-stopped
 
   sabnzbd:
-    image: lscr.io/linuxserver/sabnzbd:latest
+    image: lscr.io/linuxserver/sabnzbd:latest@sha256:793828eab1722556131d37187115a9d3e3b9703e03a55731a07f2e0fe4edc2c7
     container_name: sabnzbd
     networks:
       - media-acq-net
     environment:
-      - PUID={{ media_acquisition_puid }}
-      - PGID={{ media_acquisition_pgid }}
-      - TZ={{ media_acquisition_tz }}
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
     volumes:
-      - {{ media_acquisition_base_dir }}/sabnzbd/config:/config
+      - /opt/media-acq/sabnzbd/config:/config
       - /media:/media
       - /downloads/incomplete:/downloads/incomplete
     ports:
@@ -89,16 +78,16 @@ services:
     restart: unless-stopped
 
   sonarr:
-    image: lscr.io/linuxserver/sonarr:latest
+    image: lscr.io/linuxserver/sonarr:latest@sha256:f247545d23ba8b233d6604575347e48a623fe6ad75dda02348bf81917f3b5c06
     container_name: sonarr
     networks:
       - media-acq-net
     environment:
-      - PUID={{ media_acquisition_puid }}
-      - PGID={{ media_acquisition_pgid }}
-      - TZ={{ media_acquisition_tz }}
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
     volumes:
-      - {{ media_acquisition_base_dir }}/sonarr/config:/config
+      - /opt/media-acq/sonarr/config:/config
       - /media:/media
       - /downloads/incomplete:/downloads/incomplete
     ports:
@@ -116,16 +105,16 @@ services:
     restart: unless-stopped
 
   radarr:
-    image: lscr.io/linuxserver/radarr:latest
+    image: lscr.io/linuxserver/radarr:latest@sha256:7dfd049e79c00b16fbc29c3f5d96a9e7b9e73a23930b4c5b3c4541d60b366814
     container_name: radarr
     networks:
       - media-acq-net
     environment:
-      - PUID={{ media_acquisition_puid }}
-      - PGID={{ media_acquisition_pgid }}
-      - TZ={{ media_acquisition_tz }}
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
     volumes:
-      - {{ media_acquisition_base_dir }}/radarr/config:/config
+      - /opt/media-acq/radarr/config:/config
       - /media:/media
       - /downloads/incomplete:/downloads/incomplete
     ports:
@@ -143,16 +132,16 @@ services:
     restart: unless-stopped
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:latest
+    image: lscr.io/linuxserver/bazarr:latest@sha256:8b30e81c4aec2991f469e78fae8afaa89ecc9b21a80e3897f50427216b55470c
     container_name: bazarr
     networks:
       - media-acq-net
     environment:
-      - PUID={{ media_acquisition_puid }}
-      - PGID={{ media_acquisition_pgid }}
-      - TZ={{ media_acquisition_tz }}
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
     volumes:
-      - {{ media_acquisition_base_dir }}/bazarr/config:/config
+      - /opt/media-acq/bazarr/config:/config
       - /media:/media
       - /downloads/incomplete:/downloads/incomplete
     ports:
@@ -168,15 +157,15 @@ services:
     restart: unless-stopped
 
   jellyseerr:
-    image: fallenbagel/jellyseerr:latest
+    image: fallenbagel/jellyseerr:latest@sha256:4538137bc5af902dece165f2bf73776d9cf4eafb6dd714670724af8f3eb77764
     container_name: jellyseerr
     networks:
       - media-acq-net
     environment:
-      - TZ={{ media_acquisition_tz }}
+      - TZ=Europe/Berlin
       - LOG_LEVEL=info
     volumes:
-      - {{ media_acquisition_base_dir }}/jellyseerr/config:/app/config
+      - /opt/media-acq/jellyseerr/config:/app/config
     ports:
       - "5055:5055"
     healthcheck:
@@ -190,13 +179,9 @@ services:
     restart: unless-stopped
 
   autoheal:
-    # Watches every sibling container's Docker healthcheck status (via the
-    # autoheal=true label above) and force-restarts any that go "unhealthy" --
-    # covers the class of failure a plain `restart: unless-stopped` misses:
-    # a process that's still running but internally hung/unresponsive
-    # (as opposed to a clean crash/exit, which unless-stopped already
-    # handles fine on its own).
-    image: willfarrell/autoheal:latest
+    # Force-restarts any sibling that goes "unhealthy" -- the class of failure
+    # `restart: unless-stopped` misses: a process still running but hung.
+    image: willfarrell/autoheal:latest@sha256:de43e0064cee59af1a7a19f921f2cf10727e390dfcba2cc7d26ce9e2506e0bfe
     container_name: autoheal
     environment:
       - AUTOHEAL_CONTAINER_LABEL=autoheal
