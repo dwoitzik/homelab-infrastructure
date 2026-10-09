@@ -150,7 +150,7 @@ spec:
   # back to baseline and the operator's own scan-job I/O footprint has
   # been reviewed (e.g. lower the concurrency limit, or throttle image
   # pulls) rather than just flipping it back on to hit the same wall.
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: trivy-operator
