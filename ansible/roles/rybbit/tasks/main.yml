@@ -24,3 +24,7 @@
     project_src: /opt/rybbit
     state: present
   when: rybbit_postgres_password is defined
+
+- name: Apply ClickHouse event cleanup view
+  ansible.builtin.include_tasks: clickhouse-clean.yml
+  when: rybbit_postgres_password is defined
