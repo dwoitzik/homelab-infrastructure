@@ -1,0 +1,17 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: changedetection
+  namespace: changedetection
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`changedetection.woitzik.dev`)
+      kind: Rule
+      services: [{name: changedetection, port: 5000}]
+      middlewares:
+        - name: security-headers@kubernetescrd
+        - name: crowdsec-ip-whitelist@kubernetescrd
+        - name: authelia@kubernetescrd
+  tls:
+    certResolver: default

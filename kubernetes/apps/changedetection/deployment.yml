@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: changedetection
+  namespace: changedetection
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: changedetection}
+  template:
+    metadata:
+      labels: {app: changedetection}
+    spec:
+      containers:
+        - name: changedetection
+          image: ghcr.io/dgtlmoon/changedetection.io:0.49.18@sha256:2bdcb4baf3d5656a0468e6290f86dce5a424e82b5c1d9cf9c3f9df6644e47138
+          ports: [{containerPort: 5000}]
+          volumeMounts:
+            - name: data
+              mountPath: /datastore
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: changedetection-data
