@@ -51,6 +51,10 @@ data:
       # unreliable, but the least broken of everything tried.
       - name: google
         use_mobile_ui: true
+      - name: google cse
+        disabled: true
+      - name: wikipedia
+        disabled: true
       - name: bing
         disabled: true
       - name: qwant
