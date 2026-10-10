@@ -2,10 +2,7 @@
 - name: Create events_clean VIEW on ClickHouse
   community.docker.docker_container_exec:
     container: clickhouse
-    command:
-      - clickhouse-client
-      - --query
-      - "{{ lookup('ansible.builtin.file', 'files/events-clean.sql') }}"
+    command: clickhouse-client --query "{{ lookup('ansible.builtin.file', 'files/events-clean.sql') }}"
     stdin: true
   register: rybbit_events_clean_create
   changed_when: rybbit_events_clean_create.rc == 0
@@ -14,10 +11,7 @@
 - name: Verify VIEW creation
   community.docker.docker_container_exec:
     container: clickhouse
-    command:
-      - clickhouse-client
-      - --query
-      - "SHOW CREATE VIEW analytics.events_clean"
+    command: clickhouse-client --query "SHOW CREATE VIEW analytics.events_clean"
     stdin: true
   register: rybbit_events_clean_show
   changed_when: false
