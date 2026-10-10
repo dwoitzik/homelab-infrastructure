@@ -10,8 +10,7 @@ spec:
       kind: Rule
       services: [{name: changedetection, port: 5000}]
       middlewares:
-        - name: security-headers@kubernetescrd
-        - name: crowdsec-ip-whitelist@kubernetescrd
-        - name: authelia@kubernetescrd
+        - name: authelia
+        - name: crowdsec-bouncer
   tls:
     certResolver: default
