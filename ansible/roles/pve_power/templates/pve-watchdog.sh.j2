@@ -6,7 +6,7 @@ TEMP=$(($(cat /sys/class/hwmon/hwmon1/temp1_input) / 1000))
 LOAD1=$(awk '{print $1}' /proc/loadavg)
 LOAD1_INT=${LOAD1%.*}
 STATE=/tmp/pve-watchdog.state
-MAX_BACKOFF_MIN=240
+MAX_BACKOFF_MIN=480
 # 2026-08-22: threshold was 25, initial backoff 15min -- both too tight for
 # this host's real usage pattern (a legit ansible/kubectl bulk-apply session
 # routinely bursts load into the high-20s/low-30s for a few minutes, which
@@ -26,8 +26,8 @@ pgrep -x vzdump >/dev/null 2>&1 && VZDUMP_RUNNING=1
 
 # Bar is 70 during a backup, not disabled: observed peak 56.36 still alerts, and load
 # still high once vzdump exits trips 30 again on the next 5-minute run.
-LOAD_THRESHOLD=30
-[ "$VZDUMP_RUNNING" -eq 1 ] && LOAD_THRESHOLD=70
+LOAD_THRESHOLD=40
+[ "$VZDUMP_RUNNING" -eq 1 ] && LOAD_THRESHOLD=80
 [ "$LOAD1_INT" -ge "$LOAD_THRESHOLD" ] && \
   ALERT="${ALERT}Load ${LOAD1} (>=${LOAD_THRESHOLD}${VZDUMP_RUNNING:+ during backup}). "
 
@@ -53,7 +53,7 @@ fi
 # each repeat alert for the SAME ongoing condition doubles the wait (15 -> 30
 # -> 60 -> 120 -> 240, capped), so a long-sustained issue still gets you
 # notified promptly at first and periodically thereafter, but tapers off
-# instead of spamming. The backoff resets to 15min the moment the condition
+# instead of spamming. The backoff resets to 30min the moment the condition
 # actually clears, so a fresh/different problem right after a quiet period
 # still alerts promptly -- deliberately not a blanket "quiet hours" window,
 # which would also silence a genuinely new problem that happens to start
@@ -64,7 +64,7 @@ if [ -f "$STATE" ]; then
   read -r LAST BACKOFF < "$STATE"
 fi
 LAST=${LAST:-0}
-BACKOFF=${BACKOFF:-60}
+BACKOFF=${BACKOFF:-30}
 NOW=$(date +%s)
 
 if [ -n "$ALERT" ] && [ "$MAINTENANCE_ACTIVE" -eq 0 ]; then
