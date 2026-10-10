@@ -10,7 +10,9 @@ spec:
       kind: Rule
       services: [{name: changedetection, port: 5000}]
       middlewares:
-        - name: authelia
         - name: crowdsec-bouncer
+          namespace: apps
+        - name: authelia
+          namespace: apps
   tls:
     certResolver: default
