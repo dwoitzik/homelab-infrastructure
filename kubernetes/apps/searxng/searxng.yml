@@ -32,8 +32,8 @@ data:
     # latency, and a timeout there discards results the page already holds
     # (ADR-045), so a slow engine renders as zero hits instead of an error.
     outgoing:
-      request_timeout: 4.0
-      max_request_timeout: 6.0
+      request_timeout: 8.0
+      max_request_timeout: 10.0
       pool_connections: 100
       pool_maxsize: 20
     # Every scraped general-web engine below is blocked by request-
