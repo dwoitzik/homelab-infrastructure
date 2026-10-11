@@ -43,6 +43,7 @@ data:
         disabled: true
       - name: duckduckgo
         disabled: true
+        disabled: true
       - name: startpage
         disabled: true
       - name: wikidata
