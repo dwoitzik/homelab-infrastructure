@@ -42,7 +42,6 @@ data:
       - name: brave
         disabled: true
       - name: duckduckgo
-        disabled: true
       - name: startpage
         disabled: true
       - name: wikidata
