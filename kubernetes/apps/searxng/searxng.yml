@@ -42,7 +42,9 @@ data:
       - name: brave
         disabled: true
       - name: duckduckgo
+        disabled: true
       - name: startpage
+        disabled: true
       - name: wikidata
         disabled: true
       # google (mobile UI) is the sole general-web engine still enabled --
@@ -54,6 +56,7 @@ data:
       - name: wikipedia
         disabled: true
       - name: bing
+        disabled: true
       - name: qwant
         disabled: true
       - name: mojeek
