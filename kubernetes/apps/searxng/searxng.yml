@@ -54,13 +54,11 @@ data:
       - name: wikipedia
         disabled: true
       - name: bing
-        disabled: true
       - name: qwant
         disabled: true
       - name: mojeek
         disabled: true
       - name: yahoo
-        disabled: true
       # Same root cause as the general engines above, different category --
       # ADR-041 never checked images. /stats/errors showed these three at a
       # sustained 100% failure rate (rate-limit suspension, CAPTCHA
