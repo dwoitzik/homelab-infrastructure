@@ -52,6 +52,7 @@ data:
       # google (mobile UI) is the sole general-web engine still enabled --
       # unreliable, but the least broken of everything tried.
       - name: google
+        disabled: true
         use_mobile_ui: true
         disabled: true        disabled: true
       - name: google cse
@@ -65,7 +66,6 @@ data:
         disabled: true
         disabled: true
       - name: mojeek
-        disabled: true
       - name: yahoo
         disabled: true
         disabled: true
