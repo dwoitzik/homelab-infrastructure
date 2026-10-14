@@ -40,7 +40,6 @@ data:
     # fingerprint bot detection, not IP reputation -- see ADR-041.
     engines:
       - name: brave
-        disabled: true
       - name: duckduckgo
         disabled: true
       - name: startpage
@@ -50,7 +49,7 @@ data:
       # google (mobile UI) is the sole general-web engine still enabled --
       # unreliable, but the least broken of everything tried.
       - name: google
-
+        disabled: true        disabled: true
       - name: google cse
         disabled: true
       - name: wikipedia
