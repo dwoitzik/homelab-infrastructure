@@ -44,12 +44,12 @@ data:
       - name: duckduckgo
         disabled: true
       - name: startpage
-        disabled: true
       - name: wikidata
         disabled: true
       # google (mobile UI) is the sole general-web engine still enabled --
       # unreliable, but the least broken of everything tried.
       - name: google
+        disabled: true
       - name: google cse
         disabled: true
       - name: wikipedia
