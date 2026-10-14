@@ -42,6 +42,7 @@ data:
       - name: brave
         disabled: true
       - name: duckduckgo
+        disabled: true
       - name: startpage
         disabled: true
       - name: wikidata
@@ -49,16 +50,19 @@ data:
       # google (mobile UI) is the sole general-web engine still enabled --
       # unreliable, but the least broken of everything tried.
       - name: google
-        disabled: true
+        use_mobile_ui: true
       - name: google cse
         disabled: true
       - name: wikipedia
         disabled: true
       - name: bing
+        disabled: true
       - name: qwant
+        disabled: true
       - name: mojeek
         disabled: true
       - name: yahoo
+        disabled: true
       # Same root cause as the general engines above, different category --
       # ADR-041 never checked images. /stats/errors showed these three at a
       # sustained 100% failure rate (rate-limit suspension, CAPTCHA
