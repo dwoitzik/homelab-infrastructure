@@ -43,6 +43,7 @@ data:
         disabled: true
       - name: duckduckgo
       - name: startpage
+        disabled: true
       - name: wikidata
         disabled: true
       # google (mobile UI) is the sole general-web engine still enabled --
