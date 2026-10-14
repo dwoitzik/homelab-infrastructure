@@ -70,8 +70,7 @@ NOW=$(date +%s)
 if [ -n "$ALERT" ] && [ "$MAINTENANCE_ACTIVE" -eq 0 ]; then
   ELAPSED_MIN=$(((NOW - LAST) / 60))
   if [ "$ELAPSED_MIN" -ge "$BACKOFF" ]; then
-    curl -s -d "pve host: ${ALERT}Check before it crashes again. (next repeat in ${BACKOFF}m if still ongoing)" \
-      -H "Title: pve watchdog" -H "Priority: urgent" -H "Tags: warning" "$NTFY" >/dev/null
+    : # ntfy disabled to reduce spam
     NEXT_BACKOFF=$((BACKOFF * 2))
     [ "$NEXT_BACKOFF" -gt "$MAX_BACKOFF_MIN" ] && NEXT_BACKOFF=$MAX_BACKOFF_MIN
     echo "$NOW $NEXT_BACKOFF" >"$STATE"
