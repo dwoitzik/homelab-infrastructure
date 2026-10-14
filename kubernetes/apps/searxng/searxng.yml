@@ -50,7 +50,7 @@ data:
       # google (mobile UI) is the sole general-web engine still enabled --
       # unreliable, but the least broken of everything tried.
       - name: google
-        use_mobile_ui: true
+
       - name: google cse
         disabled: true
       - name: wikipedia
