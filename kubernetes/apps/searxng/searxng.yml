@@ -36,8 +36,9 @@ data:
       max_request_timeout: 10.0
       pool_connections: 100
       pool_maxsize: 20
-    # Every scraped general-web engine below is blocked by request-
-    # fingerprint bot detection, not IP reputation -- see ADR-041.
+    # Scraped general-web engines are blocked by request-fingerprint bot
+    # detection, not IP reputation; bing is the one that still parses -- see
+    # ADR-041.
     engines:
       - name: brave
         disabled: true
@@ -47,15 +48,15 @@ data:
         disabled: true
       - name: wikidata
         disabled: true
-      # google (mobile UI) is the sole general-web engine still enabled --
-      # unreliable, but the least broken of everything tried.
+      # bing is the sole general-web engine still parseable from this egress
+      # (server-rendered li.b_algo); google now JS-renders, the rest are
+      # fingerprint-blocked -- see ADR-041.
+      - name: bing
       - name: google
-        use_mobile_ui: true
+        disabled: true
       - name: google cse
         disabled: true
       - name: wikipedia
-        disabled: true
-      - name: bing
         disabled: true
       - name: qwant
         disabled: true
