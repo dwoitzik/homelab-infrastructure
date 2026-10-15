@@ -117,3 +117,13 @@ resource "routeros_ip_firewall_nat" "srcnat_masquerade_heimnetz_to_srv" {
   dst_address = "10.0.20.0/24"
   comment     = "NAT: Masquerade Heimnetz to SRV for return traffic"
 }
+
+# FritzBox-LAN Minecraft players land on the DMZ stream proxy; same
+# return-traffic masquerade rationale as the SRV rule above (ADR-055).
+resource "routeros_ip_firewall_nat" "srcnat_masquerade_heimnetz_to_dmz" {
+  chain       = "srcnat"
+  action      = "masquerade"
+  src_address = "192.168.178.0/24"
+  dst_address = "10.0.30.0/24"
+  comment     = "NAT: Masquerade Heimnetz to DMZ (Minecraft) for return traffic"
+}
