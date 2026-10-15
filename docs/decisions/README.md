@@ -42,6 +42,7 @@ skipped by accident.
 | [035](ADR-035-scanopy-topology-mapping.md) | Scanopy for network topology mapping | Accepted |
 | [041](ADR-041-searxng-egress-fingerprint-blocking.md) | SearXNG general-web engines blocked by request-fingerprint detection | Accepted |
 | [054](ADR-054-media-acq-gitops-converge.md) | Media-acq stack converges to git main with automatic broken-release rollback | Accepted |
+| [055](ADR-055-lan-minecraft-dmz-access.md) | Minecraft reachability for LAN players through the DMZ stream proxy | Accepted, applied |
 
 ## In review, not yet in this table
 

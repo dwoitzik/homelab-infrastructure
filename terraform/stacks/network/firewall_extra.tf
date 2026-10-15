@@ -229,6 +229,41 @@ resource "routeros_ip_firewall_filter" "fwd_k3s_nfs_media" {
   comment      = "19: Server VLAN -> MGMT NFSv4 export for Jellyfin/usenet media PVC (mnt/media)"
 }
 
+# Minecraft is the one player-facing service that has to be reachable from
+# places the DMZ is otherwise walled off from -- see ADR-055. Scoped to the two
+# TCP ports the game speaks, to the DMZ only.
+resource "routeros_ip_firewall_filter" "fwd_internal_to_dmz_minecraft" {
+  action       = "accept"
+  chain        = "forward"
+  protocol     = "tcp"
+  src_address  = "10.0.0.0/8"
+  dst_address  = "10.0.30.0/24"
+  dst_port     = "25565,25566"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "20: Internal - Minecraft to DMZ (game LXC + NPM stream proxy)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
+# FritzBox-LAN players reach the same service through the NPM stream proxy;
+# masquerade needed for return traffic, same reason as the Heimnetz->SRV NAT.
+resource "routeros_ip_firewall_filter" "fwd_heimnetz_to_dmz_minecraft" {
+  action       = "accept"
+  chain        = "forward"
+  protocol     = "tcp"
+  src_address  = "192.168.178.0/24"
+  dst_address  = "10.0.30.0/24"
+  dst_port     = "25565,25566"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "21: Heimnetz - Minecraft to DMZ (NPM stream proxy)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
 resource "routeros_ipv6_firewall_filter" "v6_block_rogue_ra" {
   action        = "drop"
   chain         = "output"
