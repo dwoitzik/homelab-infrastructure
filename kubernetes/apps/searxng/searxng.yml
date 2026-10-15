@@ -43,31 +43,25 @@ data:
         disabled: true
       - name: duckduckgo
         disabled: true
-        disabled: true
       - name: startpage
-        disabled: true
         disabled: true
       - name: wikidata
         disabled: true
       # google (mobile UI) is the sole general-web engine still enabled --
       # unreliable, but the least broken of everything tried.
       - name: google
-        disabled: true
         use_mobile_ui: true
-        disabled: true        disabled: true
       - name: google cse
         disabled: true
       - name: wikipedia
         disabled: true
       - name: bing
         disabled: true
-        disabled: true
       - name: qwant
         disabled: true
-        disabled: true
       - name: mojeek
-      - name: yahoo
         disabled: true
+      - name: yahoo
         disabled: true
       # Same root cause as the general engines above, different category --
       # ADR-041 never checked images. /stats/errors showed these three at a
