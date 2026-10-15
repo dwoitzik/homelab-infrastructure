@@ -10,6 +10,9 @@ services:
       - '80:80'
       - '81:81'
       - '443:443'
+{% for p in npm_stream_ports | default([]) %}
+      - '{{ p }}'
+{% endfor %}
 {% endif %}
     volumes:
       - /opt/npm/data:/data
