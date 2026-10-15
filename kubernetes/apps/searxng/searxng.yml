@@ -52,6 +52,7 @@ data:
       # (server-rendered li.b_algo); google now JS-renders, the rest are
       # fingerprint-blocked -- see ADR-041.
       - name: bing
+        disabled: false
       - name: google
         disabled: true
       - name: google cse
