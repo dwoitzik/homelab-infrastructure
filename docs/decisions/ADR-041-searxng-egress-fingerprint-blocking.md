@@ -86,3 +86,16 @@ Image search still has 10 working engines left (bing images, google cse
 images, pinterest, unsplash, flickr, wikicommons.images, pexels, artic,
 plus the icon-set engines devicons/lucide), so this narrows rather than
 guts image coverage.
+
+## Update (2026-10-15): google JS-renders its results now; bing is the engine that still parses
+
+`google` (mobile UI) stopped returning results entirely -- the scrape still
+gets HTTP 200, but the ~90 KB of served HTML contains zero parseable result
+nodes (`h3`/`/url?q=` both absent), because Google now renders results
+client-side. Re-tested every general engine directly from the cluster
+egress: `bing` still returns server-rendered `li.b_algo` results, while
+`duckduckgo` (html and lite) answers with a 202 bot-challenge and
+`qwant`/`yep`/`mojeek` return 403 and `brave` 429. The sole enabled
+general-web engine is therefore now `bing`, with `google` disabled. Same
+fingerprinting root cause as the original ADR -- which engine happens to
+slip through just rotates over time.
