@@ -32,12 +32,16 @@ spec:
             - sh
             - -c
             - |
+              # Poll seal-status over HTTP, not the vault CLI: the 2.1.1 binary
+              # is ~500MB (hashicorp/vault#21069) and this 64Mi cgroup can never
+              # cache it, so each exec reread hundreds of MB from the NVMe.
               while true; do
-                STATUS=$(vault status -format=json 2>/dev/null | grep '"sealed"' | grep -c 'true' || true)
-                if [ "$STATUS" -gt "0" ]; then
+                SEALED=$(wget -q -O- -T 5 --tries=1 "$VAULT_ADDR/v1/sys/seal-status" 2>/dev/null \
+                  | grep -o '"sealed":[a-z]*' | cut -d: -f2)
+                if [ "$SEALED" = "true" ]; then
                   echo "$(date): Vault is sealed, unsealing..."
-                  vault operator unseal "$UNSEAL_KEY_1" 2>&1 || true
-                  vault operator unseal "$UNSEAL_KEY_2" 2>&1 || true
+                  wget -q -O- -T 5 --tries=1 --post-data="{\"key\":\"$UNSEAL_KEY_1\"}" "$VAULT_ADDR/v1/sys/unseal" >/dev/null 2>&1 || true
+                  wget -q -O- -T 5 --tries=1 --post-data="{\"key\":\"$UNSEAL_KEY_2\"}" "$VAULT_ADDR/v1/sys/unseal" >/dev/null 2>&1 || true
                   echo "$(date): Unseal attempt done"
                 fi
                 sleep 5
