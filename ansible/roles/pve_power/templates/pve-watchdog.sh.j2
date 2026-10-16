@@ -94,6 +94,13 @@ NVME_ERRORS=$(journalctl -k --since "${NVME_WINDOW_MIN} minutes ago" 2>/dev/null
 [ "${NVME_ERRORS:-0}" -gt 0 ] && \
   ALERT="${ALERT}NVMe errors in last ${NVME_WINDOW_MIN}m (${NVME_ERRORS}). "
 
+# /tmp must be world-writable + sticky (1777). A chmod to 0755 broke apt's
+# _apt sandbox user for ~2 months (mkstemp: permission denied) with no other
+# symptom; tmp.mount owns the mode at boot, this catches runtime drift.
+TMP_MODE=$(stat -c %a /tmp 2>/dev/null)
+[ "$TMP_MODE" != "1777" ] && \
+  ALERT="${ALERT}/tmp mode is ${TMP_MODE} (want 1777). "
+
 if [ -n "$ALERT" ] && [ "$MAINTENANCE_ACTIVE" -eq 0 ]; then
   ELAPSED_MIN=$(((NOW - LAST) / 60))
   if [ "$ELAPSED_MIN" -ge "$BACKOFF" ]; then
