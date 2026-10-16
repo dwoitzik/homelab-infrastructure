@@ -24,12 +24,18 @@ VZDUMP_RUNNING=0
 # command line merely mentions vzdump, including the SSH session deploying this.
 pgrep -x vzdump >/dev/null 2>&1 && VZDUMP_RUNNING=1
 
-# Bar is 70 during a backup, not disabled: observed peak 56.36 still alerts, and load
-# still high once vzdump exits trips 30 again on the next 5-minute run.
-LOAD_THRESHOLD=40
-[ "$VZDUMP_RUNNING" -eq 1 ] && LOAD_THRESHOLD=80
+# Mostly I/O-wait on the single DRAM-less NVMe: 30-40 is normal here, so the
+# bar sits at 50 (still under the ~56 a backup reaches). Suffix is explicit --
+# VZDUMP_RUNNING=0 is non-empty, so "${VAR:+...}" would always append it.
+LOAD_THRESHOLD=50
+BACKUP_THRESHOLD=90
+BACKUP_SUFFIX=""
+if [ "$VZDUMP_RUNNING" -eq 1 ]; then
+  LOAD_THRESHOLD=$BACKUP_THRESHOLD
+  BACKUP_SUFFIX=" during backup"
+fi
 [ "$LOAD1_INT" -ge "$LOAD_THRESHOLD" ] && \
-  ALERT="${ALERT}Load ${LOAD1} (>=${LOAD_THRESHOLD}${VZDUMP_RUNNING:+ during backup}). "
+  ALERT="${ALERT}Load ${LOAD1} (>=${LOAD_THRESHOLD}${BACKUP_SUFFIX}). "
 
 # Skip alerting while deliberate bulk work (ansible/kubectl/terraform runs
 # against the cluster, PR merges, etc.) is in progress -- that's the actual
@@ -70,7 +76,8 @@ NOW=$(date +%s)
 if [ -n "$ALERT" ] && [ "$MAINTENANCE_ACTIVE" -eq 0 ]; then
   ELAPSED_MIN=$(((NOW - LAST) / 60))
   if [ "$ELAPSED_MIN" -ge "$BACKOFF" ]; then
-    : # ntfy disabled to reduce spam
+    curl -s -d "pve host: ${ALERT}Check before it crashes again. (next repeat in ${BACKOFF}m if still ongoing)" \
+      -H "Title: pve watchdog" -H "Priority: urgent" -H "Tags: warning" "$NTFY" >/dev/null
     NEXT_BACKOFF=$((BACKOFF * 2))
     [ "$NEXT_BACKOFF" -gt "$MAX_BACKOFF_MIN" ] && NEXT_BACKOFF=$MAX_BACKOFF_MIN
     echo "$NOW $NEXT_BACKOFF" >"$STATE"
