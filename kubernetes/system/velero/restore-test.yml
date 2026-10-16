@@ -77,7 +77,7 @@ metadata:
   namespace: velero-restore-test
 rules:
   - apiGroups: [""]
-    resources: ["pods", "persistentvolumeclaims", "services", "configmaps", "secrets"]
+    resources: ["pods", "persistentvolumeclaims", "services", "configmaps", "secrets", "serviceaccounts"]
     verbs: ["get", "list", "watch", "delete"]
   - apiGroups: [""]
     resources: ["pods/exec"]
@@ -159,7 +159,10 @@ data:
     chmod +x /usr/local/bin/velero
 
     log "clearing any leftovers from a previous run in $NS (pure scratch space, safe to blanket-clear)"
-    timeout 130 kubectl delete pods,deployments,replicasets,statefulsets,pvc,services,configmaps,secrets,ingressroutes.traefik.io \
+    # serviceaccounts included: the restore recreates the source namespace's
+    # default SA here, and leaving it behind gives the ArgoCD app that owns that
+    # SA a phantom extra resource (permanent OutOfSync).
+    timeout 130 kubectl delete pods,deployments,replicasets,statefulsets,pvc,services,configmaps,secrets,serviceaccounts,ingressroutes.traefik.io \
       --all -n "$NS" --ignore-not-found --wait=true --timeout=120s || true
 
     log "finding latest completed backup"
@@ -213,7 +216,7 @@ data:
 
     log "cleaning up"
     timeout 30 velero restore delete "$RESTORE_NAME" --confirm || true
-    timeout 30 kubectl delete pods,deployments,replicasets,statefulsets,pvc,services,configmaps,secrets,ingressroutes.traefik.io \
+    timeout 30 kubectl delete pods,deployments,replicasets,statefulsets,pvc,services,configmaps,secrets,serviceaccounts,ingressroutes.traefik.io \
       --all -n "$NS" --ignore-not-found --wait=false || true
 
     log "done"
