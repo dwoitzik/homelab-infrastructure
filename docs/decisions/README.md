@@ -45,6 +45,7 @@ skipped by accident.
 | [055](ADR-055-lan-minecraft-dmz-access.md) | Minecraft reachability for LAN players through the DMZ stream proxy | Accepted, applied |
 | [056](ADR-056-pve-watchdog-load-bar-and-io-wait.md) | pve watchdog load bar tracks I/O-wait; safety alerts restored | Accepted, applied |
 | [057](ADR-057-pause-in-cluster-trivy-scanning.md) | In-cluster Trivy Operator paused; PR CI owns the vulnerability gate | Accepted, applied |
+| [058](ADR-058-pve-watchdog-snapshot-and-nvme-errors.md) | pve watchdog also flags stale snapshots and NVMe resets/timeouts | Accepted, applied |
 
 ## In review, not yet in this table
 

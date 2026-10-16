@@ -47,6 +47,15 @@ pve_power_pbs_healthcheck_max_age_hours: 26
 # every check cycle while a genuinely new one still alerts promptly.
 pve_power_watchdog_ntfy_topic: dw-homelab-a12a7b540943
 
+# Watchdog extras (see ADR-058). A leftover LVM-thin snapshot is a silent COW
+# write amplifier -- every changed origin block gets copied -- and one taken
+# during an incident is easy to forget for weeks.
+pve_power_watchdog_snapshot_max_age_days: 7
+# Kernel NVMe reset/timeout lines mean the drive dropped commands under load:
+# the stall mode that took kubelet and the API server down in the vault-unseal
+# incident. Surface any occurrence in this recent window.
+pve_power_watchdog_nvme_error_window_min: 30
+
 # NVMe SMART data as real Prometheus textfile-collector metrics -- feeds
 # the weekly wear report and HARDWARE.md's wear projection.
 pve_power_smart_device: /dev/nvme0n1

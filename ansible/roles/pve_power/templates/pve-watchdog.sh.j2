@@ -73,6 +73,27 @@ LAST=${LAST:-0}
 BACKOFF=${BACKOFF:-30}
 NOW=$(date +%s)
 
+# A leftover thin snapshot is a silent COW write amplifier -- every changed
+# block of its origin is copied on write -- and one taken during an incident
+# is easy to forget for weeks. Proxmox names them snap_<vmid>-disk-<n>_<label>.
+MAX_SNAP_AGE_DAYS={{ pve_power_watchdog_snapshot_max_age_days }}
+while read -r SNAP_NAME SNAP_DATE; do
+  [ -n "$SNAP_DATE" ] || continue
+  SNAP_EPOCH=$(date -d "$SNAP_DATE" +%s 2>/dev/null) || continue
+  SNAP_AGE_DAYS=$(((NOW - SNAP_EPOCH) / 86400))
+  [ "$SNAP_AGE_DAYS" -ge "$MAX_SNAP_AGE_DAYS" ] && \
+    ALERT="${ALERT}Snapshot ${SNAP_NAME} is ${SNAP_AGE_DAYS}d old. "
+done < <(lvs --noheadings -o lv_name,lv_time 2>/dev/null | awk '$1 ~ /^snap_/ {print $1, $2}')
+
+# NVMe resets / I/O timeouts mean the SSD dropped commands under load -- the
+# same stall that starved kubelet and the API server during the vault-unseal
+# incident, so surface any occurrence in the recent window.
+NVME_WINDOW_MIN={{ pve_power_watchdog_nvme_error_window_min }}
+NVME_ERRORS=$(journalctl -k --since "${NVME_WINDOW_MIN} minutes ago" 2>/dev/null \
+  | grep -icE 'nvme[^:]*:.*(timeout|aborting|controller is down|reset|I/O error)')
+[ "${NVME_ERRORS:-0}" -gt 0 ] && \
+  ALERT="${ALERT}NVMe errors in last ${NVME_WINDOW_MIN}m (${NVME_ERRORS}). "
+
 if [ -n "$ALERT" ] && [ "$MAINTENANCE_ACTIVE" -eq 0 ]; then
   ELAPSED_MIN=$(((NOW - LAST) / 60))
   if [ "$ELAPSED_MIN" -ge "$BACKOFF" ]; then
