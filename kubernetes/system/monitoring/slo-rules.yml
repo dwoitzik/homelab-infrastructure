@@ -78,7 +78,7 @@ spec:
             description: >
               {{ $labels.instance }} error rate is burning through the monthly error budget
               at ≥30x the allowed rate. At this pace the 99.9% budget is exhausted in ~50min.
-              Current 2h error rate: {{ printf "%.2f" $value }}%
+              Current 2h error rate: {{ $value | humanizePercentage }}
 
     - name: slo.burn-rate.ticket
       rules:
@@ -97,4 +97,4 @@ spec:
             description: >
               {{ $labels.instance }} error rate is burning through the monthly error budget
               at ≥6x the allowed rate. At this pace the 99.9% budget is exhausted in ~4h.
-              Current 6h error rate: {{ printf "%.2f" $value }}%
+              Current 6h error rate: {{ $value | humanizePercentage }}
