@@ -33,6 +33,12 @@ deploy with photos but no history.
 
 ## Known gotchas
 
+- **The mobile app refuses to sync/upload while the server is older than the app.**
+  The app checks `/api/server/version` against its own build; when it auto-updates
+  ahead of the pinned server image, uploads stop with no server-side error (the app
+  simply never calls `POST /api/assets`). Bump `immich-server`/`immich-machine-learning`
+  to match — see [ADR-061](../../../docs/decisions/ADR-061-immich-server-version-tracks-mobile-app.md).
+  The `session.appVersion` column records what each client reports.
 - Major Postgres version bumps (this repo has been through 14→16) need a real dump/
   restore, not a bare image swap — the old PVC is kept declared-but-unused in git as a
   rollback path rather than deleted immediately after a migration.
