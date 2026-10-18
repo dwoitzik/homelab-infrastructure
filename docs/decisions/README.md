@@ -46,6 +46,7 @@ skipped by accident.
 | [056](ADR-056-pve-watchdog-load-bar-and-io-wait.md) | pve watchdog load bar tracks I/O-wait; safety alerts restored | Accepted, applied |
 | [057](ADR-057-pause-in-cluster-trivy-scanning.md) | In-cluster Trivy Operator paused; PR CI owns the vulnerability gate | Accepted, applied |
 | [058](ADR-058-pve-watchdog-snapshot-and-nvme-errors.md) | pve watchdog also flags stale snapshots and NVMe resets/timeouts | Accepted, applied |
+| [059](ADR-059-headscale-public-dns-cloudflare-ddns.md) | headscale's public name resolves via a Cloudflare A record, not the MikroTik DDNS CNAME | Accepted |
 
 ## In review, not yet in this table
 

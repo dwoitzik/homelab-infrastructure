@@ -139,21 +139,22 @@ resource "cloudflare_dns_record" "tunnel_analytics" {
   comment = "Rybbit analytics -- routed via Cloudflare tunnel"
 }
 
-# 2026-08-28: no longer routed through the tunnel (see the removed ingress
-# comment above) -- points straight at the MikroTik's Cloudflare-Cloud DDNS
-# hostname (routeros_ip_cloud.ddns in the network stack; that stack has no
-# output wired to this one, so the value is copied here, not referenced).
-# DNS-only (not proxied): traffic goes WAN -> FritzBox port-forward (manual,
-# not IaC-managed) -> MikroTik dst-nat -> DMZ nginx reverse proxy, matching
-# nat_portforward.tf's dstnat_headscale_dmz.
+# headscale.woitzik.dev is DNS-only -- TS2021 registration can't traverse
+# Cloudflare's proxy. Content tracks the dynamic WAN IP; the cloudflare-ddns
+# CronJob (kubernetes/system/infrastructure/cloudflare-ddns.yml) owns it, ADR-059.
 resource "cloudflare_dns_record" "dns_headscale_dmz" {
   zone_id = var.zone_id
   name    = "headscale"
-  type    = "CNAME"
-  content = "ec190fe6b6ab.sn.mynetname.net"
+  type    = "A"
+  content = "178.202.47.0"
   proxied = false
   ttl     = 300
   comment = "DMZ direct WAN path, Tunnel incompatible w/ headscale TS2021"
+
+  lifecycle {
+    # The DDNS CronJob updates content to the real WAN IP; don't revert it.
+    ignore_changes = [content]
+  }
 }
 
 # Same underlying DNS record (already live-patched via API to match the

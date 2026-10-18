@@ -33,6 +33,8 @@ import {
 # just Terraform's own state not yet tracking this one resource.
 # 2026-08-28: retargeted to dns_headscale_dmz (see main.tf's moved block) --
 # same record, same id, renamed when the record moved off the tunnel.
+# One-time adopt of the existing record so the first apply can transition it
+# from CNAME to the DDNS-managed A record (ADR-059) instead of colliding on name.
 import {
   to = cloudflare_dns_record.dns_headscale_dmz
   id = "1f15ed0f3a8b497302ba339dcab3c060/6a324d0a219b681417f63b08503f87c1"
