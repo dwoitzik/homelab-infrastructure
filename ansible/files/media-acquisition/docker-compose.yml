@@ -156,9 +156,15 @@ services:
       - autoheal=true
     restart: unless-stopped
 
+  # Jellyseerr was renamed to Seerr; the old image is frozen at 2.7.3. Container
+  # and volume names are kept so the gitops rollback and the Ansible settings
+  # task stay valid; Seerr migrates the data automatically on first start.
   jellyseerr:
-    image: fallenbagel/jellyseerr:latest@sha256:4538137bc5af902dece165f2bf73776d9cf4eafb6dd714670724af8f3eb77764
+    image: seerr/seerr:v3.5.0@sha256:27602401178d54f1964442287b9f23f67a3fa2252645ee8065839ea1c3f69e45
     container_name: jellyseerr
+    # Seerr ships no init process; runs as the node user (UID 1000), so the
+    # config dir must be owned 1000:1000 (see the media_acquisition role).
+    init: true
     networks:
       - media-acq-net
     environment:
@@ -169,7 +175,7 @@ services:
     ports:
       - "5055:5055"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5055/api/v1/status"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5055/api/v1/settings/public"]
       interval: 60s
       timeout: 10s
       retries: 3
