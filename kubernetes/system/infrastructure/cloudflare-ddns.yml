@@ -1,0 +1,95 @@
+# Keeps headscale.woitzik.dev's A record pointed at the real WAN IP. The name
+# is DNS-only and the WAN IP is dynamic, so a static record drifts whenever the
+# ISP changes it. See ADR-059.
+
+# Runs in cert-manager to reuse cloudflare-api-token-secret (Zone:DNS:Edit).
+# That namespace's existing broad-443 egress allow already covers both
+# api.ipify.org and api.cloudflare.com, so no extra NetworkPolicy is needed.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cloudflare-ddns
+  namespace: cert-manager
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      # failedJobsHistoryLimit only rotates a Job out when a newer one arrives,
+      # so without this a single stale failure re-fires KubeJobFailed forever.
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: ddns
+              image: curlimages/curl:8.21.0
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                seccompProfile:
+                  type: RuntimeDefault
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: CF_API_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-api-token-secret
+                      key: api-token
+                - name: ZONE_ID
+                  value: "1f15ed0f3a8b497302ba339dcab3c060"
+                - name: RECORD_NAME
+                  value: "headscale.woitzik.dev"
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  cpu: 100m
+                  memory: 64Mi
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  CURRENT_IP=$(curl -s --max-time 10 https://api.ipify.org)
+                  if [ -z "$CURRENT_IP" ]; then
+                    echo "Failed to determine public IP, skipping"
+                    exit 0
+                  fi
+                  RECORD_JSON=$(curl -s --max-time 10 \
+                    -H "Authorization: Bearer ${CF_API_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records?type=A&name=${RECORD_NAME}")
+                  # Fail loud on API rejection so a dead token surfaces as a
+                  # failed Job rather than silently doing nothing.
+                  if ! echo "$RECORD_JSON" | grep -q '"success":true'; then
+                    echo "Cloudflare API rejected the record lookup: $RECORD_JSON"
+                    exit 1
+                  fi
+                  RECORD_ID=$(echo "$RECORD_JSON" | sed -n 's/.*"id":"\([a-f0-9]*\)".*/\1/p' | head -1)
+                  RECORD_IP=$(echo "$RECORD_JSON" | sed -n 's/.*"content":"\([0-9.]*\)".*/\1/p' | head -1)
+                  # A missing record is not an error: Terraform owns creating it,
+                  # and the job can run once before that apply lands. Only API
+                  # rejections below (a dead token) should fail the Job loudly.
+                  if [ -z "$RECORD_ID" ]; then
+                    echo "No A record yet for ${RECORD_NAME}, nothing to do"
+                    exit 0
+                  fi
+                  if [ "$CURRENT_IP" = "$RECORD_IP" ]; then
+                    echo "IP unchanged ($CURRENT_IP), nothing to do"
+                    exit 0
+                  fi
+                  echo "IP changed: $RECORD_IP -> $CURRENT_IP, updating $RECORD_ID"
+                  UPDATE_JSON=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${RECORD_ID}" \
+                    -H "Authorization: Bearer ${CF_API_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    --data "{\"type\":\"A\",\"name\":\"${RECORD_NAME}\",\"content\":\"${CURRENT_IP}\",\"ttl\":300,\"proxied\":false}")
+                  echo "$UPDATE_JSON"
+                  if ! echo "$UPDATE_JSON" | grep -q '"success":true'; then
+                    echo "Cloudflare API rejected the record update"
+                    exit 1
+                  fi
