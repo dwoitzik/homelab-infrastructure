@@ -58,7 +58,9 @@ that keeps it that way.
   claim was found and verified against live state.
 - Weekly Discord self-report summarizes cluster health every Monday morning.
 - kube-bench runs a CIS benchmark scan daily.
-- trivy-operator scans for container vulnerabilities on image/workload changes.
+- Container vulnerability scanning runs in CI (`aquasecurity/trivy-action`) on every
+  PR. The in-cluster `trivy-operator` is **paused** (`replicas: 0`, ADR-057) — its
+  event-triggered rescan storms saturated the single NVMe and stalled the API server.
 - CrowdSec ingests community threat intelligence and auto-bans malicious IPs at the
   Traefik edge.
 

@@ -44,6 +44,22 @@ it never bounded the total.
   layer pulls, or a job-level I/O budget), not by flipping the replicas back and
   rediscovering the wall.
 
+## Update — 2026-10-18 (reports deleted)
+
+The stale reports this ADR chose to leave in place were removed from the cluster.
+Every `aquasecurity.github.io` report CR was deleted — `vulnerabilityreports` (129),
+`configauditreports` (485), `exposedsecretreports` (208), `rbacassessmentreports` (37),
+`clusterrbacassessmentreports` (128), `clusterconfigauditreports` (49), `sbomreports`
+(121), `clustersbomreports` (1), `clusterinfraassessmentreports` (3),
+`clustervulnerabilityreports` (1). That is ~130 MB of etcd state, the SBOM types the
+bulk of it.
+
+Reversible: this ADR's own decision is that nothing consumes the reports, so the only
+thing lost is a stale snapshot; re-enabling the operator regenerates them. The SQLite
+file itself does not shrink on row deletion (kine keeps `state.db` at 289 MB and its WAL
+at 322 MB) — reclaiming that needs a checkpoint/vacuum or a k3s restart, left as a
+separate maintenance-window action rather than risking the API server here.
+
 ## Consequences
 
 - Host ground truth after the change: `nvme0n1` **19 → 1.1 MB/s**, load **24 → 2.9**,
