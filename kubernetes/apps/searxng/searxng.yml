@@ -41,9 +41,9 @@ data:
       max_request_timeout: 10.0
       pool_connections: 100
       pool_maxsize: 20
-    # Scraped general-web engines are blocked by request-fingerprint bot
-    # detection, not IP reputation; bing is the one that still parses -- see
-    # ADR-041.
+    # Scraped general-web engines are blocked by request-fingerprint detection,
+    # not IP reputation (ADR-041). bing still parses; google cse is a real JSON
+    # API, not scraped, and is unaffected (ADR-060).
     engines:
       - name: brave
         disabled: true
@@ -53,15 +53,16 @@ data:
         disabled: true
       - name: wikidata
         disabled: true
-      # bing is the sole general-web engine still parseable from this egress
-      # (server-rendered li.b_algo); google now JS-renders, the rest are
-      # fingerprint-blocked -- see ADR-041.
+      # bing parses server-rendered li.b_algo; google.com/search now JS-renders
+      # and 403s from this egress, the rest are fingerprint-blocked (ADR-041).
       - name: bing
         disabled: false
       - name: google
         disabled: true
+      # google cse queries the cse.google.com JSON API, a different host from
+      # the JS-rendered google.com/search -- see ADR-060.
       - name: google cse
-        disabled: true
+        disabled: false
       - name: wikipedia
         disabled: true
       - name: qwant
