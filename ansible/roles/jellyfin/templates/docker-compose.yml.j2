@@ -16,7 +16,9 @@ services:
     volumes:
       - {{ jellyfin_base_dir }}/config:/config
       - /jellyfin-cache:/cache
-      - /media:/media:ro
+      # rw so Jellyfin can delete/replace media; a :ro mount fails in-app
+      # deletion ("ensure Jellyfin has write access to the media folder").
+      - /media:/media:rw
     ports:
       - "8096:8096"
     restart: unless-stopped
