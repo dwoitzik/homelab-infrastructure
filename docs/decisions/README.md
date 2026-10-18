@@ -48,6 +48,7 @@ skipped by accident.
 | [058](ADR-058-pve-watchdog-snapshot-and-nvme-errors.md) | pve watchdog also flags stale snapshots and NVMe resets/timeouts | Accepted, applied |
 | [059](ADR-059-headscale-public-dns-cloudflare-ddns.md) | headscale's public name resolves via a Cloudflare A record, not the MikroTik DDNS CNAME | Accepted |
 | [062](ADR-062-offsite-r2-3-day-retention.md) | Offsite R2 backup retains 3 days, not 7 | Accepted, applied |
+| [063](ADR-063-renovate-digest-minimum-release-age.md) | Renovate digest/pin updates bypass minimumReleaseAge at branch stage | Accepted, applied |
 
 ## In review, not yet in this table
 
