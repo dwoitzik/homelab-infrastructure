@@ -260,7 +260,10 @@ spec:
       # place. Flagged in the hardening report, not resolved in this PR.
       containers:
       - name: immich-server
-        image: ghcr.io/immich-app/immich-server:v3.2.2@sha256:6b0eaf8cfea6d4d6f86a45dfd0c9e3b068ed4493d8b7fa1efeca4cc87792fbe8
+        # immich's mobile app refuses to sync/upload while the server is older
+        # than the app, so keep this and the ML image in step with the app's
+        # version (the app reached v3.3.3) -- see ADR-061.
+        image: ghcr.io/immich-app/immich-server:v3.3.3@sha256:bae7664ff3aa4c2c1fcbdcdd86b40b105643c5f861f3e6a770fc760089f25862
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -379,7 +382,7 @@ spec:
       # restart.
       initContainers:
       - name: fix-cache-ownership
-        image: ghcr.io/immich-app/immich-machine-learning:v3.2.2@sha256:390453a571ca73b563cc3d9a12a37a4d71217b12608de72f26884f5e2ebc4896
+        image: ghcr.io/immich-app/immich-machine-learning:v3.3.3@sha256:73915f07e1f4289ba45b174c58443db74cef47ddf502613f475fc5e52458ea42
         command: ["chown", "-R", "65534:65534", "/cache"]
         securityContext:
           allowPrivilegeEscalation: false
@@ -391,7 +394,7 @@ spec:
           mountPath: /cache
       containers:
       - name: immich-ml
-        image: ghcr.io/immich-app/immich-machine-learning:v3.2.2@sha256:390453a571ca73b563cc3d9a12a37a4d71217b12608de72f26884f5e2ebc4896
+        image: ghcr.io/immich-app/immich-machine-learning:v3.3.3@sha256:73915f07e1f4289ba45b174c58443db74cef47ddf502613f475fc5e52458ea42
         securityContext:
           runAsNonRoot: true
           runAsUser: 65534
