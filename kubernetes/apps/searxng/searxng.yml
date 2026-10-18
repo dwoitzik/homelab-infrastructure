@@ -23,6 +23,11 @@ data:
       safe_search: 0
       autocomplete: "google"
       default_lang: "de-DE"
+      # The image default is html-only; json is what Open WebUI and other
+      # LLM/script clients need for structured results.
+      formats:
+        - html
+        - json
     # REL-033: default engine set (use_default_settings: true, ~70 engines) fans
     # every query out and waits up to the default 3s/engine before finalizing --
     # one slow/unreachable engine drags out the whole response. Capping
