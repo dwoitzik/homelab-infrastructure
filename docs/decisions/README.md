@@ -47,6 +47,7 @@ skipped by accident.
 | [057](ADR-057-pause-in-cluster-trivy-scanning.md) | In-cluster Trivy Operator paused; PR CI owns the vulnerability gate | Accepted, applied |
 | [058](ADR-058-pve-watchdog-snapshot-and-nvme-errors.md) | pve watchdog also flags stale snapshots and NVMe resets/timeouts | Accepted, applied |
 | [059](ADR-059-headscale-public-dns-cloudflare-ddns.md) | headscale's public name resolves via a Cloudflare A record, not the MikroTik DDNS CNAME | Accepted |
+| [062](ADR-062-offsite-r2-3-day-retention.md) | Offsite R2 backup retains 3 days, not 7 | Accepted, applied |
 
 ## In review, not yet in this table
 
