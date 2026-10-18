@@ -1,6 +1,6 @@
-# Offsite backup to Cloudflare R2 — critical data only, compressed via kopia/zstd.
-# Large volumes (media 1TB, prometheus, loki, tempo) are excluded via label.
-# TTL: 7 days. Runs 04:00, one hour after local backup.
+# Offsite backup to Cloudflare R2 — critical data only, kopia/zstd; large volumes
+# (media, prometheus, loki, garage) excluded via label. TTL 3 days not 7 (a full set
+# ~4 GiB; 7 days of dedup deltas hit the r2-usage-guard cap — see ADR-062). Runs 04:00.
 apiVersion: velero.io/v1
 kind: Schedule
 metadata:
@@ -9,7 +9,7 @@ metadata:
 spec:
   schedule: "0 4 * * *"
   template:
-    ttl: 168h0m0s
+    ttl: 72h0m0s
     storageLocation: r2-offsite
     defaultVolumesToFsBackup: true
     includedNamespaces:

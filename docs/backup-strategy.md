@@ -1,6 +1,6 @@
 # Backup Strategy: 3-2-1 Rule
 
-The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with 1 copy offsite. All *local* backups are fully automated. **Neither offsite leg is currently active**: Stage 1b (Cloudflare R2) is scaffolded but deliberately not turned on, and Stage 3 (Google Drive) was deliberately disabled due to insufficient Drive storage. Both are documented below with their current real status, not the originally-intended one.
+The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with 1 copy offsite. All *local* backups are fully automated, and **the Cloudflare R2 offsite leg (Stage 1b) is active**. Stage 3 (Google Drive) remains deliberately disabled due to insufficient Drive storage. Both are documented below with their current real status, not the originally-intended one.
 
 ## Stage 1 — Kubernetes Workloads (Velero)
 
@@ -23,14 +23,16 @@ The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with
 
 ## Stage 1b — Offsite (Cloudflare R2)
 
-**What:** Critical namespaces only (`apps`, `vault`, `database`, `argocd`) — excludes
-`media` (1TB), Prometheus/Loki/Garage data volumes via `velero.io/exclude-from-backup=true` label.
+**What:** Critical namespaces only (`apps`, `vault`, `database`, `argocd`) — large volumes
+(media, Prometheus/Loki/Garage data) opted out via `backup.velero.io/backup-volumes-excludes`
+pod annotations.
 
 - **Tool:** Velero, second `BackupStorageLocation` (`r2-offsite`)
-- **Schedule:** Daily at 04:00, TTL 7 days
-- **Status:** Configured (`kubernetes/system/velero/offsite-schedule.yml`,
-  `r2-backuplocation.yml`) but **not yet active** — waiting on a Cloudflare R2 Account
-  ID + API token to be provisioned.
+- **Schedule:** Daily at 04:00, TTL 3 days
+- **Status:** Active. Credentials provisioned (`velero-r2-credentials`), `r2-offsite` BSL
+  `Available`, `daily-offsite` completing. Retention is budget-bound: `r2-usage-guard`
+  pauses the schedule near the R2 free-tier cap, so the window is deliberately short
+  (see ADR-062).
 
 ## Stage 2 — VM/LXC Snapshots (PBS)
 

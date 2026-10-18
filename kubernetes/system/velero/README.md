@@ -21,8 +21,9 @@ Confirmed the hard way; do not re-enable it "to be safe."
   protection against total host loss.
 - **Offsite** (`offsite-schedule.yml`, `daily-offsite`, 04:00, one hour after local) —
   Cloudflare R2, critical namespaces only (`apps`, `vault`, `database`, `argocd`),
-  large low-value volumes (media, Prometheus/Loki/Tempo data) excluded by label. 7-day
-  TTL. This is the actual disaster-recovery tier — survives losing the physical host
+  large low-value volumes (media, Prometheus/Loki/Tempo data) excluded by label. 3-day
+  TTL (kept short so `r2-usage-guard`'s free-tier cap doesn't pause the schedule — see
+  ADR-062). This is the actual disaster-recovery tier — survives losing the physical host
   entirely, which the local tier by itself cannot.
 
 `r2-backuplocation.yml` — the R2 `BackupStorageLocation`; credentials via
