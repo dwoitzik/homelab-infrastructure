@@ -29,11 +29,24 @@
     dest: /etc/apt/trusted.gpg.d/proxmox-release-trixie.gpg
     mode: '0644'
 
+# deb822 to match this host's other sources; the old one-line apt_repository
+# task wrote pbs.list alongside the pre-existing pbs.sources for the same repo,
+# so apt warned "configured multiple times" on every update.
 - name: Add Proxmox Backup Server repository
-  ansible.builtin.apt_repository:
-    repo: "deb http://download.proxmox.com/debian/pbs trixie pbs-no-subscription"
+  ansible.builtin.deb822_repository:
+    name: pbs
+    types: deb
+    uris: http://download.proxmox.com/debian/pbs
+    suites: trixie
+    components: pbs-no-subscription
+    # The key downloaded above, so the repo doesn't depend on the archive-keyring package.
+    signed_by: /etc/apt/trusted.gpg.d/proxmox-release-trixie.gpg
     state: present
-    filename: pbs
+
+- name: Remove the legacy one-line PBS source that duplicated the deb822 entry
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/pbs.list
+    state: absent
 
 - name: Install Proxmox Backup Server package
   ansible.builtin.apt:
