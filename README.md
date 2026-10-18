@@ -227,7 +227,7 @@ the full external-reachability audit.
 | Atlantis | atlantis.woitzik.dev | Authelia (except `/events` webhook: GitHub HMAC) | LAN/VPN only |
 | Immich | photos.woitzik.dev | Rate-limited, own login | **Public** — family photo access is a real, named use case |
 | Jellyfin | media.woitzik.dev | Built-in | LAN/VPN only |
-| Jellyseerr | requests.woitzik.dev | Built-in | LAN/VPN only |
+| Seerr | requests.woitzik.dev | Built-in | LAN/VPN only |
 | AdGuard Home | dns.woitzik.dev | Authelia | LAN/VPN only |
 | Proxmox VE | pve.woitzik.dev | Authelia | LAN/VPN only |
 | PBS | backup.woitzik.dev | Authelia | LAN/VPN only |

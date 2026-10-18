@@ -36,6 +36,16 @@
     - "{{ media_acquisition_base_dir }}/nzbhydra2/config"
     - "{{ media_acquisition_base_dir }}/jellyseerr/config"
 
+# Seerr runs as the node user (UID 1000) and needs read/write on its config;
+# the directory loop above creates it root-owned.
+- name: Ensure Seerr config directory is owned by UID 1000
+  ansible.builtin.file:
+    path: "{{ media_acquisition_base_dir }}/jellyseerr/config"
+    state: directory
+    owner: '1000'
+    group: '1000'
+    recurse: true
+
 # Compose is a static, Renovate-digest-pinned file the LXC converges to from
 # git main on a timer; a Jinja template would not be Renovate-parseable.
 - name: Deploy media acquisition docker-compose configuration
