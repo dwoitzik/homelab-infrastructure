@@ -47,10 +47,19 @@
 # insufficient Google Drive storage quota for PBS's datastore, not a bug. Keep the
 # config/script deployed (harmless, useful if re-enabled later with more Drive space
 # or a different destination) but the cron job stays state: absent on purpose.
+- name: Ensure rclone config directory exists
+  ansible.builtin.file:
+    path: /root/.config/rclone
+    state: directory
+    mode: "0700"
+
+# Separate config file from pve_host_backup's rclone.conf: both roles run on
+# pve-mgmt-01, and a shared default path meant whichever ran last silently
+# replaced the other's remote (this one holds the offsite gdrive remote).
 - name: Deploy rclone config
   ansible.builtin.template:
     src: rclone.conf.j2
-    dest: /root/.config/rclone/rclone.conf
+    dest: /root/.config/rclone/pbs-offsite.conf
     mode: "0600"
 
 - name: Deploy pbs-to-gdrive sync script

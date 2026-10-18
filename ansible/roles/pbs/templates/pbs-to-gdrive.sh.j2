@@ -7,6 +7,7 @@ LOGFILE="/var/log/pbs-to-gdrive.log"
 echo "$(date): Start GDrive Sync" >> "$LOGFILE"
 
 /usr/bin/rclone sync /mnt/backups gdrive:Backup-Homelab/PBS \
+  --config /root/.config/rclone/pbs-offsite.conf \
   --quiet \
   --transfers 8 \
   --checkers 16
