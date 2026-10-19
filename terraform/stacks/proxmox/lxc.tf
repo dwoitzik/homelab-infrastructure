@@ -390,13 +390,11 @@ resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
     path   = "/media"
   }
 
-  # SABnzbd incomplete-downloads on the HDD (archive pool), NOT rpool.
-  # rpool/incomplete-downloads was causing fdatasync stalls in etcd when
-  # SABnzbd wrote large NZB downloads at high speed (ZFS dirty data
-  # shared with VM zvols → txg commit delay → etcd lease timeout → k3s crash).
-  # Moved to archive/media 2026-07-01 (REL-020).
+  # SABnzbd incomplete-downloads on a host tmpfs, not the archive HDD or rpool:
+  # rpool caused fdatasync stalls in etcd, and the HDD made unpack I/O the
+  # bottleneck. The ramdisk also caps flash write amplification. See ADR-066.
   mount_point {
-    volume = "/mnt/media/incomplete-downloads"
+    volume = "/mnt/sab-incomplete"
     path   = "/downloads/incomplete"
   }
 
@@ -424,6 +422,10 @@ resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
       operating_system[0].template_file_id,
       network_interface[0].mac_address,
       features,
+      # mp1 was repointed to the tmpfs online; volume is ForceNew, so a
+      # config/state mismatch here would destroy-and-recreate the whole media
+      # stack. Ignore it, same reasoning as the NFS LXC above.
+      mount_point,
     ]
   }
 }
