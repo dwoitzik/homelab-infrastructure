@@ -9,6 +9,7 @@ incident response).
 | Hostname | What it fronts | Protection | Why it's public |
 |---|---|---|---|
 | `photos.woitzik.dev` | Immich (photo library) | Rate-limited, Immich's own mobile-app token auth. Cloudflare Access (email OTP) still to be added — see Open Items. | Family uses it for photo backup/access away from home. |
+| `media.woitzik.dev` | Jellyfin (media server) | Rate-limited on the LAN/VPN path, Jellyfin's own login (native TV/mobile clients can't do Authelia's redirect — same own-auth model as `photos`). Proxied through Cloudflare. | Family watches the media library away from home; promoted to the allowlist 2026-10-19 — see `docs/decisions/ADR-064-jellyfin-public-exposure.md`. |
 | `headscale.woitzik.dev` | Headscale (Tailscale control plane) | Its own device-registration/preauth-key flow. No Authelia — cannot be, by definition (see below). | A device re-authenticating or joining the mesh has to reach the coordination server *before* any VPN path to it exists. Confirmed by the operator directly (2026-08-15) as a deliberate, structural requirement, not an oversight — see `docs/decisions/ADR-033-public-exposure-allowlist.md`. |
 | `mc.woitzik.dev` (Minecraft) | Minecraft server, `ct-dmz-games-01` (VLAN 30) | Not a Cloudflare Tunnel host at all — routed via playit.gg's own relay infrastructure (`doing-sigma.gl.joinmc.link`, playit-owned IP `147.185.221.212`). The home WAN IP never appears in this path. VLAN 30 (DMZ) firewall-isolated from every other zone (verified below). | Friends play on it. The only surface with actual strangers on it. |
 

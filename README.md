@@ -226,7 +226,7 @@ the full external-reachability audit.
 | Headscale | headscale.woitzik.dev | Built-in | **Public** — structurally required, a device has to reach this before any VPN path exists |
 | Atlantis | atlantis.woitzik.dev | Authelia (except `/events` webhook: GitHub HMAC) | LAN/VPN only |
 | Immich | photos.woitzik.dev | Rate-limited, own login | **Public** — family photo access is a real, named use case |
-| Jellyfin | media.woitzik.dev | Built-in | LAN/VPN only |
+| Jellyfin | media.woitzik.dev | Rate-limited, own login | **Public** — family media access away from home (`ADR-064`) |
 | Seerr | requests.woitzik.dev | Built-in | LAN/VPN only |
 | AdGuard Home | dns.woitzik.dev | Authelia | LAN/VPN only |
 | Proxmox VE | pve.woitzik.dev | Authelia | LAN/VPN only |
