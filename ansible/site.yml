@@ -99,6 +99,7 @@
   become: true
   roles:
     - minecraft
+    - enshrouded
 
 - name: Provision AI & LLM Services
   hosts: ai_nodes

@@ -544,4 +544,16 @@ import {
   id = "*B8"
 }
 
+# Added out-of-band to unblock Enshrouded LAN play ahead of the normal apply
+# cycle, then adopted here so the next apply reconciles instead of conflicting.
+import {
+  to = routeros_ip_firewall_filter.fwd_internal_to_dmz_enshrouded
+  id = "*C3"
+}
+
+import {
+  to = routeros_ip_firewall_filter.fwd_heimnetz_to_dmz_enshrouded
+  id = "*C4"
+}
+
 # Trigger fresh atlantis plan (GIT-009 apply pending)

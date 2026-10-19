@@ -1,0 +1,28 @@
+---
+# Enshrouded dedicated server (SteamCMD 2278520, Windows binary under Wine).
+# UDP game/query ports; LAN via a MikroTik rule, remote via a playit.gg tunnel.
+enshrouded_user: enshrouded
+enshrouded_home: /home/enshrouded
+enshrouded_install_dir: /home/enshrouded/enshroudedserver
+# Debian's non-free steamcmd package is not enabled on this host; the official
+# Valve tarball is distro-independent and self-updating.
+enshrouded_steamcmd_dir: /opt/steamcmd
+enshrouded_steamcmd: /opt/steamcmd/steamcmd.sh
+enshrouded_steamcmd_url: >-
+  https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
+enshrouded_app_id: "2278520"
+
+enshrouded_server_name: "Homelab Enshrouded"
+enshrouded_password: ""
+enshrouded_game_port: 15636
+enshrouded_query_port: 15637
+enshrouded_slot_count: 16
+enshrouded_game_settings_preset: "Default"
+
+enshrouded_backup_dir: /var/backups/enshrouded
+enshrouded_backup_retain_days: 14
+enshrouded_restart_time: "05:00"
+
+# Disk needed for the install plus a same-size staging copy during steamcmd
+# updates; fail the play early rather than half-installing onto a full disk.
+enshrouded_min_free_gb: 25

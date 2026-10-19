@@ -1,0 +1,196 @@
+---
+- name: Find the root filesystem's free space
+  ansible.builtin.set_fact:
+    enshrouded_root_mount: >-
+      {{ ansible_mounts | selectattr('mount', 'equalto', '/') | first }}
+
+- name: Fail if the disk lacks room for the server and its update staging
+  ansible.builtin.assert:
+    that:
+      - >-
+        enshrouded_root_mount.size_available
+        > enshrouded_min_free_gb * 1073741824
+    fail_msg: >-
+      Needs >{{ enshrouded_min_free_gb }}GB free on / for the Enshrouded
+      install + update staging
+
+- name: Enable i386 multiarch (Wine's 32-bit components)
+  ansible.builtin.command:
+    cmd: dpkg --add-architecture i386
+  changed_when: false
+
+- name: Install Wine and the runtime deps the Windows binary needs
+  ansible.builtin.apt:
+    name:
+      - wine
+      - wine32:i386
+      - wine64
+      - cabextract
+      - winbind
+      - xvfb
+      - unzip
+      - lib32gcc-s1
+      - sudo
+    update_cache: true
+    state: present
+
+- name: Create the unprivileged service user
+  ansible.builtin.user:
+    name: "{{ enshrouded_user }}"
+    home: "{{ enshrouded_home }}"
+    shell: /bin/bash
+    create_home: true
+    system: true
+
+- name: Create the SteamCMD directory
+  ansible.builtin.file:
+    path: "{{ enshrouded_steamcmd_dir }}"
+    state: directory
+    owner: "{{ enshrouded_user }}"
+    group: "{{ enshrouded_user }}"
+    mode: '0755'
+
+- name: Download the SteamCMD bootstrap tarball
+  ansible.builtin.get_url:
+    url: "{{ enshrouded_steamcmd_url }}"
+    dest: "{{ enshrouded_steamcmd_dir }}/steamcmd_linux.tar.gz"
+    owner: "{{ enshrouded_user }}"
+    group: "{{ enshrouded_user }}"
+    mode: '0644'
+
+- name: Unpack SteamCMD
+  ansible.builtin.unarchive:
+    src: "{{ enshrouded_steamcmd_dir }}/steamcmd_linux.tar.gz"
+    dest: "{{ enshrouded_steamcmd_dir }}"
+    remote_src: true
+    owner: "{{ enshrouded_user }}"
+    group: "{{ enshrouded_user }}"
+
+- name: Bootstrap SteamCMD (self-update on first run)
+  ansible.builtin.command:
+    cmd: "{{ enshrouded_steamcmd }} +quit"
+  become: true
+  become_user: "{{ enshrouded_user }}"
+  register: enshrouded_steamcmd_bootstrap
+  changed_when: false
+  async: 600
+  poll: 15
+
+- name: Create the install directory
+  ansible.builtin.file:
+    path: "{{ enshrouded_install_dir }}"
+    state: directory
+    owner: "{{ enshrouded_user }}"
+    group: "{{ enshrouded_user }}"
+    mode: '0750'
+
+- name: Download the dedicated server via SteamCMD (Windows depot)
+  ansible.builtin.command:
+    argv:
+      - "{{ enshrouded_steamcmd }}"
+      - +@sSteamCmdForcePlatformType
+      - windows
+      - +force_install_dir
+      - "{{ enshrouded_install_dir }}"
+      - +login
+      - anonymous
+      - +app_update
+      - "{{ enshrouded_app_id }}"
+      - validate
+      - +quit
+  become: true
+  become_user: "{{ enshrouded_user }}"
+  register: enshrouded_update
+  changed_when: >-
+    'fully installed' in enshrouded_update.stdout
+    or 'Success' in enshrouded_update.stdout
+  # SteamCMD downloads several GB; the default 12s connect timeout is for SSH,
+  # not this command, but it must not run concurrently with a live update.
+  async: 3600
+  poll: 30
+  args:
+    chdir: "{{ enshrouded_install_dir }}"
+
+- name: Verify the Windows depot landed (Linux depot leaves no exe)
+  ansible.builtin.stat:
+    path: "{{ enshrouded_install_dir }}/enshrouded_server.exe"
+  register: enshrouded_exe
+
+- name: Fail when the server binary is missing after download
+  ansible.builtin.assert:
+    that:
+      - enshrouded_exe.stat.exists
+    fail_msg: >-
+      enshrouded_server.exe missing -- SteamCMD fetched the ~100MB Linux
+      depot instead of the Windows one
+
+- name: Deploy the server configuration
+  ansible.builtin.template:
+    src: enshrouded_server.json.j2
+    dest: "{{ enshrouded_install_dir }}/enshrouded_server.json"
+    owner: "{{ enshrouded_user }}"
+    group: "{{ enshrouded_user }}"
+    mode: '0640'
+  notify: Restart enshrouded
+
+- name: Deploy the systemd unit
+  ansible.builtin.template:
+    src: enshrouded.service.j2
+    dest: /etc/systemd/system/enshrouded.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Restart enshrouded
+
+- name: Create the backup directory
+  ansible.builtin.file:
+    path: "{{ enshrouded_backup_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Deploy the backup script
+  ansible.builtin.template:
+    src: enshrouded-backup.sh.j2
+    dest: /usr/local/sbin/enshrouded-backup.sh
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Schedule the daily backup and restart
+  ansible.builtin.cron:
+    name: "{{ item.name }}"
+    minute: "{{ item.minute }}"
+    hour: "{{ item.hour }}"
+    user: root
+    job: "{{ item.job }}"
+  loop:
+    - name: enshrouded-backup
+      minute: "30"
+      hour: "4"
+      job: >-
+        /usr/local/sbin/enshrouded-backup.sh
+        >> /var/log/enshrouded-backup.log 2>&1
+    - name: enshrouded-restart
+      minute: "{{ enshrouded_restart_time.split(':')[1] | int }}"
+      hour: "{{ enshrouded_restart_time.split(':')[0] | int }}"
+      job: "/usr/bin/systemctl restart enshrouded"
+
+- name: Check whether ufw is active
+  ansible.builtin.command: ufw status
+  register: enshrouded_ufw
+  changed_when: false
+  failed_when: false
+
+- name: Allow the game and query ports through ufw when it is active
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+  loop:
+    - "{{ enshrouded_game_port }}"
+    - "{{ enshrouded_query_port }}"
+  when: "'Status: active' in enshrouded_ufw.stdout"

@@ -217,12 +217,8 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   vm_id     = 201
   node_name = local.target_node
   tags      = ["ai", "llm", "server"]
-  # REL-075: powered off -- reserved 24GB RAM + 4 vCPU against ~38MB live
-  # usage, one of the largest drivers of the host's chronic overcommit (swap
-  # active, 88-92C temps, freeze risk behind the recurring KubeAPIServerDown /
-  # CrashLoop alert storms). Power back on via `pct start 201` when the host
-  # has headroom again. onboot set to 0 manually (REL-016 provider gap) so it
-  # stays off across host reboots.
+  # onboot set to 0 manually (REL-016 provider gap) so it stays off across
+  # host reboots.
   started               = false
   unprivileged          = true
   environment_variables = {}
@@ -254,19 +250,17 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   # effective CPU ceiling. Provider is now 0.111.0 and exposes `limit`
   # directly, so the cap is real and Terraform-tracked going forward instead
   # of depending on a manual step nobody re-runs after a recreate.
-  # REL-074: 6->4 cores/limit, 32->24 GB dedicated (swap 8->4 GB). Live usage
-  # was ~36 MB RAM / 0-4% CPU -- Ollama holds no model in RAM when idle, and
-  # this was the single largest reservation on the host (~91 GB allocated vs
-  # 62 GB physical). 24 GB still fits a gemma2:27b run (~18 GB) with headroom;
-  # any cold-start inference takes longer on 4 cores but the host stays up.
+  # Barely used, so held at the minimum: 2 cores / 4 GB only fits a small
+  # model (qwen2.5:7b ~5 GB needs swap) -- a 27b run will not fit anymore.
+  # Its reservation was the host's largest driver of memory overcommit.
   cpu {
-    cores = 4
-    limit = 4
+    cores = 2
+    limit = 2
   }
 
   memory {
-    dedicated = 24576
-    swap      = 4096
+    dedicated = 4096
+    swap      = 1024
   }
 
   features {
@@ -850,20 +844,15 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   # LXCs. CFS quota still caps it at 4 threads; units only wins the contention
   # when the host is genuinely saturated.
   cpu {
-    cores = 4
+    cores = 6
     units = 2048
   }
 
-  # REL-035: dedicated memory was 16384 (16GB) but actual observed usage
-  # (2026-07-04, running Minecraft server) never exceeded ~4.7GB -- this was
-  # the single largest unused memory reservation on the host after ai-01,
-  # contributing to a ~91GB allocated vs 62GB physical overcommit ratio.
-  # 8192 keeps ~70% headroom over observed peak.
-  # REL-074: 8->12 GB dedicated. 4.7 GB was a vanilla server; with mods +
-  # chunk generation + player count this runs out of heap headroom, GC
-  # stutters show up as player lag spikes. 12 GB absorbs it.
+  # Games LXC: after freeing RAM/CPU from mostly idle ai-01 (reduced 24GB->4GB,
+  # 4cores->2cores), allocate more headroom for Enshrouded (Wine) alongside
+  # existing Minecraft server.
   memory {
-    dedicated = 12288
+    dedicated = 16384
     swap      = 2048
   }
 
@@ -873,7 +862,7 @@ resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
 
   disk {
     datastore_id = local.storage
-    size         = 50
+    size         = 100
   }
 
   network_interface {
