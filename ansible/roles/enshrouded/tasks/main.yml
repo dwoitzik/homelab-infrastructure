@@ -160,6 +160,25 @@
     group: root
     mode: '0750'
 
+- name: Deploy the weekly update script
+  ansible.builtin.template:
+    src: enshrouded-update.sh.j2
+    dest: /usr/local/sbin/enshrouded-update.sh
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Schedule the weekly server update
+  ansible.builtin.cron:
+    name: enshrouded-update
+    weekday: "3"
+    minute: "0"
+    hour: "4"
+    user: root
+    job: >-
+      /usr/local/sbin/enshrouded-update.sh
+      >> /var/log/enshrouded-update.log 2>&1
+
 - name: Schedule the daily backup and restart
   ansible.builtin.cron:
     name: "{{ item.name }}"

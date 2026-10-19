@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Weekly SteamCMD update: refresh the Windows depot, then restart the server so
+# the running process picks up the new build.
+set -euo pipefail
+
+install_dir="{{ enshrouded_install_dir }}"
+steamcmd="{{ enshrouded_steamcmd }}"
+user="{{ enshrouded_user }}"
+
+runuser -u "$user" -- "$steamcmd" \
+  +@sSteamCmdForcePlatformType windows \
+  +force_install_dir "$install_dir" \
+  +login anonymous \
+  +app_update {{ enshrouded_app_id }} validate \
+  +quit
+
+systemctl restart enshrouded

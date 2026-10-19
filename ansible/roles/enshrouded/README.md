@@ -18,6 +18,7 @@ via a `systemd` unit. See `docs/decisions/ADR-065-enshrouded-dedicated-server.md
 - Daily cron: `savegame/` backup (14-day local retention) at 04:30, restart at
   05:00. The whole LXC rootfs is also captured by the nightly PBS job → R2, so the
   local copies are the fast-restore path, not the only backup.
+- Weekly cron (Wed 04:00): SteamCMD `+app_update ... validate`, then restart.
 - ufw allow for UDP 15636/15637 when ufw is active.
 
 ## Deploy

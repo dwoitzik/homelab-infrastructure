@@ -31,7 +31,9 @@ Two constraints shaped the design:
 not via a third-party Docker image. The role installs Wine + the Windows SteamCMD
 depot, runs the server under `xvfb-run` (the binary expects a display even
 headless), manages `enshrouded_server.json`, and installs a `systemd` unit with
-`Restart=on-failure`. A daily cron backs up `savegame/` and restarts the server.
+`Restart=on-failure`. A daily cron backs up `savegame/` and restarts the server; a
+weekly cron runs SteamCMD `+app_update ... validate` and restarts to pick up the
+new build.
 
 **Reachability, in two lanes:**
 
