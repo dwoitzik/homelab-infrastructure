@@ -191,6 +191,25 @@ resource "cloudflare_dns_record" "mc_playit" {
   comment = "Minecraft server -- routed via playit.gg tunnel (not CF tunnel)"
 }
 
+# SRV so clients that support Minecraft service discovery reach the server as
+# mc.woitzik.dev without an explicit port. Target tracks the same playit
+# hostname as the CNAME above, so a playit reassignment updates both.
+resource "cloudflare_dns_record" "mc_srv" {
+  count    = var.mc_playit_hostname != "" ? 1 : 0
+  zone_id  = var.zone_id
+  name     = "_minecraft._tcp.mc"
+  type     = "SRV"
+  ttl      = 300
+  priority = 0
+  data = {
+    priority = 0
+    weight   = 5
+    port     = 25565
+    target   = var.mc_playit_hostname
+  }
+  comment = "SRV for mc.woitzik.dev -> playit.gg tunnel."
+}
+
 # cobblemon.woitzik.dev -- previously tracked here as a stale record pending
 # deletion (see git history for the original comment/import). 2026-08-14:
 # confirmed via the Cloudflare API that it no longer exists live -- already

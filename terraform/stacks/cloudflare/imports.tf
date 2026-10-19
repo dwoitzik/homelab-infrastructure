@@ -15,6 +15,13 @@ import {
   id = "1f15ed0f3a8b497302ba339dcab3c060/0a20f0e459e5fb34169ff5d4dda9e8c2"
 }
 
+# Same story: the _minecraft._tcp.mc SRV was created via the dashboard and
+# never tracked, so the resource above needs an import rather than a create.
+import {
+  to = cloudflare_dns_record.mc_srv[0]
+  id = "1f15ed0f3a8b497302ba339dcab3c060/8bf11c9e0f77bef273223edab6b47303"
+}
+
 # 2026-08-14 (ADR-033): tunnel_atlantis and tunnel_home import blocks removed
 # from here -- both records are being dropped entirely per the operator's
 # public-exposure-allowlist decision (see main.tf), not imported/kept. No
