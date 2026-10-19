@@ -2,9 +2,9 @@
 # Cloudflare Tunnel configuration for woitzik.dev public services.
 #
 # 2026-08-14 (ADR-033): rewritten from a "public by default, opt out" wildcard
-# to an explicit allowlist -- originally two hostnames, now three
+# to an explicit allowlist -- originally two hostnames, now four (see ADR-064)
 # (photos.woitzik.dev, headscale.woitzik.dev via the DMZ path below,
-# analytics.woitzik.dev added 2026-08-29 for Rybbit). Everything else in this
+# analytics.woitzik.dev, media.woitzik.dev/Jellyfin). Everything else in this
 # repo's ~46 declared IngressRoutes is reachable only via LAN or Headscale/
 # Tailscale VPN (the existing AdGuard rewrite to Traefik's ClusterIP LB,
 # 10.0.20.200, which never touches this tunnel or the public internet at
@@ -93,6 +93,17 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
           http_host_header       = "analytics.woitzik.dev"
         }
       },
+      # media.woitzik.dev -- Jellyfin. Own login gates access (native clients
+      # can't complete Authelia's redirect); points straight at the LXC's LAN
+      # IP, not Traefik -- same raw-IP shape as the analytics rule below.
+      {
+        hostname = "media.woitzik.dev"
+        service  = "http://10.0.20.254:8096"
+        origin_request = {
+          no_tls_verify    = false
+          http_host_header = "media.woitzik.dev"
+        }
+      },
       # headscale.woitzik.dev: removed from this tunnel's ingress 2026-08-28.
       # Headscale's ts2021/noise registration protocol upgrades the
       # connection with `Upgrade: tailscale-control-protocol`, not the
@@ -127,6 +138,16 @@ resource "cloudflare_dns_record" "tunnel_photos" {
   proxied = true
   ttl     = 1
   comment = "Immich photo library -- routed via Cloudflare tunnel"
+}
+
+resource "cloudflare_dns_record" "tunnel_media" {
+  zone_id = var.zone_id
+  name    = "media"
+  type    = "CNAME"
+  content = local.tunnel_cname
+  proxied = true
+  ttl     = 1
+  comment = "Jellyfin -- routed via Cloudflare tunnel"
 }
 
 resource "cloudflare_dns_record" "tunnel_analytics" {

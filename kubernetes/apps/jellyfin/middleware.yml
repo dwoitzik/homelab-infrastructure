@@ -1,0 +1,18 @@
+# Jellyfin has no external-auth layer in front of it -- native clients can't
+# complete Authelia's redirect -- so this is the only brute-force mitigation
+# on its login page. Looser than immich-ratelimit: HLS playback bursts.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: jellyfin-ratelimit
+  namespace: apps
+spec:
+  rateLimit:
+    average: 100
+    burst: 200
+    period: 1s
+    # Traefik sits behind cloudflared, so every request arrives from the
+    # cloudflared pod IP unless the real client is read from Cloudflare's own
+    # Cf-Connecting-Ip header (same as immich-ratelimit).
+    sourceCriterion:
+      requestHeaderName: Cf-Connecting-Ip

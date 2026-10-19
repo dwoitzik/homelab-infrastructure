@@ -313,6 +313,28 @@ spec:
         - protocol: TCP
           port: 80
 ---
+# Jellyfin runs on the GPU-passthrough LXC (10.0.20.254), not an in-cluster
+# pod -- same raw-LAN-IP gap as the rybbit rule above, so cloudflared's
+# default-deny egress needs an explicit allow on Jellyfin's port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-cloudflared-jellyfin
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: cloudflared
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.254/32
+      ports:
+        - protocol: TCP
+          port: 8096
+---
 # Nextcloud's user_oidc app needs to reach Authelia's public issuer
 # (auth.woitzik.dev, routed via Traefik) for discovery and token exchange --
 # same gap class as allow-egress-tailscale-headscale-control above

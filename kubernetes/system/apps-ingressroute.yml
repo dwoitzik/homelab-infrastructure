@@ -403,10 +403,9 @@ spec:
     middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
     services: [{name: home-assistant, port: 8123}]
 ---
-# Jellyfin — no Authelia; Jellyfin's own auth handles access control.
-# Cloudflare tunnel also bypasses Authelia (direct to Jellyfin login), so this
-# makes the internal path consistent. App clients (Android/iOS) cannot handle
-# Authelia's SSO redirect flow.
+# Jellyfin -- no Authelia; its own login gates access (native clients can't
+# complete the redirect). Public via the Cloudflare tunnel; this LAN/VPN route
+# carries the matching rate limit. See ADR-064.
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -417,6 +416,7 @@ spec:
   routes:
   - match: Host(`media.woitzik.dev`)
     kind: Rule
+    middlewares: [{name: jellyfin-ratelimit}]
     services: [{name: jellyfin, port: 8096}]
 # SABnzbd, Sonarr, Radarr, Bazarr — IngressRoutes consolidated into
 # kubernetes/apps/jellyfin/usenet.yml alongside their External service definitions.

@@ -104,7 +104,7 @@ each is still fully reachable via LAN/VPN through the same Traefik instance.
 | `loki.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `matrix.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `mealie.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
-| `media.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
+| `media.woitzik.dev` | none (pending) | Allowlisted in IaC (`ADR-064`), record not yet created | Jellyfin, family access — tunnel rule + DNS record added, **pending `atlantis apply -d cloudflare`**; re-test externally once applied |
 | `monitoring.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `n8n.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `nextcloud.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
