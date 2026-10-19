@@ -55,7 +55,7 @@ spec:
                 values: [vm-srv-k3s-11]
       containers:
         - name: onlyoffice
-          image: onlyoffice/documentserver:9.4
+          image: onlyoffice/documentserver:10.0@sha256:ca17889f10b11141cc6441836aebdd2835cf3e1b49681b2fd6e155c94b7850b3
           ports:
             - containerPort: 80
           env:
