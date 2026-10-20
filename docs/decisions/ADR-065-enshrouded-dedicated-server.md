@@ -72,14 +72,18 @@ client build uses has varied.
 - Remote play still depends on a playit.gg tunnel being created for the Enshrouded
   UDP port in the playit dashboard; the agent is installed but tunnel creation is a
   dashboard-side action outside this repository.
-- **High CPU/load under Wine is expected, not a fault.** `enshrouded_server.exe`
-  holds ~1-2 cores and `wineserver64` ~0.3 continuously even with one player, and
-  the server logs `[server] Bad Performance ~20,000 us` every few seconds. This is a
-  property of the Wine layer (upstream `mornedhels/enshrouded-server` issue #202:
-  Wine reports a high hosting load where Proton does not), with no fix short of the
-  unreleased native Linux server. The LXC is deliberately not CPU-capped — the host
-  has headroom and host CPU pressure `full` sits at 0; a cap would only be added if
-  the co-located Minecraft server or the KVM workloads ever visibly contend.
+- **High CPU under Wine: partly intrinsic, partly fixable.** `enshrouded_server.exe`
+  holds ~1-2 cores and `wineserver64` ~0.3, and the server logs `[server] Bad
+  Performance ~20,000 us` — a known property of the Wine layer (upstream
+  `mornedhels/enshrouded-server` issue #202). Separately, Wine without a fast
+  sync primitive serialises all thread waits through one wineserver socket, which
+  drove 130 ms tick peaks and packet loss at two players despite a half-idle host;
+  `WINEFSYNC=1`/`WINEESYNC=1` on the unit removed that. The LXC is deliberately not
+  CPU-capped — host CPU pressure `full` sits at 0.
+- **The server owns its config.** `enshrouded_server.json` is rewritten by the
+  server on start/stop and gets a random `userGroups[]` password if the expected
+  one is missing, so the role seeds it only when absent rather than templating it
+  each run; the password is held in Vault.
 
 ## Alternatives considered
 

@@ -51,24 +51,31 @@ cp /var/backups/enshrouded/savegame-<stamp>/enshrouded_server.json \
 systemctl start enshrouded
 ```
 
-## Known behavior — high CPU/load is expected
+## Known behavior — Wine CPU/load
 
-The Windows server under Wine is CPU-hungry even when idle or with one player:
-`enshrouded_server.exe` holds ~1-2 cores and `wineserver64` another ~0.3,
-continuously, and the server log emits `[server] Bad Performance ~20,000 us`
-lines every few seconds. This is a known property of the Wine compatibility
-layer, not a fault of this host or role — Wine reports a high "hosting load"
-where Proton does not, at the cost of lower network latency, and there is no
-fix short of the native Linux dedicated server (still unreleased). See
-`mornedhels/enshrouded-server` issue #202 and the feature request for a native
-build.
+The Windows server under Wine keeps `enshrouded_server.exe` around 1-2 cores and
+`wineserver64` another ~0.3, and logs `[server] Bad Performance ~20,000 us` every
+few seconds. The residual line is a known property of the Wine layer (upstream
+`mornedhels/enshrouded-server` issue #202), not a fault of this host.
 
-The LXC is deliberately **not** CPU-capped (`cpulimit` unset): the host has
-headroom (16 threads, ~50% idle) and the game is the point of running it. If
-the co-located Minecraft server or the KVM workloads ever contend visibly,
-cap `ct-dmz-games-01` in `terraform/stacks/proxmox/lxc.tf` and accept the drop
-in game quality. Host CPU pressure `full` staying at 0 is the signal that no
-cap is currently needed.
+What is **not** intrinsic is the fast-sync mode. Without `WINEFSYNC=1` Wine
+serialises every thread wait through the single wineserver socket, which stalls
+the server tick hard — 130 ms peaks and dropped packets for two players — even
+while the host CPU is half idle. The unit sets `WINEFSYNC=1`/`WINEESYNC=1`;
+verify with `tr '\0' '\n' < /proc/$(systemctl show -p MainPID --value enshrouded)/environ`.
+
+The LXC is deliberately **not** CPU-capped: the host has headroom and host CPU
+pressure `full` sits at 0. Cap `ct-dmz-games-01` in `terraform/stacks/proxmox/lxc.tf`
+only if the co-located Minecraft server or the KVM workloads visibly contend.
+
+## Config ownership
+
+`enshrouded_server.json` belongs to the running server: it rewrites the file on
+every start/stop and, if the password it expects is missing, generates a random
+one into `userGroups[]`. The role therefore **seeds** it only when absent
+(`force: false`) and never overwrites it — editing it by hand is safe only while
+the server is stopped. The password comes from `vault_enshrouded_password`; if it
+is ever blanked, players are locked out until it is set again.
 
 ## Reachability
 
