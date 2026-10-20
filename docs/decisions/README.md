@@ -52,6 +52,7 @@ skipped by accident.
 | [064](ADR-064-jellyfin-public-exposure.md) | Jellyfin is promoted to the public allowlist via the Cloudflare Tunnel | Accepted (apply pending) |
 | [065](ADR-065-enshrouded-dedicated-server.md) | Enshrouded dedicated server on the DMZ game LXC (Wine) | Accepted, applied |
 | [066](ADR-066-tmpfs-for-sab-incomplete-downloads.md) | SABnzbd incomplete downloads on a host tmpfs | Accepted, applied |
+| [067](ADR-067-velero-offsite-fail-fast-timeout.md) | Velero fails fast (45m) on a stuck volume upload instead of stalling 4h | Accepted, applied |
 
 ## In review, not yet in this table
 

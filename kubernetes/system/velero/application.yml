@@ -69,6 +69,11 @@ spec:
           # kopia jobs/hour hammering rpool NVMe, competing with etcd.
           extraArgs:
             - --default-repo-maintain-frequency=24h
+            # Fail fast (REL-077): a hung kopia upload held a PodVolumeBackup
+            # open the full 4h default and left a zombie. 45m is well above a
+            # healthy volume (nightly runs finish in under 15m each).
+            - --fs-backup-timeout=45m
+            - --default-item-operation-timeout=45m
         initContainers:
           - name: velero-plugin-for-aws
             # ADR-038: no tagged release fixes the unconditional empty
