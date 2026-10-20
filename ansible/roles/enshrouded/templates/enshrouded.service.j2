@@ -10,9 +10,19 @@ Group={{ enshrouded_user }}
 WorkingDirectory={{ enshrouded_install_dir }}
 Environment=WINEDEBUG=-all
 Environment=WINEPREFIX={{ enshrouded_home }}/.wine
+# Without a fast sync primitive Wine serialises every thread wait through the
+# single wineserver socket, stalling the server tick under load even while the
+# host CPU is idle. fsync (futex_waitv) is the fast path, esync the fallback.
+Environment=WINEFSYNC=1
+Environment=WINEESYNC=1
 # xvfb-run: the Windows binary expects a display even headless; Wine aborts
 # without one. -a picks a free display; the server itself renders nothing.
 ExecStart=/usr/bin/xvfb-run -a /usr/bin/wine {{ enshrouded_install_dir }}/enshrouded_server.exe
+# SIGTERM is ignored by the Wine session, so systemd would sit in
+# "deactivating" for the full 90s before SIGKILL. Let the server flush its
+# savegame first, then bound the wait so a wedged process can't stall a deploy.
+ExecStop=/usr/bin/wineserver -k
+TimeoutStopSec=30
 Restart=on-failure
 RestartSec=15
 

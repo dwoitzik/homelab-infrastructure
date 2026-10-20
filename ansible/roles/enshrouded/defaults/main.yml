@@ -13,7 +13,10 @@ enshrouded_steamcmd_url: >-
 enshrouded_app_id: "2278520"
 
 enshrouded_server_name: "Homelab Enshrouded"
-enshrouded_password: ""
+# The server password lives in userGroups[] in the config. It must be set here
+# (via Vault) rather than left empty: an empty value makes the server generate
+# a random password on first write, locking out players who had the old one.
+enshrouded_password: "{{ vault_enshrouded_password }}"
 enshrouded_game_port: 15636
 enshrouded_query_port: 15637
 enshrouded_slot_count: 16

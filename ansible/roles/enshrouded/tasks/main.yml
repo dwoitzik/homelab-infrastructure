@@ -124,13 +124,17 @@
       enshrouded_server.exe missing -- SteamCMD fetched the ~100MB Linux
       depot instead of the Windows one
 
-- name: Deploy the server configuration
+- name: Seed the server configuration (only if absent)
   ansible.builtin.template:
     src: enshrouded_server.json.j2
     dest: "{{ enshrouded_install_dir }}/enshrouded_server.json"
     owner: "{{ enshrouded_user }}"
     group: "{{ enshrouded_user }}"
     mode: '0640'
+    # The running server owns this file: it rewrites it on start/stop and
+    # generates a password if one is missing. Overwriting it invalidates the
+    # players' password and drops fields the template doesn't model.
+    force: false
   notify: Restart enshrouded
 
 - name: Deploy the systemd unit
