@@ -5,4 +5,4 @@ pve_host_mounts_list:
   - path: /mnt/sab-incomplete
     src: tmpfs
     fstype: tmpfs
-    opts: "size=20G,mode=0755,nosuid,nodev,nofail"
+    opts: "size=10G,mode=0755,nosuid,nodev,nofail"

@@ -169,9 +169,12 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
     cores = 2
   }
 
+  # Sized against the 10G host tmpfs at /mnt/sab-incomplete: ramdisk pages are
+  # charged to this container's cgroup, so the limit must clear the ramdisk plus
+  # ~2G of stack usage, or SABnzbd throttles in reclaim. See ADR-066.
   memory {
-    dedicated = 6144
-    swap      = 2048
+    dedicated = 12288
+    swap      = 4096
   }
 
   features {
@@ -391,8 +394,8 @@ resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
   }
 
   # SABnzbd incomplete-downloads on a host tmpfs, not the archive HDD or rpool:
-  # rpool caused fdatasync stalls in etcd, and the HDD made unpack I/O the
-  # bottleneck. The ramdisk also caps flash write amplification. See ADR-066.
+  # rpool caused fdatasync stalls in etcd, the HDD made unpack I/O the
+  # bottleneck, and the ramdisk caps flash write amplification. See ADR-066.
   mount_point {
     volume = "/mnt/sab-incomplete"
     path   = "/downloads/incomplete"

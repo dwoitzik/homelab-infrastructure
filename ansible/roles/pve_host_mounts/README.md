@@ -6,7 +6,7 @@ reproducible, not hand-edited into `/etc/fstab`.
 
 ## What it sets up
 
-- `/mnt/sab-incomplete` — a 20 GB tmpfs holding SABnzbd's incomplete downloads.
+- `/mnt/sab-incomplete` — a 10 GB tmpfs holding SABnzbd's incomplete downloads.
   Bind-mounted into `ct-srv-media-acq-01` as `/downloads/incomplete`. See
   `docs/decisions/ADR-066-tmpfs-for-sab-incomplete-downloads.md`.
 
