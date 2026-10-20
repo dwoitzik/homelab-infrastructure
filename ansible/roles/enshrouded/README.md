@@ -51,6 +51,25 @@ cp /var/backups/enshrouded/savegame-<stamp>/enshrouded_server.json \
 systemctl start enshrouded
 ```
 
+## Known behavior — high CPU/load is expected
+
+The Windows server under Wine is CPU-hungry even when idle or with one player:
+`enshrouded_server.exe` holds ~1-2 cores and `wineserver64` another ~0.3,
+continuously, and the server log emits `[server] Bad Performance ~20,000 us`
+lines every few seconds. This is a known property of the Wine compatibility
+layer, not a fault of this host or role — Wine reports a high "hosting load"
+where Proton does not, at the cost of lower network latency, and there is no
+fix short of the native Linux dedicated server (still unreleased). See
+`mornedhels/enshrouded-server` issue #202 and the feature request for a native
+build.
+
+The LXC is deliberately **not** CPU-capped (`cpulimit` unset): the host has
+headroom (16 threads, ~50% idle) and the game is the point of running it. If
+the co-located Minecraft server or the KVM workloads ever contend visibly,
+cap `ct-dmz-games-01` in `terraform/stacks/proxmox/lxc.tf` and accept the drop
+in game quality. Host CPU pressure `full` staying at 0 is the signal that no
+cap is currently needed.
+
 ## Reachability
 
 - **LAN** — UDP `15636,15637` allowed from `10.0.0.0/8` and `192.168.178.0/24` by
