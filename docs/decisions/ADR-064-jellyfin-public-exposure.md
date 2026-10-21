@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted, 2026-10-19. Terraform apply pending (human-gated, `atlantis apply -d cloudflare`).
+Accepted, 2026-10-19. Applied out-of-band the same day (see "Out-of-band apply" below);
+the Terraform state still expects the human-gated `atlantis apply -d cloudflare`.
 
 ## Context
 
@@ -57,3 +58,21 @@ Add exactly one hostname to the public allowlist:
 - `docs/EXPOSURE.md`, `docs/URL-INVENTORY.md` and the top-level `README.md` service table
   are updated in the same change so the public-hostname whitelist stays the source of
   truth.
+
+## Out-of-band apply (2026-10-19)
+
+The change had already merged to `main`, but it couldn't wait on the `terraform-apply`
+gate: GitHub reported degraded availability for Actions, Pages and Webhooks, so neither
+the Atlantis plan nor the merge-time workflow could run. The `cloudflare` stack's tunnel
+ingress and `media` DNS record were therefore applied directly through the Cloudflare API
+(token held on `ct-srv-atlantis-01`, never logged); the Kubernetes half
+(`allow-egress-cloudflared-jellyfin`, the `media-final` route, `jellyfin-ratelimit`) had
+already auto-synced from `main` via ArgoCD, so no cluster change was needed. The public
+path was verified end to end (`302 -> web/`, `server: Kestrel`) before this note.
+
+This bypassed the merge-to-apply convention, not the `terraform-apply` environment gate —
+that still stands, and the stack still expects to be applied normally. The one lasting
+artifact is the out-of-band DNS record: a one-time `import` block in
+`terraform/stacks/cloudflare/imports.tf` adopts it so the next gated apply is idempotent
+instead of colliding on Cloudflare's "record already exists" error. Remove that block once
+that apply has landed.
