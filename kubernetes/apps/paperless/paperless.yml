@@ -17,6 +17,43 @@ spec:
         options:
           - name: ndots
             value: "1"
+      # The paperless container runs as uid 1000. fsGroup makes the node-local
+      # beat volume group-writable so the initContainer-created file stays
+      # writable for the server process.
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+      - name: beat-schedule-file
+        image: busybox:1.38
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+        # dbm.sqlite3 switches this database to SQLite WAL mode on every open.
+        # Over NFS the WAL commits never reach the main file, so celery beat
+        # crash-loops with "database disk image is malformed" and no task runs.
+        command:
+        - sh
+        - -c
+        - >-
+          rm -f /data/celerybeat-schedule.db &&
+          ln -s /usr/src/paperless/data/beat-local/celerybeat-schedule.db
+          /data/celerybeat-schedule.db
+        resources:
+          requests:
+            cpu: 5m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 32Mi
+        volumeMounts:
+        - name: beat
+          mountPath: /beat
+        - name: data
+          mountPath: /data
       containers:
       - name: paperless
         image: paperlessngx/paperless-ngx:3.3.2@sha256:d232cba37cc0bab0d6c6581ecd320383b7a6f49f33e0fd16adda4d009eb600dd
@@ -121,6 +158,11 @@ spec:
           mountPath: /usr/src/paperless/consume
         - name: tmp
           mountPath: /tmp
+        # Node-local, so the SQLite WAL of the beat schedule database behaves.
+        # A symlink rather than a file mount: SQLite puts -wal and -shm next
+        # to the database, and those would land on NFS again.
+        - name: beat
+          mountPath: /usr/src/paperless/data/beat-local
         # s6-overlay v3's init tries to rm -rf /run/s6 on startup --
         # confirmed live, fails with "Read-only file system" otherwise
         # (same pattern as home-assistant in this pass).
@@ -167,6 +209,8 @@ spec:
       - name: consume
         persistentVolumeClaim:
           claimName: paperless-consume
+      - name: beat
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
