@@ -6,19 +6,20 @@
     mode: '0755'
   loop:
     - /opt/minecraft
-    - /opt/minecraft/data-3
+    - /opt/minecraft/data-4
 
 - name: Deploy Minecraft docker-compose.yml
   ansible.builtin.copy:
     dest: /opt/minecraft/docker-compose.yml
     content: |
       services:
-        minecraft-2:
-          image: itzg/minecraft-server
-          container_name: mc-server-2
+        minecraft-new:
+          image: itzg/minecraft-server:latest
+          container_name: mc-server-4
           environment:
             EULA: "TRUE"
             TYPE: "PAPER"
+            PAPER_CHANNEL: "default"
             INIT_MEMORY: "2G"
             MAX_MEMORY: "4G"
             VERSION: "LATEST"
@@ -26,7 +27,7 @@
           ports:
             - "25565:25565"
           volumes:
-            - ./data-3:/data
+            - ./data-4:/data
           restart: unless-stopped
     mode: '0644'
 
