@@ -12,13 +12,24 @@ via a `systemd` unit. See `docs/decisions/ADR-065-enshrouded-dedicated-server.md
   `steamcmd` package needs non-free, which this host does not enable.
 - The **Windows** depot: `+@sSteamCmdForcePlatformType windows` is required, or
   SteamCMD fetches ~100 MB of Linux libs and reports success with no executable.
+  Since Enshrouded 1.0 (2026-10-15) the game ships **no Linux depot at all** —
+  a plain `+app_update` on linux mounts only depot 1006 (the Steamworks
+  redistributable) and deletes the game content, leaving no server binary.
+- Steam client libraries linked into `~/.steam/sdk32`, `~/.steam/sdk64` and
+  `~/.steam/steam`, plus `STEAM_COMPAT_CLIENT_INSTALL_PATH` in the unit.
+  Steamworks resolves the client install directory from there; without it the
+  1.0 binary aborts with "Could not determine Steam client install directory"
+  and never reaches `HostOnline`.
 - `/home/enshrouded/enshroudedserver` (install), `enshrouded_server.json`, and a
   `Restart=on-failure` unit running
   `xvfb-run -a wine enshrouded_server.exe`.
 - Daily cron: `savegame/` backup (14-day local retention) at 04:30, restart at
   05:00. The whole LXC rootfs is also captured by the nightly PBS job → R2, so the
   local copies are the fast-restore path, not the only backup.
-- Weekly cron (Wed 04:00): SteamCMD `+app_update ... validate`, then restart.
+- Hourly timer (`enshrouded-autoupdate.timer`): compares the installed buildid
+  against `/var/lib/enshrouded/current_buildid` and only runs SteamCMD and
+  restarts the server when the build actually changed. An unchanged build is a
+  no-op, so the server is never bounced for nothing.
 - ufw allow for UDP 15636/15637 when ufw is active.
 
 ## Deploy
@@ -35,6 +46,24 @@ journalctl -u enshrouded -f
 tail -f /home/enshrouded/enshroudedserver/logs/enshrouded_server.log   # "HostOnline" = up
 ss -lunp | grep 15637
 ```
+
+### Updates
+
+The hourly timer runs the update script; `journalctl -t enshrouded-autoupdate`
+shows what it decided.
+
+```sh
+systemctl list-timers | grep enshrouded     # when the next check runs
+systemctl start enshrouded-autoupdate.service   # run a check now
+journalctl -t enshrouded-autoupdate -n 20
+cat /var/lib/enshrouded/current_buildid       # the buildid the server runs
+tail -50 /var/log/enshrouded-steamcmd.log      # the last SteamCMD run
+```
+
+A check that finds the same buildid logs `unchanged -- no action` and leaves
+the server alone. When the build changed, SteamCMD runs against the Windows
+depot, the new buildid is recorded, and the server is restarted — connected
+players are dropped at that point, so announce it.
 
 Config lives at `/home/enshrouded/enshroudedserver/enshrouded_server.json`.
 **Stop the server before editing it** — a running server rewrites the file on

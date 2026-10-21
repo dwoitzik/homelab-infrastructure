@@ -12,6 +12,11 @@ enshrouded_steamcmd_url: >-
   https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
 enshrouded_app_id: "2278520"
 
+enshrouded_update_script: /usr/local/sbin/enshrouded-update.sh
+# Buildid of the currently running build. The update script compares against it
+# so an unchanged build never restarts the server and drops connected players.
+enshrouded_buildid_file: /var/lib/enshrouded/current_buildid
+
 enshrouded_server_name: "Homelab Enshrouded"
 # The server password lives in userGroups[] in the config. It must be set here
 # (via Vault) rather than left empty: an empty value makes the server generate

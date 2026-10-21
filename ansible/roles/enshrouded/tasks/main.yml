@@ -124,6 +124,30 @@
       enshrouded_server.exe missing -- SteamCMD fetched the ~100MB Linux
       depot instead of the Windows one
 
+- name: Create the Steam client directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ enshrouded_user }}"
+    group: "{{ enshrouded_user }}"
+    mode: '0755'
+  loop:
+    - "{{ enshrouded_home }}/.steam/sdk32"
+    - "{{ enshrouded_home }}/.steam/sdk64"
+    - "{{ enshrouded_home }}/.steam/steam"
+
+- name: Link the Steam client library where Steamworks looks for it
+  # Steamworks aborts with "Could not determine Steam client install
+  # directory" when it cannot find steamclient.so there.
+  ansible.builtin.file:
+    src: "{{ enshrouded_install_dir }}/steamclient.so"
+    dest: "{{ item }}"
+    state: link
+    force: true
+  loop:
+    - "{{ enshrouded_home }}/.steam/sdk64/steamclient.so"
+    - "{{ enshrouded_home }}/.steam/sdk32/steamclient.so"
+    - "{{ enshrouded_home }}/.steam/steam/steamclient.so"
 - name: Seed the server configuration (only if absent)
   ansible.builtin.template:
     src: enshrouded_server.json.j2
@@ -164,24 +188,66 @@
     group: root
     mode: '0750'
 
-- name: Deploy the weekly update script
+- name: Deploy the update script
   ansible.builtin.template:
     src: enshrouded-update.sh.j2
-    dest: /usr/local/sbin/enshrouded-update.sh
+    dest: "{{ enshrouded_update_script }}"
     owner: root
     group: root
     mode: '0750'
 
-- name: Schedule the weekly server update
-  ansible.builtin.cron:
-    name: enshrouded-update
-    weekday: "3"
-    minute: "0"
-    hour: "4"
-    user: root
-    job: >-
-      /usr/local/sbin/enshrouded-update.sh
-      >> /var/log/enshrouded-update.log 2>&1
+- name: Deploy the auto-update service
+  ansible.builtin.template:
+    src: enshrouded-autoupdate.service.j2
+    dest: /etc/systemd/system/enshrouded-autoupdate.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd
+
+- name: Deploy the auto-update timer
+  ansible.builtin.template:
+    src: enshrouded-autoupdate.timer.j2
+    dest: /etc/systemd/system/enshrouded-autoupdate.timer
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd
+
+- name: Enable the hourly update check
+  ansible.builtin.systemd_service:
+    name: enshrouded-autoupdate.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Create the update state directory
+  ansible.builtin.file:
+    path: "{{ enshrouded_buildid_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Read the installed buildid
+  ansible.builtin.command:
+    cmd: >-
+      grep -m1 -oP '"buildid"\s+"\K[0-9]+'
+      {{ enshrouded_install_dir }}/steamapps/appmanifest_
+      {{ enshrouded_app_id }}.acf
+  register: enshrouded_buildid
+  changed_when: false
+  failed_when: false
+
+- name: Record the installed buildid as the update baseline
+  ansible.builtin.copy:
+    content: "{{ enshrouded_buildid.stdout }}\n"
+    dest: "{{ enshrouded_buildid_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+    force: false
+  when: enshrouded_buildid.stdout | length > 0
 
 - name: Schedule the daily backup and restart
   ansible.builtin.cron:

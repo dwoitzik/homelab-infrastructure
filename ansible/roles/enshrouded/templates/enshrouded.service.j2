@@ -10,6 +10,10 @@ Group={{ enshrouded_user }}
 WorkingDirectory={{ enshrouded_install_dir }}
 Environment=WINEDEBUG=-all
 Environment=WINEPREFIX={{ enshrouded_home }}/.wine
+# Steamworks resolves the Steam client install directory from this path. Without
+# it the 1.0 binary aborts with "Could not determine Steam client install
+# directory" and the server never reaches HostOnline.
+Environment=STEAM_COMPAT_CLIENT_INSTALL_PATH={{ enshrouded_home }}/.steam/steam
 # Without a fast sync primitive Wine serialises every thread wait through the
 # single wineserver socket, stalling the server tick under load even while the
 # host CPU is idle. fsync (futex_waitv) is the fast path, esync the fallback.

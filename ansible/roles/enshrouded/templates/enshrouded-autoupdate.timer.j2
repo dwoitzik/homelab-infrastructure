@@ -1,0 +1,13 @@
+[Unit]
+Description=Hourly Enshrouded dedicated server update check
+
+[Timer]
+OnCalendar=*:07
+# Spread the check so it does not collide with every other timer on the host.
+RandomizedDelaySec=180
+# Catch up after a reboot that was off at the scheduled minute.
+Persistent=true
+Unit=enshrouded-autoupdate.service
+
+[Install]
+WantedBy=timers.target

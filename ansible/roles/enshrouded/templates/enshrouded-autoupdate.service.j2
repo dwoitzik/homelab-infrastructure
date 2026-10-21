@@ -1,0 +1,10 @@
+[Unit]
+Description=Enshrouded dedicated server auto-update check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ enshrouded_update_script }}
+# A full build is ~3.5GB compressed; the default 90s timeout is far too short.
+TimeoutStartSec=3600
