@@ -2,7 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", "docker:pinDigests", "helpers:pinGitHubActionDigests"],
   "kubernetes": {
-    "fileMatch": ["kubernetes/.+\\.yml$"]
+    "fileMatch": ["kubernetes/.+\\.ya?ml$"]
   },
   "docker-compose": {
     "fileMatch": ["ansible/files/media-acquisition/docker-compose.yml$"]
@@ -15,7 +15,7 @@
       "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
-      "description": "Stateless services + digest pins: patch/minor/digest/pin only, auto-merge after CI green + a 3-day soak so a bad upstream release doesn't land same-day. 'pin' covers first-time digest pinning (no prior digest to diff against), which otherwise sits stuck needing a manual merge forever -- same soak/CI gate applies. Rule order matters -- the stateful/critical rule below is listed last so it overrides this one for the specific packages it names.",
+      "description": "Stateless services + digest pins: patch/minor/digest/pin only, auto-merge after CI green + a 3-day soak so a bad upstream release doesn't land same-day. 'pin' covers first-time digest pinning (no prior digest to diff against), which otherwise sits stuck needing a manual merge forever -- same soak/CI gate applies. Rule order matters -- the stateful/critical rule below is listed last so it overrides this one for the specific packages it names. The kubernetes fileMatch covers .yaml as well as .yml: vaultwarden.yaml was invisible to Renovate and kept an unpinned vaultwarden/server image.",
       "matchManagers": ["kubernetes"],
       "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
       "automerge": true,
