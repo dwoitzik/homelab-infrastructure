@@ -39,7 +39,7 @@
 - name: Build custom Atlantis image with trusted Proxmox CA
   community.docker.docker_image:
     name: atlantis-custom
-    tag: "{{ atlantis_image.split(':')[-1] }}"
+    tag: "{{ atlantis_image_tag }}"
     source: build
     force_source: true
     build:

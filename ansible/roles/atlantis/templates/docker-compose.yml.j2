@@ -6,7 +6,7 @@ services:
   atlantis:
     # SEC-007: custom image built from {{ atlantis_image }} with Proxmox's
     # CA trusted (ansible/roles/atlantis/files/Dockerfile), not the stock tag.
-    image: "atlantis-custom:{{ atlantis_image.split(':')[-1] }}"
+    image: "atlantis-custom:{{ atlantis_image_tag }}"
     container_name: atlantis
     restart: unless-stopped
     ports:

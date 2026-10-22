@@ -1,6 +1,10 @@
 ---
 atlantis_base_dir: /opt/atlantis
-atlantis_image: ghcr.io/runatlantis/atlantis:v0.46.0
+atlantis_image: ghcr.io/runatlantis/atlantis:v0.46.0@sha256:e79363da6b55182d0cb13d7d9deb1cef51528f309a64254755c80df09cbfd698
+# The custom image is built locally, so it has no registry digest. Its tag
+# carries the upstream version instead -- the digest in atlantis_image
+# contains colons and would break a split(':') on the image ref.
+atlantis_image_tag: v0.46.0
 atlantis_url: https://atlantis.woitzik.dev
 atlantis_repo_allowlist: github.com/dwoitzik/homelab-infrastructure
 atlantis_terraform_version: "1.10.5"

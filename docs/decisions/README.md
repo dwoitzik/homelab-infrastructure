@@ -50,6 +50,7 @@ skipped by accident.
 | [062](ADR-062-offsite-r2-3-day-retention.md) | Offsite R2 backup retains 3 days, not 7 | Accepted, applied |
 | [063](ADR-063-renovate-digest-minimum-release-age.md) | Renovate digest/pin updates bypass minimumReleaseAge at branch stage | Accepted, applied |
 | [064](ADR-064-jellyfin-public-exposure.md) | Jellyfin is promoted to the public allowlist via the Cloudflare Tunnel | Accepted (apply pending) |
+| [071](ADR-071-ansible-role-images-digest-pinned.md) | Every container image in the Ansible roles is pinned to a digest | Accepted, applied |
 
 ## In review, not yet in this table
 

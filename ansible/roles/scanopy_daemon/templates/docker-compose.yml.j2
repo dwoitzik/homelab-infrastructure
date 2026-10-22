@@ -1,7 +1,7 @@
 ---
 services:
   scanopy-daemon:
-    image: ghcr.io/scanopy/scanopy/daemon:v0.16.2
+    image: ghcr.io/scanopy/scanopy/daemon:v0.16.2@sha256:98cdba02b2b127462cba87c10dacdc5671354e2dd43a124b72f8cfd2dfb4b911
     container_name: scanopy-daemon
     restart: unless-stopped
     # host networking: ARP discovery needs the real NIC on this VLAN, a
