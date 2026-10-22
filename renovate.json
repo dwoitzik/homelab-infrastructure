@@ -7,6 +7,9 @@
   "docker-compose": {
     "fileMatch": ["ansible/files/media-acquisition/docker-compose.yml$"]
   },
+  "ansible": {
+    "fileMatch": ["ansible/roles/[^/]+/templates/docker-compose\.yml\.j2$"]
+  },
   "minimumReleaseAge": "3 days",
   "packageRules": [
     {
