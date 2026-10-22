@@ -250,6 +250,7 @@ the full external-reachability audit.
 | SearXNG | search.woitzik.dev | Authelia | LAN/VPN only |
 | Excalidraw | draw.woitzik.dev | Authelia | LAN/VPN only |
 | Minecraft | mc.woitzik.dev | Server-side auth | **Public** — via a playit.gg relay tunnel, not the Cloudflare allowlist above (raw TCP, can't route through Cloudflare's CDN); the DMZ LXC it runs on has no cluster credentials and no path to any other VLAN |
+| Enshrouded | (playit.gg tunnel) | Server-side password | **Public** — UDP game server on the same DMZ LXC as Minecraft, reached the same way (playit.gg relay, never the WAN port). LAN clients go direct over UDP 15636/15637. See ADR-065 |
 
 ## VLAN Layout
 

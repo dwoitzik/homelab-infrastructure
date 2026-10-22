@@ -14,6 +14,19 @@ for a problem this hardware doesn't have, or a regression for one it does.
 | Boot/VM-image storage | `local-lvm` (LVM-thin, VG `pve`) | **DRAM-less consumer NVMe.** No onboard write cache — every sustained write burst hits raw flash directly. |
 | Bulk/archive storage | `media`/`archive` ZFS pool | HDD-backed, ample capacity, slow — used deliberately for anything that doesn't need low latency (PBS backups, staging large restores) |
 | Immich photo library | USB-attached storage, NFS-exported | Untouched by k3s cluster lifecycle — physically independent |
+| SABnzbd scratch | host tmpfs `/mnt/sab-incomplete` (20 GB) | Transient incomplete-download space, bind-mounted into the media LXC; RAM-backed, lost on reboot by design — see `docs/decisions/ADR-066-tmpfs-for-sab-incomplete-downloads.md` |
+
+### USB topology on `pve-mgmt-01`
+
+The archive HDD and the Immich stick both hang off the same host, and **which
+USB port they occupy is load-bearing** — a USB-2 port caps either at ~40 MB/s:
+
+| Device | Uses | Port | Consequence |
+|---|---|---|---|
+| Seagate Expansion 2 TB (`archive` pool, `sda`) | PBS backups + large staging | **USB-3** (5 Gbps) | ~60 MB/s read; on USB-2 it fell to ~3–13 MB/s |
+| SanDisk Ultra Fit 512 GB (`sdb1` → `/mnt/pve/usb-immich`) | Immich photo library | USB-2 | Fine for photo I/O; the archive HDD must not be moved here |
+
+If the archive HDD is ever re-cabled, put it back on a USB-3 port.
 
 ## The hard constraint: the boot NVMe is DRAM-less
 

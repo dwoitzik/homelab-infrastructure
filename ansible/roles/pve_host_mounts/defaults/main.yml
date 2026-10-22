@@ -1,0 +1,8 @@
+---
+# Host mounts that must survive reboots but aren't in PVE's own storage config.
+# SABnzbd's incomplete downloads are transient scratch on a tmpfs -- see ADR-066.
+pve_host_mounts_list:
+  - path: /mnt/sab-incomplete
+    src: tmpfs
+    fstype: tmpfs
+    opts: "size=10G,mode=0755,nosuid,nodev,nofail"
