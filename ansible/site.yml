@@ -99,6 +99,7 @@
   become: true
   roles:
     - minecraft
+    - enshrouded
 
 - name: Provision AI & LLM Services
   hosts: ai_nodes
@@ -155,6 +156,7 @@
   become: true
   roles:
     - pve_power
+    - pve_host_mounts
     - node_exporter_native
     # BRIEFING-V4.md Phase 3: PBS's own nightly-backup job covers VMs/CTs,
     # never the hypervisor's own config (/etc/pve, network config) --
