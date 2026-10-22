@@ -223,5 +223,8 @@
       ],
       "datasourceTemplate": "docker"
     }
+  ],
+  "enabledManagers": [
+    "custom.regex"
   ]
 }
