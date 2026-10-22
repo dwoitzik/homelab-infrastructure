@@ -225,6 +225,15 @@
     }
   ],
   "enabledManagers": [
-    "custom.regex"
+    "custom.regex",
+    "ansible",
+    "ansible-galaxy",
+    "docker-compose",
+    "dockerfile",
+    "github-actions",
+    "helm-requirements",
+    "kubernetes",
+    "renovate-config",
+    "terraform"
   ]
 }
