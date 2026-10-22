@@ -5,10 +5,13 @@
     "fileMatch": ["kubernetes/.+\\.ya?ml$"]
   },
   "docker-compose": {
-    "fileMatch": ["ansible/files/media-acquisition/docker-compose.yml$"]
+    "fileMatch": [
+      "ansible/files/media-acquisition/docker-compose.yml$",
+      "ansible/roles/[^/]+/templates/docker-compose\\.yml\\.j2$"
+    ]
   },
   "ansible": {
-    "fileMatch": ["ansible/roles/[^/]+/templates/docker-compose\.yml\.j2$"]
+    "fileMatch": ["ansible/roles/[^/]+/(tasks|files)/[^/]+\\.(yml|Dockerfile)$"]
   },
   "minimumReleaseAge": "3 days",
   "packageRules": [
@@ -46,6 +49,37 @@
       "platformAutomerge": true
     },
     {
+      "description": "Images in the Ansible roles: the compose templates under ansible/roles are applied by the roles themselves, not by a GitOps converge, so a merged PR only reaches the hosts on the next ansible-playbook run. Patch/minor/digest auto-merge is still right -- the alternative is a runtime that stays a year behind on published security fixes. Major stays PR-only because a role image can carry a config migration.",
+      "matchManagers": ["ansible", "docker-compose"],
+      "matchPackageNames": [
+        "adguard/adguardhome",
+        "ghcr.io/bakito/adguardhome-sync",
+        "itzg/minecraft-server",
+        "klutchell/unbound",
+        "willfarrell/autoheal",
+        "ghcr.io/runatlantis/atlantis",
+        "jc21/nginx-proxy-manager",
+        "crowdsecurity/crowdsec",
+        "ghcr.io/scanopy/scanopy/daemon",
+        "grafana/promtail",
+        "prom/node-exporter",
+        "ghcr.io/secops-7/mikrodash",
+        "ghcr.io/rybbit-io/rybbit-backend",
+        "ghcr.io/rybbit-io/rybbit-client",
+        "caddy",
+        "clickhouse/clickhouse-server",
+        "postgres",
+        "redis",
+        "jellyfin/jellyfin",
+        "ghcr.io/juanfont/headscale",
+        "vaultwarden/server"
+      ],
+      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "automerge": true,
+      "platformAutomerge": true,
+      "labels": ["ansible-role-image"]
+    },
+    {
       "description": "Immich server + ML: MUST follow the mobile app releases. The store auto-updates the app, and an older server blocks mobile backup/sync (2026-09-05 outage: app 3.2.1 vs server 3.1.0). Unlike the generic stateful/critical rule below, minor+patch+digest auto-merge here so the server never lags the app; only major stays PR-only.",
       "matchManagers": ["kubernetes"],
       "matchPackageNames": [
@@ -59,7 +93,7 @@
     },
     {
       "description": "Major updates, any package: always PR-only, one PR per package (not grouped -- each major is its own migration, shouldn't be bundled with an unrelated one).",
-      "matchManagers": ["kubernetes", "docker-compose"],
+      "matchManagers": ["kubernetes", "docker-compose", "ansible"],
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "labels": ["major-update"]
