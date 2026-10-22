@@ -1,8 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "docker:pinDigests", "helpers:pinGitHubActionDigests"],
+  "extends": [
+    "config:recommended",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigests"
+  ],
   "kubernetes": {
-    "fileMatch": ["kubernetes/.+\\.ya?ml$"]
+    "fileMatch": [
+      "kubernetes/.+\\.ya?ml$"
+    ]
   },
   "docker-compose": {
     "fileMatch": [
@@ -11,46 +17,83 @@
     ]
   },
   "ansible": {
-    "fileMatch": ["ansible/roles/[^/]+/(tasks|files)/[^/]+\\.(yml|Dockerfile)$"]
+    "fileMatch": [
+      "ansible/roles/[^/]+/(tasks|files)/[^/]+\\.(yml|Dockerfile)$"
+    ]
   },
   "minimumReleaseAge": "3 days",
   "packageRules": [
     {
       "description": "Digest and first-time-pin updates carry no release timestamp at Renovate's branch stage (renovatebot/renovate#45236). With the global minimumReleaseAge set, the renovate/stability-days check then stays pending indefinitely and automerge silently never fires -- freezing every :latest@sha256: image (media-acq stack, k8s digests, GitHub Actions). timestamp-optional lifts the branch-stage block; the age gate still applies wherever the registry exposes a push timestamp (Docker Hub tag_last_pushed).",
-      "matchUpdateTypes": ["digest", "pin"],
+      "matchUpdateTypes": [
+        "digest",
+        "pin"
+      ],
       "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
       "description": "Stateless services + digest pins: patch/minor/digest/pin only, auto-merge after CI green + a 3-day soak so a bad upstream release doesn't land same-day. 'pin' covers first-time digest pinning (no prior digest to diff against), which otherwise sits stuck needing a manual merge forever -- same soak/CI gate applies. Rule order matters -- the stateful/critical rule below is listed last so it overrides this one for the specific packages it names. The kubernetes fileMatch covers .yaml as well as .yml: vaultwarden.yaml was invisible to Renovate and kept an unpinned vaultwarden/server image.",
-      "matchManagers": ["kubernetes"],
-      "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
+      "matchManagers": [
+        "kubernetes"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor",
+        "digest",
+        "pin"
+      ],
       "automerge": true,
       "platformAutomerge": true
     },
     {
       "description": "Media-acquisition compose images (ADR-054): digest-pinned, applied by the LXC's 5-minute gitops converge with an automatic health-gated rollback to the last good image set -- so the same patch/minor/digest auto-merge policy that k8s stateless services use is safe here too. Major stays PR-only because a linuxserver major can carry a config-migration step.",
-      "matchManagers": ["docker-compose"],
-      "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor",
+        "digest",
+        "pin"
+      ],
       "automerge": true,
       "platformAutomerge": true
     },
     {
       "description": "CI tooling (GitHub Actions): low risk, easy to revert, auto-merge after soak. 'pin' included for the same first-time-pinning reason as above.",
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor",
+        "digest",
+        "pin"
+      ],
       "automerge": true,
       "platformAutomerge": true
     },
     {
       "description": "Dev tooling (pre-commit hooks, Terraform providers): doesn't touch live services, auto-merge after soak. 'pin' included for the same first-time-pinning reason as above.",
-      "matchManagers": ["pre-commit", "terraform"],
-      "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
+      "matchManagers": [
+        "pre-commit",
+        "terraform"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor",
+        "digest",
+        "pin"
+      ],
       "automerge": true,
       "platformAutomerge": true
     },
     {
       "description": "Images in the Ansible roles: the compose templates under ansible/roles are applied by the roles themselves, not by a GitOps converge, so a merged PR only reaches the hosts on the next ansible-playbook run. Patch/minor/digest auto-merge is still right -- the alternative is a runtime that stays a year behind on published security fixes. Major stays PR-only because a role image can carry a config migration.",
-      "matchManagers": ["ansible", "docker-compose"],
+      "matchManagers": [
+        "ansible",
+        "docker-compose"
+      ],
       "matchPackageNames": [
         "adguard/adguardhome",
         "ghcr.io/bakito/adguardhome-sync",
@@ -74,40 +117,71 @@
         "ghcr.io/juanfont/headscale",
         "vaultwarden/server"
       ],
-      "matchUpdateTypes": ["patch", "minor", "digest"],
+      "matchUpdateTypes": [
+        "patch",
+        "minor",
+        "digest"
+      ],
       "automerge": true,
       "platformAutomerge": true,
-      "labels": ["ansible-role-image"]
+      "labels": [
+        "ansible-role-image"
+      ]
     },
     {
       "description": "Immich server + ML: MUST follow the mobile app releases. The store auto-updates the app, and an older server blocks mobile backup/sync (2026-09-05 outage: app 3.2.1 vs server 3.1.0). Unlike the generic stateful/critical rule below, minor+patch+digest auto-merge here so the server never lags the app; only major stays PR-only.",
-      "matchManagers": ["kubernetes"],
+      "matchManagers": [
+        "kubernetes"
+      ],
       "matchPackageNames": [
         "ghcr.io/immich-app/immich-server",
         "ghcr.io/immich-app/immich-machine-learning"
       ],
-      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
       "automerge": true,
       "platformAutomerge": true,
-      "labels": ["immich", "auto-merge"]
+      "labels": [
+        "immich",
+        "auto-merge"
+      ]
     },
     {
       "description": "Major updates, any package: always PR-only, one PR per package (not grouped -- each major is its own migration, shouldn't be bundled with an unrelated one).",
-      "matchManagers": ["kubernetes", "docker-compose", "ansible"],
-      "matchUpdateTypes": ["major"],
+      "matchManagers": [
+        "kubernetes",
+        "docker-compose",
+        "ansible"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false,
-      "labels": ["major-update"]
+      "labels": [
+        "major-update"
+      ]
     },
     {
       "description": "Terraform provider majors: made explicit rather than relying on Renovate's default (automerge unset = false). This is the exact bump class that caused the 2026-07-09 OOM/outage (hashicorp/aws 5.x->6.x) -- a major provider bump can pull a full new release's worth of platform builds through the terraform manager's checksum-verification path, so it always needs a human glance before merge, not just a green CI run.",
-      "matchManagers": ["terraform"],
-      "matchUpdateTypes": ["major"],
+      "matchManagers": [
+        "terraform"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false,
-      "labels": ["major-update"]
+      "labels": [
+        "major-update"
+      ]
     },
     {
       "description": "Stateful/critical services -- databases, Vault, Authelia, Garage, Vaultwarden, and apps whose upgrades need a manual data migration (Nextcloud, Paperless, Gitea) or whose breakage takes out backups/auth cluster-wide (Velero's own restic/kopia plugin). Immich used to be here but is NOT anymore: the store auto-updates the mobile app, so an older server silently breaks backup (2026-09-05 outage) -- immich minor+patch+digest auto-merge instead (own rule above); only immich major stays PR-only. ALL update types (patch/minor/major) stay PR-only, grouped into one PR per bump wave so they're one glance instead of scattered across the inbox. Listed last so it wins over the stateless auto-merge rule above for these specific packages. icereed/paperless-gpt was added after a version auto-merged and immediately CrashLoopBackOff'd -- its entrypoint isn't stable against this repo's readOnlyRootFilesystem hardening across versions, needs manual verification per bump.",
-      "matchManagers": ["kubernetes"],
+      "matchManagers": [
+        "kubernetes"
+      ],
       "matchPackageNames": [
         "hashicorp/vault",
         "ghcr.io/authelia/authelia",
@@ -124,7 +198,9 @@
         "icereed/paperless-gpt"
       ],
       "groupName": "stateful/critical services",
-      "labels": ["stateful-critical"],
+      "labels": [
+        "stateful-critical"
+      ],
       "automerge": false
     }
   ],
@@ -133,6 +209,19 @@
       "description": "2026-07-09 OOM root cause: a major hashicorp/aws provider bump (5.x->6.53.0) makes Renovate's terraform manager fetch and SHA256-hash every platform build of the release (14 builds) to keep .terraform.lock.hcl valid. Renovate's default concurrentRequestLimit (16) meant up to 16 of those provider zips could be buffered in memory at once, producing a real transient peak of ~4GiB in a single ~30s window (confirmed via an isolated, generously-capped diagnostic run -- not a leak, the process finished cleanly at exit 0 given real headroom). Under the CronJob's tight memory limit, the cgroup killed it mid-spike before GC could reclaim. Capping concurrency here flattens the peak at the source instead of just hoping a bigger ceiling survives it.",
       "matchHost": "releases.hashicorp.com",
       "concurrentRequestLimit": 2
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The compose templates under ansible/roles are Jinja, so the docker-compose manager cannot parse them. The ansible manager covers the roles' tasks/ and files/ directories but not the templates, so the images there would never get a version or digest update.",
+      "fileMatch": [
+        "^ansible/roles/[^/]+/templates/[^/]+\\.ya?ml\\.j2$"
+      ],
+      "matchStrings": [
+        "image:\\s*['\"]?(?<depName>[^'\"\\s:]+)(?::(?<currentValue>[^'\"\\s@]+))?(?:@sha256:(?<currentDigest>[a-f0-9]{64}))?"
+      ],
+      "datasourceTemplate": "docker"
     }
   ]
 }
