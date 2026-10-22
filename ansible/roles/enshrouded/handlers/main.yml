@@ -1,0 +1,10 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Restart enshrouded
+  ansible.builtin.systemd_service:
+    name: enshrouded
+    state: restarted
+    enabled: true

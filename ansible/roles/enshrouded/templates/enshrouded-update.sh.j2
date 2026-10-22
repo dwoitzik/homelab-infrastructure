@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Apply a new Enshrouded build, but only when the buildid changed. The server
+# ships no Linux depot, so the Windows one must be requested explicitly.
+set -euo pipefail
+install_dir="{{ enshrouded_install_dir }}"
+steamcmd="{{ enshrouded_steamcmd }}"
+user="{{ enshrouded_user }}"
+app_id="{{ enshrouded_app_id }}"
+state_dir="/var/lib/enshrouded"
+buildid_file="$state_dir/current_buildid"
+
+mkdir -p "$state_dir"
+
+current_buildid() {
+  grep -oP '"buildid"\s+"\K[0-9]+' \
+    "$install_dir/steamapps/appmanifest_${app_id}.acf" 2>/dev/null | head -1
+}
+
+old_buildid="$(cat "$buildid_file" 2>/dev/null || true)"
+new_buildid="$(current_buildid)"
+
+if [ -z "$new_buildid" ]; then
+  echo "no appmanifest under $install_dir/steamapps -- skipping update check"
+  exit 0
+fi
+
+if [ -n "$old_buildid" ] && [ "$old_buildid" = "$new_buildid" ]; then
+  echo "buildid $new_buildid unchanged -- no action"
+  exit 0
+fi
+
+echo "buildid changed: ${old_buildid:-none} -> $new_buildid, applying update"
+
+runuser -u "$user" -- "$steamcmd" \
+  +@sSteamCmdForcePlatformType windows \
+  +force_install_dir "$install_dir" \
+  +login anonymous \
+  +app_update "$app_id" validate \
+  +quit
+
+new_buildid="$(current_buildid)"
+if [ -z "$new_buildid" ]; then
+  echo "ERROR: appmanifest missing after update -- the server binary is gone" >&2
+  exit 1
+fi
+
+echo "$new_buildid" > "$buildid_file"
+echo "update applied, buildid now $new_buildid -- restarting server"
+
+systemctl restart enshrouded

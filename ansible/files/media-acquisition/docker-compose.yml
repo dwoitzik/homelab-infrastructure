@@ -24,7 +24,7 @@ services:
     restart: unless-stopped
 
   nzbhydra2:
-    image: lscr.io/linuxserver/nzbhydra2:latest@sha256:42cd8d210c005fc1e04fe561350a479d42f90d60d1557c7161673152b5c1654e
+    image: lscr.io/linuxserver/nzbhydra2:latest@sha256:52bbcf7fafb7dc4316936cd4694388b26ed7ddd4e3363bc961f7527e48c3594e
     container_name: nzbhydra2
     networks:
       - media-acq-net
@@ -187,7 +187,7 @@ services:
   autoheal:
     # Force-restarts any sibling that goes "unhealthy" -- the class of failure
     # `restart: unless-stopped` misses: a process still running but hung.
-    image: willfarrell/autoheal:latest@sha256:7221058d5f68f4aef6eccd88417c6ae18436ad81b8f9d98a204901033b662740
+    image: willfarrell/autoheal:latest@sha256:5faf6731257cd57316c2863e40b56bbd148760e867ac689311c08924a266312c
     container_name: autoheal
     environment:
       - AUTOHEAL_CONTAINER_LABEL=autoheal
