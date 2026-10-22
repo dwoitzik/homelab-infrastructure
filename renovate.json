@@ -205,10 +205,5 @@
       "ansible/files/media-acquisition/docker-compose.yml$",
       "docs/wazuh/docker-compose.yml$"
     ]
-  },
-  "ansible": {
-    "fileMatch": [
-      "^ansible/roles/[^/]+/(tasks|files)/[^/]+\\.(yml|Dockerfile)$"
-    ]
   }
 }
