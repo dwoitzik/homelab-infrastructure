@@ -56,7 +56,7 @@ spec:
           mountPath: /data
       containers:
       - name: paperless
-        image: paperlessngx/paperless-ngx:3.3.2@sha256:d232cba37cc0bab0d6c6581ecd320383b7a6f49f33e0fd16adda4d009eb600dd
+        image: paperlessngx/paperless-ngx:3.3.3@sha256:dba0242c1df1843643df4eb50ce5639f3a7900f414879088fd5bed8eaf2d456d
         # SEC-012: image entrypoint runs init-folders as root to chown
         # /tmp/paperless and /usr/src/paperless/export -- confirmed live,
         # dropping all capabilities crash-loops it (same failure class as
