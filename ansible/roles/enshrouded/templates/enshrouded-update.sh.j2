@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Apply a new Enshrouded build, but only when the buildid actually changed.
-# The server ships no Linux depot, so the Windows one must be requested
-# explicitly or SteamCMD deletes the game content and leaves no binary.
+# Apply a new Enshrouded build, but only when the buildid changed. The server
+# ships no Linux depot, so the Windows one must be requested explicitly.
 set -euo pipefail
-
 install_dir="{{ enshrouded_install_dir }}"
 steamcmd="{{ enshrouded_steamcmd }}"
 user="{{ enshrouded_user }}"

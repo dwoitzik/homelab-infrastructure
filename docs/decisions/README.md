@@ -53,6 +53,7 @@ skipped by accident.
 | [065](ADR-065-enshrouded-dedicated-server.md) | Enshrouded dedicated server on the DMZ game LXC (Wine) | Accepted, applied |
 | [066](ADR-066-tmpfs-for-sab-incomplete-downloads.md) | SABnzbd incomplete downloads on a host tmpfs | Accepted, applied |
 | [069](ADR-069-enshrouded-1-0-linux-depot-removed.md) | Enshrouded 1.0 removed the Linux depot; Windows depot, Steamworks client path, hourly buildid-checked updates | Accepted, applied |
+| [070](ADR-070-paperless-beat-schedule-off-nfs.md) | The paperless beat schedule database moves off NFS via a symlink into a node-local volume | Accepted, applied |
 
 ## In review, not yet in this table
 
