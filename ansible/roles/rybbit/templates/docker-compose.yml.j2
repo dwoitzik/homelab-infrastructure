@@ -1,7 +1,7 @@
 ---
 services:
   caddy:
-    image: caddy:2.10.0
+    image: caddy:2.10.0@sha256:133b5eb7ef9d42e34756ba206b06d84f4e3eb308044e268e182c2747083f09de
     container_name: caddy
     restart: unless-stopped
     ports:
@@ -16,7 +16,7 @@ services:
 
   clickhouse:
     container_name: clickhouse
-    image: clickhouse/clickhouse-server:26.3.17.4
+    image: clickhouse/clickhouse-server:26.3.17.4@sha256:85c434814ac8905e5648027ce926f74ab067edd6aadbccb6c0c165cd3571ea49
     volumes:
       - clickhouse-data:/var/lib/clickhouse
     configs:
@@ -44,7 +44,7 @@ services:
       - "127.0.0.1:8123:8123"
 
   postgres:
-    image: postgres:17.4
+    image: postgres:17.4@sha256:304ab813518754228f9f792f79d6da36359b82d8ecf418096c636725f8c930ad
     container_name: postgres
     environment:
       - POSTGRES_USER=rybbit
@@ -63,7 +63,7 @@ services:
       - "127.0.0.1:5432:5432"
 
   redis:
-    image: redis:8.6.4-alpine
+    image: redis:8.6.4-alpine@sha256:2cc044fc5a07c9b701f8f1255a309ae9ad7856e694ac03513bf3648c01e40763
     container_name: redis
     ports:
       - "127.0.0.1:6379:6379"
@@ -88,7 +88,7 @@ services:
       - noeviction
 
   backend:
-    image: ghcr.io/rybbit-io/rybbit-backend:latest
+    image: ghcr.io/rybbit-io/rybbit-backend:latest@sha256:f729f42575bf018ff97e9f36d49200665b99003a14868acbe56a9b32a9ed6ac7
     container_name: backend
     ports:
       - "127.0.0.1:3001:3001"
@@ -126,7 +126,7 @@ services:
     restart: unless-stopped
 
   client:
-    image: ghcr.io/rybbit-io/rybbit-client:latest
+    image: ghcr.io/rybbit-io/rybbit-client:latest@sha256:f384c1f73a0c2fc0794526908a1fdb2ba410a5cdb3f105487af70f067c8f103a
     container_name: client
     ports:
       - "127.0.0.1:3002:3002"
