@@ -5,22 +5,6 @@
     "docker:pinDigests",
     "helpers:pinGitHubActionDigests"
   ],
-  "kubernetes": {
-    "fileMatch": [
-      "kubernetes/.+\\.ya?ml$"
-    ]
-  },
-  "docker-compose": {
-    "fileMatch": [
-      "ansible/files/media-acquisition/docker-compose.yml$",
-      "ansible/roles/[^/]+/templates/docker-compose\\.yml\\.j2$"
-    ]
-  },
-  "ansible": {
-    "fileMatch": [
-      "ansible/roles/[^/]+/(tasks|files)/[^/]+\\.(yml|Dockerfile)$"
-    ]
-  },
   "minimumReleaseAge": "3 days",
   "packageRules": [
     {
@@ -215,8 +199,8 @@
     {
       "customType": "regex",
       "description": "The compose templates under ansible/roles are Jinja, so the docker-compose manager cannot parse them. The ansible manager covers the roles' tasks/ and files/ directories but not the templates, so the images there would never get a version or digest update.",
-      "fileMatch": [
-        "^ansible/roles/[^/]+/templates/[^/]+\\.ya?ml\\.j2$"
+      "managerFilePatterns": [
+        "/^ansible\\/roles\\/[^/]+\\/templates\\/[^/]+\\.ya?ml\\.j2$/"
       ],
       "matchStrings": [
         "image:\\s*['\"]?(?<depName>[^'\"\\s:]+)(?::(?<currentValue>[^'\"\\s@]+))?(?:@sha256:(?<currentDigest>[a-f0-9]{64}))?"
@@ -224,16 +208,20 @@
       "datasourceTemplate": "docker"
     }
   ],
-  "enabledManagers": [
-    "custom.regex",
-    "ansible",
-    "ansible-galaxy",
-    "docker-compose",
-    "dockerfile",
-    "github-actions",
-    "helm-requirements",
-    "kubernetes",
-    "renovate-config",
-    "terraform"
-  ]
+  "kubernetes": {
+    "managerFilePatterns": [
+      "/^kubernetes\\/.+\\.ya?ml$/"
+    ]
+  },
+  "docker-compose": {
+    "managerFilePatterns": [
+      "/^ansible\\/files\\/media-acquisition\\/docker-compose\\.yml$/",
+      "/^docs\\/wazuh\\/docker-compose\\.yml$/"
+    ]
+  },
+  "ansible": {
+    "managerFilePatterns": [
+      "/^ansible\\/roles\\/[^/]+\\/(tasks|files)\\/[^/]+\\.(yml|Dockerfile)$/"
+    ]
+  }
 }
