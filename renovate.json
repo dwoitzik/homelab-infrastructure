@@ -199,29 +199,29 @@
     {
       "customType": "regex",
       "description": "The compose templates under ansible/roles are Jinja, so the docker-compose manager cannot parse them. The ansible manager covers the roles' tasks/ and files/ directories but not the templates, so the images there would never get a version or digest update.",
-      "managerFilePatterns": [
-        "(^|/)ansible/roles/[^/]+/templates/[^/]+\\.ya?ml\\.j2$"
-      ],
       "matchStrings": [
         "image:\\s*['\"]?(?<depName>[^'\"\\s:]+)(?::(?<currentValue>[^'\"\\s@]+))?(?:@sha256:(?<currentDigest>[a-f0-9]{64}))?"
       ],
-      "datasourceTemplate": "docker"
+      "datasourceTemplate": "docker",
+      "fileMatch": [
+        "ansible/roles/[^/]+/templates/[^/]+\\.ya?ml\\.j2$"
+      ]
     }
   ],
   "kubernetes": {
-    "managerFilePatterns": [
-      "(^|/)kubernetes/.+\\.ya?ml$"
+    "fileMatch": [
+      "kubernetes/.+\\.ya?ml$"
     ]
   },
   "docker-compose": {
-    "managerFilePatterns": [
-      "(^|/)ansible/files/media-acquisition/docker-compose\\.yml$",
-      "(^|/)docs/wazuh/docker-compose\\.yml$"
+    "fileMatch": [
+      "ansible/files/media-acquisition/docker-compose.yml$",
+      "docs/wazuh/docker-compose.yml$"
     ]
   },
   "ansible": {
-    "managerFilePatterns": [
-      "(^|/)ansible/roles/[^/]+/(tasks|files)/[^/]+\\.(yml|Dockerfile)$"
+    "fileMatch": [
+      "ansible/roles/[^/]+/(tasks|files)/[^/]+\\.(yml|Dockerfile)$"
     ]
   }
 }
