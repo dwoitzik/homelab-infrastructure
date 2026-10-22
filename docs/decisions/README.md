@@ -55,6 +55,8 @@ skipped by accident.
 | [069](ADR-069-enshrouded-1-0-linux-depot-removed.md) | Enshrouded 1.0 removed the Linux depot; Windows depot, Steamworks client path, hourly buildid-checked updates | Accepted, applied |
 | [070](ADR-070-paperless-beat-schedule-off-nfs.md) | The paperless beat schedule database moves off NFS via a symlink into a node-local volume | Accepted, applied |
 | [071](ADR-071-ansible-role-images-digest-pinned.md) | Every container image in the Ansible roles is pinned to a digest | Accepted, applied |
+| [072](ADR-072-unattended-upgrades-third-party-origins.md) | unattended-upgrades covers the third-party repositories (Raspberry Pi, Docker, Tailscale) | Accepted, applied |
+| [073](ADR-073-renovate-covers-the-ansible-role-images.md) | Renovate covers the Ansible role images | Accepted, applied |
 
 ## In review, not yet in this table
 
