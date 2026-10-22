@@ -30,6 +30,46 @@
       "platformAutomerge": true
     },
     {
+      "description": "Images in the Ansible roles: the compose templates under ansible/roles are applied by the roles themselves, not by a GitOps converge, so a merged PR only reaches the hosts on the next ansible-playbook run. Patch/minor/digest auto-merge is still right -- the alternative is a runtime that stays a year behind on published security fixes. Major stays PR-only because a role image can carry a config migration.",
+      "matchManagers": [
+        "ansible",
+        "docker-compose"
+      ],
+      "matchPackageNames": [
+        "adguard/adguardhome",
+        "ghcr.io/bakito/adguardhome-sync",
+        "itzg/minecraft-server",
+        "klutchell/unbound",
+        "willfarrell/autoheal",
+        "ghcr.io/runatlantis/atlantis",
+        "jc21/nginx-proxy-manager",
+        "crowdsecurity/crowdsec",
+        "ghcr.io/scanopy/scanopy/daemon",
+        "grafana/promtail",
+        "prom/node-exporter",
+        "ghcr.io/secops-7/mikrodash",
+        "ghcr.io/rybbit-io/rybbit-backend",
+        "ghcr.io/rybbit-io/rybbit-client",
+        "caddy",
+        "clickhouse/clickhouse-server",
+        "postgres",
+        "redis",
+        "jellyfin/jellyfin",
+        "ghcr.io/juanfont/headscale",
+        "vaultwarden/server"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor",
+        "digest"
+      ],
+      "automerge": true,
+      "platformAutomerge": true,
+      "labels": [
+        "ansible-role-image"
+      ]
+    },
+    {
       "description": "Media-acquisition compose images (ADR-054): digest-pinned, applied by the LXC's 5-minute gitops converge with an automatic health-gated rollback to the last good image set -- so the same patch/minor/digest auto-merge policy that k8s stateless services use is safe here too. Major stays PR-only because a linuxserver major can carry a config-migration step.",
       "matchManagers": [
         "docker-compose"
@@ -71,46 +111,6 @@
       ],
       "automerge": true,
       "platformAutomerge": true
-    },
-    {
-      "description": "Images in the Ansible roles: the compose templates under ansible/roles are applied by the roles themselves, not by a GitOps converge, so a merged PR only reaches the hosts on the next ansible-playbook run. Patch/minor/digest auto-merge is still right -- the alternative is a runtime that stays a year behind on published security fixes. Major stays PR-only because a role image can carry a config migration.",
-      "matchManagers": [
-        "ansible",
-        "docker-compose"
-      ],
-      "matchPackageNames": [
-        "adguard/adguardhome",
-        "ghcr.io/bakito/adguardhome-sync",
-        "itzg/minecraft-server",
-        "klutchell/unbound",
-        "willfarrell/autoheal",
-        "ghcr.io/runatlantis/atlantis",
-        "jc21/nginx-proxy-manager",
-        "crowdsecurity/crowdsec",
-        "ghcr.io/scanopy/scanopy/daemon",
-        "grafana/promtail",
-        "prom/node-exporter",
-        "ghcr.io/secops-7/mikrodash",
-        "ghcr.io/rybbit-io/rybbit-backend",
-        "ghcr.io/rybbit-io/rybbit-client",
-        "caddy",
-        "clickhouse/clickhouse-server",
-        "postgres",
-        "redis",
-        "jellyfin/jellyfin",
-        "ghcr.io/juanfont/headscale",
-        "vaultwarden/server"
-      ],
-      "matchUpdateTypes": [
-        "patch",
-        "minor",
-        "digest"
-      ],
-      "automerge": true,
-      "platformAutomerge": true,
-      "labels": [
-        "ansible-role-image"
-      ]
     },
     {
       "description": "Immich server + ML: MUST follow the mobile app releases. The store auto-updates the app, and an older server blocks mobile backup/sync (2026-09-05 outage: app 3.2.1 vs server 3.1.0). Unlike the generic stateful/critical rule below, minor+patch+digest auto-merge here so the server never lags the app; only major stays PR-only.",
@@ -195,19 +195,6 @@
       "concurrentRequestLimit": 2
     }
   ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "description": "The compose templates under ansible/roles are Jinja, so the docker-compose manager cannot parse them. The ansible manager covers the roles' tasks/ and files/ directories but not the templates, so the images there would never get a version or digest update.",
-      "matchStrings": [
-        "image:\\s*['\"]?(?<depName>[^'\"\\s:]+)(?::(?<currentValue>[^'\"\\s@]+))?(?:@sha256:(?<currentDigest>[a-f0-9]{64}))?"
-      ],
-      "datasourceTemplate": "docker",
-      "fileMatch": [
-        "ansible/roles/[^/]+/templates/[^/]+\\.ya?ml\\.j2$"
-      ]
-    }
-  ],
   "kubernetes": {
     "fileMatch": [
       "kubernetes/.+\\.ya?ml$"
@@ -221,7 +208,7 @@
   },
   "ansible": {
     "fileMatch": [
-      "ansible/roles/[^/]+/(tasks|files)/[^/]+\\.(yml|Dockerfile)$"
+      "^ansible/roles/[^/]+/(tasks|files)/[^/]+\\.(yml|Dockerfile)$"
     ]
   }
 }
