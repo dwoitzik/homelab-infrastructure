@@ -277,7 +277,7 @@ spec:
             cpu: 1000m
             memory: 1Gi
       - name: tika
-        image: apache/tika:3.3.1.0
+        image: apache/tika:3.3.3.0@sha256:326b238b37904c94ff61fed87afe0af72e6a29fa715933b10af97b7d56f1d4cb
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
