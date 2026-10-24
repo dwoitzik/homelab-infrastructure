@@ -45,7 +45,7 @@
             - /opt/unbound/conf/root.hints:/etc/unbound/root.hints
 
         autoheal:
-          image: willfarrell/autoheal:latest@sha256:7221058d5f68f4aef6eccd88417c6ae18436ad81b8f9d98a204901033b662740
+          image: willfarrell/autoheal:latest@sha256:bee51452917d535d4072a6cc1f8d02153c6ed5d5d642e6f64d33353574696783
           container_name: autoheal
           restart: always
           mem_limit: 64m
