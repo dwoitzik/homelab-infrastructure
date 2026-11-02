@@ -26,10 +26,10 @@ via a `systemd` unit. See `docs/decisions/ADR-065-enshrouded-dedicated-server.md
 - Daily cron: `savegame/` backup (14-day local retention) at 04:30, restart at
   05:00. The whole LXC rootfs is also captured by the nightly PBS job → R2, so the
   local copies are the fast-restore path, not the only backup.
-- Hourly timer (`enshrouded-autoupdate.timer`): compares the installed buildid
-  against `/var/lib/enshrouded/current_buildid` and only runs SteamCMD and
-  restarts the server when the build actually changed. An unchanged build is a
-  no-op, so the server is never bounced for nothing.
+- Hourly timer (`enshrouded-autoupdate.timer`): reads the public buildid from
+  Steam, compares it against the installed buildid, and only runs SteamCMD and
+  restarts the server when Steam's build actually changed. An unchanged build
+  is a no-op, so the server is never bounced for nothing.
 - ufw allow for UDP 15636/15637 when ufw is active.
 
 ## Deploy
