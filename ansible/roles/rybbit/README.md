@@ -48,3 +48,8 @@ never saw it. Apply the view with:
 ```bash
 ansible-playbook -i inventory.ini site.yml --limit rybbit_nodes
 ```
+
+`files/weekly-report.sql` is the matching 7-day report: summary, channels,
+top pages, countries, referrers, and affiliate clicks per page. Run it with
+`docker exec -i clickhouse clickhouse-client --multiquery < weekly-report.sql`
+instead of reading the raw dashboard numbers.
