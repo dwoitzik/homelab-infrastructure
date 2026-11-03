@@ -34,3 +34,17 @@ finds analytics.woitzik.dev can self-register.
   (32 GB / 16 threads) to match this LXC's actual 4 GB / 2 vCPU -- don't
   copy upstream's numbers back in if updating the compose file from a newer
   release.
+
+## Analytics views
+
+`files/events-clean.sql` creates `analytics.events_clean` for reporting
+queries (Rybbit's own UI still reads `analytics.events`). It drops datacenter
+ASNs, `bot_events`, repeat-heavy sessions (20+ pageviews or 5+ hits on one
+path), and the 1280x1200 headless-Chrome
+signature (empty timezone, empty country/ASN, Direct channel). The signature
+filter exists because that crawler has no ASN or IP, so the datacenter filter
+never saw it. Apply the view with:
+
+```bash
+ansible-playbook -i inventory.ini site.yml --limit rybbit_nodes
+```
