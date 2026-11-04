@@ -15,6 +15,9 @@ spec:
         serviceMonitor:
           enabled: true
           namespace: monitoring
+          # Prometheus only selects ServiceMonitors carrying this label.
+          additionalLabels:
+            release: kube-prometheus-stack
   destination:
     server: https://kubernetes.default.svc
     namespace: external-secrets

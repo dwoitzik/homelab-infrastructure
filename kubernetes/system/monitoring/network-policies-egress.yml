@@ -17,9 +17,8 @@
 # and every policy in this file is Egress-only, so that footgun doesn't
 # apply here; ingress for these namespaces is untouched.
 #
-# database, external-secrets, nfs-provisioner, and trivy-system still need
-# the same apiserver-ipBlock + real-traffic-check pass this file establishes
-# the pattern for -- not done this round, no new reasoning to add.
+# database, nfs-provisioner, and trivy-system still need the same
+# apiserver-ipBlock + real-traffic-check pass.
 #
 # 2026-08-23: apps closed too, after the real per-workload pass the earlier
 # note above said it needed. Checked every one of its ~38 workloads'
@@ -600,3 +599,71 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+---
+# external-secrets only needs the apiserver and the in-cluster Vault. Vault is
+# matched by namespace: kube-router evaluates egress after the Service DNAT, so
+# an ipBlock would have to name vault-0's pod IP.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-apiserver
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.11/32
+      ports:
+        - protocol: TCP
+          port: 6443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-vault
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: vault
+      ports:
+        - protocol: TCP
+          port: 8200
