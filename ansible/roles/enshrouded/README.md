@@ -26,10 +26,10 @@ via a `systemd` unit. See `docs/decisions/ADR-065-enshrouded-dedicated-server.md
 - Daily cron: `savegame/` backup (14-day local retention) at 04:30, restart at
   05:00. The whole LXC rootfs is also captured by the nightly PBS job → R2, so the
   local copies are the fast-restore path, not the only backup.
-- Hourly timer (`enshrouded-autoupdate.timer`): compares the installed buildid
-  against `/var/lib/enshrouded/current_buildid` and only runs SteamCMD and
-  restarts the server when the build actually changed. An unchanged build is a
-  no-op, so the server is never bounced for nothing.
+- Timer every 15 minutes (`enshrouded-autoupdate.timer`): reads the public buildid from
+  Steam, compares it against the installed buildid, and only runs SteamCMD and
+  restarts the server when Steam's build actually changed. An unchanged build
+  is a no-op, so the server is never bounced for nothing.
 - ufw allow for UDP 15636/15637 when ufw is active.
 
 ## Deploy
@@ -49,18 +49,18 @@ ss -lunp | grep 15637
 
 ### Updates
 
-The hourly timer runs the update script; `journalctl -t enshrouded-autoupdate`
-shows what it decided.
+The timer runs the update script every 15 minutes;
+`journalctl -u enshrouded-autoupdate.service` shows what it decided and the
+full SteamCMD output of the last real update.
 
 ```sh
 systemctl list-timers | grep enshrouded     # when the next check runs
 systemctl start enshrouded-autoupdate.service   # run a check now
-journalctl -t enshrouded-autoupdate -n 20
+journalctl -u enshrouded-autoupdate.service -n 20
 cat /var/lib/enshrouded/current_buildid       # the buildid the server runs
-tail -50 /var/log/enshrouded-steamcmd.log      # the last SteamCMD run
 ```
 
-A check that finds the same buildid logs `unchanged -- no action` and leaves
+A check that finds the same buildid logs `buildid <n> is current -- no action` and leaves
 the server alone. When the build changed, SteamCMD runs against the Windows
 depot, the new buildid is recorded, and the server is restarted — connected
 players are dropped at that point, so announce it.

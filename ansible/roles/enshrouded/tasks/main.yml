@@ -214,7 +214,7 @@
     mode: '0644'
   notify: Reload systemd
 
-- name: Enable the hourly update check
+- name: Enable the update check timer
   ansible.builtin.systemd_service:
     name: enshrouded-autoupdate.timer
     enabled: true

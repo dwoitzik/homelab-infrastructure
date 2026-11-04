@@ -1,10 +1,11 @@
 [Unit]
-Description=Hourly Enshrouded dedicated server update check
+Description=Enshrouded dedicated server update check every 15 minutes
 
 [Timer]
-OnCalendar=*:07
-# Spread the check so it does not collide with every other timer on the host.
-RandomizedDelaySec=180
+# Steam can flip the public branch at any time; clients refuse a mismatched
+# server, so the gap between a release and the server update must stay short.
+OnCalendar=*:02/15
+RandomizedDelaySec=60
 # Catch up after a reboot that was off at the scheduled minute.
 Persistent=true
 Unit=enshrouded-autoupdate.service

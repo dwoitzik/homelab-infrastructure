@@ -1,4 +1,4 @@
-# ADR-069: Enshrouded 1.0 dropped the Linux depot — Windows depot, Steamworks client path, hourly buildid-checked updates
+# ADR-069: Enshrouded 1.0 dropped the Linux depot — Windows depot, Steamworks client path, buildid-checked updates every 15 minutes
 
 ## Status
 
@@ -63,13 +63,13 @@ Two further facts made this hard to see:
    `STEAM_COMPAT_CLIENT_INSTALL_PATH=~/.steam/steam`, and the role links
    `steamclient.so` into `~/.steam/sdk32`, `~/.steam/sdk64` and `~/.steam/steam`.
    This mirrors what the upstream Proton image does with its own SDK links.
-3. **Check the buildid hourly instead of updating on a fixed schedule.** The
-   update script compares the buildid in `steamapps/appmanifest_2278520.acf`
-   against `/var/lib/enshrouded/current_buildid`. Only a changed build triggers
-   a SteamCMD run and a restart. An unchanged build is a no-op, so the server
+3. **Check the buildid every 15 minutes instead of updating on a fixed
+   schedule.** The update script reads the `public` branch buildid from Steam
+   (`+app_info_update 1 +app_info_print`) and compares it against the buildid
+   in `steamapps/appmanifest_2278520.acf`. Only a difference triggers a
+   SteamCMD run and a restart. An unchanged build is a no-op, so the server
    keeps running with connected players instead of being bounced on a timer.
-   The previous weekly cron was replaced by `enshrouded-autoupdate.timer`
-   (hourly, with a randomised delay).
+   The previous weekly cron was replaced by `enshrouded-autoupdate.timer`.
 
 The update script fails loudly rather than silently: if the appmanifest is gone
 after a SteamCMD run, it exits non-zero instead of restarting a server whose
@@ -83,8 +83,23 @@ binary may no longer exist.
 - A real update drops connected players. The buildid check minimises how often
   that happens, but an announced maintenance window is still the honest way to
   handle an actual version bump.
-- The hourly check is cheap when nothing changed: it reads one appmanifest and
-  exits. The SteamCMD run only happens on a buildid change.
+- The check is cheap when nothing changed: one anonymous SteamCMD appinfo
+  query (~5 s, ~140 MB peak) and an appmanifest read. The content download and
+  restart only happen on a buildid change.
+
+## Amendments
+
+- **Remote buildid as source of truth.** The first version compared the
+  appmanifest against `/var/lib/enshrouded/current_buildid`. Both only change
+  when SteamCMD runs, so the check never detected a new build and the server
+  sat on 26083076 while Steam moved on. The script now asks Steam for the
+  `public` branch buildid.
+- **Interval cut from hourly to 15 minutes.** Build 26430253 was uploaded at
+  12:37 and promoted to `public` at 15:18; the hourly check had run at 15:10,
+  so players faced a version mismatch for up to an hour. Clients update
+  through Steam immediately, so the server's worst-case lag is now ~16 minutes
+  (interval plus 60 s randomised delay) at the cost of four cheap appinfo
+  queries per hour.
 - `DepotDownloader` was evaluated as a fallback for fetching the content depot
   directly and rejected: the old Linux manifest is no longer served to anonymous
   accounts (HTTP 401), and the current manifest fetch is a workaround for a
