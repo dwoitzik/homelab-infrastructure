@@ -1,12 +1,16 @@
 # Kyverno
 
-Cluster policy enforcement — currently two `ClusterPolicy` resources in
-`policies.yml`: require-resource-limits and disallow-latest-tag.
+Cluster policy enforcement. `policies.yml` holds three `ClusterPolicy` resources
+(require-resource-limits, disallow-privileged-containers, disallow-latest-tag) that
+check both containers and init containers, plus the PolicyException for
+tailscale-subnet-router. The `kyverno` Application deploys the chart and this file
+as two sources.
 
 ## Scope — deliberately not cluster-wide
 
-Both policies are `Enforce` mode but scoped to the `apps` and `database` namespaces
-only, not `monitoring`. A cluster-wide PolicyReport sweep (2026-06-23) confirmed zero
+Limits and image tags are enforced in `apps`, `database` and `security`; privileged
+containers additionally in `monitoring` and `external-secrets`. Limits are not
+enforced in `monitoring`. A cluster-wide PolicyReport sweep (2026-06-23) confirmed zero
 violations before flipping from Audit to Enforce — but restarting Grafana
 (kube-prometheus-stack chart) immediately afterward got blocked: several of that
 chart's templated sidecars (`grafana-sc-dashboard`, `grafana-sc-datasources`, and
@@ -14,6 +18,14 @@ others across `monitoring`) lack resource limits by upstream chart default. Chas
 every third-party sidecar's resource values across chart upgrades is separate, larger
 scope than this pass — `apps` and `database` are this repo's own hand-written
 manifests, where enforcement doesn't hit that problem.
+
+## Drift check
+
+Background reports are disabled (etcd write load), so a running pod that violates a
+policy is only caught at its next admission.
+`kubernetes/system/monitoring/kyverno-policy-drift-check.yml` evaluates the same
+rules against running pods every six hours and posts violations to Discord. Change
+both files together.
 
 ## Controller
 
