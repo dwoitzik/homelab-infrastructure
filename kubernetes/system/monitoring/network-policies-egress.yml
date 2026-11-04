@@ -278,6 +278,18 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+    # DNS-01 propagation checks query the --dns01-recursive-nameservers set in
+    # cert-manager/application.yml directly; keep both lists in sync.
+    - to:
+        - ipBlock:
+            cidr: 1.1.1.1/32
+        - ipBlock:
+            cidr: 8.8.8.8/32
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
 ---
 # cnpg-system: checked live, no ScheduledBackup CRs exist at all (this
 # cluster's Postgres backup path is entirely Velero+Kopia PVC snapshots,
