@@ -143,7 +143,6 @@ browser session is looking at the dashboard.
 │   │   ├── myspeed/           # Internet speed-test history
 │   │   ├── n8n/                # Workflow automation
 │   │   ├── nextcloud/         # Files · CalDAV · CardDAV
-│   │   ├── onlyoffice/        # Office document editing (Nextcloud integration)
 │   │   ├── open-webui/        # Local LLM interface (Ollama)
 │   │   ├── paperless/         # Document management + paperless-gpt
 │   │   ├── renovate/          # Dependency update bot
@@ -156,7 +155,7 @@ browser session is looking at the dashboard.
 │   │   # Two IngressRoute patterns coexist, not fully unified yet: older apps
 │   │   # route through the centralized kubernetes/system/apps-ingressroute.yml,
 │   │   # newer ones (beszel, excalidraw, firefly, freshrss, gotify, linkding,
-│   │   # lubelogger, matrix, myspeed, n8n, onlyoffice, searxng) declare their
+│   │   # lubelogger, matrix, myspeed, n8n, searxng) declare their
 │   │   # own IngressRoute inline in their own directory. Both work; picking one
 │   │   # convention and migrating the rest is open, tracked in docs/ROADMAP.md.
 │   └── system/                # Manually-applied system components
@@ -246,7 +245,6 @@ the full external-reachability audit.
 | Matrix/Synapse + Element | matrix.woitzik.dev, element.woitzik.dev | Federation protocol / Authelia | LAN/VPN only |
 | MySpeed | speed.woitzik.dev | Authelia | LAN/VPN only |
 | n8n | n8n.woitzik.dev | Authelia | LAN/VPN only |
-| OnlyOffice | onlyoffice.woitzik.dev | Authelia | LAN/VPN only |
 | SearXNG | search.woitzik.dev | Authelia | LAN/VPN only |
 | Excalidraw | draw.woitzik.dev | Authelia | LAN/VPN only |
 | Minecraft | mc.woitzik.dev | Server-side auth | **Public** — via a playit.gg relay tunnel, not the Cloudflare allowlist above (raw TCP, can't route through Cloudflare's CDN); the DMZ LXC it runs on has no cluster credentials and no path to any other VLAN |

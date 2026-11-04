@@ -108,7 +108,6 @@ each is still fully reachable via LAN/VPN through the same Traefik instance.
 | `monitoring.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `n8n.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `nextcloud.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
-| `onlyoffice.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `photos.woitzik.dev` | 104.21.38.184 | Explicit (main.tf) | **PASS (200)** — public by design, family access (`ADR-033`) |
 | `pve.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
 | `radarr.woitzik.dev` | none | not allowlisted | LAN/VPN only (by design) |
