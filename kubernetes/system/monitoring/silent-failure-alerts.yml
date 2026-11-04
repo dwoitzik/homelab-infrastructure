@@ -141,3 +141,30 @@ spec:
               a transient registry/API hiccup, but repeated failures mean dependency
               scanning has silently stopped making progress. Check:
               kubectl logs -n apps job/<job-name>.
+
+    - name: external-secrets
+      rules:
+        - alert: ExternalSecretNotSyncing
+          expr: externalsecret_status_condition{condition="Ready", status="False"} == 1
+          for: 30m
+          labels:
+            severity: critical
+          annotations:
+            summary: "ExternalSecret {{ $labels.namespace }}/{{ $labels.name }} is not syncing from Vault"
+            description: >
+              The ExternalSecret has reported Ready=False for 30+ minutes. Workloads keep
+              running on the last synced Secret, so nothing visibly breaks until a secret is
+              rotated or a Secret object is recreated. When every ExternalSecret fails at
+              once the cause is the ClusterSecretStore, not the individual secrets:
+              kubectl get clustersecretstore vault -o jsonpath='{.status.conditions}'
+        - alert: ExternalSecretsMetricsMissing
+          expr: absent(externalsecret_status_condition)
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "No external-secrets metrics in Prometheus"
+            description: >
+              ExternalSecretNotSyncing can only fire while the external-secrets controller
+              is scraped. Check the controller pod and that its ServiceMonitor carries the
+              release=kube-prometheus-stack label.
