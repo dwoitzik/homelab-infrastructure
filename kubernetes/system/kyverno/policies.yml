@@ -46,7 +46,7 @@ spec:
   validationFailureAction: Audit
   validationFailureActionOverrides:
     - action: Enforce
-      namespaces: [database, apps]
+      namespaces: [database, apps, security]
   background: true
   rules:
     - name: check-container-limits
@@ -54,11 +54,21 @@ spec:
         any:
           - resources:
               kinds: [Pod]
-              namespaces: [apps, database]
+              namespaces: [apps, database, security]
       validate:
         message: "Container '{{ request.object.spec.containers[0].name }}' must define resources.limits (cpu and memory)."
         foreach:
           - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.resources.limits.cpu || '' }}"
+                    operator: Equals
+                    value: ""
+                  - key: "{{ element.resources.limits.memory || '' }}"
+                    operator: Equals
+                    value: ""
+          - list: "request.object.spec.initContainers || []"
             deny:
               conditions:
                 any:
@@ -83,7 +93,7 @@ spec:
   validationFailureAction: Audit
   validationFailureActionOverrides:
     - action: Enforce
-      namespaces: [database, apps, monitoring, external-secrets]
+      namespaces: [database, apps, monitoring, external-secrets, security]
   background: true
   rules:
     - name: check-privileged
@@ -91,11 +101,18 @@ spec:
         any:
           - resources:
               kinds: [Pod]
-              namespaces: [apps, monitoring, database, external-secrets]
+              namespaces: [apps, monitoring, database, external-secrets, security]
       validate:
         message: "Privileged containers are not allowed."
         foreach:
           - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.privileged || false }}"
+                    operator: Equals
+                    value: true
+          - list: "request.object.spec.initContainers || []"
             deny:
               conditions:
                 any:
@@ -117,7 +134,7 @@ spec:
   validationFailureAction: Audit
   validationFailureActionOverrides:
     - action: Enforce
-      namespaces: [database, apps]
+      namespaces: [database, apps, security]
   background: true
   rules:
     - name: check-image-tag
@@ -125,11 +142,21 @@ spec:
         any:
           - resources:
               kinds: [Pod]
-              namespaces: [apps, database]
+              namespaces: [apps, database, security]
       validate:
         message: "Container '{{ request.object.spec.containers[0].name }}' must use a specific image tag, not :latest or untagged."
         foreach:
           - list: "request.object.spec.containers"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.image }}"
+                    operator: Equals
+                    value: "*:latest"
+                  - key: "{{ element.image | contains(@, ':') }}"
+                    operator: Equals
+                    value: false
+          - list: "request.object.spec.initContainers || []"
             deny:
               conditions:
                 any:

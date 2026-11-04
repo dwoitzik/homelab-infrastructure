@@ -1,0 +1,122 @@
+# Kyverno background reports are off (etcd write load), so a pod that would fail
+# its policies is only caught at its next admission. This mirrors the rules in
+# kubernetes/system/kyverno/policies.yml; change both together.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kyverno-policy-drift-checker
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno-policy-drift-checker
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kyverno-policy-drift-checker
+subjects:
+  - kind: ServiceAccount
+    name: kyverno-policy-drift-checker
+    namespace: monitoring
+roleRef:
+  kind: ClusterRole
+  name: kyverno-policy-drift-checker
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kyverno-policy-drift-check-script
+  namespace: monitoring
+data:
+  rules.jq: |
+    def ns_in($l): .metadata.namespace as $ns | $l | index($ns);
+    .items[]
+    | select(.status.phase == "Running" or .status.phase == "Pending")
+    | . as $pod
+    | "\($pod.metadata.namespace)/\($pod.metadata.name)" as $p
+    | (($pod.spec.containers // []) + ($pod.spec.initContainers // []))[]
+    | . as $c
+    | (if ($pod | ns_in(["apps","database","security"])) then
+         (if ($c.image | test(":latest$")) or (($c.image | contains(":")) | not)
+          then "\($p) \($c.name): image \($c.image) is untagged or :latest" else empty end),
+         (if (($c.resources.limits.cpu // "") == "" or ($c.resources.limits.memory // "") == "")
+          then "\($p) \($c.name): missing cpu/memory limits" else empty end)
+       else empty end),
+      (if ($pod | ns_in(["apps","monitoring","database","external-secrets","security"]))
+          and ($c.securityContext.privileged // false)
+          and (($pod.metadata.namespace == "apps" and ($pod.metadata.name | startswith("tailscale-subnet-router-"))) | not)
+       then "\($p) \($c.name): privileged" else empty end)
+  check.sh: |
+    #!/bin/sh
+    set -u
+    log() { echo "[kyverno-policy-drift] $*"; }
+    if ! PODS=$(kubectl get pods -A -o json); then
+      log "FATAL: could not list pods"
+      exit 1
+    fi
+    VIOLATIONS=$(printf '%s' "$PODS" | jq -r -f /scripts/rules.jq | sort -u)
+    if [ -z "$VIOLATIONS" ]; then
+      log "no violations"
+      exit 0
+    fi
+    log "violations:"
+    printf '%s\n' "$VIOLATIONS"
+    MSG=$(printf 'Kyverno policy drift: these running pods would be rejected on their next admission.\n```\n%s\n```' "$VIOLATIONS" | head -c 1900)
+    jq -n --arg c "$MSG" '{content: $c}' \
+      | curl -fsS -m 20 -H 'Content-Type: application/json' -d @- "$DISCORD_WEBHOOK_URL" >/dev/null \
+      || log "Discord post failed"
+    exit 1
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kyverno-policy-drift-check
+  namespace: monitoring
+spec:
+  schedule: "17 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 240
+      backoffLimit: 0
+      template:
+        spec:
+          serviceAccountName: kyverno-policy-drift-checker
+          restartPolicy: Never
+          containers:
+            - name: kyverno-policy-drift-check
+              image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+              securityContext:
+                allowPrivilegeEscalation: false
+                seccompProfile:
+                  type: RuntimeDefault
+              command: ["/bin/sh", "-c", "timeout 150 apk add --no-cache curl jq kubectl >/dev/null || { echo '[kyverno-policy-drift] FATAL: tool install failed'; exit 1; }; sh /scripts/check.sh"]
+              env:
+                - name: DISCORD_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: alertmanager-discord-webhook
+                      key: url
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+              resources:
+                requests:
+                  cpu: 20m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+          volumes:
+            - name: script
+              configMap:
+                name: kyverno-policy-drift-check-script
