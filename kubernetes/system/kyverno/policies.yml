@@ -48,14 +48,18 @@ spec:
     - action: Enforce
       namespaces: [database, apps, security]
   background: true
+  admission: true
+  emitWarning: false
   rules:
     - name: check-container-limits
+      skipBackgroundRequests: true
       match:
         any:
           - resources:
               kinds: [Pod]
               namespaces: [apps, database, security]
       validate:
+        allowExistingViolations: true
         message: "Container '{{ request.object.spec.containers[0].name }}' must define resources.limits (cpu and memory)."
         foreach:
           - list: "request.object.spec.containers"
@@ -95,14 +99,18 @@ spec:
     - action: Enforce
       namespaces: [database, apps, monitoring, external-secrets, security]
   background: true
+  admission: true
+  emitWarning: false
   rules:
     - name: check-privileged
+      skipBackgroundRequests: true
       match:
         any:
           - resources:
               kinds: [Pod]
               namespaces: [apps, monitoring, database, external-secrets, security]
       validate:
+        allowExistingViolations: true
         message: "Privileged containers are not allowed."
         foreach:
           - list: "request.object.spec.containers"
@@ -136,14 +144,18 @@ spec:
     - action: Enforce
       namespaces: [database, apps, security]
   background: true
+  admission: true
+  emitWarning: false
   rules:
     - name: check-image-tag
+      skipBackgroundRequests: true
       match:
         any:
           - resources:
               kinds: [Pod]
               namespaces: [apps, database, security]
       validate:
+        allowExistingViolations: true
         message: "Container '{{ request.object.spec.containers[0].name }}' must use a specific image tag, not :latest or untagged."
         foreach:
           - list: "request.object.spec.containers"
