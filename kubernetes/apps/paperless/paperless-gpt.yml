@@ -144,6 +144,13 @@ spec:
         # Previously only title_prompt.tmpl was overlaid; tag/correspondent/
         # document_type/created_date used untuned defaults.
         - cp -a /app/prompts/. /writable-prompts/ 2>/dev/null; for f in /configmap/*.tmpl; do cp "$f" /writable-prompts/; done
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
         volumeMounts:
         - name: prompts
           mountPath: /writable-prompts

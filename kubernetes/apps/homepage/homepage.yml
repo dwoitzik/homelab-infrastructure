@@ -522,6 +522,13 @@ spec:
             type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
         volumeMounts:
         - name: next-dir
           mountPath: /next-init
