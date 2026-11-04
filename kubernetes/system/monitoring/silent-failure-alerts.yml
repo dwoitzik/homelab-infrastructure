@@ -145,7 +145,12 @@ spec:
     - name: external-secrets
       rules:
         - alert: ExternalSecretNotSyncing
-          expr: externalsecret_status_condition{condition="Ready", status="False"} == 1
+          # The ESO metric carries the ExternalSecret's namespace as exported_namespace.
+          expr: |
+            label_replace(
+              externalsecret_status_condition{condition="Ready", status="False"} == 1,
+              "namespace", "$1", "exported_namespace", "(.+)"
+            )
           for: 30m
           labels:
             severity: critical
