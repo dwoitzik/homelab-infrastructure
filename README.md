@@ -161,7 +161,6 @@ browser session is looking at the dashboard.
 │   └── system/                # Manually-applied system components
 │       ├── argocd/            # ArgoCD config (RBAC, OIDC)
 │       ├── cert-manager/      # TLS certificate automation (+ cert-manager-config/, certificates/)
-│       ├── chaos-mesh/        # Scheduled pod-kill / latency-injection experiments
 │       ├── cloudnative-pg/    # CNPG operator (Authelia Postgres)
 │       ├── external-secrets/  # External Secrets Operator
 │       ├── infrastructure/    # sysctl-fix DaemonSet, Cloudflare DDNS, misc cluster glue
