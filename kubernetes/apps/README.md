@@ -27,7 +27,6 @@ Longhorn — migrated off it, see ROADMAP.md for why.
 - `homepage` — dashboard
 - `immich` — photo/video backup (v2.7.5) at `https://photos.woitzik.dev` via Cloudflare Tunnel. Stack: VectorChord postgres PG14, Valkey in-memory cache, immich-server port 2283, immich-ml. Uses own auth (no Authelia ForwardAuth). See ADR-011.
 - `jellyfin` — media server (k8s Service + Endpoints pointing to `ct-srv-jellyfin-01` LXC)
-- `keel` — image auto-update (installed but not actively used; Renovate PRs handle updates)
 - `mealie` — recipe manager
 - `nextcloud` — files, CalDAV, CardDAV
 - `open-webui` — local LLM frontend for Ollama

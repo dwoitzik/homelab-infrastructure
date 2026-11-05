@@ -134,7 +134,6 @@ browser session is looking at the dashboard.
 │   │   ├── homepage/          # Dashboard
 │   │   ├── immich/            # Photo library (Cloudflare Tunnel external access)
 │   │   ├── jellyfin/          # External-service pointer to the GPU-passthrough LXC
-│   │   ├── keel/               # Image auto-update
 │   │   ├── kube-bench/        # CIS Kubernetes benchmark, scheduled
 │   │   ├── linkding/          # Bookmark manager
 │   │   ├── lubelogger/        # Vehicle maintenance log
