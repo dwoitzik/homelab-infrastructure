@@ -5,13 +5,8 @@ atlantis_image: ghcr.io/runatlantis/atlantis:v0.46.0@sha256:e79363da6b55182d0cb1
 # carries the upstream version instead -- the digest in atlantis_image
 # contains colons and would break a split(':') on the image ref.
 atlantis_image_tag: v0.46.0
-atlantis_url: https://atlantis.woitzik.dev
-atlantis_repo_allowlist: github.com/dwoitzik/homelab-infrastructure
 atlantis_terraform_version: "1.10.5"
 
-atlantis_gh_user: dwoitzik
-atlantis_gh_token: "{{ vault_atlantis_gh_token }}"
-atlantis_gh_webhook_secret: "{{ vault_atlantis_gh_webhook_secret }}"
 
 atlantis_mikrotik_url: https://10.0.10.1
 atlantis_mikrotik_user: terraform
