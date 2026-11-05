@@ -191,6 +191,24 @@ jobs:
       - name: Lint Markdown
         run: markdownlint-cli2 "**/*.md" "!terraform/**" "!ansible/k3s-cluster/**"
 
+  helm-charts:
+    name: Helm charts render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install helm and kubeconform
+        run: |
+          curl -sL https://get.helm.sh/helm-v3.16.4-linux-amd64.tar.gz | tar xz -C /tmp
+          sudo install /tmp/linux-amd64/helm /usr/local/bin/helm
+          curl -sL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | sudo tar xz -C /usr/local/bin kubeconform
+
+      # Renovate auto-merges chart patch releases; this proves each chart still
+      # renders with our values against the cluster's Kubernetes version.
+      - name: Render and validate every ArgoCD Helm source
+        run: python3 scripts/render-helm-applications.py --kube-version 1.31.12
+
   kubeconform:
     name: Kubeconform
     runs-on: ubuntu-latest
