@@ -7,11 +7,14 @@ spec:
   project: default
   source:
     repoURL: https://charts.jetstack.io
-    targetRevision: v1.14.4
+    targetRevision: v1.19.6
     chart: cert-manager
     helm:
       values: |
-        installCRDs: true
+        crds:
+          enabled: true
+          # Keep CRDs (and with them every Certificate) if the release is removed.
+          keep: true
         extraArgs:
           - --dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53
           - --dns01-recursive-nameservers-only
@@ -36,3 +39,5 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
