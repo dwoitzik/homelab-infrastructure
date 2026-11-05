@@ -33,7 +33,7 @@ Every item below is done so it stays done without someone remembering it:
 | CI | Terraform plan/apply workflows restricted to the repository owner and to same-repo branches |
 | Backups | Immich photo library mirrored nightly to the archive pool with 30 days of ZFS snapshots and a staleness alert |
 | Services | OnlyOffice removed (unused); Enshrouded server checks Steam for new builds every 15 minutes |
-| Alerting | Drive-wear warnings reach Discord |
+| Alerting | Drive-wear warnings reach Discord; RESOLVED notifications delivered (group interval no longer outlives Alertmanager's resolved-alert GC); failed and missing PBS backup runs page |
 
 ## Now (November 2026)
 
@@ -45,22 +45,26 @@ rate it reaches 90 % around the end of December.
 - [ ] Order a replacement: ≥1 TB, DRAM, TLC, ideally with power-loss protection
       (fsync-heavy workload: kine, Postgres, LMDB). Swap in a December window.
 - [ ] Cut write volume (estimates in GB/day saved):
-  - [ ] vzdump falls back to suspend mode for one container and stages ~19 GB on the
-        host root every other night: move it to snapshot-capable storage (~9)
-  - [ ] Datastore churn from leader-election leases, a flapping provisioner lease,
-        ArgoCD's 5-minute reconcile of 59 apps and per-minute Velero BSL validation (~8–10)
-  - [ ] CNPG `archive_timeout` of 5 minutes ships a 16 MB WAL segment per cluster even
-        when idle (~5–8)
+  - [x] vzdump falls back to suspend mode for one container and staged ~19 GB on the
+        host root every other night: staging moved to an ACL-capable dataset on the
+        archive pool (~9)
+  - [x] Datastore churn: provisioner lease removed, Kyverno lease retry 2s → 10s,
+        ArgoCD reconcile 5 → 15 min, Velero BSL validation hourly (~8–10). The CNPG
+        operator lease stays at 2s: no retry flag, and disabling leader election would
+        let two operators overlap during a rolling update
+  - [x] CNPG `archive_timeout` 5 → 30 min (~5–8). Found on the way: the postgres
+        Application ignored every Cluster spec, so no Cluster change had ever deployed;
+        it now uses server-side diff/apply
   - [ ] Garage metadata snapshots every 6 h; Loki chunk sizing (~3–5)
   - [ ] Prometheus: drop duplicate kubelet-scraped apiserver series (~2–3)
-  - [ ] Remove Chaos Mesh (no experiments; daily re-rollout from a random chart annotation)
+  - [x] Remove Chaos Mesh (no experiments; daily re-rollout from a random chart annotation)
   - [ ] VM filesystems `noatime,commit=60` + periodic fstrim; weekly `pct fstrim`
 - [ ] Correct `docs/HARDWARE.md`: `nfs-client` volumes live on the NVMe, not the HDD.
 
 ### Backups that would actually restore
 
 - [ ] Immich library offsite copy (R2)
-- [ ] Base backups for every CNPG cluster, not only Authelia
+- [x] Base backups for every CNPG cluster (Authelia's schedule also ran hourly instead of daily: CNPG cron has a seconds field)
 - [ ] Consistent database backups: `pg_dump` pre-hooks instead of file copies of live data directories
 - [ ] PBS: daily schedule, weekly verify job, offsite sync of the datastore
 - [ ] kine datastore `.backup` to separate storage
@@ -68,8 +72,8 @@ rate it reaches 90 % around the end of December.
 
 ### Security hygiene
 
-- [ ] Retire the remaining Atlantis deployment (replaced by GitHub Actions, ADR-021) and rotate its tokens
-- [ ] Remove unused cluster tooling with broad permissions (Chaos Mesh, Keel)
+- [ ] Retire the remaining Atlantis deployment (replaced by GitHub Actions, ADR-021) and rotate its tokens. Ingress and config removed; server teardown on the runner host and token revocation pending
+- [x] Remove unused cluster tooling with broad permissions (Chaos Mesh, Keel)
 - [ ] Hypervisor patch management and account hardening under Ansible
 - [ ] One ingress path for all public services so every request passes the same rate limiting and CrowdSec bouncer
 - [ ] Commit the remaining hand-applied NetworkPolicies; default-deny ingress for every namespace
