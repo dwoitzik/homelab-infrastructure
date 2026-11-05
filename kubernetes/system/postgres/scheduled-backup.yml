@@ -13,8 +13,57 @@ metadata:
   name: postgres-authelia-backup
   namespace: database
 spec:
-  schedule: "0 2 * * *"
+  # CNPG schedules have a leading seconds field: "0 0 2 * * *" is 02:00 daily.
+  schedule: "0 0 2 * * *"
   backupOwnerReference: self
   cluster:
     name: postgres-authelia
+  method: barmanObjectStore
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-firefly-backup
+  namespace: database
+spec:
+  schedule: "0 10 2 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: postgres-firefly
+  method: barmanObjectStore
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-n8n-backup
+  namespace: database
+spec:
+  schedule: "0 20 2 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: postgres-n8n
+  method: barmanObjectStore
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-scanopy-backup
+  namespace: database
+spec:
+  schedule: "0 30 2 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: postgres-scanopy
+  method: barmanObjectStore
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-synapse-backup
+  namespace: database
+spec:
+  schedule: "0 40 2 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: postgres-synapse
   method: barmanObjectStore
