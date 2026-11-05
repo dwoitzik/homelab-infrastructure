@@ -112,13 +112,22 @@
     - '^ionice:\s*\d+\s*$'
   when: pve_power_vzdump_throttle_block_present.rc != 0
 
-- name: Ensure vzdump throttle block is set (bwlimit + ionice)
+- name: Ensure the vzdump staging directory exists on the archive pool
+  ansible.builtin.file:
+    path: "{{ pve_power_vzdump_tmpdir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Ensure vzdump throttle block is set (bwlimit + ionice + tmpdir)
   ansible.builtin.blockinfile:
     path: /etc/vzdump.conf
     marker: "# {mark} ANSIBLE MANAGED THROTTLE (pve_power role, ADR-023)"
     block: |
       bwlimit: {{ pve_power_vzdump_bwlimit_kbps }}
       ionice: {{ pve_power_vzdump_ionice }}
+      tmpdir: {{ pve_power_vzdump_tmpdir }}
 
 - name: Raise LVM thin-pool autoextend threshold
   ansible.builtin.lineinfile:
