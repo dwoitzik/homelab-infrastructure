@@ -105,6 +105,15 @@ spec:
           - matchType: "=~"
             name: alertname
             value: "ProxmoxStorageCapacityHigh|ProxmoxStorageCapacityCritical"
+      # Drive wear moves slowly but means buying hardware: page once a day.
+      - receiver: discord
+        groupWait: 30s
+        groupInterval: 24h
+        repeatInterval: 24h
+        matchers:
+          - matchType: "=~"
+            name: alertname
+            value: "NVMeWearWarning"
   receivers:
     - name: "null"
     - name: discord
