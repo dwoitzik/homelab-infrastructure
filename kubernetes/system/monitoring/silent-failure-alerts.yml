@@ -189,3 +189,28 @@ spec:
               The photo library lives on a single USB stick; immich-library-backup.timer on
               the Proxmox host is its only local copy. Check:
               systemctl status immich-library-backup.service; journalctl -u immich-library-backup.service
+
+    - name: pbs-backup
+      rules:
+        - alert: PBSBackupUnhealthy
+          expr: pve_pbs_backup_healthy == 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "The last PBS backup run left at least one guest without a fresh backup"
+            description: >
+              Written by the vzdump job-end hook on the Proxmox host. Find the guest with
+              pve_pbs_backup_age_seconds > 86400 or == -1, then read its task log:
+              pvesh get /nodes/pve-mgmt-01/tasks --typefilter vzdump --limit 5
+        # The job runs every second day, so a check older than 52h means a run was missed.
+        - alert: PBSBackupHealthcheckStale
+          expr: time() - pve_pbs_backup_healthcheck_timestamp_seconds > 52 * 3600
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "No PBS backup run has reported in over 52 hours"
+            description: >
+              The vzdump job-end hook last ran {{ $value | humanizeDuration }} ago. Check the
+              backup job schedule (pvesh get /cluster/backup) and the PBS datastore.
