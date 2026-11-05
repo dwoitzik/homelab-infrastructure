@@ -1,0 +1,6 @@
+#!/bin/sh
+# The VIP must leave this node when AdGuard or Unbound stops answering.
+# dig exits 0 on SERVFAIL, so the status line decides.
+dig +time=1 +tries=1 @127.0.0.1 -p 53 photos.woitzik.dev | grep -q "status: NOERROR" || exit 1
+dig +time=1 +tries=1 @127.0.0.1 -p 5335 . NS | grep -q "status: NOERROR" || exit 1
+exit 0
