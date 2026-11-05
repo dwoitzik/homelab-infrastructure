@@ -16,6 +16,10 @@ kind: Application
 metadata:
   name: postgres-cluster
   namespace: argocd
+  annotations:
+    # CNPG's webhook fills in and drops defaulted Cluster fields; a server-side
+    # diff compares against that result, so only real changes show up.
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
 spec:
   project: default
   source:
@@ -29,17 +33,10 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: database
-  # The CNPG operator materializes ~60 defaulted keys into .spec and drops
-  # keys equal to its own defaults, so no hand-written spec matches live.
-  # The operator owns this subtree; other objects here still diff normally.
-  ignoreDifferences:
-    - group: postgresql.cnpg.io
-      kind: Cluster
-      jsonPointers:
-        - /spec
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
