@@ -27,8 +27,9 @@ spec:
             replicas: 1
             # Same lease tuning as the cleanup controller: 60s/50s instead of
             # 12s/10s, and a renewal every 10s instead of every 2s.
-            extraArgs:
-              leaderElectionRetryPeriod: 10s
+            container:
+              extraArgs:
+                leaderElectionRetryPeriod: 10s
             tolerations:
               - key: node-role.kubernetes.io/control-plane
                 operator: Exists
