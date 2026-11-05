@@ -1,0 +1,9 @@
+[Unit]
+Description=Copy the Immich library from the USB stick to the archive pool
+RequiresMountsFor={{ immich_library_backup_source_mount }}
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/immich-library-backup.sh
+Nice=10
+IOSchedulingClass=idle

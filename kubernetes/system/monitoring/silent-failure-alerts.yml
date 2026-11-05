@@ -173,3 +173,19 @@ spec:
               ExternalSecretNotSyncing can only fire while the external-secrets controller
               is scraped. Check the controller pod and that its ServiceMonitor carries the
               release=kube-prometheus-stack label.
+
+    - name: immich-library-backup
+      rules:
+        - alert: ImmichLibraryBackupStale
+          expr: |
+            (time() - immich_library_backup_last_success_timestamp_seconds > 36 * 3600)
+            or absent(immich_library_backup_last_success_timestamp_seconds)
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "Immich library has not been copied to the archive pool for 36h+"
+            description: >
+              The photo library lives on a single USB stick; immich-library-backup.timer on
+              the Proxmox host is its only local copy. Check:
+              systemctl status immich-library-backup.service; journalctl -u immich-library-backup.service
