@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Mirror the Immich library to a ZFS dataset, then snapshot it. rsync --delete
+# keeps the mirror exact; the snapshots keep deleted photos recoverable.
+set -euo pipefail
+src="{{ immich_library_backup_source }}"
+dataset="{{ immich_library_backup_dataset }}"
+retention_days="{{ immich_library_backup_snapshot_retention_days }}"
+prom_dir="{{ immich_library_backup_textfile_dir }}"
+prom="$prom_dir/immich_library_backup.prom"
+
+write_metrics() {
+  local ok="$1" bytes="${2:-0}"
+  local tmp="$prom.$$"
+  {
+    echo "# HELP immich_library_backup_success 1 if the last run copied and snapshotted the library."
+    echo "# TYPE immich_library_backup_success gauge"
+    echo "immich_library_backup_success $ok"
+    echo "# HELP immich_library_backup_last_run_timestamp_seconds When the backup last ran."
+    echo "# TYPE immich_library_backup_last_run_timestamp_seconds gauge"
+    echo "immich_library_backup_last_run_timestamp_seconds $(date +%s)"
+    if [ "$ok" = 1 ]; then
+      echo "# HELP immich_library_backup_last_success_timestamp_seconds When the backup last succeeded."
+      echo "# TYPE immich_library_backup_last_success_timestamp_seconds gauge"
+      echo "immich_library_backup_last_success_timestamp_seconds $(date +%s)"
+      echo "# HELP immich_library_backup_bytes Size of the backed-up library."
+      echo "# TYPE immich_library_backup_bytes gauge"
+      echo "immich_library_backup_bytes $bytes"
+    elif [ -f "$prom" ]; then
+      grep -E '^immich_library_backup_(last_success_timestamp_seconds|bytes) ' "$prom" || true
+    fi
+  } > "$tmp"
+  mv "$tmp" "$prom"
+}
+trap 'write_metrics 0' ERR
+
+# An unmounted or empty source would make rsync --delete wipe the mirror.
+if ! mountpoint -q "{{ immich_library_backup_source_mount }}" || [ -z "$(ls -A "$src" 2>/dev/null)" ]; then
+  echo "source $src is not mounted or empty, refusing to sync" >&2
+  write_metrics 0
+  exit 1
+fi
+
+dest="$(zfs get -H -o value mountpoint "$dataset")"
+[ "$(zfs get -H -o value mounted "$dataset")" = yes ] || { echo "$dataset is not mounted" >&2; write_metrics 0; exit 1; }
+
+rsync -aHAX --delete --numeric-ids "$src"/ "$dest"/
+
+zfs snapshot "$dataset@auto-$(date +%Y%m%d-%H%M%S)"
+
+cutoff=$(date -d "-${retention_days} days" +%s)
+zfs list -H -p -t snapshot -o name,creation -s creation "$dataset" \
+  | awk -v c="$cutoff" '$1 ~ /@auto-/ && $2 < c {print $1}' \
+  | xargs -r -n1 zfs destroy
+
+write_metrics 1 "$(zfs get -H -p -o value used "$dataset")"
+echo "library mirrored to $dest and snapshotted"
