@@ -18,6 +18,7 @@ spec:
               provider: aws
               bucket: velero
               default: true
+              validationFrequency: 1h
               config:
                 region: homelab
                 s3ForcePathStyle: true

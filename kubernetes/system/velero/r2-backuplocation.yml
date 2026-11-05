@@ -5,6 +5,7 @@ metadata:
   namespace: velero
 spec:
   provider: aws
+  validationFrequency: 1h
   objectStorage:
     bucket: velero-offsite
   config:
