@@ -47,7 +47,7 @@
 #   to redis-authelia's pod IP) and fixed before calling this done, not
 #   left as a silent regression.
 #
-# Everything else (freshrss, linkding, mealie, n8n, renovate, keel, searxng,
+# Everything else (freshrss, linkding, mealie, n8n, renovate, searxng,
 # home-assistant, homepage, and more) genuinely does need broad, many-host
 # external HTTP(S) egress by design -- that's not a gap in the traffic map,
 # it's what these apps actually are (an RSS reader has to reach arbitrary
