@@ -10,6 +10,8 @@ spec:
     parameters:
       max_connections: "100"
       shared_buffers: "128MB"
+      # Default 5min forces a 16 MB WAL segment per cluster every 5 minutes, even idle.
+      archive_timeout: "30min"
 
   bootstrap:
     initdb:
