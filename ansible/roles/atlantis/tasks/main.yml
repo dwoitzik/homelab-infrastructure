@@ -12,16 +12,29 @@
     mode: '0750'
   loop:
     - "{{ atlantis_base_dir }}"
-    - "{{ atlantis_base_dir }}/data"
     - "{{ atlantis_base_dir }}/build"
 
-- name: Deploy Atlantis repo config
-  ansible.builtin.template:
-    src: repos.yaml.j2
-    dest: "{{ atlantis_base_dir }}/repos.yaml"
-    owner: "100"
-    group: "1000"
-    mode: '0640'
+# ADR-021 replaced the Atlantis server with comment-triggered GitHub Actions
+# workflows; only its image survives, as the runner's terraform toolbox.
+- name: Check for the retired Atlantis server stack
+  ansible.builtin.stat:
+    path: "{{ atlantis_base_dir }}/docker-compose.yml"
+  register: atlantis_server_compose
+
+- name: Stop and remove the retired Atlantis server
+  community.docker.docker_compose_v2:
+    project_src: "{{ atlantis_base_dir }}"
+    state: absent
+  when: atlantis_server_compose.stat.exists
+
+- name: Remove the retired Atlantis server's config and working data
+  ansible.builtin.file:
+    path: "{{ atlantis_base_dir }}/{{ item }}"
+    state: absent
+  loop:
+    - docker-compose.yml
+    - repos.yaml
+    - data
 
 # SEC-007: custom image adds Proxmox's self-signed cluster CA to the trust
 # store so terraform/stacks/proxmox can run with insecure = false instead of
@@ -47,17 +60,6 @@
       args:
         BASE_IMAGE: "{{ atlantis_image }}"
       pull: true
-
-- name: Deploy Atlantis docker-compose configuration
-  ansible.builtin.template:
-    src: docker-compose.yml.j2
-    dest: "{{ atlantis_base_dir }}/docker-compose.yml"
-    mode: '0640'
-
-- name: Ensure Atlantis stack is running
-  community.docker.docker_compose_v2:
-    project_src: "{{ atlantis_base_dir }}"
-    state: present
 
 # ADR-021: the GitHub Actions runner's terraform steps need the same
 # provider credentials the Atlantis container already gets via its own
