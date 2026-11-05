@@ -64,8 +64,13 @@ data:
     PROBE_TOTAL=$(prom 'count(probe_success{job=~"blackbox-.*"})' | jq -r '.data.result[0].value[1] // "0"')
 
     # --- Certs expiring within 14 days ---
-    CERTS_SOON=$(prom '(probe_ssl_earliest_cert_expiry{job=~"blackbox-.*"} - time()) / 86400 < 14' \
-      | jq -r '[.data.result[] | .metric.instance] | join(", ")')
+    # Public hosts sit behind Cloudflare, so the probes see the edge cert; the
+    # origin certs only show up in cert-manager's own metric.
+    CERTS_SOON=$( { prom '(probe_ssl_earliest_cert_expiry{job=~"blackbox-.*"} - time()) / 86400 < 14' \
+        | jq -r '.data.result[] | .metric.instance'
+      prom '(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < 14' \
+        | jq -r '.data.result[] | "\(.metric.exported_namespace)/\(.metric.name)"'
+    } | paste -sd, - | sed 's/,/, /g')
     [ -z "$CERTS_SOON" ] && CERTS_SOON="none"
 
     # --- SSD wear ---
