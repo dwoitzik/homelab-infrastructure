@@ -29,6 +29,7 @@ pve_power_vzdump_ionice: 7
 # Containers on non-snapshot storage fall back to suspend mode, which stages a
 # full rootfs copy in tmpdir. The default /var/tmp is on the NVMe root (18G free).
 pve_power_vzdump_tmpdir: /mnt/pbs-storage/vzdump-tmp
+pve_power_vzdump_tmpdir_dataset: archive/vzdump-tmp
 
 # This host's LVM thin pool has zero free space at the volume-group level,
 # so the default 80% autoextend threshold only ever blocked new thin-LVs
