@@ -6,13 +6,13 @@
     "helpers:pinGitHubActionDigests"
   ],
   "kubernetes": {
-    "fileMatch": [
-      "kubernetes/.+\\.ya?ml$"
+    "managerFilePatterns": [
+      "/kubernetes/.+\\.ya?ml$/"
     ]
   },
   "docker-compose": {
-    "fileMatch": [
-      "ansible/files/media-acquisition/docker-compose.yml$"
+    "managerFilePatterns": [
+      "/ansible/files/media-acquisition/docker-compose.yml$/"
     ]
   },
   "minimumReleaseAge": "3 days",
@@ -210,8 +210,8 @@
     }
   ],
   "argocd": {
-    "fileMatch": [
-      "kubernetes/.+\\.ya?ml$"
+    "managerFilePatterns": [
+      "/kubernetes/.+\\.ya?ml$/"
     ]
   }
 }
