@@ -187,7 +187,7 @@ services:
   autoheal:
     # Force-restarts any sibling that goes "unhealthy" -- the class of failure
     # `restart: unless-stopped` misses: a process still running but hung.
-    image: willfarrell/autoheal:latest@sha256:5faf6731257cd57316c2863e40b56bbd148760e867ac689311c08924a266312c
+    image: willfarrell/autoheal:latest@sha256:b1517815087f04edd0b0c103d6df4ac5c4d6f22db5c62e32949e135a25f1d945
     container_name: autoheal
     environment:
       - AUTOHEAL_CONTAINER_LABEL=autoheal
