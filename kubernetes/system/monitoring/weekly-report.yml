@@ -86,8 +86,10 @@ data:
       | jq -r '"last scheduled: \(.status.lastScheduleTime // "never"), last successful: \(.status.lastSuccessfulTime // "never")"')
 
     # --- Pending Renovate PRs (unauthenticated GitHub API, public repo) ---
+    # Renovate runs in-cluster with the owner's token, so its PRs are
+    # recognised by their renovate/ branch, not by the author.
     RENOVATE_PRS=$(timeout 15 curl -fsS "https://api.github.com/repos/${REPO}/pulls?state=open&per_page=100" 2>/dev/null \
-      | jq -r '[.[] | select(.user.login == "renovate[bot]")] | length' 2>/dev/null)
+      | jq -r '[.[] | select(.head.ref | startswith("renovate/"))] | length' 2>/dev/null)
     [ -z "$RENOVATE_PRS" ] && RENOVATE_PRS="unknown (GitHub API unreachable)"
 
     OPEN_PRS=$(timeout 15 curl -fsS "https://api.github.com/repos/${REPO}/pulls?state=open&per_page=100" 2>/dev/null \
@@ -103,7 +105,7 @@ data:
     Restore test: ${RESTORE_TEST}
     Open PRs: ${OPEN_PRS} (${RENOVATE_PRS} from Renovate)
 
-    Drift detection: not wired into this report yet -- Atlantis's own PR-triggered plans are the current drift signal, no scheduled out-of-band check exists. See phase8/LEDGER.md for status."
+    Drift detection: declared-vs-live check every 30 min (GitHub Actions, ADR-027); ArgoCD self-heal for the cluster.
 
     PAYLOAD=$(jq -n --arg content "$MSG" '{content: $content}')
     timeout 15 curl -fsS -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK_URL"
