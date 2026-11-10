@@ -150,8 +150,50 @@
       ]
     },
     {
+      "description": "Helm charts referenced by ArgoCD Applications: patch releases auto-merge after the soak once the Helm render gate in CI passes. Minor and major releases stay PR-only because a chart minor can raise its Kubernetes floor without declaring kubeVersion (cert-manager 1.20 needs 1.32+), which no render check catches. 0.x charts get no auto-merge at all: under semver a 0.x minor is breaking. Renovate merges these itself (platformAutomerge off) so every status check, including the Helm render job, must be green, not only the branch-protection required ones.",
+      "matchManagers": [
+        "argocd"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "matchCurrentVersion": "!/^v?0\\./",
+      "automerge": true,
+      "platformAutomerge": false,
+      "labels": [
+        "helm-chart",
+        "auto-merge"
+      ]
+    },
+    {
+      "description": "Helm chart minor/major (and every 0.x bump): PR-only, one PR per chart. Check the upstream upgrade notes and the chart's supported Kubernetes range before merging.",
+      "matchManagers": [
+        "argocd"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "helm-chart"
+      ]
+    },
+    {
+      "description": "0.x Helm charts: any bump is potentially breaking, keep it PR-only.",
+      "matchManagers": [
+        "argocd"
+      ],
+      "matchCurrentVersion": "/^v?0\\./",
+      "automerge": false,
+      "labels": [
+        "helm-chart"
+      ]
+    },
+    {
       "description": "Stateful/critical services -- databases, Vault, Authelia, Garage, Vaultwarden, and apps whose upgrades need a manual data migration (Nextcloud, Paperless, Gitea) or whose breakage takes out backups/auth cluster-wide (Velero's own restic/kopia plugin). Immich used to be here but is NOT anymore: the store auto-updates the mobile app, so an older server silently breaks backup (2026-09-05 outage) -- immich minor+patch+digest auto-merge instead (own rule above); only immich major stays PR-only. ALL update types (patch/minor/major) stay PR-only, grouped into one PR per bump wave so they're one glance instead of scattered across the inbox. Listed last so it wins over the stateless auto-merge rule above for these specific packages. icereed/paperless-gpt was added after a version auto-merged and immediately CrashLoopBackOff'd -- its entrypoint isn't stable against this repo's readOnlyRootFilesystem hardening across versions, needs manual verification per bump.",
       "matchManagers": [
+        "argocd",
         "kubernetes"
       ],
       "matchPackageNames": [
@@ -167,7 +209,10 @@
         "paperlessngx/paperless-ngx",
         "gitea/gitea",
         "velero/velero-plugin-for-aws",
-        "icereed/paperless-gpt"
+        "icereed/paperless-gpt",
+        "vault",
+        "cloudnative-pg",
+        "velero"
       ],
       "groupName": "stateful/critical services",
       "labels": [
@@ -182,5 +227,10 @@
       "matchHost": "releases.hashicorp.com",
       "concurrentRequestLimit": 2
     }
-  ]
+  ],
+  "argocd": {
+    "managerFilePatterns": [
+      "/kubernetes/.+\\.ya?ml$/"
+    ]
+  }
 }
