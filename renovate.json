@@ -38,6 +38,13 @@
       "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
+      "description": "Most registries other than Docker Hub (GHCR, Quay, ...) expose no release timestamp, so with timestamp-required minimumReleaseAge those updates sat in 'pending' forever: headscale, immich-server, n8n, cloudflared, home-assistant, nextcloud, synapse and ~15 more never got a PR. Without a timestamp the soak is skipped; CI, the stateful PR-only group and PR-only majors still apply.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
+    {
       "description": "Stateless services + digest pins: patch/minor/digest/pin only, auto-merge after CI green + a 3-day soak so a bad upstream release doesn't land same-day. 'pin' covers first-time digest pinning (no prior digest to diff against), which otherwise sits stuck needing a manual merge forever -- same soak/CI gate applies. Rule order matters -- the stateful/critical rule below is listed last so it overrides this one for the specific packages it names. The kubernetes fileMatch covers .yaml as well as .yml: vaultwarden.yaml was invisible to Renovate and kept an unpinned vaultwarden/server image.",
       "matchManagers": [
         "kubernetes"

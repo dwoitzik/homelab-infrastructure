@@ -34,7 +34,7 @@ spec:
             value: "1"
       containers:
         - name: headscale
-          image: ghcr.io/juanfont/headscale:v0.29.2
+          image: ghcr.io/juanfont/headscale:v0.29.7@sha256:11f81665e842809db9fe3006a38c56a66e968baa5abd4bac498e86445572b970
           # SEC-012: needs to create /var/run/headscale (its unix socket dir)
           # at startup -- confirmed live, dropping all capabilities fails
           # with "creating directory failed with permission error".

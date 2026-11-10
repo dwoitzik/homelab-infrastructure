@@ -22,6 +22,7 @@ jobs:
   plan:
     if: |
       github.event.issue.pull_request != null &&
+      github.event.comment.author_association == 'OWNER' &&
       startsWith(github.event.comment.body, 'atlantis plan')
     runs-on: self-hosted
     steps:
@@ -46,6 +47,11 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.issue.number,
             });
+            // The self-hosted runner holds the infra credentials; never run fork code on it.
+            if (pr.data.head.repo === null || pr.data.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.setFailed('Refusing to run: PR head is not a branch of this repository.');
+              return;
+            }
             core.setOutput('sha', pr.data.head.sha);
 
       - name: Parse stack name from comment

@@ -59,6 +59,16 @@ spec:
           - matchType: "=~"
             name: alertname
             value: "ProxmoxHostHighTemp|RpiHighTemp"
+      # Drive wear only pages at the critical threshold, and once a day: it moves
+      # slowly, and the warning level is tracked in the weekly report instead.
+      - receiver: discord
+        groupWait: 30s
+        groupInterval: 15m
+        repeatInterval: 24h
+        matchers:
+          - matchType: "="
+            name: alertname
+            value: NVMeWearCritical
       - receiver: discord
         groupWait: 30s
         groupInterval: 15m
@@ -108,15 +118,6 @@ spec:
           - matchType: "=~"
             name: alertname
             value: "ProxmoxStorageCapacityHigh|ProxmoxStorageCapacityCritical"
-      # Drive wear moves slowly but means buying hardware: page once a day.
-      - receiver: discord
-        groupWait: 30s
-        groupInterval: 15m
-        repeatInterval: 24h
-        matchers:
-          - matchType: "=~"
-            name: alertname
-            value: "NVMeWearWarning"
   receivers:
     - name: "null"
     - name: discord
