@@ -38,7 +38,7 @@ spec:
       containers:
         - name: scanopy-server
           # Renovate tracks this tag going forward.
-          image: ghcr.io/scanopy/scanopy/server:v0.16.2
+          image: ghcr.io/scanopy/scanopy/server:v0.16.2@sha256:e3c55cd639b9643c01e21c1fcc5470c6524ea5c3ac316768bf028737c656bbe6
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -154,7 +154,7 @@ spec:
       containers:
         - name: scanopy-daemon
           # Renovate tracks this tag going forward.
-          image: ghcr.io/scanopy/scanopy/daemon:v0.16.2
+          image: ghcr.io/scanopy/scanopy/daemon:v0.16.2@sha256:98cdba02b2b127462cba87c10dacdc5671354e2dd43a124b72f8cfd2dfb4b911
           securityContext:
             allowPrivilegeEscalation: false
             # NOT readOnlyRootFilesystem -- the daemon writes its own log

@@ -110,7 +110,7 @@ spec:
             value: "1"
       containers:
       - name: searxng
-        image: searxng/searxng:2026.9.4-15b0c8ef3
+        image: searxng/searxng:2026.9.4-15b0c8ef3@sha256:8bb6a6f677a758cefa4ae2c9f5da1012876e428a4388e3e86f34be4ca715330a
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
