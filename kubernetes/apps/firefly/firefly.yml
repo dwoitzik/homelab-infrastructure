@@ -65,7 +65,7 @@ spec:
       # Not forcing it; same call as myspeed-collector.
       containers:
         - name: firefly-iii
-          image: fireflyiii/core:version-6.6.6
+          image: fireflyiii/core:version-6.6.6@sha256:ae69fdd95cdef9038cd7a460a5aec731f14813973e4f096511d5a4ea9ff0e972
           ports:
             - containerPort: 8080
           env:
@@ -161,7 +161,7 @@ spec:
                 value: "1"
           initContainers:
             - name: seed-storage
-              image: fireflyiii/core:version-6.6.6
+              image: fireflyiii/core:version-6.6.6@sha256:ae69fdd95cdef9038cd7a460a5aec731f14813973e4f096511d5a4ea9ff0e972
               command: ["sh", "-c", "cp -a /var/www/html/storage/. /writable-storage/ 2>/dev/null; cp -a /var/www/html/bootstrap/cache/. /writable-bootstrap-cache/ 2>/dev/null; true"]
               securityContext:
                 allowPrivilegeEscalation: false
@@ -175,7 +175,7 @@ spec:
                   mountPath: /writable-bootstrap-cache
           containers:
             - name: firefly-iii-cron
-              image: fireflyiii/core:version-6.6.6
+              image: fireflyiii/core:version-6.6.6@sha256:ae69fdd95cdef9038cd7a460a5aec731f14813973e4f096511d5a4ea9ff0e972
               command: ["php", "/var/www/html/artisan", "firefly-iii:cron"]
               securityContext:
                 allowPrivilegeEscalation: false
