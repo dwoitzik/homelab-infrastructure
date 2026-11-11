@@ -309,6 +309,23 @@ resource "routeros_ip_firewall_filter" "fwd_09c_mgmt_to_scanopy" {
   }
 }
 
+# Proxmox host -> rpi-srv-02 SSH: nightly Immich library snapshot (rsync, key
+# confined by rrsync on the Pi). Single host, single port.
+resource "routeros_ip_firewall_filter" "fwd_09e_pve_to_pi_backup" {
+  chain        = "forward"
+  action       = "accept"
+  src_address  = "10.0.10.10"
+  dst_address  = "10.0.20.3"
+  dst_port     = "22"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_10_srv_to_wan.id
+  comment      = "09e: MGMT (pve-mgmt-01) - Immich library snapshot to rpi-srv-02"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
 resource "routeros_ip_firewall_filter" "fwd_09d_dmz_to_scanopy" {
   chain        = "forward"
   action       = "accept"
