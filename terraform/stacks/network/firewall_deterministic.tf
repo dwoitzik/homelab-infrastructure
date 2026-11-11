@@ -297,7 +297,7 @@ resource "routeros_ip_firewall_filter" "fwd_09b_dmz_to_headscale" {
 resource "routeros_ip_firewall_filter" "fwd_09c_mgmt_to_scanopy" {
   chain        = "forward"
   action       = "accept"
-  src_address  = "10.0.10.111/32"
+  src_address  = "10.0.10.111"
   dst_address  = "10.0.20.202"
   dst_port     = "60072"
   protocol     = "tcp"
@@ -312,7 +312,7 @@ resource "routeros_ip_firewall_filter" "fwd_09c_mgmt_to_scanopy" {
 resource "routeros_ip_firewall_filter" "fwd_09d_dmz_to_scanopy" {
   chain        = "forward"
   action       = "accept"
-  src_address  = "10.0.30.2/32"
+  src_address  = "10.0.30.2"
   dst_address  = "10.0.20.202"
   dst_port     = "60072"
   protocol     = "tcp"
