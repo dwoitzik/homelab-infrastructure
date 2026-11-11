@@ -12,7 +12,7 @@ resource "routeros_queue_type" "cake_wan_up" {
 resource "routeros_queue_tree" "wan_up" {
   name      = "wan-up"
   parent    = "ether1"
-  max_limit = "68M"
+  max_limit = "68000000"
   queue     = routeros_queue_type.cake_wan_up.name
   comment   = "SQM: CAKE on WAN upload (bufferbloat)"
 }
