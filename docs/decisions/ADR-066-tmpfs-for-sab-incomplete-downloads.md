@@ -5,6 +5,9 @@
 Accepted and applied, 2026-10-19. Revised 2026-10-20 after a production
 incident (see "Revised sizing and the memory-cgroup rule" below).
 
+Superseded 2026-11-11 by [ADR-073](ADR-073-sab-incomplete-on-hdd-4k-without-remux.md):
+the 10 GB per-job ceiling conflicted with Radarr's 4K profile.
+
 ## Context
 
 SABnzbd (in `ct-srv-media-acq-01`) writes every download into an *incomplete*

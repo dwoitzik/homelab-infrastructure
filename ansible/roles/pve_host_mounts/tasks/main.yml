@@ -1,4 +1,10 @@
 ---
+- name: Ensure retired host mounts are unmounted and out of fstab
+  ansible.posix.mount:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ pve_host_mounts_absent }}"
+
 - name: Ensure host mounts are present in fstab and mounted
   ansible.posix.mount:
     path: "{{ item.path }}"
@@ -9,3 +15,24 @@
   loop: "{{ pve_host_mounts_list }}"
   loop_control:
     label: "{{ item.path }}"
+
+- name: Ensure container scratch datasets exist
+  community.general.zfs:
+    name: "{{ item.name }}"
+    state: present
+    extra_zfs_properties:
+      mountpoint: "{{ item.mountpoint }}"
+  loop: "{{ pve_host_mounts_datasets }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure container scratch datasets are writable by the container user
+  ansible.builtin.file:
+    path: "{{ item.mountpoint }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop: "{{ pve_host_mounts_datasets }}"
+  loop_control:
+    label: "{{ item.mountpoint }}"
