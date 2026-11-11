@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# Mirror the Immich library to a ZFS dataset, then snapshot it. rsync --delete
-# keeps the mirror exact; the snapshots keep deleted photos recoverable.
+# Snapshot the Immich library to the SSD on {{ immich_library_backup_target_inventory_host }}. Each run is a new
+# directory hard-linked against the previous one, so unchanged photos cost no space
+# and a deletion in Immich stays recoverable for the retention window.
 set -euo pipefail
 src="{{ immich_library_backup_source }}"
-dataset="{{ immich_library_backup_dataset }}"
-retention_days="{{ immich_library_backup_snapshot_retention_days }}"
-prom_dir="{{ immich_library_backup_textfile_dir }}"
-prom="$prom_dir/immich_library_backup.prom"
+state="{{ immich_library_backup_state_dir }}/last_snapshot"
+prom="{{ immich_library_backup_textfile_dir }}/immich_library_backup.prom"
+remote="{{ immich_library_backup_target_user }}@{{ immich_library_backup_target_address }}"
+ssh_cmd="ssh -i {{ immich_library_backup_key }} -o BatchMode=yes -o StrictHostKeyChecking=yes"
 
 write_metrics() {
   local ok="$1" bytes="${2:-0}"
   local tmp="$prom.$$"
   {
-    echo "# HELP immich_library_backup_success 1 if the last run copied and snapshotted the library."
+    echo "# HELP immich_library_backup_success 1 if the last run completed a snapshot."
     echo "# TYPE immich_library_backup_success gauge"
     echo "immich_library_backup_success $ok"
     echo "# HELP immich_library_backup_last_run_timestamp_seconds When the backup last ran."
@@ -33,24 +34,23 @@ write_metrics() {
 }
 trap 'write_metrics 0' ERR
 
-# An unmounted or empty source would make rsync --delete wipe the mirror.
+# An unmounted or empty source would produce an empty snapshot.
 if ! mountpoint -q "{{ immich_library_backup_source_mount }}" || [ -z "$(ls -A "$src" 2>/dev/null)" ]; then
-  echo "source $src is not mounted or empty, refusing to sync" >&2
+  echo "source $src is not mounted or empty, refusing to snapshot" >&2
   write_metrics 0
   exit 1
 fi
 
-dest="$(zfs get -H -o value mountpoint "$dataset")"
-[ "$(zfs get -H -o value mounted "$dataset")" = yes ] || { echo "$dataset is not mounted" >&2; write_metrics 0; exit 1; }
+snap="$(date +%Y%m%d-%H%M%S)"
+link_dest=()
+if [ -s "$state" ]; then
+  link_dest=(--link-dest="../$(cat "$state")")
+fi
 
-rsync -aHAX --delete --numeric-ids "$src"/ "$dest"/
+# rrsync on the target confines this key to the mirror root, so paths are relative.
+stats=$(rsync -rltH --delete --stats "${link_dest[@]}" -e "$ssh_cmd" "$src"/ "$remote:snapshots/$snap/")
+echo "$snap" > "$state"
 
-zfs snapshot "$dataset@auto-$(date +%Y%m%d-%H%M%S)"
-
-cutoff=$(date -d "-${retention_days} days" +%s)
-zfs list -H -p -t snapshot -o name,creation -s creation "$dataset" \
-  | awk -v c="$cutoff" '$1 ~ /@auto-/ && $2 < c {print $1}' \
-  | xargs -r -n1 zfs destroy
-
-write_metrics 1 "$(zfs get -H -p -o value used "$dataset")"
-echo "library mirrored to $dest and snapshotted"
+bytes=$(printf '%s\n' "$stats" | awk -F': ' '/^Total file size/ {gsub(/[^0-9]/, "", $2); print $2}')
+write_metrics 1 "${bytes:-0}"
+echo "snapshot $snap written to $remote"

@@ -187,8 +187,20 @@ spec:
             summary: "Immich library has not been copied to the archive pool for 36h+"
             description: >
               The photo library lives on a single USB stick; immich-library-backup.timer on
-              the Proxmox host is its only local copy. Check:
+              the Proxmox host snapshots it to rpi-srv-02's SSD and is its only copy. Check:
               systemctl status immich-library-backup.service; journalctl -u immich-library-backup.service
+        - alert: ImmichMirrorSSDFull
+          expr: |
+            1 - node_filesystem_avail_bytes{instance="10.0.20.3:9100", mountpoint="/mnt/ssd"}
+              / node_filesystem_size_bytes{instance="10.0.20.3:9100", mountpoint="/mnt/ssd"} > 0.9
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "rpi-srv-02's SSD holding the Immich snapshots is over 90% full"
+            description: >
+              The next snapshot may fail. Shorten the retention in the
+              immich_library_mirror_target role or replace the SSD with a larger one.
 
     - name: pbs-backup
       rules:
