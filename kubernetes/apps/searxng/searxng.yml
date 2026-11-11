@@ -63,6 +63,16 @@ data:
       # the JS-rendered google.com/search -- see ADR-060.
       - name: google cse
         disabled: false
+      # Brave's paid JSON Search API (not scraped, so not fingerprint-blocked). The
+      # key comes from Vault; the init container below renders it into this file.
+      - name: braveapi
+        engine: braveapi
+        api_key: "__BRAVE_API_KEY__"
+        shortcut: bra
+        disabled: false
+      # Vane (kubernetes/apps/vane) expects Wolfram Alpha for calculations.
+      - name: wolframalpha
+        disabled: false
       - name: wikipedia
         disabled: true
       - name: qwant
@@ -108,6 +118,38 @@ spec:
         options:
           - name: ndots
             value: "1"
+      initContainers:
+      - name: render-settings
+        image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+        command: ["sh", "-c", "sed \"s|__BRAVE_API_KEY__|${BRAVE_API_KEY}|\" /template/settings.yml > /rendered/settings.yml"]
+        env:
+        - name: BRAVE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: searxng-secrets
+              key: brave-api-key
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop: ["ALL"]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+        volumeMounts:
+        - name: config-template
+          mountPath: /template
+          readOnly: true
+        - name: config
+          mountPath: /rendered
       containers:
       - name: searxng
         image: searxng/searxng:2026.9.4-15b0c8ef3@sha256:8bb6a6f677a758cefa4ae2c9f5da1012876e428a4388e3e86f34be4ca715330a
@@ -153,9 +195,13 @@ spec:
             cpu: 1000m
             memory: 512Mi
       volumes:
-      - name: config
+      - name: config-template
         configMap:
           name: searxng-config
+      - name: config
+        emptyDir:
+          medium: Memory
+          sizeLimit: 1Mi
       - name: tmp
         emptyDir: {}
       - name: cache

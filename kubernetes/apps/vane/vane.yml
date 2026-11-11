@@ -1,0 +1,99 @@
+# Vane (formerly Perplexica): AI answers with cited sources, searching through the
+# in-cluster SearXNG. The answering model is Claude via the Anthropic API.
+# Settings and chat history live in a SQLite database, so the volume is local-path.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vane-data
+  namespace: apps
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vane
+  namespace: apps
+  labels:
+    app: vane
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vane
+  template:
+    metadata:
+      labels:
+        app: vane
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: vane
+          image: itzcrazykns1337/vane:slim-v1.12.2@sha256:d2878cf9c91962aa3fc053b59bc9b89adcbdcaeb7ee36b54906e853464b2c190
+          ports:
+            - containerPort: 3000
+          env:
+            - name: SEARXNG_API_URL
+              value: http://searxng.apps.svc.cluster.local:8080
+            - name: DATA_DIR
+              value: /home/vane
+          envFrom:
+            - secretRef:
+                name: vane-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /home/vane/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: vane-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vane
+  namespace: apps
+spec:
+  selector:
+    app: vane
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: vane-final
+  namespace: apps
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`ask.woitzik.dev`)
+      kind: Rule
+      middlewares: [{name: crowdsec-bouncer}, {name: authelia}]
+      services: [{name: vane, port: 3000}]
