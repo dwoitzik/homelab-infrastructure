@@ -20,15 +20,15 @@ queue_slots() {
     | python3 -c "import sys,json;print(json.load(sys.stdin).get('totalRecords',0))" 2>/dev/null
 }
 
-radarr_search_missing() {
-  local key="$1"
+radarr_search() {
+  local key="$1" kind="$2"
   [ -z "$key" ] && return 0
   [ "$(queue_slots 7878 "$key")" -ge 5 ] && return 0
   local payload ids titles
-  payload=$(python3 - "$key" <<'PY'
+  payload=$(python3 - "$key" "$kind" <<'PY'
 import sys, json, urllib.request
-key = sys.argv[1]
-req = urllib.request.Request("http://localhost:7878/api/v3/wanted/missing?pageSize=200&sortKey=airDateUtc",
+key, kind = sys.argv[1], sys.argv[2]
+req = urllib.request.Request("http://localhost:7878/api/v3/wanted/%s?pageSize=200&sortKey=airDateUtc" % kind,
     headers={"X-Api-Key": key})
 rec = json.load(urllib.request.urlopen(req)).get("records", [])[:15]
 ids = ",".join(str(m["id"]) for m in rec)
@@ -43,22 +43,22 @@ PY
   curl -s -X POST "http://localhost:7878/api/v3/command" -H "X-Api-Key: ${key}" \
     -H "Content-Type: application/json" \
     -d "{\"name\":\"MoviesSearch\",\"movieIds\":[${ids}]}" > /dev/null
-  notify "🔍 **media-acq**: Radarr-Suche für $titles"
+  [ "$kind" = missing ] && notify "🔍 **media-acq**: Radarr-Suche für $titles"
 }
 
-sonarr_search_missing() {
-  local key="$1"
+sonarr_search() {
+  local key="$1" kind="$2"
   [ -z "$key" ] && return 0
   [ "$(queue_slots 8989 "$key")" -ge 5 ] && return 0
   local payload ids titles
-  payload=$(python3 - "$key" <<'PY'
+  payload=$(python3 - "$key" "$kind" <<'PY'
 import sys, json, urllib.request
-key = sys.argv[1]
+key, kind = sys.argv[1], sys.argv[2]
 def get(path):
     return json.load(urllib.request.urlopen(urllib.request.Request(
         "http://localhost:8989/api/v3" + path, headers={"X-Api-Key": key})))
 series = {s["id"]: s["title"] for s in get("/series")}
-rec = get("/wanted/missing?pageSize=200&sortKey=airDateUtc").get("records", [])[:15]
+rec = get("/wanted/%s?pageSize=200&sortKey=airDateUtc" % kind).get("records", [])[:15]
 ids = ",".join(str(r["id"]) for r in rec)
 titles = "; ".join("%s S%02dE%02d" % (series.get(r["seriesId"], "?"),
     r["seasonNumber"], r["episodeNumber"]) for r in rec) if rec else ""
@@ -72,8 +72,37 @@ PY
   curl -s -X POST "http://localhost:8989/api/v3/command" -H "X-Api-Key: ${key}" \
     -H "Content-Type: application/json" \
     -d "{\"name\":\"EpisodeSearch\",\"episodeIds\":[${ids}]}" > /dev/null
-  notify "🔍 **media-acq**: Sonarr-Suche für $titles"
+  [ "$kind" = missing ] && notify "🔍 **media-acq**: Sonarr-Suche für $titles"
 }
 
-radarr_search_missing "$RADARR_KEY"
-sonarr_search_missing "$SONARR_KEY"
+# Movies whose file has no German audio get re-searched; Radarr otherwise only
+# upgrades from RSS, which older titles never show up in. Limited to language
+# (the quality cutoff is 2160p Remux) and skipped when the media pool runs low.
+radarr_search_german_upgrades() {
+  local key="$1"
+  [ -z "$key" ] && return 0
+  [ "$(queue_slots 7878 "$key")" -ge 5 ] && return 0
+  local free_gb
+  free_gb=$(df -BG --output=avail {{ media_acquisition_media_mount }} | tail -1 | tr -dc '0-9')
+  [ "${free_gb:-0}" -lt {{ media_acquisition_upgrade_min_free_gb }} ] && return 0
+  local ids
+  ids=$(python3 - "$key" <<'PY'
+import sys, json, urllib.request
+key = sys.argv[1]
+req = urllib.request.Request("http://localhost:7878/api/v3/movie", headers={"X-Api-Key": key})
+movies = json.load(urllib.request.urlopen(req))
+ids = [m["id"] for m in movies
+       if m.get("monitored") and m.get("hasFile")
+       and "German" not in [l["name"] for l in m.get("movieFile", {}).get("languages", [])]]
+print(",".join(str(i) for i in ids[:5]))
+PY
+)
+  [ -z "$ids" ] && return 0
+  curl -s -X POST "http://localhost:7878/api/v3/command" -H "X-Api-Key: ${key}" \
+    -H "Content-Type: application/json" \
+    -d "{\"name\":\"MoviesSearch\",\"movieIds\":[${ids}]}" > /dev/null
+}
+
+radarr_search "$RADARR_KEY" missing
+sonarr_search "$SONARR_KEY" missing
+radarr_search_german_upgrades "$RADARR_KEY"

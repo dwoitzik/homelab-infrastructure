@@ -79,12 +79,14 @@
   retries: 20
   delay: 5
   changed_when: false
+  check_mode: false
 
 - name: Read Sonarr API key from config.xml
   ansible.builtin.shell:
     cmd: "grep -oP '(?<=<ApiKey>)[^<]+' {{ media_acquisition_base_dir }}/sonarr/config/config.xml"
   register: media_acquisition_sonarr_apikey_xml
   changed_when: false
+  check_mode: false
 
 - name: Set Sonarr API key fact
   ansible.builtin.set_fact:
@@ -96,6 +98,7 @@
     headers:
       X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
   register: media_acquisition_sonarr_profiles
+  check_mode: false
 
 - name: Get Sonarr base quality profile for cloning
   ansible.builtin.uri:
@@ -104,6 +107,7 @@
       X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
   register: media_acquisition_sonarr_base_profile
   when: media_acquisition_sonarr_profiles.json | selectattr('name', 'equalto', 'HD-1080p-DE') | list | length == 0
+  check_mode: false
 
 - name: Create Sonarr HD-1080p-DE quality profile (German preferred, 1080p cutoff)
   ansible.builtin.uri:
@@ -128,12 +132,14 @@
     headers:
       X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
   register: media_acquisition_sonarr_download_clients
+  check_mode: false
 
 - name: Read SABnzbd API key from config ini
   ansible.builtin.shell:
     cmd: "grep -oP '(?<=^api_key = )\\S+' {{ media_acquisition_base_dir }}/sabnzbd/config/sabnzbd.ini"
   register: media_acquisition_sabnzbd_apikey_ini
   changed_when: false
+  check_mode: false
 
 - name: Set SABnzbd API key fact
   ansible.builtin.set_fact:
@@ -175,6 +181,7 @@
     headers:
       X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
   register: media_acquisition_sonarr_indexers
+  check_mode: false
 
 - name: Add NZBHydra2 as Sonarr indexer
   ansible.builtin.uri:
@@ -209,6 +216,7 @@
     headers:
       X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
   register: media_acquisition_sonarr_release_profiles
+  check_mode: false
 
 - name: Add Block Bonus Disc release profile to Sonarr
   ansible.builtin.uri:
@@ -240,12 +248,14 @@
   retries: 20
   delay: 5
   changed_when: false
+  check_mode: false
 
 - name: Read Radarr API key from config.xml
   ansible.builtin.shell:
     cmd: "grep -oP '(?<=<ApiKey>)[^<]+' {{ media_acquisition_base_dir }}/radarr/config/config.xml"
   register: media_acquisition_radarr_apikey_xml
   changed_when: false
+  check_mode: false
 
 - name: Set Radarr API key fact
   ansible.builtin.set_fact:
@@ -257,6 +267,7 @@
     headers:
       X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
   register: media_acquisition_radarr_profiles
+  check_mode: false
 
 - name: Get Radarr base quality profile for cloning
   ansible.builtin.uri:
@@ -264,9 +275,10 @@
     headers:
       X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
   register: media_acquisition_radarr_base_profile
-  when: media_acquisition_radarr_profiles.json | selectattr('name', 'equalto', '4K-HDR-DE') | list | length == 0
+  when: media_acquisition_radarr_profiles.json | selectattr('name', 'in', ['4K-HDR-DE', 'HD-1080p-DE']) | list | length == 0
+  check_mode: false
 
-- name: Create Radarr 4K-HDR-DE quality profile (German preferred, Remux-2160p cutoff)
+- name: Create Radarr HD-1080p-DE quality profile (German preferred, Bluray-1080p cutoff)
   ansible.builtin.uri:
     url: "http://localhost:7878/api/v3/qualityprofile"
     method: POST
@@ -277,11 +289,11 @@
     body: >-
       {{
         media_acquisition_radarr_base_profile.json
-        | combine({'name': '4K-HDR-DE', 'cutoff': 19, 'upgradeAllowed': true})
+        | combine({'name': 'HD-1080p-DE', 'cutoff': 7, 'upgradeAllowed': true})
         | dict2items | rejectattr('key', 'equalto', 'id') | items2dict
       }}
     status_code: 201
-  when: media_acquisition_radarr_profiles.json | selectattr('name', 'equalto', '4K-HDR-DE') | list | length == 0
+  when: media_acquisition_radarr_profiles.json | selectattr('name', 'in', ['4K-HDR-DE', 'HD-1080p-DE']) | list | length == 0
 
 - name: Get Radarr existing download clients
   ansible.builtin.uri:
@@ -289,6 +301,7 @@
     headers:
       X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
   register: media_acquisition_radarr_download_clients
+  check_mode: false
 
 - name: Add SABnzbd as Radarr download client
   ansible.builtin.uri:
@@ -326,6 +339,7 @@
     headers:
       X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
   register: media_acquisition_radarr_indexers
+  check_mode: false
 
 - name: Add NZBHydra2 as Radarr indexer
   ansible.builtin.uri:
@@ -359,6 +373,7 @@
     headers:
       X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
   register: media_acquisition_radarr_release_profiles
+  check_mode: false
 
 - name: Add Block Bonus Disc release profile to Radarr
   ansible.builtin.uri:
@@ -474,6 +489,32 @@
   when: media_acquisition_sab_categories_check.rc != 0
   notify: Start sabnzbd
 
+# SABnzbd pauses itself when a download disk fills up and by default never
+# resumes; the 10 GB tmpfs for incomplete jobs (ADR-066) makes that routine.
+- name: Ensure SABnzbd is running for API configuration
+  community.docker.docker_container:
+    name: sabnzbd
+    state: started
+
+- name: Read SABnzbd misc settings
+  ansible.builtin.uri:
+    url: "http://localhost:8080/api?mode=get_config&section=misc&output=json&apikey={{ media_acquisition_sabnzbd_api_key }}"
+    return_content: true
+  register: media_acquisition_sab_misc
+  retries: 6
+  delay: 5
+  until: media_acquisition_sab_misc.status == 200
+  check_mode: false
+  no_log: true
+
+- name: Let SABnzbd resume on its own after a full-disk pause
+  ansible.builtin.uri:
+    url: "http://localhost:8080/api?mode=set_config&section=misc&keyword=fulldisk_autoresume&value=1&output=json&apikey={{ media_acquisition_sabnzbd_api_key }}"
+  when: (media_acquisition_sab_misc.json.config.misc.fulldisk_autoresume | int) != 1
+  changed_when: true
+  no_log: true
+  check_mode: false
+
 - name: Flush handlers to start SABnzbd before Sonarr/Radarr client tests
   ansible.builtin.meta: flush_handlers
 
@@ -516,8 +557,8 @@
 # point at the old Kubernetes service DNS. Update them to use Docker
 # service names (sonarr, radarr) on the shared bridge network, and set
 # the correct quality profile IDs created above.
-# The 4K-HDR-DE profile is profile id=7 in Radarr; is4k=true routes
-# Ultra HD requests from Jellyseerr to this server.
+# Radarr's HD-1080p-DE profile is id 7 (it was 4K-HDR-DE before the switch
+# to 1080p, see the profile reconcile below).
 
 - name: Update Jellyseerr server configuration
   ansible.builtin.shell:
@@ -549,8 +590,8 @@
               continue
           r['hostname'] = 'radarr'
           r['activeProfileId'] = 7
-          r['activeProfileName'] = '4K-HDR-DE'
-          r['is4k'] = True
+          r['activeProfileName'] = 'HD-1080p-DE'
+          r['is4k'] = False
           r['isDefault'] = True
           r['enabled'] = True
           new_radarr.append(r)
@@ -630,6 +671,7 @@
     headers:
       X-Api-Key: "{{ media_acquisition_sonarr_api_key }}"
   register: media_acquisition_sonarr_custom_formats
+  check_mode: false
 
 - name: Add Block Raw Disc/ISO Releases custom format to Sonarr
   ansible.builtin.uri:
@@ -779,6 +821,7 @@
     headers:
       X-Api-Key: "{{ media_acquisition_radarr_api_key }}"
   register: media_acquisition_radarr_custom_formats
+  check_mode: false
 
 - name: Add Block Raw Disc/ISO Releases custom format to Radarr
   ansible.builtin.uri:
@@ -916,6 +959,58 @@
       "
   register: media_acquisition_radarr_block_format_scores
   changed_when: "'CHANGED' in media_acquisition_radarr_block_format_scores.stdout"
+
+# SABnzbd's incomplete directory is a 10 GB tmpfs (ADR-066), so no release may
+# be larger: 1080p WEB/Bluray only (no Remux, no 2160p) and at most 50 MB per
+# minute of runtime, which keeps a three-hour film under 9 GB.
+- name: Enforce Radarr HD-1080p-DE profile and 1080p size limits
+  ansible.builtin.shell:
+    cmd: |
+      python3 -c "
+      import json, urllib.request
+
+      api_key = '{{ media_acquisition_radarr_api_key }}'
+      base = 'http://localhost:7878/api/v3'
+
+      def req(method, path, body=None):
+          data = json.dumps(body).encode() if body is not None else None
+          r = urllib.request.Request(base + path, data=data, method=method,
+              headers={'X-Api-Key': api_key, 'Content-Type': 'application/json'})
+          with urllib.request.urlopen(r) as resp:
+              return json.loads(resp.read() or b'null')
+
+      allowed = {'WEB 1080p', 'Bluray-1080p'}
+      cutoff_quality = 7
+      max_mb_per_min = {{ media_acquisition_radarr_max_mb_per_minute }}
+      sized = {3, 15, 7, 9}
+      changed = False
+
+      for p in req('GET', '/qualityprofile'):
+          if p['name'] not in ('4K-HDR-DE', 'HD-1080p-DE'):
+              continue
+          before = json.dumps(p, sort_keys=True)
+          p['name'] = 'HD-1080p-DE'
+          p['cutoff'] = cutoff_quality
+          for it in p['items']:
+              name = it['quality']['name'] if it.get('quality') else it.get('name')
+              it['allowed'] = name in allowed
+          if json.dumps(p, sort_keys=True) != before:
+              req('PUT', f\"/qualityprofile/{p['id']}\", p)
+              changed = True
+
+      for d in req('GET', '/qualitydefinition'):
+          if d['quality']['id'] not in sized:
+              continue
+          before = (d.get('maxSize'), d.get('preferredSize'))
+          d['maxSize'] = max_mb_per_min
+          d['preferredSize'] = min(d.get('preferredSize') or max_mb_per_min - 10, max_mb_per_min - 10)
+          if (d['maxSize'], d['preferredSize']) != before:
+              req('PUT', f\"/qualitydefinition/{d['id']}\", d)
+              changed = True
+      print('CHANGED' if changed else 'OK')
+      "
+  register: media_acquisition_radarr_1080p_profile
+  changed_when: "'CHANGED' in media_acquisition_radarr_1080p_profile.stdout"
 
 # ── Queue watchdog (REL-032): auto-clear stuck import jams ────────
 # See templates/queue-watchdog.sh.j2 for the failure class this covers.
