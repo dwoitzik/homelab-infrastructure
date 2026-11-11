@@ -1,0 +1,32 @@
+---
+- name: Ensure rsync is installed
+  ansible.builtin.apt:
+    name: rsync
+    state: present
+
+- name: Deploy the Immich library backup script
+  ansible.builtin.template:
+    src: immich-library-backup.sh.j2
+    dest: /usr/local/sbin/immich-library-backup.sh
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Deploy the Immich library backup service
+  ansible.builtin.template:
+    src: immich-library-backup.service.j2
+    dest: /etc/systemd/system/immich-library-backup.service
+    mode: '0644'
+
+- name: Deploy the Immich library backup timer
+  ansible.builtin.template:
+    src: immich-library-backup.timer.j2
+    dest: /etc/systemd/system/immich-library-backup.timer
+    mode: '0644'
+
+- name: Enable the Immich library backup timer
+  ansible.builtin.systemd:
+    name: immich-library-backup.timer
+    daemon_reload: true
+    enabled: true
+    state: started

@@ -17,7 +17,7 @@ version: '3.8'
 
 services:
   wazuh.manager:
-    image: wazuh/wazuh-manager:4.14.9@sha256:dbb337727a6b6b17e24b1ccfe4c6e95fd983286ba0ccbf29d568144aa9527c6b
+    image: wazuh/wazuh-manager:4.14.10@sha256:dcda4869e2f792e92f03bce93f85b4bdf103756ea61cfca8ba9f3eabeb05365b
     container_name: wazuh.manager
     hostname: wazuh-manager
     restart: unless-stopped
@@ -54,7 +54,7 @@ services:
         condition: service_healthy
 
   wazuh.indexer:
-    image: wazuh/wazuh-indexer:4.14.9@sha256:615465315b560d974100ea55bbe67efa72afc6490ef563d4d1bef127df0e98f6
+    image: wazuh/wazuh-indexer:4.14.10@sha256:e56f85ed9e79f113c0f2d2a7965171cd8e063262ec88e110086acdb1f69f2240
     container_name: wazuh.indexer
     hostname: wazuh.indexer
     restart: unless-stopped
@@ -85,7 +85,7 @@ services:
       retries: 5
 
   wazuh.dashboard:
-    image: wazuh/wazuh-dashboard:4.14.9@sha256:e8e2340265feb6f61711d2ba460d04d2dea875ee46de26cd1832da2a3558a341
+    image: wazuh/wazuh-dashboard:4.14.10@sha256:0eebab19802342b841a258f56d6fa0fb085cdae08ab5eb2e45f9455c906d719a
     container_name: wazuh.dashboard
     hostname: wazuh-dashboard
     restart: unless-stopped

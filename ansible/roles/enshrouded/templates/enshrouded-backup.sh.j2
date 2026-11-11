@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Savegame snapshot, pruned after {{ enshrouded_backup_retain_days }} days; the
+# fast-restore path beside the nightly PBS -> R2 rootfs backup.
+set -euo pipefail
+
+install_dir="{{ enshrouded_install_dir }}"
+backup_dir="{{ enshrouded_backup_dir }}"
+retain_days="{{ enshrouded_backup_retain_days }}"
+stamp="$(date +%Y%m%d-%H%M%S)"
+dest="${backup_dir}/savegame-${stamp}"
+
+mkdir -p "${dest}"
+tar -C "${install_dir}" -czf "${dest}/savegame.tar.gz" savegame
+cp -f "${install_dir}/enshrouded_server.json" "${dest}/enshrouded_server.json"
+
+find "${backup_dir}" -maxdepth 1 -type d -name 'savegame-*' -mtime "+${retain_days}" -exec rm -rf {} +

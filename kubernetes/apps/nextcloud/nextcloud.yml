@@ -427,6 +427,13 @@ spec:
             readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
           volumeMounts:
             - name: php-conf
               mountPath: /writable-conf

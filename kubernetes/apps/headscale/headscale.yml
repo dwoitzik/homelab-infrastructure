@@ -34,7 +34,7 @@ spec:
             value: "1"
       containers:
         - name: headscale
-          image: ghcr.io/juanfont/headscale:v0.29.2
+          image: ghcr.io/juanfont/headscale:v0.29.7@sha256:11f81665e842809db9fe3006a38c56a66e968baa5abd4bac498e86445572b970
           # SEC-012: needs to create /var/run/headscale (its unix socket dir)
           # at startup -- confirmed live, dropping all capabilities fails
           # with "creating directory failed with permission error".
@@ -94,7 +94,7 @@ spec:
         # Deployment) because litestream needs to read the live WAL
         # directly, not a point-in-time copy.
         - name: litestream
-          image: litestream/litestream:0.5.17@sha256:dff47ab648faddd4b6385e9eeebc1649edd84fb020c576e8b9311cf1dc4a0155
+          image: litestream/litestream:0.5.18@sha256:0512488c5fbcd5a86cc65d367542b7eb869f2fc2699c67e11f4fcec7e899e830
           args:
             - replicate
             - -config

@@ -1,0 +1,21 @@
+{
+  "name": {{ enshrouded_server_name | to_json }},
+  "saveDirectory": "./savegame",
+  "logDirectory": "./logs",
+  "ip": "0.0.0.0",
+  "queryPort": {{ enshrouded_query_port }},
+  "slotCount": {{ enshrouded_slot_count }},
+  "gameSettingsPreset": {{ enshrouded_game_settings_preset | to_json }},
+  "userGroups": [
+    {
+      "name": "Default",
+      "password": {{ enshrouded_password | to_json }},
+      "canKickBan": false,
+      "canAccessInventories": true,
+      "canEditWorld": true,
+      "canEditBase": true,
+      "canExtendBase": true,
+      "reservedSlots": 0
+    }
+  ]
+}

@@ -264,6 +264,39 @@ resource "routeros_ip_firewall_filter" "fwd_heimnetz_to_dmz_minecraft" {
   }
 }
 
+# Enshrouded dedicated server: UDP game (15636) + query (15637) ports, same
+# LAN-to-DMZ pattern as Minecraft above. Remote players use the playit.gg
+# tunnel instead, this is the direct-LAN path.
+resource "routeros_ip_firewall_filter" "fwd_internal_to_dmz_enshrouded" {
+  action       = "accept"
+  chain        = "forward"
+  protocol     = "udp"
+  src_address  = "10.0.0.0/8"
+  dst_address  = "10.0.30.0/24"
+  dst_port     = "15636,15637"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "22: Internal - Enshrouded to DMZ (game LXC)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
+resource "routeros_ip_firewall_filter" "fwd_heimnetz_to_dmz_enshrouded" {
+  action       = "accept"
+  chain        = "forward"
+  protocol     = "udp"
+  src_address  = "192.168.178.0/24"
+  dst_address  = "10.0.30.0/24"
+  dst_port     = "15636,15637"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "23: Heimnetz - Enshrouded to DMZ"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
 resource "routeros_ipv6_firewall_filter" "v6_block_rogue_ra" {
   action        = "drop"
   chain         = "output"

@@ -10,13 +10,47 @@
     - /opt/adguardhome/work
     - /opt/adguardhome/conf
 
-- name: Deploy AdGuardHome configuration
+# AdGuard rewrites its config on every save (quoting, no comments), so a
+# plain template reports a change, and restarts DNS, on every run. Render to a
+# staging file and replace the live one only when the parsed content differs.
+- name: Render AdGuardHome configuration to a staging file
   ansible.builtin.template:
     src: AdGuardHome.yaml.j2
-    dest: /opt/adguardhome/conf/AdGuardHome.yaml
+    dest: /opt/adguardhome/conf/AdGuardHome.yaml.desired
     mode: '0600'
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
+
+- name: Compare desired and live AdGuardHome configuration
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - |
+        import sys, yaml
+        def load(p):
+            try:
+                with open(p) as f:
+                    return yaml.safe_load(f)
+            except FileNotFoundError:
+                return None
+        sys.exit(0 if load(sys.argv[1]) == load(sys.argv[2]) else 1)
+      - /opt/adguardhome/conf/AdGuardHome.yaml.desired
+      - /opt/adguardhome/conf/AdGuardHome.yaml
+  register: adguard_config_compare
+  changed_when: false
+  failed_when: adguard_config_compare.rc not in [0, 1]
+  check_mode: false
+
+- name: Deploy AdGuardHome configuration when its content changed
+  ansible.builtin.copy:
+    src: /opt/adguardhome/conf/AdGuardHome.yaml.desired
+    dest: /opt/adguardhome/conf/AdGuardHome.yaml
+    remote_src: true
+    mode: '0600'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  when: adguard_config_compare.rc == 1
   notify: Restart AdGuard Home
 
 - name: Deploy AdGuard Home Docker Compose file
@@ -25,7 +59,7 @@
     content: |
       services:
         adguardhome:
-          image: adguard/adguardhome
+          image: adguard/adguardhome:v0.107.79@sha256:aba9e3bf0613be3ba3755e1fc311b126e2c24bec25e18b6483894a88283074f0
           container_name: adguardhome
           restart: always
           network_mode: host
@@ -57,7 +91,7 @@
         content: |
           services:
             adguardhome-sync:
-              image: ghcr.io/bakito/adguardhome-sync
+              image: ghcr.io/bakito/adguardhome-sync:latest@sha256:4fec72b9c580c6711036ea42db645232d86384fde687365b0d0452d38d507280
               container_name: adguardhome-sync
               restart: unless-stopped
               mem_limit: 128m

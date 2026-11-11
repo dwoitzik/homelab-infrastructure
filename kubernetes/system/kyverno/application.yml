@@ -5,71 +5,70 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  source:
-    repoURL: https://kyverno.github.io/kyverno/
-    targetRevision: 3.5.3
-    chart: kyverno
-    helm:
-      values: |
-        # Fail-open: when Kyverno is unavailable the API server must not block
-        # requests. With failurePolicy:Fail every admission call waits up to 30s
-        # before timing out, driving p99 latency to 60s+ (REL-024 pattern).
-        features:
-          forceFailurePolicyIgnore:
-            enabled: true
-          # Off by default in the chart -- PolicyException objects are
-          # otherwise silently ignored by the admission controller. Scoped
-          # to apps only, not cluster-wide, on purpose.
-          policyExceptions:
-            enabled: true
-            namespace: apps
-        admissionController:
-          replicas: 1
-          tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 384Mi
-        # Background controller scans all existing resources and generates/updates
-        # policyreports in etcd — 357 reports in apps/monitoring alone, each an
-        # etcd write. On a single-node etcd this is a significant fraction of all
-        # write traffic. Disable: enforcement is handled by the admission webhook.
-        backgroundController:
-          enabled: false
-        cleanupController:
-          # 337 restarts/16d root-caused live (2026-07-10): --previous logs
-          # show the exact same leader-election lease-renewal timeout
-          # against the apiserver as cnpg-operator's REL-069 fix
-          # ("context deadline exceeded", "leadership lost, stopped
-          # leading", full shutdown) -- single-replica controller
-          # self-terminates on any apiserver latency blip. Kyverno's
-          # leader-election is custom (pkg/leaderelection), not
-          # controller-runtime's, so there's no direct lease-duration
-          # flag -- but LeaseDuration/RenewDeadline are computed as
-          # 6x/5x --leaderElectionRetryPeriod (default 2s -> 12s/10s).
-          # Scaling retryPeriod to 10s gives 60s/50s, matching the
-          # cnpg-operator fix's numbers exactly.
-          extraArgs:
-            leaderElectionRetryPeriod: 10s
-          tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
-          resources:
-            requests:
-              cpu: 25m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 128Mi
-        reportsController:
-          enabled: false
+  sources:
+    - repoURL: https://kyverno.github.io/kyverno/
+      targetRevision: 3.5.3
+      chart: kyverno
+      helm:
+        values: |
+          # Fail-open: when Kyverno is unavailable the API server must not block
+          # requests. With failurePolicy:Fail every admission call waits up to 30s
+          # before timing out, driving p99 latency to 60s+ (REL-024 pattern).
+          features:
+            forceFailurePolicyIgnore:
+              enabled: true
+            # Off by default in the chart -- PolicyException objects are
+            # otherwise silently ignored by the admission controller. Scoped
+            # to apps only, not cluster-wide, on purpose.
+            policyExceptions:
+              enabled: true
+              namespace: apps
+          admissionController:
+            replicas: 1
+            # Same lease tuning as the cleanup controller: 60s/50s instead of
+            # 12s/10s, and a renewal every 10s instead of every 2s.
+            container:
+              extraArgs:
+                leaderElectionRetryPeriod: 10s
+            tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 384Mi
+          # Policy reports are one datastore write per resource; enforcement happens at
+          # admission, and kyverno-policy-drift-check covers running pods instead.
+          backgroundController:
+            enabled: false
+          cleanupController:
+            # Leader-election lease is 6x/5x the retry period; 10s gives 60s/50s so an
+            # apiserver latency blip no longer makes the single replica exit.
+            extraArgs:
+              leaderElectionRetryPeriod: 10s
+            tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
+            resources:
+              requests:
+                cpu: 25m
+                memory: 32Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
+          reportsController:
+            enabled: false
+    # Policies live in Git like the controller, not applied by hand.
+    - repoURL: https://github.com/dwoitzik/homelab-infrastructure.git
+      targetRevision: main
+      path: kubernetes/system/kyverno
+      directory:
+        include: policies.yml
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno
@@ -80,3 +79,4 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true

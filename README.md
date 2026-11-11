@@ -134,7 +134,6 @@ browser session is looking at the dashboard.
 │   │   ├── homepage/          # Dashboard
 │   │   ├── immich/            # Photo library (Cloudflare Tunnel external access)
 │   │   ├── jellyfin/          # External-service pointer to the GPU-passthrough LXC
-│   │   ├── keel/               # Image auto-update
 │   │   ├── kube-bench/        # CIS Kubernetes benchmark, scheduled
 │   │   ├── linkding/          # Bookmark manager
 │   │   ├── lubelogger/        # Vehicle maintenance log
@@ -143,7 +142,6 @@ browser session is looking at the dashboard.
 │   │   ├── myspeed/           # Internet speed-test history
 │   │   ├── n8n/                # Workflow automation
 │   │   ├── nextcloud/         # Files · CalDAV · CardDAV
-│   │   ├── onlyoffice/        # Office document editing (Nextcloud integration)
 │   │   ├── open-webui/        # Local LLM interface (Ollama)
 │   │   ├── paperless/         # Document management + paperless-gpt
 │   │   ├── renovate/          # Dependency update bot
@@ -156,13 +154,12 @@ browser session is looking at the dashboard.
 │   │   # Two IngressRoute patterns coexist, not fully unified yet: older apps
 │   │   # route through the centralized kubernetes/system/apps-ingressroute.yml,
 │   │   # newer ones (beszel, excalidraw, firefly, freshrss, gotify, linkding,
-│   │   # lubelogger, matrix, myspeed, n8n, onlyoffice, searxng) declare their
+│   │   # lubelogger, matrix, myspeed, n8n, searxng) declare their
 │   │   # own IngressRoute inline in their own directory. Both work; picking one
 │   │   # convention and migrating the rest is open, tracked in docs/ROADMAP.md.
 │   └── system/                # Manually-applied system components
 │       ├── argocd/            # ArgoCD config (RBAC, OIDC)
 │       ├── cert-manager/      # TLS certificate automation (+ cert-manager-config/, certificates/)
-│       ├── chaos-mesh/        # Scheduled pod-kill / latency-injection experiments
 │       ├── cloudnative-pg/    # CNPG operator (Authelia Postgres)
 │       ├── external-secrets/  # External Secrets Operator
 │       ├── infrastructure/    # sysctl-fix DaemonSet, Cloudflare DDNS, misc cluster glue
@@ -246,10 +243,10 @@ the full external-reachability audit.
 | Matrix/Synapse + Element | matrix.woitzik.dev, element.woitzik.dev | Federation protocol / Authelia | LAN/VPN only |
 | MySpeed | speed.woitzik.dev | Authelia | LAN/VPN only |
 | n8n | n8n.woitzik.dev | Authelia | LAN/VPN only |
-| OnlyOffice | onlyoffice.woitzik.dev | Authelia | LAN/VPN only |
 | SearXNG | search.woitzik.dev | Authelia | LAN/VPN only |
 | Excalidraw | draw.woitzik.dev | Authelia | LAN/VPN only |
 | Minecraft | mc.woitzik.dev | Server-side auth | **Public** — via a playit.gg relay tunnel, not the Cloudflare allowlist above (raw TCP, can't route through Cloudflare's CDN); the DMZ LXC it runs on has no cluster credentials and no path to any other VLAN |
+| Enshrouded | (playit.gg tunnel) | Server-side password | **Public** — UDP game server on the same DMZ LXC as Minecraft, reached the same way (playit.gg relay, never the WAN port). LAN clients go direct over UDP 15636/15637. See ADR-065 |
 
 ## VLAN Layout
 

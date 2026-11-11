@@ -46,6 +46,17 @@ spec:
           annotations:
             summary: "cert-manager certificate {{ $labels.name }} is not Ready"
             description: "Certificate {{ $labels.name }} in {{ $labels.exported_namespace }} has been in a non-Ready state for 30m+ -- renewal is failing, not just approaching expiry."
+        # A stuck renewal keeps the old cert Ready until it expires, so alert on
+        # the renewal time itself instead of waiting for the 7-day expiry warning.
+        - alert: CertManagerRenewalOverdue
+          expr: |
+            time() - certmanager_certificate_renewal_timestamp_seconds > 86400
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "cert-manager certificate {{ $labels.name }} is overdue for renewal"
+            description: "Certificate {{ $labels.name }} in {{ $labels.exported_namespace }} passed its renewal time over 24h ago and is still on the old certificate. Check: kubectl get challenges,orders -n {{ $labels.exported_namespace }}"
         # Early-warning companion: catches the case where the Ready status
         # itself is stale/missing but the cert is genuinely close to expiry.
         - alert: CertManagerCertExpirySoon

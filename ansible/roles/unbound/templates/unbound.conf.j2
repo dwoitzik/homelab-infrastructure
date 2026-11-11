@@ -35,7 +35,7 @@ server:
     msg-cache-size: 128m
     rrset-cache-size: 256m
     key-cache-size: 32m
-    cache-min-ttl: 300
+    cache-min-ttl: 60
     cache-max-ttl: 86400
     cache-max-negative-ttl: 300
 
@@ -68,6 +68,11 @@ server:
 
     # Root hints
     root-hints: "/etc/unbound/root.hints"
+    # This file replaces the image's config, which is where the trust anchor was
+    # set; without it every answer is treated as insecure and nothing validates.
+    auto-trust-anchor-file: "/var/unbound/root.key"
+    # .box is a signed TLD, so the unsigned FRITZ!Box zone would turn bogus.
+    domain-insecure: "fritz.box"
 
     # DNS query-volume investigation (2026-07-07): 7d query volume grew ~45x
     # (40k -> 1.8M) post-K3s migration. Two distinct root causes found, both

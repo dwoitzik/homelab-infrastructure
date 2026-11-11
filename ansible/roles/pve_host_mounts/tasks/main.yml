@@ -1,0 +1,11 @@
+---
+- name: Ensure host mounts are present in fstab and mounted
+  ansible.posix.mount:
+    path: "{{ item.path }}"
+    src: "{{ item.src }}"
+    fstype: "{{ item.fstype }}"
+    opts: "{{ item.opts }}"
+    state: mounted
+  loop: "{{ pve_host_mounts_list }}"
+  loop_control:
+    label: "{{ item.path }}"

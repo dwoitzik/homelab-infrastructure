@@ -112,13 +112,26 @@
     - '^ionice:\s*\d+\s*$'
   when: pve_power_vzdump_throttle_block_present.rc != 0
 
-- name: Ensure vzdump throttle block is set (bwlimit + ionice)
+# A dataset of its own: suspend-mode vzdump rsyncs with -A, and the archive
+# pool itself has POSIX ACLs off, so staging there fails with
+# "set_acl: Operation not supported".
+- name: Ensure the vzdump staging dataset exists with POSIX ACLs
+  community.general.zfs:
+    name: "{{ pve_power_vzdump_tmpdir_dataset }}"
+    state: present
+    extra_zfs_properties:
+      mountpoint: "{{ pve_power_vzdump_tmpdir }}"
+      acltype: posixacl
+      xattr: sa
+
+- name: Ensure vzdump throttle block is set (bwlimit + ionice + tmpdir)
   ansible.builtin.blockinfile:
     path: /etc/vzdump.conf
     marker: "# {mark} ANSIBLE MANAGED THROTTLE (pve_power role, ADR-023)"
     block: |
       bwlimit: {{ pve_power_vzdump_bwlimit_kbps }}
       ionice: {{ pve_power_vzdump_ionice }}
+      tmpdir: {{ pve_power_vzdump_tmpdir }}
 
 - name: Raise LVM thin-pool autoextend threshold
   ansible.builtin.lineinfile:

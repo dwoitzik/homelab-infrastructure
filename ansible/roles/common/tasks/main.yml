@@ -37,7 +37,28 @@
     content: |
       APT::Periodic::Update-Package-Lists "1";
       APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
     mode: '0644'
+  # The periodic settings above are booleans, not intervals. AutocleanInterval
+  # is in days and is the only one that reads as a number.
+
+- name: Let unattended-upgrades cover the third-party repositories
+  ansible.builtin.blockinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    marker: "# {mark} ANSIBLE MANAGED ORIGINS"
+    block: |
+      Unattended-Upgrade::Origins-Pattern {
+          "origin=Debian,codename=${distro_codename},label=Debian";
+          "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+          "origin=Debian,codename=${distro_codename}-updates,label=Debian";
+          "origin=Raspberry Pi Foundation,codename=${distro_codename},label=Raspberry Pi Foundation,c=main";
+          "origin=Docker,label=Docker CE,c=stable";
+          "origin=Tailscale,codename=bookworm,label=Tailscale,c=main";
+      };
+  # The stock pattern only lists Debian, so packages from the other
+  # repositories never became candidates. It is replaced rather than
+  # extended: one stock entry names a nonexistent label.
+
 
 - name: Set inotify limits for k3s/container workloads
   ansible.posix.sysctl:

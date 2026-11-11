@@ -10,6 +10,10 @@
     name: net.ipv4.ip_nonlocal_bind
     value: '1'
     sysctl_set: true
+    # Without a file the setting only lives in the running kernel and is gone
+    # after a reboot, so HAProxy then fails to bind the VIP on the standby
+    # node and the service stays down until the next run of this role.
+    sysctl_file: /etc/sysctl.d/99-haproxy-nonlocal-bind.conf
     state: present
     reload: true
 

@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly Immich library copy to the archive pool
+
+[Timer]
+OnCalendar={{ immich_library_backup_schedule }}
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

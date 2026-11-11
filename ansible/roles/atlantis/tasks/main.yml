@@ -1,27 +1,43 @@
 ---
-# Atlantis image runs as uid=100(atlantis) gid=1000(atlantis), not root --
-# bind-mounted files/dirs must be readable (and /data writable) by that uid,
-# confirmed live 2026-07-04 (container crash-looped on "permission denied"
-# reading repos.yaml until ownership was set here).
+# The runner's plan/apply jobs read the env file as the runner user, so the
+# directory and file are group-owned by the runner's group.
+- name: Ensure the runner group exists
+  ansible.builtin.group:
+    name: "{{ atlantis_runner_group }}"
+    system: true
+
 - name: Ensure base directories exist
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ item.path }}"
     state: directory
-    owner: "100"
-    group: "1000"
+    owner: root
+    group: "{{ item.group }}"
     mode: '0750'
   loop:
-    - "{{ atlantis_base_dir }}"
-    - "{{ atlantis_base_dir }}/data"
-    - "{{ atlantis_base_dir }}/build"
+    - { path: "{{ atlantis_base_dir }}", group: "{{ atlantis_runner_group }}" }
+    - { path: "{{ atlantis_base_dir }}/build", group: root }
 
-- name: Deploy Atlantis repo config
-  ansible.builtin.template:
-    src: repos.yaml.j2
-    dest: "{{ atlantis_base_dir }}/repos.yaml"
-    owner: "100"
-    group: "1000"
-    mode: '0640'
+# ADR-021 replaced the Atlantis server with comment-triggered GitHub Actions
+# workflows; only its image survives, as the runner's terraform toolbox.
+- name: Check for the retired Atlantis server stack
+  ansible.builtin.stat:
+    path: "{{ atlantis_base_dir }}/docker-compose.yml"
+  register: atlantis_server_compose
+
+- name: Stop and remove the retired Atlantis server
+  community.docker.docker_compose_v2:
+    project_src: "{{ atlantis_base_dir }}"
+    state: absent
+  when: atlantis_server_compose.stat.exists
+
+- name: Remove the retired Atlantis server's config and working data
+  ansible.builtin.file:
+    path: "{{ atlantis_base_dir }}/{{ item }}"
+    state: absent
+  loop:
+    - docker-compose.yml
+    - repos.yaml
+    - data
 
 # SEC-007: custom image adds Proxmox's self-signed cluster CA to the trust
 # store so terraform/stacks/proxmox can run with insecure = false instead of
@@ -39,7 +55,7 @@
 - name: Build custom Atlantis image with trusted Proxmox CA
   community.docker.docker_image:
     name: atlantis-custom
-    tag: "{{ atlantis_image.split(':')[-1] }}"
+    tag: "{{ atlantis_image_tag }}"
     source: build
     force_source: true
     build:
@@ -47,17 +63,6 @@
       args:
         BASE_IMAGE: "{{ atlantis_image }}"
       pull: true
-
-- name: Deploy Atlantis docker-compose configuration
-  ansible.builtin.template:
-    src: docker-compose.yml.j2
-    dest: "{{ atlantis_base_dir }}/docker-compose.yml"
-    mode: '0640'
-
-- name: Ensure Atlantis stack is running
-  community.docker.docker_compose_v2:
-    project_src: "{{ atlantis_base_dir }}"
-    state: present
 
 # ADR-021: the GitHub Actions runner's terraform steps need the same
 # provider credentials the Atlantis container already gets via its own
@@ -71,5 +76,5 @@
     src: terraform-runner.env.j2
     dest: "{{ atlantis_base_dir }}/terraform-runner.env"
     owner: root
-    group: root
-    mode: '0600'
+    group: "{{ atlantis_runner_group }}"
+    mode: '0640'

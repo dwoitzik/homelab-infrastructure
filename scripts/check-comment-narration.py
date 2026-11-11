@@ -34,6 +34,9 @@ MAX_COMMENT_BLOCK = 3
 
 def is_comment_line(text: str) -> bool:
     stripped = text.strip()
+    # A YAML document separator starts with the SQL "--" marker but is not a comment.
+    if stripped == "---":
+        return False
     return any(stripped.startswith(m) for m in COMMENT_MARKERS)
 
 

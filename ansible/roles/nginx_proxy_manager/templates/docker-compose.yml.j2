@@ -1,7 +1,7 @@
 ---
 services:
   npm:
-    image: 'jc21/nginx-proxy-manager:latest'
+    image: 'jc21/nginx-proxy-manager:latest@sha256:52b2c59994f3d36acfcf70a1626f29734df0ed8c71bacc0269f78b6f939858bb'
     container_name: npm
     restart: unless-stopped
     network_mode: "{{ npm_network_mode | default('bridge') }}"
@@ -26,7 +26,10 @@ services:
 
 {% if npm_enable_crowdsec | default(false) | bool %}
   crowdsec:
-    image: crowdsecurity/crowdsec:latest
+    # v1.8.1, matching the crowdsec DaemonSet in the cluster. The stack had
+    # drifted to v1.7.8, which predates the v1.8.0 fixes for two unbounded
+    # request-body reads in the acquisition datasources.
+    image: crowdsecurity/crowdsec:v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a
     container_name: crowdsec
     restart: unless-stopped
     environment:
@@ -53,7 +56,7 @@ services:
 
 {% if npm_enable_scanopy_daemon | default(false) | bool %}
   scanopy-daemon:
-    image: ghcr.io/scanopy/scanopy/daemon:v0.16.2
+    image: ghcr.io/scanopy/scanopy/daemon:v0.16.2@sha256:98cdba02b2b127462cba87c10dacdc5671354e2dd43a124b72f8cfd2dfb4b911
     container_name: scanopy-daemon
     restart: unless-stopped
     # host networking: ARP discovery needs the real NIC on 10.0.30.0/24, a

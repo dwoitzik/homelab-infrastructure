@@ -4,6 +4,15 @@
     name: keepalived
     state: present
 
+- name: Deploy the DNS health check that moves the VIP
+  ansible.builtin.template:
+    src: check_dns.sh.j2
+    dest: /etc/keepalived/check_dns.sh
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart Keepalived
+
 - name: Deploy Keepalived configuration from template
   ansible.builtin.template:
     src: keepalived.conf.j2

@@ -66,3 +66,6 @@ docs/STATUS.md
 docs/secrets-inventory.md
 docs/runbooks/pending-major-upgrades.md
 .kube/
+
+# Working notes with evidence for open security findings. Never published.
+docs/private/

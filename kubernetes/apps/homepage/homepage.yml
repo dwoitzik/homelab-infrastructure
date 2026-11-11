@@ -91,10 +91,6 @@ data:
             widget:
               type: traefik
               url: http://traefik-api.kube-system.svc.cluster.local:9000
-        - Atlantis:
-            icon: https://avatars.githubusercontent.com/u/32311288?s=200
-            href: https://atlantis.woitzik.dev
-            description: Terraform GitOps · Proxmox & Network
     - Security:
         - Authelia:
             icon: authelia.png
@@ -513,7 +509,7 @@ spec:
             value: "1"
       initContainers:
       - name: copy-next
-        image: ghcr.io/gethomepage/homepage:v1.13.2
+        image: ghcr.io/gethomepage/homepage:v1.13.2@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
         command: ["sh", "-c", "cp -a /app/.next/. /next-init/"]
         securityContext:
           allowPrivilegeEscalation: false
@@ -522,12 +518,19 @@ spec:
             type: RuntimeDefault
           capabilities:
             drop: ["ALL"]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
         volumeMounts:
         - name: next-dir
           mountPath: /next-init
       containers:
       - name: homepage
-        image: ghcr.io/gethomepage/homepage:v1.13.2
+        image: ghcr.io/gethomepage/homepage:v1.13.2@sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true

@@ -1,0 +1,14 @@
+[Unit]
+Description=Enshrouded dedicated server update check every 15 minutes
+
+[Timer]
+# Steam can flip the public branch at any time; clients refuse a mismatched
+# server, so the gap between a release and the server update must stay short.
+OnCalendar=*:02/15
+RandomizedDelaySec=60
+# Catch up after a reboot that was off at the scheduled minute.
+Persistent=true
+Unit=enshrouded-autoupdate.service
+
+[Install]
+WantedBy=timers.target

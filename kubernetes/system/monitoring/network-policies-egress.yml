@@ -17,9 +17,8 @@
 # and every policy in this file is Egress-only, so that footgun doesn't
 # apply here; ingress for these namespaces is untouched.
 #
-# database, external-secrets, nfs-provisioner, and trivy-system still need
-# the same apiserver-ipBlock + real-traffic-check pass this file establishes
-# the pattern for -- not done this round, no new reasoning to add.
+# database, nfs-provisioner, and trivy-system still need the same
+# apiserver-ipBlock + real-traffic-check pass.
 #
 # 2026-08-23: apps closed too, after the real per-workload pass the earlier
 # note above said it needed. Checked every one of its ~38 workloads'
@@ -48,7 +47,7 @@
 #   to redis-authelia's pod IP) and fixed before calling this done, not
 #   left as a silent regression.
 #
-# Everything else (freshrss, linkding, mealie, n8n, renovate, keel, searxng,
+# Everything else (freshrss, linkding, mealie, n8n, renovate, searxng,
 # home-assistant, homepage, and more) genuinely does need broad, many-host
 # external HTTP(S) egress by design -- that's not a gap in the traffic map,
 # it's what these apps actually are (an RSS reader has to reach arbitrary
@@ -279,6 +278,18 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+    # DNS-01 propagation checks query the --dns01-recursive-nameservers set in
+    # cert-manager/application.yml directly; keep both lists in sync.
+    - to:
+        - ipBlock:
+            cidr: 1.1.1.1/32
+        - ipBlock:
+            cidr: 8.8.8.8/32
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
 ---
 # cnpg-system: checked live, no ScheduledBackup CRs exist at all (this
 # cluster's Postgres backup path is entirely Velero+Kopia PVC snapshots,
@@ -600,3 +611,71 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+---
+# external-secrets only needs the apiserver and the in-cluster Vault. Vault is
+# matched by namespace: kube-router evaluates egress after the Service DNAT, so
+# an ipBlock would have to name vault-0's pod IP.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-apiserver
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.11/32
+      ports:
+        - protocol: TCP
+          port: 6443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-vault
+  namespace: external-secrets
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: vault
+      ports:
+        - protocol: TCP
+          port: 8200

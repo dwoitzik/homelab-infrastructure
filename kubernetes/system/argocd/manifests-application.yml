@@ -40,7 +40,7 @@ spec:
       # Included after the diff its own header demanded: every field is
       # identical to live, so selfHeal has nothing to revert. Renamed .yaml ->
       # .yml because a brace glob ending in .yml cannot match it.
-      include: '{ingressroute,external-secret,argocd-notifications-cm,notifications-external-secret,network-policies,system-app-bootstrap,apps-applicationset}.yml'
+      include: '{ingressroute,external-secret,argocd-cm,argocd-cmd-params-cm,argocd-rbac-cm,argocd-notifications-cm,notifications-external-secret,network-policies,system-app-bootstrap,apps-applicationset}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

@@ -44,21 +44,34 @@ spec:
   # auto-injected namespace matcher, an unrestricted top-level receiver here
   # would catch and Discord-notify EVERY alert cluster-wide, not just the two
   # cases below. The two real routes are children with their own matchers.
+  # groupInterval stays at 15m on every route: Alertmanager garbage-collects
+  # resolved alerts well before a 4h group flush, so longer intervals silently
+  # drop every RESOLVED message. repeatInterval controls how often firing repeats.
   route:
     receiver: "null"
     groupBy: [alertname, namespace]
     routes:
       - receiver: discord
         groupWait: 30s
-        groupInterval: 4h
+        groupInterval: 15m
         repeatInterval: 4h
         matchers:
           - matchType: "=~"
             name: alertname
             value: "ProxmoxHostHighTemp|RpiHighTemp"
+      # Drive wear only pages at the critical threshold, and once a day: it moves
+      # slowly, and the warning level is tracked in the weekly report instead.
       - receiver: discord
         groupWait: 30s
-        groupInterval: 4h
+        groupInterval: 15m
+        repeatInterval: 24h
+        matchers:
+          - matchType: "="
+            name: alertname
+            value: NVMeWearCritical
+      - receiver: discord
+        groupWait: 30s
+        groupInterval: 15m
         repeatInterval: 4h
         matchers:
           - matchType: "="
@@ -83,7 +96,7 @@ spec:
       # the cluster at the time -- just not pushed.
       - receiver: discord
         groupWait: 30s
-        groupInterval: 4h
+        groupInterval: 15m
         repeatInterval: 4h
         matchers:
           - matchType: "=~"
@@ -99,7 +112,7 @@ spec:
       # earlier warning threshold pages too, not just the later critical one.
       - receiver: discord
         groupWait: 30s
-        groupInterval: 4h
+        groupInterval: 15m
         repeatInterval: 4h
         matchers:
           - matchType: "=~"
