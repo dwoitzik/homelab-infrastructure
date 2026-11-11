@@ -137,16 +137,12 @@ resource "routeros_ip_firewall_filter" "fwd_00b_antispoofing" {
   }
 }
 
-# FastTrack bypasses every queue on RouterOS 7, interface queue trees included,
-# so internet traffic stays on the slow path where the WAN CAKE queue shapes it.
 resource "routeros_ip_firewall_filter" "fwd_00_fasttrack" {
   action           = "fasttrack-connection"
   chain            = "forward"
   connection_state = "established,related"
-  in_interface     = "!ether1"
-  out_interface    = "!ether1"
   place_before     = routeros_ip_firewall_filter.fwd_01_established.id
-  comment          = "00: Fasttrack inter-VLAN traffic only (WAN is shaped)"
+  comment          = "00: Global - Fasttrack for CPU efficiency"
 
   lifecycle {
     ignore_changes = [place_before]
