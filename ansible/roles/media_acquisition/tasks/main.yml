@@ -278,7 +278,7 @@
   when: media_acquisition_radarr_profiles.json | selectattr('name', 'in', ['4K-HDR-DE', 'HD-1080p-DE']) | list | length == 0
   check_mode: false
 
-- name: Create Radarr HD-1080p-DE quality profile (German preferred, Bluray-1080p cutoff)
+- name: Create Radarr 4K-HDR-DE quality profile (German preferred, no Remux)
   ansible.builtin.uri:
     url: "http://localhost:7878/api/v3/qualityprofile"
     method: POST
@@ -289,7 +289,7 @@
     body: >-
       {{
         media_acquisition_radarr_base_profile.json
-        | combine({'name': 'HD-1080p-DE', 'cutoff': 7, 'upgradeAllowed': true})
+        | combine({'name': '4K-HDR-DE', 'cutoff': 1003, 'upgradeAllowed': true})
         | dict2items | rejectattr('key', 'equalto', 'id') | items2dict
       }}
     status_code: 201
@@ -557,8 +557,8 @@
 # point at the old Kubernetes service DNS. Update them to use Docker
 # service names (sonarr, radarr) on the shared bridge network, and set
 # the correct quality profile IDs created above.
-# Radarr's HD-1080p-DE profile is id 7 (it was 4K-HDR-DE before the switch
-# to 1080p, see the profile reconcile below).
+# Radarr's 4K-HDR-DE profile is id 7; one server for all requests, so not
+# marked as a separate 4K server.
 
 - name: Update Jellyseerr server configuration
   ansible.builtin.shell:
@@ -590,7 +590,7 @@
               continue
           r['hostname'] = 'radarr'
           r['activeProfileId'] = 7
-          r['activeProfileName'] = 'HD-1080p-DE'
+          r['activeProfileName'] = '4K-HDR-DE'
           r['is4k'] = False
           r['isDefault'] = True
           r['enabled'] = True
@@ -960,10 +960,10 @@
   register: media_acquisition_radarr_block_format_scores
   changed_when: "'CHANGED' in media_acquisition_radarr_block_format_scores.stdout"
 
-# SABnzbd's incomplete directory is a 10 GB tmpfs (ADR-066), so no release may
-# be larger: 1080p WEB/Bluray only (no Remux, no 2160p) and at most 50 MB per
-# minute of runtime, which keeps a three-hour film under 9 GB.
-- name: Enforce Radarr HD-1080p-DE profile and 1080p size limits
+# 4K HDR encodes, never Remux (ADR-073): Remux adds 3-4x the size for no visible
+# gain here. Size caps keep a 2h 2160p film near 26 GB and 1080p near 6 GB;
+# imports stop when /media drops below the free-space floor.
+- name: Enforce Radarr 4K-HDR-DE profile, size limits and import free-space floor
   ansible.builtin.shell:
     cmd: |
       python3 -c "
@@ -979,18 +979,20 @@
           with urllib.request.urlopen(r) as resp:
               return json.loads(resp.read() or b'null')
 
-      allowed = {'WEB 1080p', 'Bluray-1080p'}
-      cutoff_quality = 7
-      max_mb_per_min = {{ media_acquisition_radarr_max_mb_per_minute }}
-      sized = {3, 15, 7, 9}
+      allowed = {'WEB 2160p', 'Bluray-2160p', 'WEB 1080p', 'Bluray-1080p'}
+      cutoff_group = 1003
+      uhd = {{ media_acquisition_radarr_max_mb_per_minute_2160p }}
+      hd = {{ media_acquisition_radarr_max_mb_per_minute }}
+      caps = {18: uhd, 17: uhd, 19: uhd, 3: hd, 15: hd, 7: hd, 9: hd}
+      min_free_mb = {{ media_acquisition_radarr_min_free_gb }} * 1024
       changed = False
 
       for p in req('GET', '/qualityprofile'):
           if p['name'] not in ('4K-HDR-DE', 'HD-1080p-DE'):
               continue
           before = json.dumps(p, sort_keys=True)
-          p['name'] = 'HD-1080p-DE'
-          p['cutoff'] = cutoff_quality
+          p['name'] = '4K-HDR-DE'
+          p['cutoff'] = cutoff_group
           for it in p['items']:
               name = it['quality']['name'] if it.get('quality') else it.get('name')
               it['allowed'] = name in allowed
@@ -999,18 +1001,25 @@
               changed = True
 
       for d in req('GET', '/qualitydefinition'):
-          if d['quality']['id'] not in sized:
+          cap = caps.get(d['quality']['id'])
+          if cap is None:
               continue
           before = (d.get('maxSize'), d.get('preferredSize'))
-          d['maxSize'] = max_mb_per_min
-          d['preferredSize'] = min(d.get('preferredSize') or max_mb_per_min - 10, max_mb_per_min - 10)
+          d['maxSize'] = cap
+          d['preferredSize'] = cap - 10
           if (d['maxSize'], d['preferredSize']) != before:
               req('PUT', f\"/qualitydefinition/{d['id']}\", d)
               changed = True
+
+      mm = req('GET', '/config/mediamanagement')
+      if mm.get('minimumFreeSpaceWhenImporting') != min_free_mb:
+          mm['minimumFreeSpaceWhenImporting'] = min_free_mb
+          req('PUT', f\"/config/mediamanagement/{mm['id']}\", mm)
+          changed = True
       print('CHANGED' if changed else 'OK')
       "
-  register: media_acquisition_radarr_1080p_profile
-  changed_when: "'CHANGED' in media_acquisition_radarr_1080p_profile.stdout"
+  register: media_acquisition_radarr_4k_profile
+  changed_when: "'CHANGED' in media_acquisition_radarr_4k_profile.stdout"
 
 # ── Queue watchdog (REL-032): auto-clear stuck import jams ────────
 # See templates/queue-watchdog.sh.j2 for the failure class this covers.

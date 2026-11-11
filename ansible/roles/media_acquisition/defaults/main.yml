@@ -31,5 +31,7 @@ media_acquisition_discord_webhook_url: "{{ vault_media_acquisition_discord_webho
 # German-audio upgrade search (missing-search.sh) only runs with this much free space.
 media_acquisition_media_mount: /media
 media_acquisition_upgrade_min_free_gb: 150
-# Upper size limit for 1080p releases in Radarr (MB per minute of runtime).
+# Radarr release size caps (MB per minute of runtime) and import free-space floor.
 media_acquisition_radarr_max_mb_per_minute: 50
+media_acquisition_radarr_max_mb_per_minute_2160p: 220
+media_acquisition_radarr_min_free_gb: 100
