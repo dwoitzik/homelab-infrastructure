@@ -107,18 +107,6 @@ resource "routeros_ip_firewall_filter" "in_01a_icmp" {
   }
 }
 
-resource "routeros_ip_firewall_filter" "in_02a_srv_monitoring" {
-  action       = "accept"
-  chain        = "input"
-  src_address  = "10.0.20.0/24"
-  place_before = routeros_ip_firewall_filter.drop_all_input.id
-  comment      = "IN-02a: Allow SRV (Monitoring) to Router"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
-}
-
 resource "routeros_ip_firewall_filter" "in_02_mgmt" {
   action           = "accept"
   chain            = "input"

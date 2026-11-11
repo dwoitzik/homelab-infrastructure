@@ -19,18 +19,6 @@ removed {
 # carried zero traffic, so they were deleted outright instead.
 # ===============================================
 
-resource "routeros_ip_firewall_filter" "in_03_admin_router_api" {
-  action           = "accept"
-  chain            = "input"
-  src_address_list = "Mgmt_Devices"
-  place_before     = routeros_ip_firewall_filter.drop_all_input.id
-  comment          = "IN-03: Allow Admin-VLAN access to Router-API"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
-}
-
 resource "routeros_ip_firewall_filter" "in_06_snmp" {
   action       = "accept"
   chain        = "input"

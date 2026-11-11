@@ -55,11 +55,6 @@ resource "routeros_ip_service" "api_ssl" {
 # See firewall_extra.tf for the resource definitions and full context.
 
 import {
-  to = routeros_ip_firewall_filter.in_03_admin_router_api
-  id = "*50"
-}
-
-import {
   to = routeros_ip_firewall_filter.in_06_snmp
   id = "*51"
 }
@@ -376,10 +371,6 @@ import {
   id = "*A4"
 }
 import {
-  to = routeros_ip_firewall_filter.in_02a_srv_monitoring
-  id = "*74"
-}
-import {
   to = routeros_ip_firewall_filter.in_02_mgmt
   id = "*81"
 }
@@ -534,10 +525,6 @@ import {
   id = "*2"
 }
 
-import {
-  to = routeros_queue_simple.wan_egress_sqm
-  id = "*1"
-}
 
 import {
   to = routeros_ip_firewall_filter.fwd_k3s_nfs_media
