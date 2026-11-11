@@ -51,11 +51,12 @@ skipped by accident.
 | [063](ADR-063-renovate-digest-minimum-release-age.md) | Renovate digest/pin updates bypass minimumReleaseAge at branch stage | Accepted, applied |
 | [064](ADR-064-jellyfin-public-exposure.md) | Jellyfin is promoted to the public allowlist via the Cloudflare Tunnel | Accepted (apply pending) |
 | [065](ADR-065-enshrouded-dedicated-server.md) | Enshrouded dedicated server on the DMZ game LXC (Wine) | Accepted, applied |
-| [066](ADR-066-tmpfs-for-sab-incomplete-downloads.md) | SABnzbd incomplete downloads on a host tmpfs | Accepted, applied |
+| [066](ADR-066-tmpfs-for-sab-incomplete-downloads.md) | SABnzbd incomplete downloads on a host tmpfs | Superseded by 073 |
 | [069](ADR-069-enshrouded-1-0-linux-depot-removed.md) | Enshrouded 1.0 removed the Linux depot; Windows depot, Steamworks client path, buildid-checked updates every 15 minutes | Accepted, applied |
 | [070](ADR-070-paperless-beat-schedule-off-nfs.md) | The paperless beat schedule database moves off NFS via a symlink into a node-local volume | Accepted, applied |
 | [071](ADR-071-ansible-role-images-digest-pinned.md) | Every container image in the Ansible roles is pinned to a digest | Accepted, applied |
 | [072](ADR-072-unattended-upgrades-third-party-origins.md) | unattended-upgrades covers the third-party repositories (Raspberry Pi, Docker, Tailscale) | Accepted, applied |
+| [073](ADR-073-sab-incomplete-on-hdd-4k-without-remux.md) | SABnzbd scratch back on the archive HDD; 4K HDR releases without Remux | Accepted, applied |
 
 ## In review, not yet in this table
 
