@@ -31,3 +31,8 @@ spec:
       # investigation, since prior checks confirmed pod health but never the
       # actual external route.
       crowdsecLapiKeyFile: /etc/traefik/crowdsec/crowdsec-bouncer-key
+      # Requests through the Cloudflare tunnel arrive from the cloudflared pod;
+      # the real client is in Cf-Connecting-Ip, trusted only from the pod CIDR.
+      forwardedHeadersCustomName: Cf-Connecting-Ip
+      forwardedHeadersTrustedIPs:
+        - 10.42.0.0/16

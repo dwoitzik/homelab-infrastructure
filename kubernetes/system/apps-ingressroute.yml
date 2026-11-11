@@ -69,7 +69,7 @@ spec:
     # API-token auth, not Authelia's browser redirect), so this is the only
     # brute-force/abuse mitigation on login and upload. See
     # apps/immich/middleware.yml for the limit rationale.
-    middlewares: [{name: immich-ratelimit}]
+    middlewares: [{name: crowdsec-bouncer}, {name: immich-ratelimit}]
     services: [{name: immich-server, port: 2283}]
 ---
 # Vaultwarden — direct access, no Authelia in front (2026-08-08).
@@ -358,7 +358,7 @@ spec:
   routes:
   - match: Host(`media.woitzik.dev`)
     kind: Rule
-    middlewares: [{name: jellyfin-ratelimit}]
+    middlewares: [{name: crowdsec-bouncer}, {name: jellyfin-ratelimit}]
     services: [{name: jellyfin, port: 8096}]
 # SABnzbd, Sonarr, Radarr, Bazarr — IngressRoutes consolidated into
 # kubernetes/apps/jellyfin/usenet.yml alongside their External service definitions.
