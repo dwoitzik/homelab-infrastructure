@@ -15,6 +15,14 @@ import {
   id = "1f15ed0f3a8b497302ba339dcab3c060/0a20f0e459e5fb34169ff5d4dda9e8c2"
 }
 
+# media DNS record + tunnel ingress were applied out-of-band during the GitHub
+# Actions outage, so the next gated apply must adopt the existing record instead
+# of colliding on Cloudflare's "record already exists" error. Remove after it lands.
+import {
+  to = cloudflare_dns_record.tunnel_media
+  id = "1f15ed0f3a8b497302ba339dcab3c060/25eda7b5425151e8dc08e5e074010c2e"
+}
+
 # Same story: the _minecraft._tcp.mc SRV was created via the dashboard and
 # never tracked, so the resource above needs an import rather than a create.
 import {
