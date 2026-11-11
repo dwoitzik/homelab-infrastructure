@@ -1,18 +1,21 @@
 ---
-# Atlantis image runs as uid=100(atlantis) gid=1000(atlantis), not root --
-# bind-mounted files/dirs must be readable (and /data writable) by that uid,
-# confirmed live 2026-07-04 (container crash-looped on "permission denied"
-# reading repos.yaml until ownership was set here).
+# The runner's plan/apply jobs read the env file as the runner user, so the
+# directory and file are group-owned by the runner's group.
+- name: Ensure the runner group exists
+  ansible.builtin.group:
+    name: "{{ atlantis_runner_group }}"
+    system: true
+
 - name: Ensure base directories exist
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ item.path }}"
     state: directory
-    owner: "100"
-    group: "1000"
+    owner: root
+    group: "{{ item.group }}"
     mode: '0750'
   loop:
-    - "{{ atlantis_base_dir }}"
-    - "{{ atlantis_base_dir }}/build"
+    - { path: "{{ atlantis_base_dir }}", group: "{{ atlantis_runner_group }}" }
+    - { path: "{{ atlantis_base_dir }}/build", group: root }
 
 # ADR-021 replaced the Atlantis server with comment-triggered GitHub Actions
 # workflows; only its image survives, as the runner's terraform toolbox.
@@ -73,5 +76,5 @@
     src: terraform-runner.env.j2
     dest: "{{ atlantis_base_dir }}/terraform-runner.env"
     owner: root
-    group: root
-    mode: '0600'
+    group: "{{ atlantis_runner_group }}"
+    mode: '0640'
