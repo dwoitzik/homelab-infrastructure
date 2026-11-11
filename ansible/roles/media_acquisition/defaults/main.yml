@@ -27,3 +27,11 @@ media_acquisition_eweka_password: "{{ vault_eweka_password }}"
 # every grab behind it. Runs via cron, see tasks/main.yml.
 media_acquisition_watchdog_stuck_threshold_min: 30
 media_acquisition_discord_webhook_url: "{{ vault_media_acquisition_discord_webhook_url }}"
+
+# German-audio upgrade search (missing-search.sh) only runs with this much free space.
+media_acquisition_media_mount: /media
+media_acquisition_upgrade_min_free_gb: 150
+# Radarr release size caps (MB per minute of runtime) and import free-space floor.
+media_acquisition_radarr_max_mb_per_minute: 50
+media_acquisition_radarr_max_mb_per_minute_2160p: 220
+media_acquisition_radarr_min_free_gb: 100
