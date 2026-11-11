@@ -14,7 +14,7 @@
     content: |
       services:
         minecraft-new:
-          image: itzg/minecraft-server:latest@sha256:2fe790e54fc0138ab9f011b38473c11161984b911d32ebfd6877f7411f736937
+          image: itzg/minecraft-server:latest@sha256:d3415f085e10f522969d3a580247ff23b4ccd8d5b152ca08280fb13395dd15bc
           container_name: mc-server-4
           environment:
             EULA: "TRUE"
