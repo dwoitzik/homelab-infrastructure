@@ -58,13 +58,11 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
     ingress = [
       {
         hostname = "photos.woitzik.dev"
-        # Family access to the Immich photo library -- explicitly named by
-        # the operator as one of the hostnames that should be publicly
-        # reachable (ADR-033). Routed directly to the Immich Service,
-        # not through Traefik -- Immich has no external auth in front of it
-        # (mobile app needs API-token auth, not Authelia's browser redirect).
-        service = "http://immich-server.apps.svc.cluster.local:2283"
+        # Public by design (ADR-033). Through Traefik so the CrowdSec bouncer
+        # and rate limit on immich-final apply; no Authelia (mobile app).
+        service = "https://traefik.kube-system.svc.cluster.local:443"
         origin_request = {
+          origin_server_name     = "photos.woitzik.dev"
           no_tls_verify          = false
           connect_timeout        = 10
           tcp_keep_alive         = 30
@@ -93,15 +91,15 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
           http_host_header       = "analytics.woitzik.dev"
         }
       },
-      # media.woitzik.dev -- Jellyfin. Own login gates access (native clients
-      # can't complete Authelia's redirect); points straight at the LXC's LAN
-      # IP, not Traefik -- same raw-IP shape as the analytics rule below.
+      # media.woitzik.dev -- Jellyfin, own login (native clients can't do the
+      # Authelia redirect). Through Traefik for the bouncer and rate limit.
       {
         hostname = "media.woitzik.dev"
-        service  = "http://10.0.20.254:8096"
+        service  = "https://traefik.kube-system.svc.cluster.local:443"
         origin_request = {
-          no_tls_verify    = false
-          http_host_header = "media.woitzik.dev"
+          origin_server_name = "media.woitzik.dev"
+          no_tls_verify      = false
+          http_host_header   = "media.woitzik.dev"
         }
       },
       # headscale.woitzik.dev: removed from this tunnel's ingress 2026-08-28.
