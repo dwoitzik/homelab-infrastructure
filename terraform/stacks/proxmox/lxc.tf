@@ -19,6 +19,9 @@ locals {
 # start_on_boot: bpg/proxmox does not read it back into state, so Terraform
 # cannot enforce it. A recreated container needs it set again.
 resource "proxmox_virtual_environment_container" "ct_mgmt_scanopy_01" {
+  # ADR-035 mgmt-VLAN daemon, not built yet: its address and firewall path to
+  # the scanopy server are still open, so it stays off until that exists.
+  count        = var.enable_scanopy_mgmt_daemon ? 1 : 0
   vm_id        = 111
   node_name    = local.target_node
   tags         = ["network", "management"]
