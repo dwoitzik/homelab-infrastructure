@@ -31,7 +31,7 @@ ADR-033 allowlist.
 
 ## SLOs and alert routing
 
-- `slo-rules.yml` / `slo-dashboard.yml` — 99.9% availability + p95≤2s latency
+- `slo-rules.yml` / `slo-dashboard.yml` — 99.9% availability (blackbox `probe_success`)
   PrometheusRules and the paired Grafana error-budget dashboard. These were deployed
   once but never actually evaluated for a while — a missing `release:
   kube-prometheus-stack` label meant Prometheus's `ruleSelector` never matched them
