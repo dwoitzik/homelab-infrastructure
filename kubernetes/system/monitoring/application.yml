@@ -11,9 +11,11 @@ spec:
     chart: kube-prometheus-stack
     helm:
       values: |
+        # The chart reads the top-level crds.enabled; a crds block under
+        # prometheusOperator is ignored.
+        crds:
+          enabled: true
         prometheusOperator:
-          crds:
-            enabled: true
           # ADR-036: soft preference off vm-srv-k3s-11, which had
           # accumulated most of this cluster's stateful/heavy workload with
           # nothing steering new placements elsewhere.
