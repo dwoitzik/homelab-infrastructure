@@ -12,13 +12,20 @@ infrastructure, not just an app.
   that survives independently of the k3s cluster's own lifecycle. A full k3s rebuild
   does not touch this data at all; there is nothing to "restore" here under normal
   circumstances.
-- **`garage-meta` (LMDB metadata, small): a regular `local-path` PVC.** This *does* need
-  restoring after a cluster rebuild — it's node-local and gets wiped along with
-  everything else on that node's disk.
+- **Metadata (LMDB, ~1.5 GB): a `hostPath` on a dedicated 8G disk of `vm-srv-k3s-11`**
+  (`/mnt/garage-meta-dedicated`, ADR-024). This *does* need restoring after a node
+  rebuild, and it lives on the host NVMe like every other VM disk.
+- **Metadata snapshots: `meta-snapshots/` on the `garage-data` volume.** Garage copies
+  the LMDB file there every 6h (`metadata_auto_snapshot_interval`) and keeps the two
+  newest. Keeping them on the archive HDD means a lost NVMe or VM disk still leaves a
+  snapshot at most 6h old, and the ~2 GB/day of snapshot writes stay off the NVMe.
 
 ## How to restore
 
-Only `garage-meta` needs it. Copy the preserved metadata DB onto the PVC, restart. Sanity
+Only the metadata needs it. Stop Garage, copy the newest snapshot file
+`meta-snapshots/<timestamp>/db.lmdb` to `/mnt/garage-meta-dedicated/db.lmdb/data.mdb`
+(remove the stale `lock.mdb` next to it), start Garage again. Objects written after
+that snapshot lose their metadata. Sanity
 check by standing up a temporary Garage instance bind-mounted read-only against the
 restored `garage-meta` + the live (untouched) `garage-data` and confirming
 `garage bucket list` shows the expected buckets with plausible object counts — a
