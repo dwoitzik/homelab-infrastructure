@@ -9,7 +9,7 @@ common_packages:
   - htop
   - net-tools
   - bridge-utils
-  - dnsutils
+  - bind9-dnsutils  # dnsutils is only a virtual name on trixie and always reports a change
   - gnupg
   - ca-certificates
 

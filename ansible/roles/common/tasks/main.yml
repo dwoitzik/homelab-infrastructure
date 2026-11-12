@@ -10,17 +10,18 @@
     line: "127.0.1.1 {{ inventory_hostname }}"
     state: present
 
-- name: Perform system update (apt-get update & upgrade)
+- name: Refresh the apt cache
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
+  # A cache refresh changes no configuration; reporting it would make every
+  # run look like drift once the cache is an hour old.
+  changed_when: false
 
 - name: Install base packages
   ansible.builtin.apt:
     name: "{{ common_packages }}"
     state: present
-    update_cache: true
-    cache_valid_time: 3600
 
 - name: Set timezone to Europe/Berlin
   community.general.timezone:
@@ -72,11 +73,6 @@
       value: "512"
     - name: fs.inotify.max_user_watches
       value: "1048576"
-  # Unprivileged LXC containers can't write to host-namespaced sysctl keys —
-  # the setting has to come from the Proxmox host/LXC config instead. The
-  # kernel reports that as "permission denied" or "read-only file system".
-  register: common_inotify_sysctl_result
-  failed_when:
-    - common_inotify_sysctl_result is failed
-    - "'permission denied' not in (common_inotify_sysctl_result.msg | default('') | lower)"
-    - "'read-only file system' not in (common_inotify_sysctl_result.msg | default('') | lower)"
+  # LXC guests inherit these from the Proxmox host and cannot set them; the
+  # host's values are higher anyway. A privileged guest would lower the host's.
+  when: not (ansible_virtualization_type == 'lxc' and ansible_virtualization_role == 'guest')

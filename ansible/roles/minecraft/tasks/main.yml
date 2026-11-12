@@ -13,13 +13,12 @@
     dest: /opt/minecraft/docker-compose.yml
     content: |
       services:
-        minecraft-new:
+        minecraft-4:
           image: itzg/minecraft-server:latest@sha256:2fe790e54fc0138ab9f011b38473c11161984b911d32ebfd6877f7411f736937
           container_name: mc-server-4
           environment:
             EULA: "TRUE"
             TYPE: "PAPER"
-            PAPER_CHANNEL: "default"
             INIT_MEMORY: "2G"
             MAX_MEMORY: "4G"
             VERSION: "LATEST"

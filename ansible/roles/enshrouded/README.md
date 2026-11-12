@@ -32,6 +32,10 @@ via a `systemd` unit. See `docs/decisions/ADR-065-enshrouded-dedicated-server.md
   is a no-op, so the server is never bounced for nothing.
 - ufw allow for UDP 15636/15637 when ufw is active.
 
+The role downloads the server only when `enshrouded_server.exe` is missing.
+Re-running it leaves the installed build alone; build updates are
+the timer's job.
+
 ## Deploy
 
 ```sh
