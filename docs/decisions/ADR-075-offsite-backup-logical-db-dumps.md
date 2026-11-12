@@ -66,7 +66,7 @@ Vault token with snapshot rights in the backup path, which is a separate change.
 
 ## Expected size
 
-Per backup about 1.9 GiB raw: 1.78 GiB of remaining volumes plus about 100 MB of dumps
+Per backup about 1.9 GiB raw (measured: 1.85 GiB): 1.78 GiB of remaining volumes plus about 100 MB of dumps
 (immich 97 MB, the rest under 1 MB each). Most of that is nextcloud data and html, which
 deduplicates between days. The daily new content is roughly vault (0.18 GiB), the immich
 dump (about 0.1 GiB, compressed, so it does not deduplicate) and small app changes, about
