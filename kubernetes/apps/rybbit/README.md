@@ -32,8 +32,8 @@ Authelia route and fails closed: add it to the tracker route's match.
 
 ## Egress
 
-`allow-egress-cloudflared-rybbit` (cloudflared -> LXC:80) and
-`allow-egress-nextcloud-authelia` live in
+Public traffic reaches the LXC through Traefik (ADR-074), so cloudflared has
+no direct egress rule to it. `allow-egress-nextcloud-authelia` lives in
 `kubernetes/apps/network-policies-egress.yml`, a loose file tracked by the
 `apps-loose-manifests` Application, not the per-directory ApplicationSet --
 apply it manually (`kubectl apply -f`) if a change here doesn't seem to take

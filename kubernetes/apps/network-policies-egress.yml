@@ -288,34 +288,8 @@ spec:
         - protocol: TCP
           port: 22
 ---
-# cloudflared's analytics.woitzik.dev ingress (terraform/stacks/cloudflare)
-# points straight at ct-srv-rybbit-01's raw LAN IP, not an in-cluster
-# Service -- same class of gap as allow-egress-cloudflared-tunnel's second
-# rule above (that one only covers Traefik specifically), confirmed live:
-# 404 on the tunnel path until this existed, no error in cloudflared's own
-# logs since NetworkPolicy drops are silent.
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-egress-cloudflared-rybbit
-  namespace: apps
-spec:
-  podSelector:
-    matchLabels:
-      app: cloudflared
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - ipBlock:
-            cidr: 10.0.20.205/32
-      ports:
-        - protocol: TCP
-          port: 80
----
 # Jellyfin runs on the GPU-passthrough LXC (10.0.20.254), not an in-cluster
-# pod -- same raw-LAN-IP gap as the rybbit rule above, so cloudflared's
-# default-deny egress needs an explicit allow on Jellyfin's port.
+# pod, so cloudflared's default-deny egress needs an explicit allow on Jellyfin's port.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
