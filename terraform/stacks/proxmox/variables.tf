@@ -14,3 +14,9 @@ variable "proxmox_api_token_secret" {
   description = "Proxmox API token secret UUID"
   sensitive   = true
 }
+
+variable "enable_scanopy_mgmt_daemon" {
+  description = "Create ct-mgmt-scanopy-01, the scanopy discovery daemon on the management VLAN (ADR-035)."
+  type        = bool
+  default     = false
+}
