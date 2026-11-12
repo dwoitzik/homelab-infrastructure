@@ -62,6 +62,37 @@ resource "routeros_ip_firewall_filter" "fwd_wan_headscale_dmz" {
   }
 }
 
+# Tailscale WireGuard: lets peers behind a hard (mobile carrier) NAT reach the
+# subnet router directly instead of via DERP (ADR-076). Needs the manual FritzBox
+# forward UDP 41641 -> 192.168.178.10; the pod is pinned to .11 by its PVC.
+
+resource "routeros_ip_firewall_nat" "dstnat_tailscale_wireguard" {
+  chain        = "dstnat"
+  action       = "dst-nat"
+  in_interface = "ether1"
+  dst_address  = "192.168.178.10"
+  protocol     = "udp"
+  dst_port     = "41641"
+  to_addresses = "10.0.20.11"
+  to_ports     = "41641"
+  comment      = "Tailscale WireGuard -> tailscale-subnet-router (hostNetwork on vm-srv-k3s-11), ADR-076"
+}
+
+resource "routeros_ip_firewall_filter" "fwd_wan_tailscale_wireguard" {
+  chain        = "forward"
+  action       = "accept"
+  in_interface = "ether1"
+  dst_address  = "10.0.20.11"
+  dst_port     = "41641"
+  protocol     = "udp"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "WAN -> Tailscale WireGuard on vm-srv-k3s-11, matches dstnat_tailscale_wireguard"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
 ###############################################################################
 # Outbound NAT (GIT-009) — these two srcnat rules existed live but were never
 # declared in Terraform at all; basic internet access for the whole homelab
