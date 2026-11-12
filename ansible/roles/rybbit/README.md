@@ -30,6 +30,26 @@ The role writes `/opt/rybbit/{Caddyfile,docker-compose.yml}`, brings the stack
 up with `docker compose`, and installs `rybbit-healthcheck.sh` (cron, every 5
 minutes).
 
+## Updates
+
+Every image in `templates/docker-compose.yml.j2` is digest-pinned (ADR-071)
+and Renovate reads the template (`renovate.json`, docker-compose manager).
+Patch, minor and digest bumps arrive as one `renovate/rybbit-stack` PR labelled
+`rybbit`, never auto-merged; majors get their own PR. ClickHouse is held on
+upstream's 26.3 LTS line. Nothing converges on the LXC, so after merging:
+
+1. PBS snapshot or `pct snapshot 205 pre-update` on the Proxmox host.
+2. Run the role (see Deploy); `docker compose ps` all healthy.
+3. Load woitzik.dev and check the page view lands, and that the browser
+   console shows no blocked request to analytics.woitzik.dev (a new tracker
+   path needs adding to `rybbit-final`, ADR-074).
+
+A Postgres major needs a dump and restore (`pg_dumpall -U rybbit`), not just
+a new tag.
+
+The template must stay valid YAML for Renovate to parse it: quote any value
+that starts with `{{`.
+
 ## Monitoring
 
 - `node-exporter-rybbit` scrape job (10.0.20.205:9100, from the
