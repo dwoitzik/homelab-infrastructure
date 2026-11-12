@@ -73,8 +73,10 @@
     - name: fs.inotify.max_user_watches
       value: "1048576"
   # Unprivileged LXC containers can't write to host-namespaced sysctl keys —
-  # the setting has to come from the Proxmox host/LXC config instead.
+  # the setting has to come from the Proxmox host/LXC config instead. The
+  # kernel reports that as "permission denied" or "read-only file system".
   register: common_inotify_sysctl_result
   failed_when:
     - common_inotify_sysctl_result is failed
-    - "'permission denied' not in common_inotify_sysctl_result.msg | default('')"
+    - "'permission denied' not in (common_inotify_sysctl_result.msg | default('') | lower)"
+    - "'read-only file system' not in (common_inotify_sysctl_result.msg | default('') | lower)"
