@@ -272,3 +272,27 @@ already lives behind, not "the internet" or "every VLAN." Still
 unapplied, still needs the operator's own review of that exposure before
 it's treated as load-bearing -- that part of the original Status line
 stands.
+
+## Status update: the LoadBalancer Service never let the standby in
+
+The Service shipped with the default `externalTrafficPolicy: Cluster`.
+In that mode kube-proxy masquerades external traffic to a LoadBalancer
+IP, so the primary pod saw a node address as the source, not
+`10.0.20.3`. Both the NetworkPolicy `ipBlock` and the `pg_hba` rule key
+on that source IP, so every connection from `rpi-srv-02` was rejected:
+a TCP connect to the Service's LoadBalancer IP on 5432 from `rpi-srv-02` returned
+`Connection refused`, and the REJECT counter in kube-router's pod
+firewall chain for `postgres-authelia-1` went up by exactly one packet
+per attempt. MetalLB was announcing the IP from `vm-srv-k3s-13` while
+the primary ran on `vm-srv-k3s-11`.
+
+Fix: `externalTrafficPolicy: Local`. The client IP is preserved, and
+MetalLB's L2 mode only announces the IP from a node that has a ready
+endpoint, which is the primary's node. After a CNPG switchover the
+`instanceRole: primary` selector moves the endpoint and MetalLB moves
+the announcement with it.
+
+Still open: the `postgres_authelia_standby` role has never been run
+against `rpi-srv-02` (no `postgresql` unit, no
+`/mnt/ssd/postgres-authelia-standby`), so there is no standby replicating
+yet. The Service fix removes the network blocker for that first run.
