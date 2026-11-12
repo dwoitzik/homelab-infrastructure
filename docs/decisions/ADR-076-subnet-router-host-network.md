@@ -1,7 +1,7 @@
 # ADR-076: The tailnet subnet router runs on the host network with a fixed port
 
 **Date:** 2026-11-12
-**Status:** Accepted
+**Status:** Superseded the same day. The host-network subnet router was reverted (#1111); direct connections go to rpi-srv-02 instead, see "Outcome" below.
 
 ## Context
 
@@ -85,3 +85,22 @@ Options not taken:
 Revert the PR. ArgoCD puts the pod back on the pod network; the Deployment uses the
 `Recreate` strategy, so there is never a second tailscaled on port 41641. `rpi-srv-02`
 is approved for the same three routes and keeps serving them during the restart.
+
+## Outcome
+
+The host-network deployment (#1095) broke pod networking on vm-srv-k3s-11: from
+18:12 UTC, pods on the other nodes could not reach any pod on that node, so
+Traefik answered 502 for Immich and Authelia among others. It was reverted in
+PR #1111 within the hour and the photos/auth paths returned to 200. tailscaled in
+the host network namespace of a k3s node competes with kube-router and flannel
+for netfilter state and fwmark bits; validating only the tailnet side missed it.
+
+rpi-srv-02 already runs tailscaled on its host, advertises the same routes
+(`10.0.20.0/24`, exit node) and reports `MappingVariesByDestIP: false`, so it
+gets direct connections without touching the cluster. The WAN port forward
+(UDP 41641) now targets rpi-srv-02, and it serves as primary for the LAN route;
+the in-cluster router stays as the fallback.
+
+Lesson: a change to a k3s node's host network needs a cross-node pod
+reachability check (Traefik to a pod on that node), not only checks of the
+component being changed.
