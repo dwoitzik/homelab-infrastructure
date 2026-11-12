@@ -18,4 +18,6 @@ loki_push_url: "https://loki.woitzik.dev/loki/api/v1/push"
 
 tailscale_authkey: "{{ vault_tailscale_authkey }}"
 tailscale_login_server: "https://headscale.woitzik.dev"
-tailscale_advertise_routes: "10.0.0.0/8"
+# Advertise nothing unless a host opts in (inventory.ini); a 10.0.0.0/8 default
+# would offer every VLAN to the tailnet the moment someone approved it.
+tailscale_advertise_routes: ""

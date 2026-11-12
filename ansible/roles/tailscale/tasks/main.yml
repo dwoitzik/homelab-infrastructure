@@ -44,6 +44,7 @@
   register: tailscale_status
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: Connect to Headscale control server
   ansible.builtin.command: >
@@ -91,6 +92,7 @@
   register: tailscale_traefik_nodeport_discovered
   delegate_to: "{{ tailscale_traefik_k3s_api_host }}"
   changed_when: false
+  check_mode: false
   failed_when: tailscale_traefik_nodeport_discovered.stdout == ""
 
 - name: Discover Traefik pod node IP from k3s API
@@ -101,6 +103,7 @@
   register: tailscale_traefik_node_ip_discovered
   delegate_to: "{{ tailscale_traefik_k3s_api_host }}"
   changed_when: false
+  check_mode: false
   failed_when: tailscale_traefik_node_ip_discovered.stdout == ""
 
 - name: Set Traefik target facts
