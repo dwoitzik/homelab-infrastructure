@@ -63,6 +63,20 @@ spec:
         kubeProxy:
           enabled: false
 
+        # k3s runs every control-plane component in one process with one
+        # metrics registry, so the server node's kubelet /metrics repeats
+        # everything the apiserver job already scrapes (~93k series).
+        kubelet:
+          serviceMonitor:
+            metricRelabelings:
+              # Chart default, kept because setting this list replaces it.
+              - action: drop
+                sourceLabels: [__name__, le]
+                regex: (csi_operations|storage_operation_duration)_seconds_bucket;(0.25|2.5|15|25|120|600)(\.0)?
+              - action: drop
+                sourceLabels: [__name__]
+                regex: (apiserver|apiextensions|aggregator|etcd|scheduler|watch_cache)_.+
+
         # prometheus-blackbox-exporter subchart is not rendered from the
         # kube-prometheus-stack Helm release in ArgoCD (subchart not bundled
         # in upstream tarball). Deployed standalone via monitoring-manifests
