@@ -21,6 +21,8 @@
   ansible.builtin.command: dpkg --print-architecture
   register: docker_dpkg_arch
   changed_when: false
+  # Read-only; without it check mode renders the repo line with an empty arch.
+  check_mode: false
 
 - name: Add Docker repository with signed-by key
   ansible.builtin.apt_repository:
