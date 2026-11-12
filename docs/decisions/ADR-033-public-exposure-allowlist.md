@@ -81,6 +81,7 @@ source of truth is `terraform/stacks/cloudflare/main.tf`; this table mirrors it.
 | `analytics.woitzik.dev` (Rybbit) | Cloudflare Tunnel | public tracker endpoint by design | ADR-039 |
 | `headscale.woitzik.dev` | DNS-only record, DMZ reverse proxy (TS2021 cannot traverse the tunnel) | device registration | this ADR, ADR-059 |
 | Game servers (Minecraft, Enshrouded) | playit.gg relay to the DMZ VLAN, no WAN port-forward | server-side | ADR-055, ADR-065 |
+| Tailscale WireGuard, UDP 41641 (no hostname) | FritzBox and MikroTik port forward to the subnet router on `vm-srv-k3s-11` | WireGuard peer keys; silent to anything else | ADR-076 |
 
 Everything else is LAN/VPN only.
 

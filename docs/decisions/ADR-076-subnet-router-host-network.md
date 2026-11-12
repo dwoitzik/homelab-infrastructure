@@ -76,9 +76,9 @@ Options not taken:
   tailnet addresses (100.64.0.0/10, fd7a:115c:a1e0::/48).
 - Off-LAN peers behind a hard NAT (some mobile carriers) still need the other side to
   be reachable without a mapping. That takes a UDP 41641 forward on both the FritzBox
-  (manual, outside Terraform) and the MikroTik (`terraform/stacks/network`). Not done
-  here; the host network alone fixes the case where the remote peer has an
-  endpoint-independent NAT.
+  (manual, outside Terraform) and the MikroTik (`dstnat_tailscale_wireguard` in
+  `terraform/stacks/network/nat_portforward.tf`). The host network alone fixes the
+  case where the remote peer has an endpoint-independent NAT.
 
 ## Rollback
 
