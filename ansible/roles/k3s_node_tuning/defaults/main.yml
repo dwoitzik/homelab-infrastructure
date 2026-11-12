@@ -1,0 +1,4 @@
+---
+# ext4 journal commit interval for the root filesystem (kernel default 5s).
+# kine and Postgres fsync what must be durable; this only batches the rest.
+k3s_node_tuning_root_commit_seconds: 60

@@ -9,12 +9,19 @@
   ansible.builtin.set_fact:
     k3s_node_tuning_root_mount: "{{ ansible_mounts | selectattr('mount', 'equalto', '/') | first }}"
 
-- name: Add noatime to the root filesystem mount options (fstab + live remount)
+# Existing atime options are stripped first: mount applies options left to
+# right, so a leftover relatime after noatime silently wins.
+- name: Set noatime and a longer ext4 commit interval on the root filesystem (fstab + live remount)
   ansible.posix.mount:
     path: /
     src: "{{ k3s_node_tuning_root_mount.device }}"
     fstype: "{{ k3s_node_tuning_root_mount.fstype }}"
-    opts: "noatime,{{ k3s_node_tuning_root_mount.options | regex_replace(',?noatime', '') }}"
+    opts: >-
+      {{ (['noatime', 'commit=' ~ k3s_node_tuning_root_commit_seconds]
+          + (k3s_node_tuning_root_mount.options.split(',')
+             | reject('match', '^(no|rel|strict)?atime$|^commit=')
+             | list))
+         | join(',') }}
     state: mounted
 
 - name: Ensure journald drop-in directory exists
