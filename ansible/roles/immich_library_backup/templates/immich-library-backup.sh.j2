@@ -44,10 +44,11 @@ fi
 snap="$(date +%Y%m%d-%H%M%S)"
 link_dest=()
 if [ -s "$state" ]; then
-  link_dest=(--link-dest="../$(cat "$state")")
+  link_dest=(--link-dest="/snapshots/$(cat "$state")")
 fi
 
-# rrsync on the target confines this key to the mirror root, so paths are relative.
+# rrsync confines this key to the mirror root; paths, including --link-dest, are
+# anchored at that root and may not contain "..".
 stats=$(rsync -rltH --delete --stats "${link_dest[@]}" -e "$ssh_cmd" "$src"/ "$remote:snapshots/$snap/")
 echo "$snap" > "$state"
 
