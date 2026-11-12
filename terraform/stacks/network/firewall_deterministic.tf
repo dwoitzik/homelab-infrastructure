@@ -326,6 +326,21 @@ resource "routeros_ip_firewall_filter" "fwd_09e_pve_to_pi_backup" {
   }
 }
 
+resource "routeros_ip_firewall_filter" "fwd_09g_dmz_to_loki_push" {
+  chain        = "forward"
+  action       = "accept"
+  src_address  = "10.0.30.0/24"
+  dst_address  = "10.0.20.204"
+  dst_port     = "3101"
+  protocol     = "tcp"
+  place_before = routeros_ip_firewall_filter.fwd_10_srv_to_wan.id
+  comment      = "09g: DMZ - promtail push to traefik-loki-dmz (push route only)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
 resource "routeros_ip_firewall_filter" "fwd_09d_dmz_to_scanopy" {
   chain        = "forward"
   action       = "accept"
