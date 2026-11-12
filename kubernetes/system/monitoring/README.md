@@ -44,8 +44,8 @@ ADR-033 allowlist.
   the URL in Vault still pointed at it).
 - Per-domain alert rules split into their own files: `cert-manager-alerts.yml`,
   `control-plane-alerts.yml`, `hardware-temp-alerts.yml`, `postgres-alerts.yml`,
-  `storage-capacity-alerts.yml`, `velero-alerts.yml` — one file per concern rather than
-  one giant rules file.
+  `storage-capacity-alerts.yml`, `velero-alerts.yml`, `rybbit-alerts.yml` — one file per
+  concern rather than one giant rules file.
 
 ## Loki
 
