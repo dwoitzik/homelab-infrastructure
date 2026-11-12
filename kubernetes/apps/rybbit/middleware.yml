@@ -1,0 +1,17 @@
+# The tracker routes have no Authelia in front of them (anonymous visitors
+# must reach them), so this and the CrowdSec bouncer are their only abuse
+# limit. One page view is 2-4 requests; this leaves headroom for SPA bursts.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rybbit-ratelimit
+  namespace: apps
+spec:
+  rateLimit:
+    average: 20
+    burst: 60
+    period: 1s
+    # Behind cloudflared every request comes from the cloudflared pod IP; the
+    # real visitor is in Cf-Connecting-Ip (same as immich/jellyfin-ratelimit).
+    sourceCriterion:
+      requestHeaderName: Cf-Connecting-Ip

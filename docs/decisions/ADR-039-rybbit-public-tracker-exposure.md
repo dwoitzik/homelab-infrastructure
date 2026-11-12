@@ -1,7 +1,8 @@
 # ADR-039: Rybbit Public Tracker Exposure and OIDC SSRF Trade-offs
 
 **Date:** 2026-08-30
-**Status:** Accepted.
+**Status:** Accepted. The Authelia bypass decision is superseded by
+[ADR-074](ADR-074-rybbit-public-path-through-traefik.md).
 
 ## Context
 

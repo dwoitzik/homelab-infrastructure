@@ -57,6 +57,7 @@ skipped by accident.
 | [071](ADR-071-ansible-role-images-digest-pinned.md) | Every container image in the Ansible roles is pinned to a digest | Accepted, applied |
 | [072](ADR-072-unattended-upgrades-third-party-origins.md) | unattended-upgrades covers the third-party repositories (Raspberry Pi, Docker, Tailscale) | Accepted, applied |
 | [073](ADR-073-sab-incomplete-on-hdd-4k-without-remux.md) | SABnzbd scratch back on the archive HDD; 4K HDR releases without Remux | Accepted, applied |
+| [074](ADR-074-rybbit-public-path-through-traefik.md) | Rybbit's public path goes through Traefik; only the tracker endpoints are open, the dashboard sits behind Authelia | Accepted |
 
 ## In review, not yet in this table
 

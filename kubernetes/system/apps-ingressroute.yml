@@ -363,9 +363,9 @@ spec:
 # SABnzbd, Sonarr, Radarr, Bazarr — IngressRoutes consolidated into
 # kubernetes/apps/jellyfin/usenet.yml alongside their External service definitions.
 ---
-# Rybbit -- external LXC, see kubernetes/apps/rybbit/rybbit.yml. Authelia
-# gate is on top of Rybbit's own login (signup closed), not instead of it --
-# tracker/ingest paths stay bypassed, see authelia/configmap.yml.
+# Rybbit -- external LXC, see kubernetes/apps/rybbit/rybbit.yml. Two routes:
+# the tracker endpoints the woitzik.dev script calls are open (CrowdSec + rate
+# limit), everything else (dashboard, login, admin API) sits behind Authelia.
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -374,6 +374,13 @@ metadata:
 spec:
   entryPoints: [websecure]
   routes:
+  - match: Host(`analytics.woitzik.dev`) && (Path(`/api/script.js`) || Path(`/api/replay.js`) || Path(`/api/metrics.js`) || Path(`/api/track`) || Path(`/api/identify`) || Path(`/api/health`) || PathPrefix(`/api/session-replay/record/`) || PathPrefix(`/api/site/`))
+    kind: Rule
+    priority: 200
+    middlewares:
+      - name: crowdsec-bouncer
+      - name: rybbit-ratelimit
+    services: [{name: external-rybbit, port: 80}]
   - match: Host(`analytics.woitzik.dev`)
     kind: Rule
     middlewares:
