@@ -65,16 +65,16 @@
     remote_src: true
     owner: "{{ enshrouded_user }}"
     group: "{{ enshrouded_user }}"
+    # SteamCMD self-updates its binaries, so re-extracting would downgrade
+    # them on every run.
+    creates: "{{ enshrouded_steamcmd_dir }}/linux32/steamcmd"
 
 - name: Bootstrap SteamCMD (self-update on first run)
   ansible.builtin.command:
     cmd: "{{ enshrouded_steamcmd }} +quit"
+    creates: "{{ enshrouded_steamcmd_dir }}/linux32/steamclient.so"
   become: true
   become_user: "{{ enshrouded_user }}"
-  register: enshrouded_steamcmd_bootstrap
-  changed_when: false
-  async: 600
-  poll: 15
 
 - name: Create the install directory
   ansible.builtin.file:
@@ -84,8 +84,12 @@
     group: "{{ enshrouded_user }}"
     mode: '0750'
 
+# First install only. Updates belong to the autoupdate timer, which acts only
+# when Steam's buildid changed; app_update here would rewrite the files under
+# the running server on every play.
 - name: Download the dedicated server via SteamCMD (Windows depot)
   ansible.builtin.command:
+    creates: "{{ enshrouded_install_dir }}/enshrouded_server.exe"
     argv:
       - "{{ enshrouded_steamcmd }}"
       - +@sSteamCmdForcePlatformType
@@ -100,14 +104,6 @@
       - +quit
   become: true
   become_user: "{{ enshrouded_user }}"
-  register: enshrouded_update
-  changed_when: >-
-    'fully installed' in enshrouded_update.stdout
-    or 'Success' in enshrouded_update.stdout
-  # SteamCMD downloads several GB; the default 12s connect timeout is for SSH,
-  # not this command, but it must not run concurrently with a live update.
-  async: 3600
-  poll: 30
   args:
     chdir: "{{ enshrouded_install_dir }}"
 
@@ -231,13 +227,16 @@
 
 - name: Read the installed buildid
   ansible.builtin.command:
-    cmd: >-
-      grep -m1 -oP '"buildid"\s+"\K[0-9]+'
-      {{ enshrouded_install_dir }}/steamapps/appmanifest_
-      {{ enshrouded_app_id }}.acf
+    argv:
+      - grep
+      - -m1
+      - -oP
+      - '"buildid"\s+"\K[0-9]+'
+      - "{{ enshrouded_install_dir }}/steamapps/appmanifest_{{ enshrouded_app_id }}.acf"
   register: enshrouded_buildid
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: Record the installed buildid as the update baseline
   ansible.builtin.copy:

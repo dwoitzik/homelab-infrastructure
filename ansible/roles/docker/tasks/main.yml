@@ -16,6 +16,9 @@
     url: https://download.docker.com/linux/debian/gpg
     dest: /etc/apt/keyrings/docker.asc
     mode: '0644'
+    # Pins the key and keeps check mode quiet: without a checksum get_url
+    # always reports a change there.
+    checksum: sha256:1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570
 
 - name: Determine dpkg architecture
   ansible.builtin.command: dpkg --print-architecture
