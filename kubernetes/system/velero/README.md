@@ -53,6 +53,12 @@ kubectl get podvolumebackups -n velero -l velero.io/backup-name=<backup> \
 No `tmp`/`cache`/`shm` volumes and no `pgdata`/`db` volumes of the database pods should
 be listed, and both `pg-dump` pods' `dumps` volumes should.
 
+Measured on the first backups with this scope (2026-11-12): 27 PodVolumeBackups, 1.85 GiB
+read per backup (was 11 GiB with 124), of which nextcloud data and html are 1.5 GiB and
+the dumps 100 MB. The first backup added 0.24 GiB to R2, a second one minutes later
+0.05 GiB. R2 held 8.3 GiB afterwards, most of it raw database content of the older
+backups, which leaves R2 once they expire (TTL 72h) and kopia maintenance has run.
+
 ### `r2-usage-guard` and Git
 
 The guard pauses `daily-offsite` by patching `spec.paused` live and never resumes it.
