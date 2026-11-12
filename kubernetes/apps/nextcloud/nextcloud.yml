@@ -469,11 +469,6 @@ metadata:
   namespace: apps
 spec:
   schedule: "*/5 * * * *"
-  # REL-xxx: suspended during cluster stabilization -- the 5-min cron produced
-  # 22-min runs (cron.php background jobs) that saturated the host nvme (60%+
-  # iowait in the VM, D-state postgres/vault), driving load >300. Re-enable
-  # once the cluster is quiet and load stays <30.
-  suspend: true
   concurrencyPolicy: Forbid
   # REL-061: a single failed run from 2026-06-28/29 (root cause not
   # determinable -- pod logs already garbage-collected by the time this was
@@ -513,9 +508,20 @@ spec:
                   type: RuntimeDefault
                 capabilities:
                   drop: ["ALL"]
+              # Same layout as the Deployment: code on nextcloud-html, state
+              # subPath-mounted from nextcloud-data.
               volumeMounts:
-                - name: data
+                - name: html
                   mountPath: /var/www/html
+                - name: data
+                  mountPath: /var/www/html/data
+                  subPath: data
+                - name: data
+                  mountPath: /var/www/html/config
+                  subPath: config
+                - name: data
+                  mountPath: /var/www/html/custom_apps
+                  subPath: custom_apps
                 - name: tmp
                   mountPath: /tmp
               resources:
@@ -526,6 +532,9 @@ spec:
                   cpu: 200m
                   memory: 256Mi
           volumes:
+            - name: html
+              persistentVolumeClaim:
+                claimName: nextcloud-html
             - name: data
               persistentVolumeClaim:
                 claimName: nextcloud-data
