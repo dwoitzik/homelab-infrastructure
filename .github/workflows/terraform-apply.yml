@@ -101,7 +101,7 @@ jobs:
             2>&1 | tee /tmp/tfapply-${{ github.run_id }}.txt
         continue-on-error: true
 
-      - name: Post apply output to the PR
+      - name: Write apply output into the PR description
         if: always()
         uses: actions/github-script@v7
         with:
@@ -109,30 +109,30 @@ jobs:
             const fs = require('fs');
             const path = '/tmp/tfapply-${{ github.run_id }}.txt';
             let output = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : '(no output captured)';
-            if (output.length > 30000) {
-              output = '... (truncated, showing last 30000 chars) ...\n' + output.slice(-30000);
+            if (output.length > 25000) {
+              output = '... (truncated, showing last 25000 chars) ...\n' + output.slice(-25000);
             }
+            const stack = '${{ steps.parse.outputs.stack }}';
             const outcome = '${{ steps.tfapply.outcome }}';
             const icon = outcome === 'success' ? '✅' : '❌';
-            // One comment per PR and stack, edited in place: edits send no
-            // notification, a new comment on every plan/apply did.
-            const marker = `<!-- terraform:${{ steps.parse.outputs.stack }} -->`;
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            // Output goes into a marked section of the PR description, edited in
+            // place: description edits send no email, bot comments on the
+            // owner's PRs emailed the owner on every plan and apply.
+            const start = `<!-- terraform:${stack}:apply -->`;
+            const end = `<!-- /terraform:${stack}:apply -->`;
+            const section = `${start}\n<details><summary>${icon} Terraform Apply: <code>${stack}</code> (${new Date().toISOString()})</summary>\n\n\`\`\`\n${output}\n\`\`\`\n</details>\n${end}`;
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner, repo: context.repo.repo, pull_number: context.issue.number,
             });
-            const existing = comments.find(c => c.user.type === 'Bot' && c.body.startsWith(marker));
-            const section = `<!-- apply -->\n${icon} **Terraform Apply: \`${{ steps.parse.outputs.stack }}\`** (approved via the \`terraform-apply\` Environment)\n\n\`\`\`\n${output}\n\`\`\`\n<!-- /apply -->`;
-            const prior = existing ? existing.body.replace(marker, '').replace(/<!-- apply -->[\s\S]*<!-- \/apply -->/, '').trim() : '';
-            const body = `${marker}\n${prior}\n\n${section}`;
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body,
-              });
-            }
+            const current = pr.body || '';
+            const i = current.indexOf(start);
+            const j = current.indexOf(end);
+            const body = i !== -1 && j > i
+              ? current.slice(0, i) + section + current.slice(j + end.length)
+              : `${current}\n\n${section}`;
+            await github.rest.pulls.update({
+              owner: context.repo.owner, repo: context.repo.repo, pull_number: context.issue.number, body,
+            });
 
       - name: Fail the job if apply failed
         if: steps.tfapply.outcome == 'failure'
