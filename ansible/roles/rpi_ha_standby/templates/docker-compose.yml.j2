@@ -30,7 +30,7 @@ services:
     ports:
       - "{{ rpi_ha_standby_vaultwarden_host_port }}:80"
     environment:
-      - SIGNUPS_ALLOWED=true
+      - SIGNUPS_ALLOWED=false
       - DOMAIN=https://vault.woitzik.dev
       - ICON_SERVICE=internal
     volumes:
