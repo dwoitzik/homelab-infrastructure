@@ -1,331 +1,212 @@
 [![CI](https://github.com/dwoitzik/homelab-infrastructure/actions/workflows/ci.yml/badge.svg)](https://github.com/dwoitzik/homelab-infrastructure/actions/workflows/ci.yml)
 ![License](https://img.shields.io/github/license/dwoitzik/homelab-infrastructure)
-![HCL](https://img.shields.io/github/languages/top/dwoitzik/homelab-infrastructure)
 
 # Homelab Infrastructure as Code
 
-A homelab, fully managed as code: MikroTik firewall rules, Proxmox VMs/LXCs, and ~30
-self-hosted applications running on top in Kubernetes, all applied through GitOps, none
-of it by hand. It exists to be genuinely used day to day — not a demo cluster spun up to
-have something to show — and it's also a record of what running real infrastructure
-looks like: a from-nothing disaster recovery (`DISASTER-RECOVERY.md`) and the
-architecture decisions that came out of it (`docs/decisions/`).
+A self-hosted platform run like production and managed entirely from this repository:
+the router firewall, the Proxmox VMs and containers, a three-node Kubernetes cluster and
+about 30 applications on top of it. Nothing is changed by hand. Network and hypervisor
+changes go through Terraform in pull requests, cluster state is reconciled by ArgoCD,
+and host configuration is applied with Ansible.
 
-**What this demonstrates**: GitOps discipline (every change is a PR, Terraform applies
-only via Atlantis, Kubernetes only via ArgoCD), root-causing real production incidents
-rather than guessing, an explicit default-deny security posture (network segmentation,
-public exposure as an allowlist, secrets in Vault, policy enforcement via Kyverno), and
-documentation that stays honest about what's still open rather than only what's done.
-
-Start with [docs/STEADY-STATE.md](docs/STEADY-STATE.md) for how this actually runs day
-to day, or [docs/OPERATIONS.md](docs/OPERATIONS.md) for where things live, where secrets
-are kept, and how I've debugged this stuff before.
-
-## Stack Overview
-
-| Layer | Technology |
-|---|---|
-| Hypervisor | Proxmox VE (Ryzen 7 5825U, 64 GB RAM) |
-| Networking | MikroTik RB5009 (Terraform-managed firewall) |
-| Edge DNS | 2× Raspberry Pi 4B — AdGuard Home + Unbound |
-| Kubernetes | k3s v1.31 — 3-node cluster (1 control-plane, 2 workers), embedded SQLite datastore, not etcd — see [ADR-015](docs/decisions/ADR-015-k3s-datastore-sqlite.md). A single-server (not 3-way HA) topology by design, not drift — see [ADR-014](docs/decisions/ADR-014-etcd-topology.md) for why 3-way embedded-etcd HA is specifically ruled out on this hardware. |
-| Ingress + TLS | Traefik + cert-manager (wildcard `*.woitzik.dev` via DNS-01) |
-| Storage | NFS (`ct-srv-nfs-01`, ZFS-backed) — Longhorn fully removed |
-| GitOps (k8s) | ArgoCD — ApplicationSet watching `kubernetes/apps/*` |
-| GitOps (TF) | Atlantis — self-hosted, exposed via Cloudflare Tunnel |
-| Auth | Authelia — SSO/OIDC for all protected services |
-| VPN | Headscale (self-hosted Tailscale control plane), OIDC login via Authelia |
-| Secrets | Ansible Vault (host-level) + HashiCorp Vault w/ auto-unseal (k8s, via ExternalSecrets) |
-| Backups | Velero → Garage S3 (k8s, incl. PVC data via Kopia), daily offsite to Cloudflare R2 (with a usage guard that pauses it before hitting the free-tier cap), + Proxmox Backup Server (VMs/LXCs). Restore is tested automatically, monthly — see `docs/STEADY-STATE.md`. |
+It is in daily use (photos, media, documents, passwords, home automation), so it has
+real failure modes: a full rebuild from bare metal, datastore corruption under I/O
+pressure, a backup job that filled its own disk, alerts that went silent. The interesting
+part of this repo is how those were found, fixed and then guarded against so they stay
+fixed. That reasoning is recorded in [70+ Architecture Decision Records](docs/decisions/).
 
 ## Architecture
 
 ```mermaid
-graph TB
-    subgraph cloud["Cloud & External"]
-        NET([Internet])
-        CF["Cloudflare\nDNS · Tunnel · *.woitzik.dev"]
+flowchart TB
+    subgraph github["GitHub"]
+        repo[("this repository")]
+        ci["CI: lint, validate,<br/>Helm render, policy guards"]
+        tfwf["Terraform plan / apply<br/>PR comment + environment gate"]
+        renovate["Renovate<br/>(runs in-cluster)"]
     end
 
-    subgraph router["Network Layer"]
-        MK["MikroTik RB5009\nVLAN 10/20/30 · Default-drop firewall"]
+    subgraph internet["Internet edge"]
+        cf["Cloudflare DNS + Tunnel<br/>explicit allowlist"]
+        playit["playit.gg relay<br/>(game servers)"]
+        r2[("Cloudflare R2<br/>offsite backups")]
     end
 
-    subgraph k3s["k3s Cluster — 3 nodes"]
-        LB["MetalLB"]
-        TR["Traefik\nEdge router · TLS termination"]
-        ARGO["ArgoCD\nGitOps · kubernetes/apps/*"]
-        APPS["Applications\nNextcloud · Paperless · Vaultwarden\nMealie · Gitea · Home Assistant\nOpen WebUI · Uptime Kuma · Immich"]
-        VAULT["HashiCorp Vault\nauto-unseal · secrets root"]
-        ESO["External Secrets Operator"]
-        GARAGE["Garage\nS3-compatible object storage"]
-        MON["Monitoring\nPrometheus · Grafana · Loki"]
+    router["MikroTik RB5009<br/>VLAN 10 / 20 / 30 / 40 / 100<br/>default-drop firewall"]
+    rpi["2x Raspberry Pi 4B<br/>AdGuard Home + Unbound<br/>keepalived VIP"]
+
+    subgraph pve["Proxmox VE host"]
+        subgraph k3s["k3s: 1 server + 2 agents, SQLite datastore via kine"]
+            argocd["ArgoCD<br/>app-of-apps + ApplicationSet"]
+            ingress["Traefik<br/>Authelia SSO · CrowdSec"]
+            secrets["Vault<br/>External Secrets Operator"]
+            policy["Kyverno<br/>NetworkPolicies · PSA"]
+            apps["~30 applications"]
+            obs["Prometheus · Alertmanager<br/>Loki · Grafana · Tempo"]
+            velero["Velero + Kopia"]
+            garage[("Garage S3")]
+            tunnel["cloudflared"]
+        end
+        lxc["LXCs: NFS on ZFS, Jellyfin (GPU),<br/>media stack, Terraform runner"]
+        dmz["DMZ LXCs (VLAN 30):<br/>reverse proxy, game servers"]
+        pbs[("Proxmox Backup Server")]
     end
 
-    subgraph edge["RPi Edge Cluster — Keepalived VIP"]
-        RPI1["RPi 4B — primary\nAdGuard · Unbound"]
-        RPI2["RPi 4B — replica\nAdGuard standby"]
-    end
+    discord(["Discord alerts"])
 
-    subgraph infra["Infrastructure VMs/LXC"]
-        PBS["PBS (LXC 110)\nProxmox Backup Server"]
-        AI["AI LXC (LXC 201)\nOllama LLM inference"]
-        DMZ["DMZ Proxy (LXC 301)\nNginx Proxy Manager"]
-        ATLLXC["Atlantis (LXC 204)\nTerraform GitOps -- ADR-012"]
-    end
-
-    NET --> MK
-    CF -. "DNS-01 + Tunnel" .-> LB
-    MK --> LB
-    LB --> TR
-    TR --> ARGO
-    TR --> APPS
-    TR --> MON
-    TR --> ATLLXC
-    ESO -. "resolves secrets" .-> VAULT
-    ESO -. "writes k8s Secrets" .-> APPS
-    APPS -. "backup archive" .-> GARAGE
-    MK --> RPI1
-    RPI1 -. "sync" .-> RPI2
-    MK --> PBS
-    MK --> AI
-    MK --> DMZ
-    MK --> ATLLXC
+    repo --> ci
+    repo --> tfwf
+    tfwf -- "runner LXC applies" --> router
+    tfwf --> pve
+    tfwf --> cf
+    argocd -- "pulls desired state" --> repo
+    renovate -- "update PRs" --> repo
+    cf --> tunnel --> ingress --> apps
+    playit --> dmz
+    router --- rpi
+    router --- pve
+    secrets -. "synced Secrets" .-> apps
+    velero --> garage
+    velero --> r2
+    lxc -. "nightly VM / LXC backups" .-> pbs
+    obs --> discord
 ```
 
-## Screenshots
+## Stack
 
-![Homepage dashboard](docs/images/homepage.png)
+| Layer | Choice | Why (decision record) |
+|---|---|---|
+| Hypervisor | Proxmox VE on a single mini PC (Ryzen 7 5825U, 64 GB) | Hardware constraints in [HARDWARE.md](docs/HARDWARE.md) |
+| Network | MikroTik RB5009, five VLANs, default-drop forward and input chains, all rules in Terraform | [vlan-segmentation.md](docs/vlan-segmentation.md) |
+| Edge DNS | AdGuard Home + Unbound on two Raspberry Pis behind a keepalived VIP | [ADR-001](docs/decisions/ADR-001-unbound-recursive-dns.md), [ADR-002](docs/decisions/ADR-002-keepalived-edge-ha.md) |
+| Kubernetes | k3s, one server and two agents, SQLite (kine) instead of etcd | [ADR-014](docs/decisions/ADR-014-etcd-topology.md), [ADR-015](docs/decisions/ADR-015-k3s-datastore-sqlite.md) |
+| GitOps | ArgoCD; any new folder under `kubernetes/apps/` is picked up by an ApplicationSet | [k3s-architecture.md](docs/k3s-architecture.md) |
+| Infrastructure as code | Terraform (router, Proxmox, Cloudflare, Garage), state in Garage S3; Ansible for hosts | [ADR-003](docs/decisions/ADR-003-garage-terraform-backend.md), [ADR-021](docs/decisions/ADR-021-atlantis-off-public-internet.md) |
+| Ingress and auth | Traefik, cert-manager (DNS-01), Authelia SSO/OIDC backed by CloudNativePG, CrowdSec bouncer | [ADR-006](docs/decisions/ADR-006-cloudnativepg-authelia.md) |
+| External access | Cloudflare Tunnel for an explicit allowlist of hostnames; everything else is LAN or tailnet (Headscale) only | [ADR-011](docs/decisions/ADR-011-cloudflare-tunnel-external-access.md), [ADR-033](docs/decisions/ADR-033-public-exposure-allowlist.md) |
+| Secrets | HashiCorp Vault with auto-unseal, External Secrets Operator; Ansible Vault for hosts | [ADR-009](docs/decisions/ADR-009-vault-auto-unseal.md) |
+| Policy | Kyverno (resource limits, no `latest`, no privileged), Pod Security Admission, default-deny NetworkPolicies | [ADR-008](docs/decisions/ADR-008-networkpolicy-default-deny.md) |
+| Storage | NFS on ZFS for shared volumes, `local-path` for SQLite-backed apps, CloudNativePG for Postgres | [ADR-005](docs/decisions/ADR-005-nfs-over-longhorn.md), [ADR-016](docs/decisions/ADR-016-storage-class-policy.md) |
+| Backups | Velero + Kopia to Garage, daily offsite copy to Cloudflare R2, Proxmox Backup Server for VMs and LXCs | [ADR-004](docs/decisions/ADR-004-backup-strategy.md), [ADR-007](docs/decisions/ADR-007-velero-kopia-pvc-backup.md), [ADR-062](docs/decisions/ADR-062-offsite-r2-3-day-retention.md) |
+| Observability | kube-prometheus-stack, Loki, Tempo, blackbox probes with SLO burn-rate alerts, Alertmanager to Discord | [monitoring README](kubernetes/system/monitoring/README.md) |
+| Updates | Renovate every two hours; digest-pinned images; patch updates auto-merge only after CI and a soak period | [ADR-063](docs/decisions/ADR-063-renovate-digest-minimum-release-age.md), [ADR-071](docs/decisions/ADR-071-ansible-role-images-digest-pinned.md) |
 
-The dashboard (self-hosted [Homepage](https://github.com/gethomepage/homepage)) — every
-service grouped by function, live status widgets where the service supports one. Public
-Grafana/ArgoCD screenshots aren't included here: both require an authenticated login
-(Authelia SSO) to view anything beyond the sign-in page, so there's nothing meaningful
-to capture without live operator credentials.
+## How changes are deployed
 
-**Currency note (2026-08-23)**: `home.woitzik.dev` is behind the same Authelia gate,
-so this screenshot can only be refreshed by someone with a real login session — checked
-live, an unauthenticated request only reaches the Authelia sign-in page. The image
-above is dated 2026-08-14 and several widgets in it show placeholder `-` values (a real
-CrowdSec widget auth bug, fixed same-session — see `phase8/LEDGER.md`) that would read
-real numbers today. Flagging this honestly rather than leaving a screenshot that reads
-as current when it isn't; refresh it opportunistically next time someone with an actual
-browser session is looking at the dashboard.
+**Kubernetes.** A merged manifest is a deployment. ArgoCD syncs `kubernetes/` with
+self-heal on, so hand edits in the cluster are reverted.
 
-## Repository Layout
+**Terraform.** Never applied from a laptop. On a pull request, a comment
+`atlantis plan -d <stack>` runs the plan on a self-hosted runner and posts it to the PR
+([terraform-plan.yml](.github/workflows/terraform-plan.yml)). `atlantis apply -d <stack>`
+triggers [terraform-apply.yml](.github/workflows/terraform-apply.yml), which waits on the
+`terraform-apply` GitHub Environment for approval. Only the repository owner can trigger
+either workflow, and both refuse to run code from forks. (The comment keywords are kept
+from the Atlantis setup this replaced; see ADR-021.)
+
+**Ansible.** Roles per service (34 roles), run in check mode first:
+
+```bash
+ansible-playbook ansible/site.yml --check --diff --limit <group>
+ansible-playbook ansible/site.yml --limit <group>
+```
+
+**Dependencies.** Renovate opens PRs for container images, Helm charts, GitHub Actions
+and Terraform providers. Helm chart patch releases auto-merge only after the CI job
+[render-helm-applications.py](scripts/render-helm-applications.py) proves that every
+chart referenced by an ArgoCD Application still renders with this repo's values against
+the cluster's Kubernetes version and passes kubeconform. Chart minors and majors, 0.x
+charts and stateful services stay PR-only.
+
+## Engineering practices
+
+**Verify against live state, not reported status.** A green workflow, a "Synced" badge
+or a sysctl that reads `1` is a claim, not proof. Changes are checked against the real
+route, DNS answer, rule or pod afterwards. [ADR-043](docs/decisions/ADR-043-exit-node-ipv6-false-advertisement.md)
+is the clearest example: the forwarding sysctl was set correctly, but the pod had no
+IPv6 uplink at all.
+
+**Every failure mode gets a mechanical guard.** When something breaks silently once, the
+check that would have caught it is committed so it runs whether or not anyone remembers:
+
+| Guard | What it catches |
+|---|---|
+| [drift-check.yml](.github/workflows/drift-check.yml) every 30 min | objects declared in git that never became live ([ADR-027](docs/decisions/ADR-027-declared-vs-live-drift-guard.md)) |
+| [tailnet route drift check](kubernetes/system/monitoring/tailnet-route-drift-check.yml) every 15 min | Headscale route approvals drifting from the intended state |
+| [Kyverno policy drift check](kubernetes/system/monitoring/kyverno-policy-drift-check.yml) | running pods that violate policy (background scans are off to save datastore writes) |
+| [Dead man's switch](kubernetes/system/monitoring/dead-mans-switch.yml) | the whole cluster going quiet, detected from outside |
+| [Monthly restore test](kubernetes/system/velero/restore-test.yml) | backups that complete but do not restore |
+| [Quarterly DR game day](kubernetes/system/monitoring/dr-game-day.yml) | a recovery procedure that no longer matches reality |
+| [R2 usage guard](kubernetes/system/velero/r2-usage-guard.yml) | offsite backups running past the storage budget |
+| [Silent-failure alerts](kubernetes/system/monitoring/silent-failure-alerts.yml) | operators down, backups stopping, log sources going stale |
+
+**Pre-commit and CI gates.** Pre-commit hooks and CI run terraform fmt, validate and
+tflint, ansible-lint, yamllint, markdownlint, kubeconform against vendored schemas,
+gitleaks, and four repository-specific guards in [scripts/](scripts/):
+
+- `check-disclosure.py`: blocks new credentials and new infrastructure identifiers in
+  this public repo ([ADR-048](docs/decisions/ADR-048-public-repo-disclosure-policy.md)).
+- `check-argocd-include-coverage.py`: fails when a manifest is added to a directory but
+  missing from the ArgoCD include glob that would deploy it.
+- `check-host-memory-overcommit.py`: keeps VM memory reservations under the host ceiling
+  that previously froze the hypervisor.
+- `check-comment-narration.py`: keeps investigation diaries out of code comments.
+
+**Decisions are written down.** Each non-trivial choice has an ADR with context,
+alternatives and consequences, including the ones that turned out wrong and were
+superseded. A selection:
+
+- [ADR-015](docs/decisions/ADR-015-k3s-datastore-sqlite.md): SQLite instead of etcd,
+  because etcd's fsync pattern locked up a host with a DRAM-less NVMe.
+- [ADR-021](docs/decisions/ADR-021-atlantis-off-public-internet.md): replacing Atlantis
+  with GitHub Actions so nothing holding Terraform credentials is reachable from the
+  internet.
+- [ADR-033](docs/decisions/ADR-033-public-exposure-allowlist.md): public exposure as an
+  explicit allowlist instead of a wildcard tunnel.
+- [ADR-028](docs/decisions/ADR-028-mechanical-secret-exposure-prevention.md): preventing
+  credential leaks by construction rather than by remembering a rule.
+- [ADR-038](docs/decisions/ADR-038-r2-offsite-backup-checksum-fix.md): why every
+  offsite backup to R2 failed for a week, and the plugin fix.
+- [ADR-046](docs/decisions/ADR-046-vault-goroutine-leak-externalsecrets.md): a Vault
+  goroutine leak that left every ExternalSecret failing, unalerted, for about 20 days.
+- [ADR-063](docs/decisions/ADR-063-renovate-digest-minimum-release-age.md): why digest
+  updates never auto-merged, and the Renovate setting that fixed it.
+
+Full index: [docs/decisions/](docs/decisions/README.md).
+
+## Repository layout
 
 ```text
+.
 ├── kubernetes/
-│   ├── apps/                  # ArgoCD-managed workloads (ApplicationSet picks up any new folder)
-│   │   ├── authelia/          # SSO / OIDC identity provider
-│   │   ├── beszel/            # Lightweight server monitoring
-│   │   ├── cloudflared/       # Cloudflare Tunnel
-│   │   ├── crowdsec/          # Collaborative IPS, bans malicious IPs at the Traefik edge
-│   │   ├── excalidraw/        # Collaborative whiteboard
-│   │   ├── firefly/           # Personal finance manager
-│   │   ├── freshrss/          # RSS reader
-│   │   ├── garage/            # S3-compatible object storage
-│   │   ├── gitea/             # Private git instance
-│   │   ├── gotify/            # Push notification server
-│   │   ├── headscale/         # Tailscale control plane
-│   │   ├── home-assistant/    # Smart home hub
-│   │   ├── homepage/          # Dashboard
-│   │   ├── immich/            # Photo library (Cloudflare Tunnel external access)
-│   │   ├── jellyfin/          # External-service pointer to the GPU-passthrough LXC
-│   │   ├── kube-bench/        # CIS Kubernetes benchmark, scheduled
-│   │   ├── linkding/          # Bookmark manager
-│   │   ├── lubelogger/        # Vehicle maintenance log
-│   │   ├── matrix/            # Synapse homeserver + Element web client
-│   │   ├── mealie/            # Recipe manager
-│   │   ├── myspeed/           # Internet speed-test history
-│   │   ├── n8n/                # Workflow automation
-│   │   ├── nextcloud/         # Files · CalDAV · CardDAV
-│   │   ├── open-webui/        # Local LLM interface (Ollama)
-│   │   ├── paperless/         # Document management + paperless-gpt
-│   │   ├── renovate/          # Dependency update bot
-
-│   │   ├── searxng/           # Self-hosted metasearch
-│   │   ├── trivy-operator/    # Continuous container vulnerability scanning
-│   │   ├── uptime-kuma/       # Uptime monitoring
-│   │   └── vaultwarden/       # Password manager
-│   │
-│   │   # Two IngressRoute patterns coexist, not fully unified yet: older apps
-│   │   # route through the centralized kubernetes/system/apps-ingressroute.yml,
-│   │   # newer ones (beszel, excalidraw, firefly, freshrss, gotify, linkding,
-│   │   # lubelogger, matrix, myspeed, n8n, searxng) declare their
-│   │   # own IngressRoute inline in their own directory. Both work; picking one
-│   │   # convention and migrating the rest is open, tracked in docs/ROADMAP.md.
-│   └── system/                # Manually-applied system components
-│       ├── argocd/            # ArgoCD config (RBAC, OIDC)
-│       ├── cert-manager/      # TLS certificate automation (+ cert-manager-config/, certificates/)
-│       ├── cloudnative-pg/    # CNPG operator (Authelia Postgres)
-│       ├── external-secrets/  # External Secrets Operator
-│       ├── infrastructure/    # sysctl-fix DaemonSet, Cloudflare DDNS, misc cluster glue
-│       ├── kyverno/           # Policy engine (resource limits, no-latest-tag, no-privileged)
-│       ├── metallb/           # LoadBalancer IPs (+ metallb-config/)
-│       ├── monitoring/        # kube-prometheus-stack + Loki + Tempo + PVE exporter
-│       ├── nfs-provisioner/   # nfs-client StorageClass
-│       ├── postgres/          # Authelia PostgreSQL
-│       ├── redis/             # Authelia Redis
-│       ├── tempo/             # Distributed tracing backend
-│       ├── traefik/           # Traefik ingress (+ traefik-config/)
-│       ├── vault/             # HashiCorp Vault + auto-unseal sidecar
-│       ├── velero/            # Cluster backup to Garage S3 (Cloudflare R2 offsite configured, not yet active)
-│       ├── apps-ingressroute.yml   # All app IngressRoutes
-│       └── other-ingressroute.yml  # System IngressRoutes (ArgoCD, Grafana)
-├── terraform/
-│   └── stacks/
-│       ├── cloudflare/        # Tunnel config + DNS records (Terraform-managed, applied via Atlantis)
-│       ├── network/           # MikroTik — VLANs, firewall, DHCP, NAT
-│       └── proxmox/           # VMs and LXC containers, incl. ct-srv-atlantis-01 (ADR-012)
-├── ansible/
-│   ├── roles/                # One role per service (22 roles) -- incl. the DMZ hosts:
-│   │                         # minecraft, nginx_proxy_manager, crowdsec_bouncer,
-│   │                         # watchtower, monitoring_agent (docker-based node_exporter
-│   │                         # + promtail for rpi_nodes/dmz_proxies/dmz_games; every
-│   │                         # other host group uses node_exporter_native instead)
-│   ├── group_vars/           # Variables + Ansible Vault secrets
-│   ├── k3s-cluster/          # k3s provisioning (install, upgrade, reset)
-│   └── inventory.ini
+│   ├── apps/          # one folder per application, deployed by an ArgoCD ApplicationSet
+│   └── system/        # platform components, each with its own ArgoCD Application
+├── terraform/stacks/
+│   ├── network/       # MikroTik: VLANs, firewall, DHCP, NAT, DNS
+│   ├── proxmox/       # VMs and LXCs
+│   ├── cloudflare/    # tunnel ingress and public DNS allowlist
+│   └── garage/        # S3 buckets
+├── ansible/           # roles per host service, site.yml, k3s provisioning
+├── scripts/           # pre-commit and CI guards, Helm render gate
+├── ci/                # vendored kubeconform schemas
 ├── docs/
-│   ├── decisions/             # ADRs
-│   └── *.md                   # Architecture, naming, topology, VLAN docs
-├── network/
-│   └── scripts/bootstrap.rsc  # MikroTik initial bootstrap (RouterOS script)
-├── atlantis.yaml              # Atlantis — stack definitions
-└── .github/workflows/ci.yml   # Terraform lint + Ansible lint
+│   ├── decisions/     # ADRs
+│   └── runbooks/      # failover procedures
+├── .github/workflows/ # CI, Terraform plan/apply, drift check
+└── DISASTER-RECOVERY.md
 ```
-
-## Kubernetes Services
-
-Every hostname below resolves and works from the LAN or over the Headscale/Tailscale
-VPN. **Only two are actually reachable from the public internet** — everything else
-is deliberately allowlisted out of Cloudflare's DNS/tunnel entirely, an explicit
-default-deny decision (`ADR-033`), not an oversight.
-
-| Service | URL | Auth | Reachable from |
-|---|---|---|---|
-| Homepage | home.woitzik.dev | Authelia | LAN/VPN only |
-| ArgoCD | argo.woitzik.dev | Authelia OIDC | LAN/VPN only |
-| Grafana | monitoring.woitzik.dev | Authelia OIDC | LAN/VPN only |
-| Traefik | traefik.woitzik.dev | Authelia | LAN/VPN only |
-| Uptime Kuma | status.woitzik.dev | Authelia | LAN/VPN only |
-| Paperless-ngx | docs.woitzik.dev | Authelia | LAN/VPN only |
-| Open WebUI | ai.woitzik.dev | Authelia | LAN/VPN only |
-| Vaultwarden | vault.woitzik.dev | Built-in | LAN/VPN only |
-| Nextcloud | nextcloud.woitzik.dev | Built-in | LAN/VPN only |
-| Mealie | mealie.woitzik.dev | Authelia | LAN/VPN only |
-| Gitea | git.woitzik.dev | Built-in | LAN/VPN only |
-| Home Assistant | ha.woitzik.dev | Built-in | LAN/VPN only |
-| Headscale | headscale.woitzik.dev | Built-in | **Public** — structurally required, a device has to reach this before any VPN path exists |
-| Atlantis | atlantis.woitzik.dev | Authelia (except `/events` webhook: GitHub HMAC) | LAN/VPN only |
-| Immich | photos.woitzik.dev | Rate-limited, own login | **Public** — family photo access is a real, named use case |
-| Jellyfin | media.woitzik.dev | Rate-limited, own login | **Public** — family media access away from home (`ADR-064`) |
-| Seerr | requests.woitzik.dev | Built-in | LAN/VPN only |
-| AdGuard Home | dns.woitzik.dev | Authelia | LAN/VPN only |
-| Proxmox VE | pve.woitzik.dev | Authelia | LAN/VPN only |
-| PBS | backup.woitzik.dev | Authelia | LAN/VPN only |
-| MikroTik (RouterOS webfig) | router.woitzik.dev | Authelia | LAN/VPN only |
-| Garage S3 | s3.woitzik.dev | Key auth | LAN/VPN only |
-| Wazuh (SIEM) | wazuh.woitzik.dev | Built-in | LAN/VPN only |
-| Vault | secrets.woitzik.dev | Built-in | LAN/VPN only |
-| Loki | loki.woitzik.dev | Authelia | LAN/VPN only |
-
-| Beszel | beszel.woitzik.dev | Authelia | LAN/VPN only |
-| Firefly III | finance.woitzik.dev | Authelia | LAN/VPN only |
-| FreshRSS | rss.woitzik.dev | Authelia | LAN/VPN only |
-| Gotify | gotify.woitzik.dev | Authelia | LAN/VPN only |
-| Linkding | links.woitzik.dev | Authelia | LAN/VPN only |
-| LubeLogger | cars.woitzik.dev | Authelia | LAN/VPN only |
-| Matrix/Synapse + Element | matrix.woitzik.dev, element.woitzik.dev | Federation protocol / Authelia | LAN/VPN only |
-| MySpeed | speed.woitzik.dev | Authelia | LAN/VPN only |
-| n8n | n8n.woitzik.dev | Authelia | LAN/VPN only |
-| SearXNG | search.woitzik.dev | Authelia | LAN/VPN only |
-| Excalidraw | draw.woitzik.dev | Authelia | LAN/VPN only |
-| Minecraft | mc.woitzik.dev | Server-side auth | **Public** — via a playit.gg relay tunnel, not the Cloudflare allowlist above (raw TCP, can't route through Cloudflare's CDN); the DMZ LXC it runs on has no cluster credentials and no path to any other VLAN |
-| Enshrouded | (playit.gg tunnel) | Server-side password | **Public** — UDP game server on the same DMZ LXC as Minecraft, reached the same way (playit.gg relay, never the WAN port). LAN clients go direct over UDP 15636/15637. See ADR-065 |
-
-## VLAN Layout
-
-| VLAN | Zone | Purpose |
-|---|---|---|
-| 10 | Management | Proxmox, PBS, router management |
-| 20 | Server | k3s nodes, edge DNS, service LXCs |
-| 30 | DMZ | Reverse proxy and game servers, isolated from every other zone |
-| 40 | IOT | Untrusted / smart-home devices, restricted internet only |
-| 100 | Admin | Trusted admin workstations, the only zone allowed into VLAN 10 |
-
-Full detail (physical port mapping, firewall policy) in [docs/vlan-segmentation.md](docs/vlan-segmentation.md).
-
-## Terraform Workflow
-
-All Terraform changes go through Atlantis (self-hosted GitOps):
-
-```bash
-git checkout -b feature/my-change
-# edit terraform/stacks/network/*.tf or terraform/stacks/proxmox/*.tf
-git push && gh pr create
-# Atlantis auto-plans on PR open
-# comment "atlantis apply" on the PR to apply
-# merge after apply succeeds
-```
-
-I never run `terraform apply` locally. Everything goes through Atlantis.
-
-## Ansible Workflow
-
-```bash
-# Dry run
-ansible-playbook ansible/site.yml --check
-
-# Apply to specific group
-ansible-playbook ansible/site.yml --limit rpi_nodes
-
-# Rotate/add one secret -- vault.yml is plaintext-structured YAML with each
-# value individually vault-encrypted (not a whole-file-encrypted blob), so
-# `ansible-vault edit` doesn't work on it. Value goes over stdin, never a
-# CLI arg or on-screen:
-printf '%s' 'new-value' | ansible-vault encrypt_string \
-  --vault-password-file ansible/.ansible_vault_pass --stdin-name vault_foo
-# paste the output block in place of the existing vault_foo entry in vault.yml
-```
-
-## Adding a New k8s Service
-
-1. Create `kubernetes/apps/<service>/<service>.yml` with Deployment + Service + PVC
-2. ArgoCD ApplicationSet auto-detects the new directory and deploys it
-3. Add an IngressRoute — either declare it inline in the new app's own directory
-   (the pattern most recent apps use, and the one to prefer for anything new — no
-   separate `kubectl apply` step, ArgoCD picks it up with the rest of the manifest)
-   or add it to `kubernetes/system/apps-ingressroute.yml` and `kubectl apply -f` that
-   file directly (the older, still-working, not-yet-migrated pattern most existing
-   apps use — see the Repository Layout note above)
-4. Decide deliberately whether it needs a public DNS/tunnel entry at all — the
-   default is no (`ADR-033`); only add one with a real reason, in
-   `terraform/stacks/cloudflare/main.tf`
-
-## Monitoring
-
-Prometheus scrapes metrics from all hosts:
-
-- k3s nodes: DaemonSet node_exporter
-- Raspberry Pis and DMZ hosts: node_exporter Docker container
-- Service LXCs: node_exporter native binary
-- Proxmox host: prometheus-pve-exporter in-cluster
-
-Grafana dashboards: Node Exporter Full (1860), Proxmox PVE (10347, 19022).
 
 ## Documentation
 
-- [Steady State](docs/STEADY-STATE.md) — what runs itself, what needs a human, what
-  the alerts mean, and the monthly/quarterly operating rhythm. Start here for how this
-  cluster actually runs day to day.
-- [Disaster Recovery](DISASTER-RECOVERY.md) — full bare-metal-to-running-cluster
-  rebuild procedure, written from a real recovery, not theorized.
-- [Architecture Decision Records](docs/decisions/)
-- [k3s Cluster Architecture](docs/k3s-architecture.md)
-- [VLAN Segmentation](docs/vlan-segmentation.md)
-- [Backup Strategy](docs/backup-strategy.md)
-- [SSO Setup (Proxmox/PBS)](docs/SSO_SETUP.md)
-- [Naming Convention](docs/naming-convention.md)
+- [Disaster recovery](DISASTER-RECOVERY.md): bare metal to a running cluster, written
+  from a real full rebuild.
+- [Operating model](docs/OPERATING-MODEL.md): what updates itself, what alerts, what
+  stays manual and why.
+- [Backup strategy](docs/backup-strategy.md)
+- [k3s architecture](docs/k3s-architecture.md) and [hardware constraints](docs/HARDWARE.md)
+- [Network segmentation](docs/vlan-segmentation.md)
 - [Roadmap](docs/ROADMAP.md)
+
+## License
+
+[MIT](LICENSE)
