@@ -129,6 +129,9 @@ spec:
         - protocol: TCP
           port: 8448
 ---
+# The three tailscale-subnet-router policies below are inert while that pod
+# runs with hostNetwork (NetworkPolicy does not apply to host-network pods);
+# they are kept so a revert to the pod network works without new rules.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
