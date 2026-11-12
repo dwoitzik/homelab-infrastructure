@@ -91,9 +91,15 @@ is approved for the same three routes and keeps serving them during the restart.
 The host-network deployment (#1095) broke pod networking on vm-srv-k3s-11: from
 18:12 UTC, pods on the other nodes could not reach any pod on that node, so
 Traefik answered 502 for Immich and Authelia among others. It was reverted in
-PR #1111 within the hour and the photos/auth paths returned to 200. tailscaled in
-the host network namespace of a k3s node competes with kube-router and flannel
-for netfilter state and fwmark bits; validating only the tailnet side missed it.
+PR #1111 within the hour and the photos/auth paths returned to 200.
+
+Cause: in nftables mode tailscaled added its `ts-forward` chain to the node's
+`filter` table using expressions `iptables-save` cannot parse ("meta sreg is not
+an immediate"). k3s's network-policy controller (kube-router) rebuilds its rules
+from `iptables-save` output, so every sync on vm-srv-k3s-11 aborted and pods
+started or moved after that got no allow rules. Switching tailscaled to iptables
+mode would not help: the image ships legacy iptables, which would put legacy
+rules next to the node's nft-backed ones.
 
 rpi-srv-02 already runs tailscaled on its host, advertises the same routes
 (`10.0.20.0/24`, exit node) and reports `MappingVariesByDestIP: false`, so it
