@@ -36,8 +36,9 @@ spec:
         ports:
         - containerPort: 80
         env:
+        # Accounts exist; new ones come from an organization invite, not open signup.
         - name: SIGNUPS_ALLOWED
-          value: "true"
+          value: "false"
         - name: DOMAIN
           value: "https://vault.woitzik.dev"
         # Default icon fetching relays every visited domain through
