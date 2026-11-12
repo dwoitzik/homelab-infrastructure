@@ -918,8 +918,10 @@ resource "proxmox_virtual_environment_container" "ct_srv_rybbit_01" {
         gateway = "10.0.20.1"
       }
     }
+    # LAN DNS VIP (AdGuard on the RPis) like every other VLAN20 guest; the
+    # public resolvers stay only on the DMZ containers, which cannot reach it.
     dns {
-      servers = ["1.1.1.1", "8.8.8.8"]
+      servers = ["10.0.20.5", "10.0.20.2"]
     }
   }
 
