@@ -72,42 +72,40 @@ rate it reaches 90 % around the end of December.
 
 ### Security hygiene
 
-- [ ] Retire the remaining Atlantis deployment (replaced by GitHub Actions, ADR-021) and rotate its tokens. Ingress and config removed; server teardown on the runner host and token revocation pending
-- [x] Remove unused cluster tooling with broad permissions (Chaos Mesh, Keel)
+- [ ] Finish retiring the Atlantis deployment that GitHub Actions replaced (ADR-021),
+      including its credentials
+- [x] Remove unused cluster tooling with broad permissions
 - [ ] Hypervisor patch management and account hardening under Ansible
-- [ ] One ingress path for all public services so every request passes the same rate limiting and CrowdSec bouncer
-- [ ] Commit the remaining hand-applied NetworkPolicies; default-deny ingress for every namespace
+- [ ] One ingress path for every public service, so all requests pass the same rate
+      limiting and CrowdSec bouncer
+- [ ] Every NetworkPolicy under GitOps; default-deny ingress in every namespace
 - [ ] Pod Security `baseline` enforced in application namespaces
-- [ ] Secrets encryption at rest in the cluster datastore; unseal material handled separately from data backups
-- [ ] Merged-but-unapplied Terraform changes (network, Cloudflare) planned and applied
+- [ ] Encryption at rest for cluster secrets; key material kept apart from data backups
+- [ ] Merged Terraform changes planned and applied promptly
 
 ### Headscale / remote access
 
-- [ ] Upgrade 0.29.2 → 0.29.7 (Android peer-list crash, OIDC re-login, exit-node route fixes)
-- [ ] Exit nodes advertise IPv6 without an IPv6 uplink: stop advertising `::/0` until VLAN 20 has real IPv6
-- [ ] Subnet router sits behind hard NAT and relays everything through DERP: host networking + a UDP port forward, or move the role to the Raspberry Pi
-- [ ] Apply the pending DNS change for the control-plane hostname (ADR-059)
-- [ ] Clean up stale nodes and unapproved route advertisements
+- [ ] Keep Headscale current
+- [ ] Exit-node route advertisements match what each node can actually serve (ADR-043)
+- [ ] Direct peer connections for the subnet router instead of relayed traffic
+- [ ] Control-plane DNS served by Cloudflare (ADR-059)
 - [ ] Make the documented standby (ADR-029) real, or remove it from the docs
 
 ### DNS
 
-- [ ] Unbound: enable DNSSEC validation (trust anchor), keep local zones insecure
-- [ ] Keepalived: health-check AdGuard/Unbound so the DNS VIP fails over when the resolver dies
-- [ ] Lower `cache-min-ttl`
+- [ ] DNSSEC validation in Unbound
+- [ ] Health-checked keepalived failover for the DNS VIP
 
 ## Next (December 2026 – January 2027)
 
 ### Platform upgrades, one step at a time
 
-- [ ] k3s 1.31 → 1.37, one minor per step with a snapshot before each, automated via
-      system-upgrade-controller plans that Renovate bumps
-- [ ] External Secrets 0.10 → current (`v1beta1` → `v1` manifests)
-- [ ] Vault 1.17 → 2.2 (raft snapshot first)
-- [ ] Traefik latest 2.11 → v3
-- [ ] ArgoCD, CloudNativePG, Kyverno, Velero, MetalLB, kube-prometheus-stack to current
-- [ ] Promtail and Tempo charts are deprecated: move log shipping to Grafana Alloy
-- [ ] Jellyfin 10.11 → 12.x, Immich and Headscale kept current by Renovate
+- [ ] k3s to a supported minor, one minor per step with a snapshot before each,
+      automated via system-upgrade-controller plans that Renovate bumps
+- [ ] Platform components (External Secrets, Vault, Traefik v3, ArgoCD, CloudNativePG,
+      Kyverno, Velero, MetalLB, kube-prometheus-stack) to current releases
+- [ ] Move log shipping from the deprecated Promtail chart to Grafana Alloy
+- [ ] Application majors (Jellyfin, Immich, Headscale) kept current by Renovate
 
 ### Reliability
 
@@ -130,16 +128,17 @@ rate it reaches 90 % around the end of December.
 
 ### Network
 
-- [ ] QoS: replace the simple queue (bypassed by FastTrack) with a CAKE queue tree on the WAN interface
-- [ ] Router input chain limited to the management ports each source actually needs
-- [ ] Brute-force detection on the router rewritten as an address-list ladder
-- [ ] Remove stale VPN and proxy firewall rules
+- [ ] QoS with a CAKE queue tree on the WAN interface
+- [ ] Router input chain scoped per source to the ports each one needs
+- [ ] Router brute-force protection reworked
+- [ ] Remove stale firewall rules
 
 ## Later
 
-- [ ] Publication hygiene: host-level addressing, provider IDs and investigation diaries
-      move to a private overlay; the public repo keeps architecture, code and decisions
-- [ ] README rewritten as an architecture and skills overview
+- [x] Publication hygiene: provider IDs, WAN details, audit lists and investigation
+      diaries moved out of the public repo; it keeps architecture, code and decisions
+- [x] README rewritten as an architecture and skills overview
+- [ ] Deployable hostnames via a private kustomize overlay (ADR-048 follow-up)
 - [ ] Observability gaps: Traefik, Garage and promtail metrics; probes for Jellyfin and Nextcloud
 - [ ] SLO burn-rate rules aligned with the SRE workbook windows; annotations corrected
 - [ ] IPv6 beyond ULA once the provider delegates a prefix
