@@ -40,8 +40,13 @@ data:
     }
     if [ "${1:-}" = restore ]; then
       load "$2"
-      exec pg_restore --host="$host" --username="$user" --dbname="$db" \
-        --clean --if-exists --no-owner --exit-on-error "$OUT/$file.dump"
+      set -o pipefail
+      # pg_restore 18 always emits SET transaction_timeout, which a 16 server rejects.
+      pg_restore --clean --if-exists --no-owner --file=- "$OUT/$file.dump" \
+        | sed '/^SET transaction_timeout = /d' \
+        | psql --host="$host" --username="$user" --dbname="$db" \
+            -v ON_ERROR_STOP=1 --single-transaction --quiet >/dev/null
+      exit $?
     fi
     rc=0
     for name in $DUMP_TARGETS; do
@@ -83,8 +88,13 @@ data:
     }
     if [ "${1:-}" = restore ]; then
       load "$2"
-      exec pg_restore --host="$host" --username="$user" --dbname="$db" \
-        --clean --if-exists --no-owner --exit-on-error "$OUT/$file.dump"
+      set -o pipefail
+      # pg_restore 18 always emits SET transaction_timeout, which a 16 server rejects.
+      pg_restore --clean --if-exists --no-owner --file=- "$OUT/$file.dump" \
+        | sed '/^SET transaction_timeout = /d' \
+        | psql --host="$host" --username="$user" --dbname="$db" \
+            -v ON_ERROR_STOP=1 --single-transaction --quiet >/dev/null
+      exit $?
     fi
     rc=0
     for name in $DUMP_TARGETS; do
