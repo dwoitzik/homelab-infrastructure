@@ -11,16 +11,24 @@ IngressRoute (`kubernetes/system/apps-ingressroute.yml`) can route
 
 ## Access paths
 
-- **Public** (real site visitors): Cloudflare Tunnel routes straight to the
-  LXC's raw IP, bypassing Traefik/this Service entirely
+Both paths end at Traefik's `rybbit-final` IngressRoute
+(`kubernetes/system/apps-ingressroute.yml`), see
+`docs/decisions/ADR-074-rybbit-public-path-through-traefik.md`:
+
+- **Public** (real site visitors): Cloudflare Tunnel -> Traefik
   (`terraform/stacks/cloudflare/main.tf`, ADR-033's public allowlist).
-- **LAN/Tailscale**: `*.woitzik.dev` AdGuard wildcard -> Traefik -> this
-  Service. Gated by Authelia (`kubernetes/apps/authelia/configmap.yml`'s
-  `analytics.woitzik.dev` `access_control` rule) except the tracker/ingest
-  API paths under `/api/*`, `/track`, `/identify` etc. -- those stay open on
-  both paths, or the tracker script can't load/report for anonymous
-  visitors. See `docs/decisions/ADR-039-rybbit-public-tracker-exposure.md`
-  for why that's an acceptable exposure.
+- **LAN/Tailscale**: `*.woitzik.dev` AdGuard wildcard -> Traefik.
+
+`rybbit-final` has two routes. The tracker endpoints the woitzik.dev script
+calls (`/api/script.js`, `/api/track`, `/api/identify`, `/api/site/...`,
+`/api/session-replay/record/...`, `/api/replay.js`, `/api/metrics.js`,
+`/api/health`) get CrowdSec + `rybbit-ratelimit` (`middleware.yml`) and no
+Authelia. Everything else, including the dashboard, `/api/auth/*` and
+`/api/admin/*`, gets CrowdSec + Authelia. Since Authelia's portal is not
+public, the dashboard is reachable from LAN/Tailscale only.
+
+If a Rybbit update makes the script call a new path, that path hits the
+Authelia route and fails closed: add it to the tracker route's match.
 
 ## Egress
 
