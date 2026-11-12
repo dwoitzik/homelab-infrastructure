@@ -21,10 +21,9 @@ All notable changes to this infrastructure are documented here.
 
 ### Added
 
-- **REL-074 incident record** (`docs/incidents/REL-074-2026-09-21-alert-storm.md`):
-  the 2026-09-21 overnight alert storm (8 alerts, k3s-13 memory pressure, API p99 8.5s)
-  was previously only in an untracked scratch log — consolidated as a proper incident
-  doc and cross-referenced from `docs/HOMELAB-AUDIT.md`.
+- **REL-074 incident record**: the 2026-09-21 overnight alert storm (8 alerts, k3s-13
+  memory pressure, API p99 8.5s) consolidated from an untracked scratch log into an
+  incident record (kept local since the public-repo cleanup, ADR-048).
 
 ## [0.8.0] — 2026-06-28
 

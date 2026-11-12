@@ -8,9 +8,8 @@ A homelab, fully managed as code: MikroTik firewall rules, Proxmox VMs/LXCs, and
 self-hosted applications running on top in Kubernetes, all applied through GitOps, none
 of it by hand. It exists to be genuinely used day to day — not a demo cluster spun up to
 have something to show — and it's also a record of what running real infrastructure
-looks like: a from-nothing disaster recovery (`docs/RECOVERY-REPORT-2026-08-13.md`), the
-architecture decisions that came out of it (`docs/decisions/`, 33 ADRs), and an honest
-closing assessment of what still needs work (`docs/POST-MISSION.md`).
+looks like: a from-nothing disaster recovery (`DISASTER-RECOVERY.md`) and the
+architecture decisions that came out of it (`docs/decisions/`).
 
 **What this demonstrates**: GitOps discipline (every change is a PR, Terraform applies
 only via Atlantis, Kubernetes only via ArgoCD), root-causing real production incidents
@@ -52,8 +51,8 @@ graph TB
         MK["MikroTik RB5009\nVLAN 10/20/30 · Default-drop firewall"]
     end
 
-    subgraph k3s["k3s Cluster — 10.0.20.11-13"]
-        LB["MetalLB\n10.0.20.200"]
+    subgraph k3s["k3s Cluster — 3 nodes"]
+        LB["MetalLB"]
         TR["Traefik\nEdge router · TLS termination"]
         ARGO["ArgoCD\nGitOps · kubernetes/apps/*"]
         APPS["Applications\nNextcloud · Paperless · Vaultwarden\nMealie · Gitea · Home Assistant\nOpen WebUI · Uptime Kuma · Immich"]
@@ -102,8 +101,7 @@ The dashboard (self-hosted [Homepage](https://github.com/gethomepage/homepage)) 
 service grouped by function, live status widgets where the service supports one. Public
 Grafana/ArgoCD screenshots aren't included here: both require an authenticated login
 (Authelia SSO) to view anything beyond the sign-in page, so there's nothing meaningful
-to capture without live operator credentials — see `docs/URL-INVENTORY.md` for what's
-actually reachable and how.
+to capture without live operator credentials.
 
 **Currency note (2026-08-23)**: `home.woitzik.dev` is behind the same Authelia gate,
 so this screenshot can only be refreshed by someone with a real login session — checked
@@ -203,8 +201,7 @@ browser session is looking at the dashboard.
 Every hostname below resolves and works from the LAN or over the Headscale/Tailscale
 VPN. **Only two are actually reachable from the public internet** — everything else
 is deliberately allowlisted out of Cloudflare's DNS/tunnel entirely, an explicit
-default-deny decision (`ADR-033`), not an oversight. See `docs/URL-INVENTORY.md` for
-the full external-reachability audit.
+default-deny decision (`ADR-033`), not an oversight.
 
 | Service | URL | Auth | Reachable from |
 |---|---|---|---|
@@ -250,13 +247,13 @@ the full external-reachability audit.
 
 ## VLAN Layout
 
-| VLAN | Zone | Subnet | Key Hosts |
-|---|---|---|---|
-| 10 | Management | 10.0.10.0/24 | Proxmox + PBS (both 10.0.10.10), MikroTik API (10.0.10.1) |
-| 20 | Server | 10.0.20.0/24 | k3s (10.0.20.11-13), RPi (10.0.20.2-3), MetalLB (10.0.20.200) |
-| 30 | DMZ | 10.0.30.0/24 | Proxy (10.0.30.2), Games (10.0.30.3) |
-| 40 | IOT | 10.0.40.0/24 | Untrusted / smart-home devices, restricted internet only |
-| 100 | Admin | 10.0.100.0/24 | Trusted admin workstations -- only zone allowed into VLAN 10 |
+| VLAN | Zone | Purpose |
+|---|---|---|
+| 10 | Management | Proxmox, PBS, router management |
+| 20 | Server | k3s nodes, edge DNS, service LXCs |
+| 30 | DMZ | Reverse proxy and game servers, isolated from every other zone |
+| 40 | IOT | Untrusted / smart-home devices, restricted internet only |
+| 100 | Admin | Trusted admin workstations, the only zone allowed into VLAN 10 |
 
 Full detail (physical port mapping, firewall policy) in [docs/vlan-segmentation.md](docs/vlan-segmentation.md).
 
@@ -311,11 +308,10 @@ printf '%s' 'new-value' | ansible-vault encrypt_string \
 
 Prometheus scrapes metrics from all hosts:
 
-- k3s nodes: DaemonSet node_exporter (10.0.20.11-13)
-- Raspberry Pis: node_exporter Docker container (10.0.20.2-3)
-- Docker LXC: node_exporter Docker container (10.0.20.252)
-- AI LXC: node_exporter native binary (10.0.20.251)
-- Proxmox host: prometheus-pve-exporter in-cluster (10.0.10.10)
+- k3s nodes: DaemonSet node_exporter
+- Raspberry Pis and DMZ hosts: node_exporter Docker container
+- Service LXCs: node_exporter native binary
+- Proxmox host: prometheus-pve-exporter in-cluster
 
 Grafana dashboards: Node Exporter Full (1860), Proxmox PVE (10347, 19022).
 

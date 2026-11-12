@@ -5,7 +5,7 @@ diff for a comment containing a date, an investigation-narration phrase, or
 a comment block longer than 3 lines.
 
 Markdown docs are exempt: a `#` there is a heading, not a comment, and dated
-narration is the legitimate home of incident records (docs/incidents/) --
+narration belongs in ADRs and local incident records (docs/private/) --
 the rule is about comments in code, not prose in docs.
 
 This exists because asking for it in CLAUDE.md alone didn't hold --

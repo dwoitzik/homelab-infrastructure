@@ -6,7 +6,7 @@ workload.
 
 ## Why several dashboards/scrapers look messy right now
 
-See `docs/URL-INVENTORY.md` and the Phase 6 ADRs — Grafana's default dashboard set is
+See the Phase 6 ADRs — Grafana's default dashboard set is
 mostly kube-prometheus-stack's stock imports (some, like the AIX/macOS Node Exporter
 ones, are irrelevant to this all-Linux homelab), not yet curated down to a small
 useful set. Tracked as open follow-up work, not fixed as of this README.
@@ -26,8 +26,8 @@ workaround — there's no real target to scrape on this platform.
 kube-prometheus-stack chart lists it as a dependency but ArgoCD doesn't render the
 sub-chart from the upstream repo — so it's deployed separately here, with scrape
 configs in `application.yml` (`blackbox-http`, `blackbox-authelia-health` jobs)
-pointing at this standalone Service's DNS name. Probes every public hostname in
-`docs/URL-INVENTORY.md`.
+pointing at this standalone Service's DNS name. Probes every public hostname on the
+ADR-033 allowlist.
 
 ## SLOs and alert routing
 

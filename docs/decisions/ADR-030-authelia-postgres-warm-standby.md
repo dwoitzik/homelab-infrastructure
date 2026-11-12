@@ -145,8 +145,8 @@ similar WAL-shipping tool, or continuous barman/pgBackRest archiving to
   far is either HTTP/Traefik or SFTP (ADR-029). Mitigated with three
   independent restriction layers (§Implementation, points 2-4), but it's a
   real, new category of exposure and is called out explicitly rather than
-  buried in the diff — see `docs/EXPOSURE.md` for a review pass
-  before this reaches the "operator-verified" bar this ADR's Status line
+  buried in the diff; it needs a review pass against the public-exposure
+  allowlist (ADR-033) before this reaches the "operator-verified" bar this ADR's Status line
   notes as still outstanding.
 - Failback has no clean live-resync path (see Implementation, point 6) —
   accepted because a from-scratch `pg_basebackup` against a freshly-promoted

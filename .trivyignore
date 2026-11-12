@@ -53,7 +53,7 @@ KSV-01010 path:kubernetes/apps/homepage/homepage.yml
 #     compatibility scope), so an aws_s3_bucket_public_access_block resource here
 #     would fail to apply. Also moot in practice regardless -- these buckets are
 #     ClusterIP-only (garage.apps.svc.cluster.local), never on any public-exposure
-#     allowlist (see docs/EXPOSURE.md), so there is no public-internet path to
+#     allowlist (see ADR-033), so there is no public-internet path to
 #     "accidentally public" in the first place.
 #   - AWS-0132 (Customer Managed Keys / AWS KMS): Garage has no KMS integration:
 #     setting kms_master_key_id would either be silently ignored or fail the apply.

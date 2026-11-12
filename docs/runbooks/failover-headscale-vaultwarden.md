@@ -189,6 +189,5 @@ Mirror image, done deliberately:
   least-rehearsed part of this runbook precisely because that flip
   touches live production DNS/routing; the first time it's actually run
   should be either a deliberate, scheduled game-day exercise (see
-  `docs/RECOVERY-REPORT-2026-08-13.md` and the quarterly DR game-day
-  cadence added in commit `5d65817`) or a real incident, not something to
+  `DISASTER-RECOVERY.md` and the quarterly DR game-day cadence) or a real incident, not something to
   rehearse silently against live traffic.

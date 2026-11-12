@@ -55,9 +55,8 @@ Add exactly one hostname to the public allowlist:
 - The exposure is one explicit hostname, reversible by removing the ingress rule, the DNS
   record, and the NetworkPolicy rule — a PR + `atlantis apply -d cloudflare`, no
   destructive operation in either direction.
-- `docs/EXPOSURE.md`, `docs/URL-INVENTORY.md` and the top-level `README.md` service table
-  are updated in the same change so the public-hostname whitelist stays the source of
-  truth.
+- The public-hostname allowlist (ADR-033) is updated in the same change so it stays the
+  source of truth.
 
 ## Out-of-band apply (2026-10-19)
 

@@ -4,7 +4,9 @@ Working conventions for any Claude Code session (or other AI agent) operating in
 repository — how to approach a task here, not what the infrastructure is. Hardware and
 topology constraints live in `docs/HARDWARE.md` and `docs/physical-topology.md`,
 recovery in `DISASTER-RECOVERY.md`, and the internet-reachable allowlist in
-`docs/EXPOSURE.md`; this file is the process layer on top of them.
+`docs/decisions/ADR-033-public-exposure-allowlist.md`; this file is the process layer on
+top of them. Working notes that must not be public (audits, open-gap lists, incident
+diaries) live in the gitignored `docs/private/`.
 
 These conventions were adapted from a general team/services-oriented template and cut
 down to fit reality: this is a solo homelab, not a services monorepo. Anything about
@@ -176,7 +178,8 @@ flex.
 - Inline comments: one to three lines, WHY only (a non-obvious constraint, a workaround, a
   real gotcha). No dates, no "confirmed via", no step-by-step investigation replay.
 - The investigation itself (what was tried, what was ruled out, evidence) belongs in an ADR
-  in `docs/decisions/` or `docs/incidents/`, not in the diff.
+  in `docs/decisions/` (the decision and its reasoning, identifiers redacted) or in a local
+  incident note under the gitignored `docs/private/incidents/`, not in the diff.
 - PR descriptions carry the blast radius / rationale / rollback. Don't duplicate that into
   the diff as a comment block.
 - Before adding a comment, ask: would a human engineer, mid-incident, have written this

@@ -60,8 +60,8 @@ spec:
     spec:
       # This pod's DNS resolution otherwise inherits the node's own
       # resolv.conf, which points at the LAN AdGuard resolver -- AdGuard
-      # rewrites every *.woitzik.dev query to its internal LAN IP (see
-      # docs/URL-INVENTORY.md's own Methodology section). Probing through
+      # rewrites every *.woitzik.dev query to its internal LAN IP (split-horizon
+      # DNS). Probing through
       # that rewrite would silently test the internal path and prove
       # nothing about real external reachability, which is the entire
       # point of this exporter. Pinning to public resolvers makes every

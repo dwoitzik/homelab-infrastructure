@@ -3,8 +3,7 @@
 Bare metal to running cluster, assuming nothing survives but: PBS backups, the Garage
 S3 bucket contents (if the host running Garage is also gone, this assumes the archive
 disk itself survives), and this git repo. Written from the actual 2026-08-13 recovery —
-every step here was really executed, not theorized. See
-`docs/RECOVERY-REPORT-2026-08-13.md` for the full narrative and `HARDWARE.md` for why
+every step here was really executed, not theorized. See `docs/HARDWARE.md` for why
 several steps are the way they are.
 
 ## 0. Before you start
@@ -149,5 +148,4 @@ this document's full-rebuild path.
 
 Before declaring the recovery done, actually demonstrate (not just configure):
 Alertmanager delivering a real alert, a certificate actually renewing, ArgoCD actually
-reverting hand-introduced drift, and a real backup actually restoring. See
-`RECOVERY-REPORT-2026-08-13.md` §5 for exactly how each was proven during this run.
+reverting hand-introduced drift, and a real backup actually restoring.

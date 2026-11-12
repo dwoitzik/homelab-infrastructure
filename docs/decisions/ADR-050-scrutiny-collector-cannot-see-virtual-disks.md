@@ -95,7 +95,7 @@ Keep the host-side `smart_nvme_*` path as the single source of truth for disk we
 
 An inert service is worse than an absent one. This one carried `hostPID` and
 `CAP_SYS_RAWIO` on every node, an Authelia-gated public hostname, and two NFS PVCs,
-and it had produced nothing since day one while appearing in `HOMELAB-AUDIT.md` as
+and it had produced nothing since day one while appearing in the service inventory as
 "✅ Deployed". That is the same class of failure as the ArgoCD include-glob gap in
 [PR #819](https://github.com/dwoitzik/homelab-infrastructure/pull/819): a status
 line that was true about the manifest and false about the system.
