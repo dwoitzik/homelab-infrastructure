@@ -137,8 +137,10 @@ when only R2 is left.
    kubectl exec -n apps deploy/pg-dump -- sh /scripts/pg-dump.sh restore IMMICH
    ```
 
-   This runs `pg_restore --clean --if-exists --no-owner --exit-on-error`. immich's role
-   is a superuser, so the vector extensions in its dump are recreated by the restore.
+   This pipes `pg_restore --clean --if-exists --no-owner` into `psql` with
+   `ON_ERROR_STOP` in a single transaction, so a failed restore leaves the database
+   unchanged. immich's role is a superuser, so the vector extensions in its dump are
+   recreated by the restore.
 5. Scale the application back up and verify against content (row counts of a few key
    tables, the app's own UI), not just pod status.
 
