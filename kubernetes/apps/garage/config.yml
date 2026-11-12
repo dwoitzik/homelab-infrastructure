@@ -17,6 +17,10 @@ data:
     # replication_factor is fixed at 1 by this cluster's single-node hardware
     # (see below), so this is the mitigation actually available here.
     metadata_auto_snapshot_interval = "6h"
+    # Each snapshot is a full copy of the LMDB file (~550 MB, about 2 GB/day
+    # at 6h). Writing them to the archive HDD keeps that off the worn host
+    # NVMe and out of the failure domain the snapshot is meant to cover.
+    metadata_snapshots_dir = "/var/lib/garage/meta-snapshots"
 
     replication_factor = 1
 

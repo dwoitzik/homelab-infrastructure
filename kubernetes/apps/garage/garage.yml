@@ -156,6 +156,12 @@ spec:
               mountPath: /var/lib/garage/data
             - name: meta
               mountPath: /var/lib/garage/meta
+            # Garage's block scanner only walks hex-named directories, so
+            # this non-hex subdirectory of the data volume is never read as
+            # block data.
+            - name: data
+              mountPath: /var/lib/garage/meta-snapshots
+              subPath: meta-snapshots
             - name: tmp
               mountPath: /tmp
           resources:
