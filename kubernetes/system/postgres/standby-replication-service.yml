@@ -8,6 +8,9 @@ metadata:
   namespace: database
 spec:
   type: LoadBalancer
+  # Local keeps rpi-srv-02's source IP. Cluster SNATs it to a node address,
+  # so the pg_hba rule and the NetworkPolicy ipBlock both reject the standby.
+  externalTrafficPolicy: Local
   loadBalancerSourceRanges:
     - 10.0.20.3/32
   selector:
