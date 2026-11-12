@@ -39,6 +39,15 @@ spec:
             tls:
               enabled: true
               secretName: wildcard-woitzik-dev-tls
+          # Loki push for DMZ hosts on its own entrypoint and LB IP, so the DMZ
+          # firewall rule reaches one route instead of every Traefik host.
+          lokipush:
+            port: 3101
+            expose: false
+            exposedPort: 3101
+            protocol: TCP
+            tls:
+              enabled: true
         logs:
           general:
             level: INFO
