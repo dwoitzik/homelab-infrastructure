@@ -19,6 +19,14 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
 
   # disk and clone/initialization are creation-time only; ignore prevents Atlantis
   # from stopping the VM (and killing itself) on subsequent plans.
+  operating_system {
+    type = "l26"
+  }
+
+  serial_device {
+    device = "socket"
+  }
+
   lifecycle {
     ignore_changes = [clone, initialization, disk]
   }
@@ -66,9 +74,11 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_11_master" {
   # purpose guest. Made safe by pairing it with the zfs_arc_max cut
   # (16->8 GiB, ansible/roles/pve_power) that freed the real host RAM
   # this now claims; see ADR-037 for the full investigation.
+  # Lowered to 14 GB live to stay inside the host memory budget (REL-035
+  # guard); a memory change here reboots the only control-plane node.
   memory {
-    dedicated = 16384
-    floating  = 16384
+    dedicated = 14336
+    floating  = 14336
   }
 
   # cache=none + aio=native (O_DIRECT, no QEMU page cache). Originally
@@ -166,6 +176,14 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_12_worker" {
   startup {
     order    = 3
     up_delay = 30
+  }
+
+  operating_system {
+    type = "l26"
+  }
+
+  serial_device {
+    device = "socket"
   }
 
   lifecycle {
@@ -272,6 +290,14 @@ resource "proxmox_virtual_environment_vm" "vm_srv_k3s_13_worker" {
   startup {
     order    = 4
     up_delay = 30
+  }
+
+  operating_system {
+    type = "l26"
+  }
+
+  serial_device {
+    device = "socket"
   }
 
   lifecycle {

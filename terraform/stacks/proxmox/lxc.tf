@@ -15,68 +15,9 @@ locals {
 
 # --- Management Stack ---
 
-# REL-016: onboot=1 is applied manually (`pct set 110 -onboot 1`) and NOT via
-# Terraform's start_on_boot attribute -- confirmed live that bpg/proxmox 0.100.0
-# doesn't read this attribute back from the API into state, so any value set
-# here always shows as "No changes" regardless of the live onboot value,
-# silently not applying. Same gap on ct_srv_docker_01/ct_srv_ai_01/
-# ct_dmz_proxy_01/ct_dmz_games_01 below. If any of these containers are ever
-# recreated, onboot needs to be set manually again afterward.
-resource "proxmox_virtual_environment_container" "ct_mgmt_pbs_01" {
-  vm_id        = 110
-  node_name    = local.target_node
-  tags         = ["backup", "management"]
-  started      = true
-  unprivileged = true
-
-  startup {
-    order    = 5
-    up_delay = 10
-  }
-
-  initialization {
-    hostname = "ct-mgmt-pbs-01"
-    ip_config {
-      ipv4 {
-        address = "dhcp"
-      }
-      ipv6 {
-        address = "auto"
-      }
-    }
-  }
-
-  cpu {
-    cores = 2
-  }
-
-  memory {
-    dedicated = 2048
-    swap      = 512
-  }
-
-  disk {
-    datastore_id = local.storage
-    size         = 10
-  }
-
-  network_interface {
-    name        = "eth0"
-    bridge      = "vmbr0"
-    mac_address = "bc:24:11:24:7a:71"
-    vlan_id     = 10
-  }
-
-  operating_system {
-    template_file_id = local.template
-    type             = "debian"
-  }
-
-  lifecycle {
-    ignore_changes = all
-  }
-}
-
+# REL-016: onboot=1 is set manually (`pct set <id> -onboot 1`), not through
+# start_on_boot: bpg/proxmox does not read it back into state, so Terraform
+# cannot enforce it. A recreated container needs it set again.
 resource "proxmox_virtual_environment_container" "ct_mgmt_scanopy_01" {
   vm_id        = 111
   node_name    = local.target_node
@@ -142,7 +83,7 @@ resource "proxmox_virtual_environment_container" "ct_mgmt_scanopy_01" {
 
 # --- Server Stack ---
 
-# REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
+# REL-016: onboot=1 applied manually, see the note at the top of this file.
 resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
   vm_id                 = 200
   node_name             = local.target_node
@@ -169,12 +110,9 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
     cores = 2
   }
 
-  # Sized against the 10G host tmpfs at /mnt/sab-incomplete: ramdisk pages are
-  # charged to this container's cgroup, so the limit must clear the ramdisk plus
-  # ~2G of stack usage, or SABnzbd throttles in reclaim. See ADR-066.
   memory {
-    dedicated = 12288
-    swap      = 4096
+    dedicated = 6144
+    swap      = 2048
   }
 
   features {
@@ -215,14 +153,13 @@ resource "proxmox_virtual_environment_container" "ct_srv_docker_01" {
 
 # --- AI & LLM Stack ---
 
-# REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
+# REL-016: onboot=1 applied manually, see the note at the top of this file.
 resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   vm_id     = 201
   node_name = local.target_node
   tags      = ["ai", "llm", "server"]
-  # onboot set to 0 manually (REL-016 provider gap) so it stays off across
-  # host reboots.
-  started               = false
+  # Serves Ollama for paperless-gpt and open-webui, so it runs and boots with the host.
+  started               = true
   unprivileged          = true
   environment_variables = {}
 
@@ -253,12 +190,11 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   # effective CPU ceiling. Provider is now 0.111.0 and exposes `limit`
   # directly, so the cap is real and Terraform-tracked going forward instead
   # of depending on a manual step nobody re-runs after a recreate.
-  # Barely used, so held at the minimum: 2 cores / 4 GB only fits a small
-  # model (qwen2.5:7b ~5 GB needs swap) -- a 27b run will not fit anymore.
-  # Its reservation was the host's largest driver of memory overcommit.
+  # 4 GB only fits a small model (qwen2.5:7b ~5 GB needs swap); a 27b run
+  # does not fit. The CFS limit keeps inference from starving the host.
   cpu {
     cores = 2
-    limit = 2
+    limit = 4
   }
 
   memory {
@@ -351,6 +287,8 @@ resource "proxmox_virtual_environment_container" "ct_srv_media_acq_01" {
     cores = 2
   }
 
+  # SABnzbd's scratch is on the archive HDD since ADR-073, not a tmpfs charged
+  # to this cgroup; the stack uses about 1 GB.
   memory {
     dedicated = 4096
     swap      = 2048
@@ -598,8 +536,8 @@ resource "proxmox_virtual_environment_container" "ct_srv_atlantis_01" {
   }
 
   disk {
-    datastore_id = local.storage
-    size         = 15
+    datastore_id = "media"
+    size         = 25
   }
 
   network_interface {
@@ -627,7 +565,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_atlantis_01" {
 
 # --- DMZ Stack ---
 
-# REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
+# REL-016: onboot=1 applied manually, see the note at the top of this file.
 resource "proxmox_virtual_environment_container" "ct_dmz_proxy_01" {
   vm_id                 = 301
   node_name             = local.target_node
@@ -726,7 +664,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
   }
 
   cpu {
-    cores = 2
+    cores = 4
   }
 
   # 512MB was a near-miss: this LXC OOM-killed during a routine multi-directory
@@ -734,7 +672,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
   # down NFS for the whole cluster. Bumped with headroom — this is the storage
   # backend for nearly every nfs-client PVC in the cluster, not just its own data.
   memory {
-    dedicated = 2048
+    dedicated = 4096
     swap      = 1024
   }
 
@@ -809,7 +747,7 @@ resource "proxmox_virtual_environment_container" "ct_srv_nfs_01" {
   }
 }
 
-# REL-016: onboot=1 applied manually, see ct_mgmt_pbs_01's comment above.
+# REL-016: onboot=1 applied manually, see the note at the top of this file.
 resource "proxmox_virtual_environment_container" "ct_dmz_games_01" {
   vm_id                 = 302
   node_name             = local.target_node
