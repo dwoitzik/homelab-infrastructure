@@ -7,6 +7,10 @@ positions:
 
 clients:
   - url: {{ loki_push_url | default('http://' ~ monitoring_core_host ~ ':3100/loki/api/v1/push') }}
+{% if loki_push_tls_server_name is defined %}
+    tls_config:
+      server_name: {{ loki_push_tls_server_name }}
+{% endif %}
 
 scrape_configs:
   - job_name: system
