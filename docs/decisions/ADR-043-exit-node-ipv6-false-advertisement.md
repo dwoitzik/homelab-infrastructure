@@ -221,3 +221,21 @@ likely needing a network-mode change away from the CNI-default pod network
 (`hostNetwork` or a macvlan-style attachment) -- is real project work, not
 squeezed into this already twice-touched-today session. Tracked as a
 concrete follow-up, not left as an open question.
+
+## Update (2026-11-12): no host on this network has IPv6 egress
+
+The follow-up above assumed a host-network or macvlan subnet router would get a real
+IPv6 path. It would not. Checked on `vm-srv-k3s-11` and `rpi-srv-02`: both hold only a
+ULA address (`fd20::/64`) from the MikroTik's router advertisements, and `curl -6` to a
+public address fails immediately on both. The site has no IPv6 uplink at all, so neither
+exit node can serve `::/0`, wherever tailscaled runs. ADR-076 moved the subnet router to
+the host network for NAT reasons; it does not change this.
+
+What can be controlled is how fast that IPv6 fails. Both exit nodes forward IPv6
+(`net.ipv6.conf.all.forwarding=1`), and IPv6 to the internet is refused at once on both
+hosts (`curl -6` fails after 0 ms, not after a timeout), so forwarded client IPv6 should
+fail just as fast and let apps fall back to IPv4. That last step was not tested from a
+real client: no tailnet client was online during the check. The mismatch between
+advertised and servable routes stays until the WAN side delivers IPv6 (FritzBox
+prefix delegation to the MikroTik). Tailscale offers no IPv4-only exit node, so there
+is nothing to fix on the Tailscale or Headscale side.

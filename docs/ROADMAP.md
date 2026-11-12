@@ -86,10 +86,18 @@ rate it reaches 90 % around the end of December.
 ### Headscale / remote access
 
 - [ ] Keep Headscale current
-- [ ] Exit-node route advertisements match what each node can actually serve (ADR-043)
-- [ ] Direct peer connections for the subnet router instead of relayed traffic
+- [ ] Exit-node route advertisements match what each node can actually serve (ADR-043).
+      Blocked on an IPv6 uplink: no host here has IPv6 egress, and Tailscale has no
+      IPv4-only exit node. Needs FritzBox prefix delegation to the MikroTik first.
+- [ ] Direct peer connections for the subnet router instead of relayed traffic. Host side
+      done (ADR-076: endpoint-independent NAT, fixed port 41641); still to prove with an
+      off-LAN client, plus a UDP 41641 forward (FritzBox and MikroTik) for carriers with
+      a hard NAT
 - [ ] Control-plane DNS served by Cloudflare (ADR-059)
-- [ ] Make the documented standby (ADR-029) real, or remove it from the docs
+- [x] Make the documented standby (ADR-029) real, or remove it from the docs: docs now
+      describe an off-host replica, not a standby (ADR-029, 2026-11-12 status)
+- [ ] Finish the headscale/vaultwarden standby: identity keys and OIDC secret on
+      `rpi-srv-02`, standby config kept in sync with the primary, one rehearsed failover
 
 ### DNS
 

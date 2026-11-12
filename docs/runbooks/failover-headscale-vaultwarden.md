@@ -1,5 +1,12 @@
 # Failover Runbook: headscale + vaultwarden warm standby
 
+> **Not usable yet (checked 2026-11-12).** Step 0's prerequisites are not done: the
+> headscale identity keys and OIDC secret are missing on `rpi-srv-02`, the standby
+> config lags the primary (image, policy), and this runbook has never been rehearsed.
+> Following it today would give every tailnet node a new control key. Until ADR-029's
+> 2026-11-12 status is resolved, use the Litestream replica only as a restore source
+> (`litestream restore`, §2) for a rebuild.
+
 Manual, deliberate failover to the `rpi-srv-02` standby built under
 `docs/decisions/ADR-029-warm-standby-ha-headscale-vaultwarden.md`. Not
 automatic by design — see that ADR for why. RTO target: a few minutes.

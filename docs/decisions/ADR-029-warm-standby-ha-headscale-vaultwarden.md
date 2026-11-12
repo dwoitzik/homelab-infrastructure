@@ -1,7 +1,8 @@
 # ADR-029: Warm-Standby HA for Headscale + Vaultwarden on rpi-srv-02
 
 **Date:** 2026-08-26
-**Status:** Accepted (partially implemented — see Status below)
+**Status:** Replication implemented and restore-tested; the standby itself is not usable as a
+failover target (see the 2026-11-12 status update at the end)
 
 ## Context
 
@@ -198,3 +199,28 @@ a separate infrastructure issue from this ADR's own scope.
   AppRole scope and the credential-safety block already explained above).
 - Authelia stays scoped out, unchanged from the entry above
   (`phase8/QUESTIONS.md`, 2026-08-26).
+
+## Status update, 2026-11-12: replication works, the standby does not exist as a failover target
+
+Checked on `rpi-srv-02` and in the cluster:
+
+- **Replication is real.** Both Litestream sidecars ship to
+  `/mnt/ssd/litestream-replicas/{headscale,vaultwarden}`; the newest LTX files were
+  under a minute old. `litestream restore` of the headscale replica into a scratch
+  directory passed `PRAGMA integrity_check` and held the same four nodes as the live
+  database, with `last_seen` values from the same minute.
+- **The standby is not usable.** `/mnt/ssd/ha-standby/headscale/data` holds no
+  `private.key` or `noise_private.key`, so a started standby would mint a new control
+  key and every node would have to re-register. `docker ps -a` on `rpi-srv-02` shows no
+  standby containers. The deployed config has drifted from the primary: headscale
+  image v0.29.2 (live v0.29.7), and the `policy.hujson` copy on the Pi is the August
+  version. The induced-failure test (item 6) never ran.
+
+Decision: the documentation stops calling this a warm standby. What exists is a
+continuously replicated, restore-tested copy of the two SQLite databases on hardware
+that does not share `pve-mgmt-01`'s fate. In an outage that gives a recovery point a
+minute old, not a few-minute failover. `DISASTER-RECOVERY.md` §7b and the runbook now say
+that. Finishing the standby (identity files and OIDC secret on the Pi, config kept in
+sync with the primary, one rehearsed failover and failback) stays on
+`docs/ROADMAP.md`; it needs the key material copied by the owner, which this ADR's
+Status section already explains.
