@@ -103,6 +103,45 @@ these usually point at storage that's physically independent of the k3s cluster'
 lifecycle and may not need restoring at all — check what the PV actually points at
 before assuming a restore is needed.
 
+## 5b. Postgres from the offsite (R2) backup
+
+The offsite backup has no raw Postgres data directories, only `pg_dump` archives
+(ADR-075): `/dumps/<db>.dump` on the `pg-dumps` PVC of the `pg-dump` pod in `database`
+(authelia, firefly, n8n, scanopy, synapse) and in `apps` (immich, paperless, nextcloud).
+`/dumps/.last-run` holds the time of the last dump. The local Garage backup and CNPG's
+barman backups (local PITR) are the better source while Garage survives; use this path
+when only R2 is left.
+
+1. Let ArgoCD bring the database up empty from Git: CNPG bootstraps the cluster with its
+   owner role and database, the plain StatefulSets initialise an empty PVC. The
+   `postgres-*-user` secrets in `database` are applied out-of-band (`user-*.yml.example`)
+   and must exist first.
+2. Restore the dump pods and their PVCs (everything of theirs carries `app=pg-dump`).
+   If ArgoCD already created an empty `pg-dumps` PVC, delete the `pg-dump` Deployment and
+   PVC first, or Velero skips the existing PVC and its data:
+
+   ```bash
+   velero restore create --from-backup <daily-offsite-...> \
+     --include-namespaces database,apps --selector app=pg-dump
+   kubectl exec -n database deploy/pg-dump -- ls -l /dumps
+   ```
+
+3. Stop the application that writes to the database (scale its Deployment to 0).
+4. Load the dump from the `pg-dump` pod, which has the client version the archives need
+   (pg_restore 18) and every database's credentials in its environment. The names are
+   the `DUMP_TARGETS` entries (`AUTHELIA FIREFLY N8N SCANOPY SYNAPSE` in `database`,
+   `IMMICH PAPERLESS NEXTCLOUD` in `apps`):
+
+   ```bash
+   kubectl exec -n database deploy/pg-dump -- sh /scripts/pg-dump.sh restore SYNAPSE
+   kubectl exec -n apps deploy/pg-dump -- sh /scripts/pg-dump.sh restore IMMICH
+   ```
+
+   This runs `pg_restore --clean --if-exists --no-owner --exit-on-error`. immich's role
+   is a superuser, so the vector extensions in its dump are recreated by the restore.
+5. Scale the application back up and verify against content (row counts of a few key
+   tables, the app's own UI), not just pod status.
+
 ## 6. Backup layer, then bulk workload rollout
 
 1. Confirm a PBS backup job actually exists (`pvesh get /cluster/backup`) — this

@@ -23,7 +23,7 @@ spec:
       # its own namespaces (velero-restore-test, plus Role/RoleBinding in
       # velero) explicitly on every resource, so it's safe to sync from this
       # Application even though its destination.namespace default is velero.
-      include: '{secrets,schedule,restore-test,offsite-schedule,r2-backuplocation,r2-usage-guard}.yml'
+      include: '{secrets,schedule,restore-test,offsite-schedule,offsite-db-dumps,r2-backuplocation,r2-usage-guard}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: velero

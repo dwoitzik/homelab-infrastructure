@@ -1,0 +1,349 @@
+# Consistent pg_dump archives, taken by a Velero pre-backup hook and copied by
+# the same backup. Offsite they replace the raw data directories (ADR-075).
+# One client (18) for the 16, 17 and 18 servers; restores need it too.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: offsite-volume-policy
+  namespace: velero
+data:
+  policy.yaml: |
+    version: v1
+    volumePolicies:
+      # emptyDirs hold caches, sockets and scratch space that the pods rebuild
+      # on start; copying them offsite only costs R2 space.
+      - conditions:
+          volumeTypes:
+            - emptyDir
+        action:
+          type: skip
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-dump-script
+  namespace: database
+  labels:
+    app: pg-dump
+data:
+  pg-dump.sh: |
+    #!/bin/sh
+    # Pre-backup hook: a dump replaces the old file only once pg_restore reads it,
+    # failures exit non-zero. "restore <NAME>" loads it back (DISASTER-RECOVERY.md).
+    set -u
+    OUT=/dumps
+    load() {
+      eval "host=\$${1}_HOST db=\$${1}_DB user=\$${1}_USER"
+      eval "export PGPASSWORD=\"\$${1}_PASSWORD\""
+      export PGCONNECT_TIMEOUT=10
+      file=$(echo "$1" | tr 'A-Z' 'a-z')
+    }
+    if [ "${1:-}" = restore ]; then
+      load "$2"
+      exec pg_restore --host="$host" --username="$user" --dbname="$db" \
+        --clean --if-exists --no-owner --exit-on-error "$OUT/$file.dump"
+    fi
+    rc=0
+    for name in $DUMP_TARGETS; do
+      load "$name"
+      tmp="$OUT/.$file.dump.partial"
+      start=$(date +%s)
+      if pg_dump --host="$host" --username="$user" --dbname="$db" \
+          --format=custom --file="$tmp" && pg_restore --list "$tmp" >/dev/null; then
+        mv -f "$tmp" "$OUT/$file.dump"
+        echo "pg-dump: $file ok, $(wc -c < "$OUT/$file.dump") bytes, $(( $(date +%s) - start ))s"
+      else
+        rm -f "$tmp"
+        echo "pg-dump: $file FAILED, previous dump kept" >&2
+        rc=1
+      fi
+    done
+    date -u +%FT%TZ > "$OUT/.last-run"
+    exit $rc
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-dump-script
+  namespace: apps
+  labels:
+    app: pg-dump
+data:
+  pg-dump.sh: |
+    #!/bin/sh
+    # Pre-backup hook: a dump replaces the old file only once pg_restore reads it,
+    # failures exit non-zero. "restore <NAME>" loads it back (DISASTER-RECOVERY.md).
+    set -u
+    OUT=/dumps
+    load() {
+      eval "host=\$${1}_HOST db=\$${1}_DB user=\$${1}_USER"
+      eval "export PGPASSWORD=\"\$${1}_PASSWORD\""
+      export PGCONNECT_TIMEOUT=10
+      file=$(echo "$1" | tr 'A-Z' 'a-z')
+    }
+    if [ "${1:-}" = restore ]; then
+      load "$2"
+      exec pg_restore --host="$host" --username="$user" --dbname="$db" \
+        --clean --if-exists --no-owner --exit-on-error "$OUT/$file.dump"
+    fi
+    rc=0
+    for name in $DUMP_TARGETS; do
+      load "$name"
+      tmp="$OUT/.$file.dump.partial"
+      start=$(date +%s)
+      if pg_dump --host="$host" --username="$user" --dbname="$db" \
+          --format=custom --file="$tmp" && pg_restore --list "$tmp" >/dev/null; then
+        mv -f "$tmp" "$OUT/$file.dump"
+        echo "pg-dump: $file ok, $(wc -c < "$OUT/$file.dump") bytes, $(( $(date +%s) - start ))s"
+      else
+        rm -f "$tmp"
+        echo "pg-dump: $file FAILED, previous dump kept" >&2
+        rc=1
+      fi
+    done
+    date -u +%FT%TZ > "$OUT/.last-run"
+    exit $rc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pg-dumps
+  namespace: database
+  labels:
+    app: pg-dump
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pg-dumps
+  namespace: apps
+  labels:
+    app: pg-dump
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pg-dump
+  namespace: database
+  labels:
+    app: pg-dump
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pg-dump
+  template:
+    metadata:
+      labels:
+        app: pg-dump
+      annotations:
+        pre.hook.backup.velero.io/container: pg-dump
+        pre.hook.backup.velero.io/command: '["/bin/sh", "/scripts/pg-dump.sh"]'
+        # Continue, not Fail: Fail would skip the pg-dumps volume entirely,
+        # losing the dumps that did succeed. The error still marks the backup
+        # PartiallyFailed, which VeleroBackupPartialFailure alerts on.
+        pre.hook.backup.velero.io/on-error: Continue
+        pre.hook.backup.velero.io/timeout: 15m
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: pg-dump
+          image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+          command: ["/bin/sh", "-c", "trap 'exit 0' TERM INT; while true; do sleep 3600 & wait $!; done"]
+          env:
+            - name: HOME
+              value: /tmp
+            - name: DUMP_TARGETS
+              value: AUTHELIA FIREFLY N8N SCANOPY SYNAPSE
+            - {name: AUTHELIA_HOST, value: postgres-authelia-rw}
+            - {name: AUTHELIA_DB, value: authelia}
+            - name: AUTHELIA_USER
+              valueFrom: {secretKeyRef: {name: postgres-authelia-user, key: username}}
+            - name: AUTHELIA_PASSWORD
+              valueFrom: {secretKeyRef: {name: postgres-authelia-user, key: password}}
+            - {name: FIREFLY_HOST, value: postgres-firefly-rw}
+            - {name: FIREFLY_DB, value: firefly}
+            - name: FIREFLY_USER
+              valueFrom: {secretKeyRef: {name: postgres-firefly-cnpg-user, key: username}}
+            - name: FIREFLY_PASSWORD
+              valueFrom: {secretKeyRef: {name: postgres-firefly-cnpg-user, key: password}}
+            - {name: N8N_HOST, value: postgres-n8n-rw}
+            - {name: N8N_DB, value: n8n}
+            - name: N8N_USER
+              valueFrom: {secretKeyRef: {name: postgres-n8n-user, key: username}}
+            - name: N8N_PASSWORD
+              valueFrom: {secretKeyRef: {name: postgres-n8n-user, key: password}}
+            - {name: SCANOPY_HOST, value: postgres-scanopy-rw}
+            - {name: SCANOPY_DB, value: scanopy}
+            - name: SCANOPY_USER
+              valueFrom: {secretKeyRef: {name: postgres-scanopy-user, key: username}}
+            - name: SCANOPY_PASSWORD
+              valueFrom: {secretKeyRef: {name: postgres-scanopy-user, key: password}}
+            - {name: SYNAPSE_HOST, value: postgres-synapse-rw}
+            - {name: SYNAPSE_DB, value: synapse}
+            - name: SYNAPSE_USER
+              valueFrom: {secretKeyRef: {name: postgres-synapse-user, key: username}}
+            - name: SYNAPSE_PASSWORD
+              valueFrom: {secretKeyRef: {name: postgres-synapse-user, key: password}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: dumps
+              mountPath: /dumps
+            - name: script
+              mountPath: /scripts
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: dumps
+          persistentVolumeClaim:
+            claimName: pg-dumps
+        - name: script
+          configMap:
+            name: pg-dump-script
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pg-dump
+  namespace: apps
+  labels:
+    app: pg-dump
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pg-dump
+  template:
+    metadata:
+      labels:
+        app: pg-dump
+      annotations:
+        pre.hook.backup.velero.io/container: pg-dump
+        pre.hook.backup.velero.io/command: '["/bin/sh", "/scripts/pg-dump.sh"]'
+        # Continue, not Fail: Fail would skip the pg-dumps volume entirely,
+        # losing the dumps that did succeed. The error still marks the backup
+        # PartiallyFailed, which VeleroBackupPartialFailure alerts on.
+        pre.hook.backup.velero.io/on-error: Continue
+        pre.hook.backup.velero.io/timeout: 15m
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: pg-dump
+          image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+          command: ["/bin/sh", "-c", "trap 'exit 0' TERM INT; while true; do sleep 3600 & wait $!; done"]
+          env:
+            - name: HOME
+              value: /tmp
+            - name: DUMP_TARGETS
+              value: IMMICH PAPERLESS NEXTCLOUD
+            - {name: IMMICH_HOST, value: immich-postgres}
+            - {name: IMMICH_DB, value: immich}
+            - {name: IMMICH_USER, value: immich}
+            - name: IMMICH_PASSWORD
+              valueFrom: {secretKeyRef: {name: immich-secrets, key: db-password}}
+            - {name: PAPERLESS_HOST, value: postgres-paperless}
+            - {name: PAPERLESS_DB, value: paperless}
+            - {name: PAPERLESS_USER, value: paperless}
+            - name: PAPERLESS_PASSWORD
+              valueFrom: {secretKeyRef: {name: paperless-secrets, key: postgres-password}}
+            - {name: NEXTCLOUD_HOST, value: postgres-nextcloud}
+            - {name: NEXTCLOUD_DB, value: nextcloud}
+            - {name: NEXTCLOUD_USER, value: nextcloud}
+            - name: NEXTCLOUD_PASSWORD
+              valueFrom: {secretKeyRef: {name: nextcloud-secrets, key: postgres-password}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: dumps
+              mountPath: /dumps
+            - name: script
+              mountPath: /scripts
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: dumps
+          persistentVolumeClaim:
+            claimName: pg-dumps
+        - name: script
+          configMap:
+            name: pg-dump-script
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+# The database namespace denies egress by default; the dump pod only needs
+# the Postgres instances.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-pg-dump
+  namespace: database
+spec:
+  podSelector:
+    matchLabels:
+      app: pg-dump
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/podRole: instance
+      ports:
+        - port: 5432
+          protocol: TCP

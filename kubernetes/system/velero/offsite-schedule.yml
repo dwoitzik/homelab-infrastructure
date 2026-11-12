@@ -1,6 +1,6 @@
-# Offsite backup to Cloudflare R2 — critical data only, kopia/zstd; large volumes
-# (media, prometheus, loki, garage) excluded via label. TTL 3 days not 7 (a full set
-# ~4 GiB; 7 days of dedup deltas hit the r2-usage-guard cap — see ADR-062). Runs 04:00.
+# Offsite backup to Cloudflare R2, sized for the r2-usage-guard cap (ADR-062,
+# ADR-075). Excluded: large volumes (pod annotations), emptyDirs (volume policy),
+# raw Postgres directories (labelSelector); databases go as pg_dump archives.
 apiVersion: velero.io/v1
 kind: Schedule
 metadata:
@@ -18,5 +18,22 @@ spec:
       - database
       - argocd
     excludedNamespaces: []
+    resourcePolicy:
+      kind: configmap
+      name: offsite-volume-policy
+    # A pod left out of the backup takes its volumes with it. On restore the
+    # databases come up from Git (CNPG bootstraps an empty cluster) and the
+    # dumps are loaded with pg_restore, see DISASTER-RECOVERY.md.
+    labelSelector:
+      matchExpressions:
+        - key: cnpg.io/podRole
+          operator: NotIn
+          values: [instance]
+        - key: cnpg.io/pvcRole
+          operator: NotIn
+          values: [PG_DATA, PG_WAL]
+        - key: app
+          operator: NotIn
+          values: [immich-postgres, postgres-paperless, postgres-nextcloud]
     volumeSnapshotLocations:
       - default
