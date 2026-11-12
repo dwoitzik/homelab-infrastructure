@@ -1,7 +1,7 @@
 # Traefik
 
-Ingress controller for the whole cluster — every hostname in
-`docs/URL-INVENTORY.md` eventually routes through this. Deployed via the official Helm
+Ingress controller for the whole cluster: every in-cluster hostname eventually routes
+through this. Deployed via the official Helm
 chart (`application.yml`), fronted by MetalLB for its LoadBalancer IP.
 
 ## Routing

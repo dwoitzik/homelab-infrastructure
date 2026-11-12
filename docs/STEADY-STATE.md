@@ -92,18 +92,6 @@ that keeps it that way.
 - **`atlantis apply` comments** for any Terraform PR that's actually supposed to take
   effect — plan runs automatically, apply is a deliberate PR-comment trigger by design
   (never automatic, per `ADR-021`).
-- **Rotate the 3 GitHub PATs** that appeared in an agent's tool output on 2026-08-23
-  (a debugging mistake, not a network exposure, but per this mission's own standing
-  rule any such appearance is treated as compromised). `~/.config/gh/hosts.yml` itself
-  is gone now (ADR-028 — `GH_TOKEN` is sourced from a dedicated 0600 file instead), but
-  the active `dwoitzik` token's *value* is unchanged, just relocated to
-  `/root/.secrets/gh_token` — rotating it is still real, not done by the design fix
-  alone. Not urgent-critical (no evidence of misuse), but real.
-- **Decide the disposal of 3 flagged-for-review credentials** in
-  `/root/.secrets/flagged-for-review/` (a Proxmox API token, a GitHub PAT, a Vault
-  session token — found loose on disk during ADR-028's sweep, moved somewhere
-  mechanically protected rather than deleted unverified). See
-  `phase8/QUESTIONS.md`'s 2026-08-23 entry for what each needs.
 - **Disk wear alerting has no live path until `fwd_04a_srv_monitoring` is
   applied** — the host-side `smart_nvme_*` metrics and `NVMeWearWarning`/
   `NVMeWearCritical` rules exist but are blocked from reaching Prometheus by the

@@ -21,11 +21,11 @@ headscale answered `200` on every probe that *did* resolve, so headscale was nev
 The reason lives in the DNS chain:
 
 ```text
-headscale.woitzik.dev  CNAME  ec190fe6b6ab.sn.mynetname.net   (ttl 300)
-ec190fe6b6ab.sn.mynetname.net  A  178.202.47.0                (ttl 60)
+headscale.woitzik.dev     CNAME  <serial>.sn.mynetname.net   (ttl 300)
+<serial>.sn.mynetname.net A      <home WAN IP>               (ttl 60)
 ```
 
-`ec190fe6b6ab.sn.mynetname.net` is the MikroTik IP-Cloud DDNS name
+`<serial>.sn.mynetname.net` is the MikroTik IP-Cloud DDNS name
 (`routeros_ip_cloud.ddns`), and its **A record carries a 60s TTL**. Recursive resolvers
 therefore re-chase the DDNS target roughly every minute, and MikroTik's authoritative
 side intermittently takes ~8–9s to answer. Even on *successful* probes the lookup was
@@ -59,8 +59,9 @@ goes through the same DDNS target and sees the same slowness.
 - Changing the record `type` (`CNAME -> A`) **forces replacement** in the Cloudflare
   provider, so the first apply destroys and recreates the record — a brief DNS gap,
   confined to the PR-gated manual apply.
-- The home WAN IP (`178.202.47.0`) now appears literally in `main.tf`. It was already
-  derivable from the DDNS hostname, and the disclosure guard has no rule for public IPv4.
+- `main.tf` carries only a documentation placeholder (RFC 5737) as the record's initial
+  content. The live value is owned by the CronJob and ignored by Terraform, so the home
+  WAN IP never needs to appear in the repository.
 - On a real WAN-IP change, convergence takes up to 5 min (CronJob interval) plus record
   TTL, versus the previous ~60s DDNS update — an acceptable trade for resolver reliability.
 - Known layering smell: an infrastructure DDNS job living in the `cert-manager` namespace

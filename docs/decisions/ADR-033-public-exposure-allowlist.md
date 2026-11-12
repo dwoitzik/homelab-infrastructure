@@ -56,7 +56,7 @@ Every other hostname declared across this repo's IngressRoutes — all ~44 other
 including Vaultwarden, Nextcloud, Jellyfin, Grafana, Vault, PVE, PBS, Wazuh, Atlantis,
 Authelia itself, everything — gets no Cloudflare DNS record and no tunnel ingress rule.
 Reachable via LAN or Headscale/Tailscale VPN only, through the AdGuard split-horizon
-rewrite to Traefik's ClusterIP LoadBalancer (`10.0.20.200`) that every internal client
+rewrite to Traefik's MetalLB LoadBalancer IP that every internal client
 already uses — a path that never touches Cloudflare or the public internet, so nothing
 about LAN/VPN access changes.
 
@@ -68,6 +68,21 @@ redirect completing against a publicly-resolvable `auth.woitzik.dev`. Safe to dr
 Internal Authelia login (everything on the LAN/VPN path) is unaffected — that resolves
 `auth.woitzik.dev` via the same internal AdGuard rewrite as everything else, never
 Cloudflare's public DNS.
+
+## Current allowlist
+
+The list has grown since this ADR by deliberate, individually recorded decisions. The
+source of truth is `terraform/stacks/cloudflare/main.tf`; this table mirrors it.
+
+| Hostname | Path | Auth | Decision |
+|---|---|---|---|
+| `photos.woitzik.dev` (Immich) | Cloudflare Tunnel to Traefik (CrowdSec bouncer, rate limit) | Immich login | this ADR |
+| `media.woitzik.dev` (Jellyfin) | Cloudflare Tunnel to Traefik (CrowdSec bouncer, rate limit) | Jellyfin login | ADR-064 |
+| `analytics.woitzik.dev` (Rybbit) | Cloudflare Tunnel | public tracker endpoint by design | ADR-039 |
+| `headscale.woitzik.dev` | DNS-only record, DMZ reverse proxy (TS2021 cannot traverse the tunnel) | device registration | this ADR, ADR-059 |
+| Game servers (Minecraft, Enshrouded) | playit.gg relay to the DMZ VLAN, no WAN port-forward | server-side | ADR-055, ADR-065 |
+
+Everything else is LAN/VPN only.
 
 ## Reasons
 
@@ -89,7 +104,7 @@ Cloudflare's public DNS.
   AdGuard rewrite + Traefik LB path every local and Tailscale-connected client already
   uses doesn't touch Cloudflare at all, confirmed by how this repo's own internal
   testing works throughout this recovery (every `dig` from inside the network resolves
-  these hostnames to `10.0.20.200`, never Cloudflare's edge).
+  these hostnames to Traefik's internal LoadBalancer IP, never Cloudflare's edge).
 
 ## Trade-offs (accepted)
 
@@ -111,7 +126,7 @@ Cloudflare's public DNS.
   ingress rule + DNS record added (previously only covered by the wildcard).
 - `terraform/stacks/cloudflare/imports.tf`: `tunnel_atlantis` and `tunnel_home` import
   blocks removed along with their resources.
-- `docs/URL-INVENTORY.md` needs a fresh pass once this is applied: every hostname
+- The URL inventory needs a fresh pass once this is applied: every hostname
   except `photos.woitzik.dev` and `headscale.woitzik.dev` becomes "PASS via LAN/VPN,
   no public DNS by design" rather than a FAIL or a PARKED-pending-fix row.
 - The Wazuh/Nextcloud/Jellyseerr middleware gaps that motivated this audit are now

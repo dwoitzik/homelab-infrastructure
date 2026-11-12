@@ -168,7 +168,7 @@ of 478 SARIF rows are not worth spending core-auth availability on to clear.
   the `.trivyignore` header and the `authelia` evidence this ADR leans on. The
   REL-IDs it cited (019, 021, 022, 062, 068) exist nowhere in the repo now. Those
   pointers are dead and are **not** repaired here, because repointing them at
-  `docs/HOMELAB-AUDIT.md` would substitute visible references to nonexistent IDs
+  the audit tracker would substitute visible references to nonexistent IDs
   for visible references to a nonexistent file. The rationale survives inline in
   each manifest; only the citation is stale.
 

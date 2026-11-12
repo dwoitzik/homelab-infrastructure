@@ -1,28 +1,6 @@
-# =============================================================================
-# Cloudflare Tunnel configuration for woitzik.dev public services.
-#
-# 2026-08-14 (ADR-033): rewritten from a "public by default, opt out" wildcard
-# to an explicit allowlist -- originally two hostnames, now four (see ADR-064)
-# (photos.woitzik.dev, headscale.woitzik.dev via the DMZ path below,
-# analytics.woitzik.dev, media.woitzik.dev/Jellyfin). Everything else in this
-# repo's ~46 declared IngressRoutes is reachable only via LAN or Headscale/
-# Tailscale VPN (the existing AdGuard rewrite to Traefik's ClusterIP LB,
-# 10.0.20.200, which never touches this tunnel or the public internet at
-# all) -- same reasoning as ADR-032 (why claude.woitzik.dev got its own
-# tunnel instead of a VLAN20->VLAN100 firewall hole), extended from "which
-# network zone" to "the public internet as a whole." See ADR-033 for the
-# full exposure audit this rewrite is based on.
-#
-# The cloudflared daemon runs in K3s (apps/cloudflared) and holds persistent
-# connections to Cloudflare's edge. This stack configures which hostnames are
-# routed through that tunnel and creates the matching DNS records -- if a
-# hostname has neither, it simply isn't reachable from outside the LAN/VPN,
-# which is now the deliberate default rather than something to opt into.
-#
-# Tunnel ID:  1f2e0f78-214b-4f59-881d-37e22625ae6e
-# Account ID: 61863ddb47e05bc833c7671f69e3454c
-# Zone:       woitzik.dev (1f15ed0f3a8b497302ba339dcab3c060)
-# =============================================================================
+# Public exposure is an explicit allowlist (ADR-033): a hostname without a tunnel
+# ingress rule and DNS record here is reachable only via LAN or the tailnet.
+# cloudflared runs in-cluster (kubernetes/apps/cloudflared).
 
 # Provider v4 -> v5 renames: moved blocks prevent destroy+recreate of live resources.
 moved {
@@ -39,10 +17,6 @@ locals {
   tunnel_cname = "${var.tunnel_id}.cfargotunnel.com"
 }
 
-# claude.woitzik.dev -- removed. This fronted a web terminal onto the
-# recovery agent's own control host, which should never have been on the
-# public internet regardless of what sat in front of it. Tailscale (the
-# host already has its own tailnet node) is the intended remote-access path.
 # -----------------------------------------------------------------------------
 # Tunnel ingress configuration
 # v5 schema: config is an object attribute (config = {}) not a block (config {}).
@@ -76,12 +50,8 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
       },
       {
         hostname = "analytics.woitzik.dev"
-        # Rybbit self-hosted analytics (ansible/roles/rybbit) -- deliberately
-        # public: real visitors to woitzik.dev need to reach it, same
-        # reasoning ADR-033 used for photos.woitzik.dev. This is the third
-        # hostname on the public allowlist, not two anymore -- see that ADR
-        # for the original reasoning, still followed here just with an
-        # updated count.
+        # Rybbit analytics (ansible/roles/rybbit): public because site
+        # visitors' browsers must reach the tracker endpoint (ADR-039).
         service = "http://10.0.20.205:80"
         origin_request = {
           no_tls_verify          = false
@@ -102,22 +72,9 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
           http_host_header   = "media.woitzik.dev"
         }
       },
-      # headscale.woitzik.dev: removed from this tunnel's ingress 2026-08-28.
-      # Headscale's ts2021/noise registration protocol upgrades the
-      # connection with `Upgrade: tailscale-control-protocol`, not the
-      # literal `websocket` value. Neither Traefik
-      # (github.com/traefik/traefik#12609) nor cloudflared itself forward a
-      # non-"websocket" Upgrade header -- confirmed live (repeated 500s "no
-      # upgrade header in TS2021 request") and in headscale's own docs
-      # ("Running Headscale behind a Cloudflare Proxy or Tunnel is not
-      # supported"). Moved to a direct WAN path via the DMZ reverse proxy
-      # instead (nginx forwards $http_upgrade unconditionally) -- see
-      # dns_headscale_dmz below and terraform/stacks/network/nat_portforward.tf.
-      # Every other hostname: no ingress entry, no route through this tunnel
-      # at all. Falls through to this 404 -- the deliberate default per
-      # ADR-033, not a gap to fill in later. LAN/Tailscale clients reach
-      # these exact same services fine via the existing AdGuard rewrite to
-      # Traefik's ClusterIP LB (10.0.20.200), which never touches Cloudflare.
+      # headscale is not here: its TS2021 Upgrade header is dropped by cloudflared
+      # and Traefik (traefik#12609), so it uses a DNS-only record (below).
+      # Every other hostname falls through to this 404 (ADR-033).
       { service = "http_status:404" }
     ]
   }
@@ -165,13 +122,13 @@ resource "cloudflare_dns_record" "dns_headscale_dmz" {
   zone_id = var.zone_id
   name    = "headscale"
   type    = "A"
-  content = "178.202.47.0"
+  content = "192.0.2.1"
   proxied = false
   ttl     = 300
   comment = "DMZ direct WAN path, Tunnel incompatible w/ headscale TS2021"
 
   lifecycle {
-    # The DDNS CronJob updates content to the real WAN IP; don't revert it.
+    # The DDNS CronJob owns content; the placeholder only seeds a recreate.
     ignore_changes = [content]
   }
 }
@@ -183,17 +140,6 @@ moved {
   from = cloudflare_dns_record.tunnel_headscale
   to   = cloudflare_dns_record.dns_headscale_dmz
 }
-
-# 2026-08-14 (ADR-033): atlantis, auth, home, and the *.woitzik.dev wildcard
-# DNS records were removed here. The operator's explicit instruction: only
-# an explicit allowlist (photos, headscale, and now analytics -- see this
-# file's header) should have any public DNS/tunnel exposure at all. Every
-# other hostname declared in this repo's
-# IngressRoutes -- including atlantis, auth, home, and everything the
-# wildcard used to catch -- is reachable only via LAN or Headscale/Tailscale
-# VPN through the existing AdGuard rewrite to Traefik's ClusterIP LB
-# (10.0.20.200), which never touches Cloudflare or the public internet. See
-# ADR-033 for the full exposure audit and reasoning.
 
 # mc.woitzik.dev -> playit.gg tunnel for Minecraft (port 25565, main server).
 # Only created once var.mc_playit_hostname is set in tfvars.
@@ -228,13 +174,6 @@ resource "cloudflare_dns_record" "mc_srv" {
   }
   comment = "SRV for mc.woitzik.dev -> playit.gg tunnel."
 }
-
-# cobblemon.woitzik.dev -- previously tracked here as a stale record pending
-# deletion (see git history for the original comment/import). 2026-08-14:
-# confirmed via the Cloudflare API that it no longer exists live -- already
-# deleted out-of-band since that note was written. Dropped from Terraform
-# entirely rather than recreating a record whose own history said to remove
-# it.
 
 # =============================================================================
 # Immich SSO via CF Access OIDC IdP (sign-in only, immich#8299). NOT

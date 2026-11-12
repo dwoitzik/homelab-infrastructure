@@ -16,8 +16,7 @@ problem, not a genuine "someone needs to reach this from their phone" need.
 ADR-033 (this session) already dropped `atlantis.woitzik.dev`'s Cloudflare DNS record
 and tunnel ingress rule as part of moving to an explicit public-exposure allowlist —
 Atlantis is not on that allowlist and has no plausible case for being on it. That
-apply is what actually happened live, confirmed via the Cloudflare API; see
-`docs/EXPOSURE.md` and `phase8/LEDGER.md` Entry 2 for the full history, including the
+apply is what actually happened live, confirmed via the Cloudflare API; the full history includes the
 self-inflicted chicken-and-egg it created (the same apply that removed the DNS record
 also removed the one path GitHub's webhook needs to tell Atlantis to finish
 reconciling its own Terraform state — parked, not blocking, since the dangerous state
@@ -78,8 +77,7 @@ port forward, Cloudflare Tunnel, or WAN-listening service is needed at all.
   internet who can get past HMAC verification." A self-hosted runner with no inbound
   path removes an entire class of "what if Atlantis's own auth has a bug" risk for the
   most sensitive credentials in the whole stack. This directly feeds the credential
-  rotation plan in `docs/EXPOSURE.md` (Tier 1) — Option A makes that Tier 1 risk
-  permanently smaller, not just rotated once.
+  rotation work: Option A makes that risk permanently smaller, not just rotated once.
 - **Better portfolio story.** GitHub Actions + self-hosted runner is a widely
   recognized, directly reusable pattern (matches how most real orgs run
   infra-as-code CI); a bespoke public Atlantis webhook is a homelab-specific
@@ -125,8 +123,7 @@ port forward, Cloudflare Tunnel, or WAN-listening service is needed at all.
   workflow).
 - `ansible/roles/atlantis/defaults/main.yml`'s `atlantis_gh_webhook_secret` becomes
   unused once the webhook path is removed — remove it and rotate it out of Vault as
-  part of that follow-up (folds into the Tier 1 credential rotation work already
-  tracked in `docs/EXPOSURE.md`).
+  part of that follow-up (folds into the credential rotation work).
 - `terraform/stacks/cloudflare/`'s Atlantis tunnel entry stays removed permanently
   (already true post-ADR-033) — this ADR is what makes that removal a deliberate,
   permanent architectural decision rather than a still-open loose end.

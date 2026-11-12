@@ -21,7 +21,7 @@ intended direction is Admin reaching *out*, not other zones reaching *in*.
 
 `ct-srv-claude-agent` (this agent's own LXC, holding its SSH key, GitHub PAT, and
 Tailscale identity) lives on that same Admin VLAN. VLAN20 is where every internet-facing
-application in `docs/URL-INVENTORY.md` runs — the zone with, by construction, the largest
+application runs — the zone with, by construction, the largest
 attack surface and the most third-party container images. Opening any hole from VLAN20
 into VLAN100, even one scoped to a single port, means a compromise in any one of those
 ~45 apps gains a path toward the same network segment as this agent's credentials and
@@ -81,5 +81,5 @@ configuration implying a path that doesn't exist.
 - New Terraform resources need an `atlantis apply` (same PR-then-apply gate as
   everything else) before the tunnel exists and has credentials to configure
   `cloudflared` with on the host.
-- `docs/URL-INVENTORY.md`'s `claude.woitzik.dev` row updates: tunnel ingress rule is
-  "dedicated (own tunnel)", not "wildcard" — noted there once this is live and tested.
+- The URL inventory's `claude.woitzik.dev` row updates: tunnel ingress rule is
+  "dedicated (own tunnel)", not "wildcard".

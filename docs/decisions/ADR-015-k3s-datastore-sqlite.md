@@ -20,8 +20,7 @@ That ADR is about *topology* (how many servers). This one is about the *storage 
 choice itself, which turned out to be a separate, compounding factor: `docs/HARDWARE.md`
 documents the boot NVMe as DRAM-less, with no onboard cache to absorb write bursts —
 etcd's fsync-heavy write pattern is a specifically bad fit for that hardware regardless of
-how many servers are running it (see `REL-012c` in the repo's incident history, cited in
-`docs/RECOVERY-REPORT-2026-08-13.md`).
+how many servers are running it (see `REL-012c` in the repo's incident history).
 
 ## Decision
 
@@ -44,8 +43,7 @@ happened rather than fighting to restore an architecture that wasn't actually ru
   when there's deliberately only one server node. Running etcd for a single-server
   cluster gets none of its benefit while keeping all of its extra write cost.
 - **No data migration needed.** The cluster was rebuilt clean during this recovery
-  (`docs/RECOVERY-REPORT-2026-08-13.md`'s inventory explicitly notes the old `state.db`
-  was superseded by a fresh cluster, not migrated) — there was no in-place conversion
+  (the old `state.db` was superseded by a fresh cluster, not migrated) — there was no in-place conversion
   requiring a risky live datastore swap either way.
 
 ## Trade-offs
@@ -61,8 +59,7 @@ happened rather than fighting to restore an architecture that wasn't actually ru
 
 ## Consequences
 
-- `docs/HARDWARE.md`, `docs/k3s-architecture.md`, and `docs/RECOVERY-REPORT-2026-08-13.md`
-  all now correctly describe the datastore as SQLite — this ADR is the canonical record
+- `docs/HARDWARE.md` and `docs/k3s-architecture.md` both correctly describe the datastore as SQLite — this ADR is the canonical record
   of *why*, referenced from each of them rather than re-explained.
 - Any future move back toward multi-server HA (revisiting ADR-014) would need to revisit
   this decision too, since multi-server k3s requires etcd (or an external datastore like

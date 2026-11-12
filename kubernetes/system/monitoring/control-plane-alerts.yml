@@ -28,7 +28,7 @@ spec:
               Prometheus can't scrape the API server (job=apiserver). This is single-node
               control plane on this homelab -- when this fires, kubectl/ArgoCD/Atlantis
               are all down too. Known recurring cause: kine/SQLite datastore latency under
-              disk I/O contention (REL-012 in docs/HOMELAB-AUDIT.md) -- check `journalctl -u
+              disk I/O contention (REL-012, ADR-015) -- check `journalctl -u
               k3s` on vm-srv-k3s-11 for "apply request took too long" warnings.
 
         - alert: KubeAPIServerHighLatency

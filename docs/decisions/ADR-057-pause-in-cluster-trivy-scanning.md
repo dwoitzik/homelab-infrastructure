@@ -69,7 +69,7 @@ separate maintenance-window action rather than risking the API server here.
 - **No runtime drift detection for image vulnerabilities.** Nothing now notices that a
   long-running Pod is on an image with a CVE disclosed after it shipped. Accepted for
   now: rebuilds and PR scanning cover what ships, and the lab's reach is narrow
-  (`docs/EXPOSURE.md`).
+  (ADR-033).
 - Existing `VulnerabilityReport`/`ConfigAuditReport` objects stay in etcd (161 + 522
   already, which ADR-related comments call out as bloat). Deleting them is separate
   follow-up and not required by this ADR.
