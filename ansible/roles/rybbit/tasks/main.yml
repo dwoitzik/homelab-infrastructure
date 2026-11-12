@@ -25,6 +25,14 @@
     state: present
   when: rybbit_postgres_password is defined
 
+- name: Deploy the ClickHouse reporting views
+  ansible.builtin.include_tasks:
+    file: clickhouse-views.yml
+    apply:
+      tags: [rybbit_views]
+  when: rybbit_postgres_password is defined
+  tags: [rybbit_views]
+
 - name: Deploy Rybbit healthcheck script
   ansible.builtin.template:
     src: rybbit-healthcheck.sh.j2
