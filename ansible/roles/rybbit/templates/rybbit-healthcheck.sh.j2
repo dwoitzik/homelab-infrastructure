@@ -1,0 +1,31 @@
+#!/bin/bash
+# Textfile-collector metrics for the Rybbit alerts in
+# kubernetes/system/monitoring/rybbit-alerts.yml.
+set -u
+DIR=/opt/docker/node_exporter/textfile_collector
+OUT=$DIR/rybbit_healthcheck.prom.tmp
+FINAL=$DIR/rybbit_healthcheck.prom
+
+{
+  echo "# HELP rybbit_container_up 1 if the container is running and, where it has a healthcheck, healthy"
+  echo "# TYPE rybbit_container_up gauge"
+  for c in caddy clickhouse postgres redis backend client; do
+    STATE=$(docker inspect -f '{% raw %}{{.State.Running}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}{% endraw %}' "$c" 2>/dev/null)
+    case "$STATE" in
+      "true healthy" | "true none") UP=1 ;;
+      *) UP=0 ;;
+    esac
+    echo "rybbit_container_up{container=\"$c\"} $UP"
+  done
+
+  # Catches a tracker that stops reporting (script path changed, CSP, route)
+  # while every container still looks healthy.
+  LAST=$(docker exec clickhouse clickhouse-client -q \
+    "SELECT toUnixTimestamp(max(timestamp)) FROM analytics.events" 2>/dev/null)
+  if [[ "$LAST" =~ ^[0-9]+$ ]]; then
+    echo "# HELP rybbit_last_event_timestamp_seconds Time of the newest event in analytics.events"
+    echo "# TYPE rybbit_last_event_timestamp_seconds gauge"
+    echo "rybbit_last_event_timestamp_seconds $LAST"
+  fi
+} >"$OUT"
+mv "$OUT" "$FINAL"

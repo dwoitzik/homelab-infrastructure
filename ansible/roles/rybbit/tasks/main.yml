@@ -24,3 +24,17 @@
     project_src: /opt/rybbit
     state: present
   when: rybbit_postgres_password is defined
+
+- name: Deploy Rybbit healthcheck script
+  ansible.builtin.template:
+    src: rybbit-healthcheck.sh.j2
+    dest: /usr/local/bin/rybbit-healthcheck.sh
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Schedule Rybbit healthcheck via cron (every 5 minutes)
+  ansible.builtin.cron:
+    name: rybbit-healthcheck
+    minute: "*/5"
+    job: /usr/local/bin/rybbit-healthcheck.sh

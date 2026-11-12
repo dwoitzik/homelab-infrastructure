@@ -373,6 +373,15 @@ spec:
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: instance
+              - job_name: 'node-exporter-rybbit'
+                static_configs:
+                  - targets:
+                      - '10.0.20.205:9100'
+                    labels:
+                      group: 'rybbit_nodes'
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: instance
               - job_name: 'node-exporter-pve'
                 static_configs:
                   - targets:
@@ -507,6 +516,24 @@ spec:
                 static_configs:
                   - targets:
                       - http://10.43.186.87:80/alive
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - source_labels: [__param_target]
+                    target_label: instance
+                  - target_label: __address__
+                    replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+              # The tracker endpoint woitzik.dev visitors hit, resolved via public DNS
+              # through the Cloudflare tunnel. http_2xx, not http_auth_ok: a 401/403
+              # here would mean the tracker is blocked, not that it is up.
+              - job_name: 'blackbox-rybbit-public'
+                scrape_interval: 60s
+                metrics_path: /probe
+                params:
+                  module: [http_2xx]
+                static_configs:
+                  - targets:
+                      - https://analytics.woitzik.dev/api/health
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: __param_target

@@ -1,0 +1,82 @@
+# Rybbit runs on ct-srv-rybbit-01 outside the cluster; metrics come from its
+# node_exporter and the rybbit role's healthcheck textfile. The public endpoint
+# is probed by blackbox-rybbit-public (ExternalProbeFailed).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-rybbit-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: rybbit
+      rules:
+        - alert: RybbitHostDown
+          expr: |
+            up{job="node-exporter-rybbit"} == 0
+            or absent(up{job="node-exporter-rybbit"})
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "ct-srv-rybbit-01 is not answering on node_exporter"
+            description: >
+              Prometheus cannot scrape 10.0.20.205:9100. Either the LXC is down (no
+              analytics for woitzik.dev) or node_exporter stopped. Check `pct status 205`
+              on the Proxmox host, then `docker ps` on the LXC.
+
+        - alert: RybbitHealthcheckStale
+          expr: |
+            absent(rybbit_container_up)
+            or (time() - node_textfile_mtime_seconds{job="node-exporter-rybbit", file=~".*rybbit_healthcheck.prom"}) > 1800
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Rybbit's healthcheck metrics are missing or older than 30 minutes"
+            description: >
+              /usr/local/bin/rybbit-healthcheck.sh runs from cron every 5 minutes on
+              ct-srv-rybbit-01. Without it RybbitContainerDown and RybbitNoEventsRecorded
+              cannot fire. Check `crontab -l` and run the script by hand on the LXC.
+
+        - alert: RybbitContainerDown
+          expr: rybbit_container_up == 0
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Rybbit container {{ $labels.container }} is down or unhealthy"
+            description: >
+              On ct-srv-rybbit-01: `cd /opt/rybbit && docker compose ps` and
+              `docker logs {{ $labels.container }}`.
+
+        - alert: RybbitNoEventsRecorded
+          expr: (time() - rybbit_last_event_timestamp_seconds) > 36 * 3600
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Rybbit has recorded no event for woitzik.dev in 36 hours"
+            description: >
+              The site gets dozens of page views a day, so a 36h gap means tracking is
+              broken even if every container is healthy: the script tag on woitzik.dev,
+              a tracker path missing from the rybbit-final IngressRoute (ADR-074), or the
+              ingest itself. Open woitzik.dev with the browser console and watch the
+              requests to analytics.woitzik.dev.
+
+        - alert: RybbitDiskFilling
+          expr: |
+            1 - node_filesystem_avail_bytes{job="node-exporter-rybbit", mountpoint="/"}
+              / node_filesystem_size_bytes{job="node-exporter-rybbit", mountpoint="/"} > 0.85
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ct-srv-rybbit-01's root filesystem is {{ $value | humanizePercentage }} full"
+            description: >
+              ClickHouse, Postgres and Redis all keep their Docker volumes on this
+              rootfs. Check `du -sh /var/lib/docker/volumes/*` and
+              `docker system df`; grow the disk in terraform/stacks/proxmox/lxc.tf.
