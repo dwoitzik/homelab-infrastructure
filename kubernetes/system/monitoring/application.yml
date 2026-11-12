@@ -465,6 +465,7 @@ spec:
                   - targets:
                       - https://headscale.woitzik.dev
                       - https://photos.woitzik.dev
+                      - https://media.woitzik.dev
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: __param_target
