@@ -50,10 +50,12 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
       },
       {
         hostname = "analytics.woitzik.dev"
-        # Rybbit analytics (ansible/roles/rybbit): public because site
-        # visitors' browsers must reach the tracker endpoint (ADR-039).
-        service = "http://10.0.20.205:80"
+        # Public by design (ADR-033): woitzik.dev visitors load the tracker.
+        # Through Traefik so only the tracker endpoints are open and the
+        # dashboard stays behind Authelia (ADR-074).
+        service = "https://traefik.kube-system.svc.cluster.local:443"
         origin_request = {
+          origin_server_name     = "analytics.woitzik.dev"
           no_tls_verify          = false
           connect_timeout        = 10
           tcp_keep_alive         = 30
