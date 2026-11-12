@@ -17,10 +17,16 @@ spec:
           auth_enabled: false
           commonConfig:
             replication_factor: 1
+          # Few, quiet streams: short chunk lifetimes meant one tiny Garage
+          # object per stream every 30 min. A longer WAL checkpoint keeps the
+          # bigger in-memory chunks from being rewritten every 5 min instead.
           ingester:
-            chunk_idle_period: 5m
-            max_chunk_age: 30m
+            chunk_idle_period: 30m
+            max_chunk_age: 2h
             chunk_target_size: 1572864
+            wal:
+              dir: /var/loki/wal
+              checkpoint_duration: 15m
           compactor:
             working_directory: /var/loki/compactor
             compaction_interval: 10m
