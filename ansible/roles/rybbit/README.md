@@ -108,3 +108,30 @@ finds analytics.woitzik.dev can self-register. It is `true` today; check with
 - Page views from LAN/Tailscale arrive without `Cf-Connecting-Ip`, so they are
   recorded without a country. Exclude the LAN ranges in the site settings if
   own visits should not count.
+
+## Reporting views
+
+`files/events-clean.sql` defines `analytics.events_clean`, the bot-filtered
+view reporting queries should use (Rybbit's own UI still reads
+`analytics.events`). It drops datacenter ASNs, sessions in `bot_events`,
+repeat-heavy sessions (20+ pageviews or 5+ hits on one path), and the
+1280x1200 headless-Chrome crawler (empty timezone). That crawler carries no
+ASN, so the datacenter filter never catches it.
+
+The role stores the SQL file's sha1 as the view's comment and only replaces
+the view when the file changes. Apply just the views with:
+
+```bash
+ansible-playbook site.yml --limit rybbit_nodes --tags rybbit_views
+```
+
+`events_clean` is a `SELECT *` view: ClickHouse fixes its column list at
+creation, so after a Rybbit upgrade adds columns to `analytics.events`, edit
+the SQL file (any change alters the hash) to recreate it.
+
+`files/weekly-report.sql` is the matching 7-day report (summary, channels,
+top pages, countries, referrers, affiliate clicks per page):
+
+```bash
+docker exec -i clickhouse clickhouse-client --multiquery < weekly-report.sql
+```

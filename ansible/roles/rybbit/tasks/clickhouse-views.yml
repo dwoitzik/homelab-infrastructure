@@ -1,0 +1,31 @@
+---
+- name: Hash the events_clean definition
+  ansible.builtin.set_fact:
+    rybbit_events_clean_sql: >-
+      {{ lookup('ansible.builtin.file', 'events-clean.sql') | trim | regex_replace(';$', '') }}
+    rybbit_events_clean_hash: >-
+      {{ lookup('ansible.builtin.file', 'events-clean.sql') | hash('sha1') }}
+
+# ClickHouse normalises a view's query, so the definition cannot be compared
+# directly; the source hash is stored as the view's comment instead.
+- name: Read the deployed events_clean hash
+  community.docker.docker_container_exec:
+    container: clickhouse
+    argv:
+      - clickhouse-client
+      - --query
+      - >-
+        SELECT comment FROM system.tables
+        WHERE database = 'analytics' AND name = 'events_clean'
+  register: rybbit_events_clean_deployed
+  changed_when: false
+  check_mode: false
+
+- name: Create or replace the events_clean view
+  community.docker.docker_container_exec:
+    container: clickhouse
+    argv:
+      - clickhouse-client
+      - --query
+      - "{{ rybbit_events_clean_sql }} COMMENT '{{ rybbit_events_clean_hash }}'"
+  when: rybbit_events_clean_deployed.stdout | trim != rybbit_events_clean_hash
