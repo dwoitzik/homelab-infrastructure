@@ -12,7 +12,8 @@
   },
   "docker-compose": {
     "managerFilePatterns": [
-      "/ansible/files/media-acquisition/docker-compose.yml$/"
+      "/ansible/files/media-acquisition/docker-compose.yml$/",
+      "/ansible/roles/rybbit/templates/docker-compose.yml.j2$/"
     ]
   },
   "minimumReleaseAge": "3 days",
@@ -71,6 +72,33 @@
       ],
       "automerge": true,
       "platformAutomerge": true
+    },
+    {
+      "description": "Rybbit stack (ansible/roles/rybbit compose template, ADR-071 digest pins): patch/minor/digest in one grouped PR, never auto-merged. Unlike media-acquisition there is no converge on the LXC, so a merged bump only takes effect when the rybbit role is run against rybbit_nodes, and ClickHouse and Postgres are stateful. Majors fall to the major rule below (own PR each). Merge, then run the role and check the stack (role README).",
+      "matchFileNames": [
+        "ansible/roles/rybbit/templates/docker-compose.yml.j2"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor",
+        "digest",
+        "pin"
+      ],
+      "groupName": "rybbit stack",
+      "automerge": false,
+      "labels": [
+        "rybbit"
+      ]
+    },
+    {
+      "description": "Rybbit's upstream compose pins ClickHouse to the 26.3 LTS line; stay on it. Moving to the next LTS is a manual change, after upstream does.",
+      "matchFileNames": [
+        "ansible/roles/rybbit/templates/docker-compose.yml.j2"
+      ],
+      "matchPackageNames": [
+        "clickhouse/clickhouse-server"
+      ],
+      "allowedVersions": "/^26\\.3\\./"
     },
     {
       "description": "CI tooling (GitHub Actions): low risk, easy to revert, auto-merge after soak. 'pin' included for the same first-time-pinning reason as above.",
