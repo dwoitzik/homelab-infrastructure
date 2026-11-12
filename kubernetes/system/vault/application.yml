@@ -28,6 +28,10 @@ spec:
                 node_id = "vault-0"
               }
               service_registration "kubernetes" {}
+          # A raw copy of the raft directory does not restore; snapshot.yml
+          # backs Vault up through a raft snapshot instead.
+          annotations:
+            backup.velero.io/backup-volumes-excludes: data
           dataStorage:
             enabled: true
             size: 5Gi

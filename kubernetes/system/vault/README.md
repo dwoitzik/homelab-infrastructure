@@ -27,20 +27,31 @@ live cluster built from it doesn't.
 Once unsealed, Vault's own data (the raft log) restores the same way as any other
 `local-path` PVC — copy the preserved files back, restart.
 
-## Known gap — Vault does NOT have a reliable generic backup
+## Backup: raft snapshots
 
-**Velero's generic kopia filesystem backup does not reliably protect Vault.** A raw
-filesystem-level snapshot of Vault's raft/bolt database files taken *while Vault is live
-and actively in use* is not guaranteed crash-consistent — proven live during this
-recovery's own backup/restore verification: a Velero-restored copy had the right files at
-the right sizes, but Vault itself reported `Initialized: false` against it. The live
-StatefulSet is patched with `backup.velero.io/backup-volumes-excludes: data` to stop the
-daily schedule from attempting this unreliable path at all, rather than silently
-producing backups that look successful but can't actually restore.
+A raw filesystem copy of Vault's raft/bolt files taken while Vault runs is not
+crash-consistent: a Velero-restored copy once came up as `Initialized: false`. So
+vault-0's `data` volume is excluded from Velero (`server.annotations` in
+`application.yml`), and `snapshot.yml` runs `vault operator raft snapshot save` as a
+Velero pre-backup hook instead. The snapshot lands in the `vault-snapshots` PVC
+(`/snapshots/vault.snap`), which the daily local and offsite backups copy. It is
+encrypted with the barrier key, so restoring it needs the unseal keys.
 
-**What's still needed, not yet built:** a real backup mechanism using Vault's own
-`vault operator raft snapshot save` (an application-level, consistent snapshot), written
-somewhere Velero/Garage can pick it up on a schedule. Until this exists, Vault's *current
-live data* is safe (recoverable via the unseal-key procedure above, same as any other
-`local-path` service), but there is no tested, working path to recover from a scenario
-where the live cluster is lost *and* the old cluster's datastore is also gone.
+The hook authenticates with a periodic token (policy `raft-snapshot`, read on
+`sys/storage/raft/snapshot`) stored at `secret/vault-snapshot` property `token`;
+each run renews it. One-time setup with an admin token:
+
+```sh
+vault policy write raft-snapshot - <<'POLICY'
+path "sys/storage/raft/snapshot" { capabilities = ["read"] }
+POLICY
+vault kv put secret/vault-snapshot token="$(vault token create -orphan -policy=raft-snapshot \
+  -period=768h -display-name=vault-snapshot -field=token)"
+```
+
+Restore onto a fresh, initialized and unsealed Vault:
+
+```sh
+kubectl -n vault cp vault-snapshot-<pod>:/snapshots/vault.snap ./vault.snap
+vault operator raft snapshot restore -force vault.snap   # then unseal with the original keys
+```
