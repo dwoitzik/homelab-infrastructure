@@ -174,16 +174,18 @@ and hijack short-hostname lookups — external and internal alike. Confirmed liv
 running the current Ansible role — but if pods are behaving oddly on DNS for hostnames
 that look otherwise correct, check this first.
 
-## 7b. Exception: headscale + vaultwarden have a warm standby
+## 7b. headscale + vaultwarden: an off-host replica, not a standby
 
-Everything above assumes a full rebuild after total loss. Two apps don't have to wait
-for that: headscale and vaultwarden replicate continuously to `rpi-srv-02` (Litestream
-WAL streaming) and can fail over there in minutes without waiting on `pve-mgmt-01` at
-all — see `docs/decisions/ADR-029-warm-standby-ha-headscale-vaultwarden.md` for the
-design and `docs/runbooks/failover-headscale-vaultwarden.md` for the actual failover
-steps. This is a narrow, deliberate exception to "recovery, not HA" (see
-`docs/physical-topology.md`) — every other component still follows
-this document's full-rebuild path.
+headscale and vaultwarden replicate their SQLite databases continuously to `rpi-srv-02`
+(Litestream, `/mnt/ssd/litestream-replicas/`). The replica survives a `pve-mgmt-01`
+loss and restores with `litestream restore` (restore-tested 2026-11-12, recovery point
+under a minute old). That is a better recovery point than the nightly backups, nothing
+more: there is no working standby to fail over to. The standby containers in
+`/opt/ha-standby` lack headscale's identity keys and the OIDC secret and have never been
+started, so `docs/runbooks/failover-headscale-vaultwarden.md` cannot be followed as
+written yet. See `docs/decisions/ADR-029-warm-standby-ha-headscale-vaultwarden.md`
+(2026-11-12 status) for what is missing. Every component, these two included, follows
+this document's rebuild path.
 
 ## 8. Prove it, don't assume it
 

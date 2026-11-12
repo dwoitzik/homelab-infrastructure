@@ -35,7 +35,7 @@ skipped by accident.
 | [026](ADR-026-three-vm-topology-overhead.md) | Keep the 3-VM-on-one-host k3s topology | Accepted |
 | [027](ADR-027-declared-vs-live-drift-guard.md) | Declared-vs-live drift guard for non-ArgoCD-managed manifests | Accepted |
 | [028](ADR-028-mechanical-secret-exposure-prevention.md) | Make secret exposure mechanically impossible, not just against the rules | Accepted |
-| [029](ADR-029-warm-standby-ha-headscale-vaultwarden.md) | Warm-standby HA for Headscale + Vaultwarden on rpi-srv-02 | Accepted, partially implemented |
+| [029](ADR-029-warm-standby-ha-headscale-vaultwarden.md) | Warm-standby HA for Headscale + Vaultwarden on rpi-srv-02 | Replication live and restore-tested; standby not usable yet |
 | [031](ADR-031-jellyfin-stays-lxc-not-k8s.md) | Jellyfin stays on a dedicated LXC, not migrated into k3s | Accepted |
 | [032](ADR-032-claude-agent-dedicated-tunnel.md) | claude.woitzik.dev gets its own Cloudflare Tunnel, not a firewall hole | Superseded 2026-08-27 |
 | [033](ADR-033-public-exposure-allowlist.md) | Public exposure is an explicit allowlist of two hostnames, not a wildcard | Accepted |
