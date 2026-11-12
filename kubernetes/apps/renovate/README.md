@@ -26,7 +26,12 @@ None — clones the repo fresh into a `/tmp` emptyDir on every run.
   was tuned after two real OOMKilled incidents from repo growth and a major Terraform
   provider bump respectively. Don't set the container memory limit close to the heap
   cap if you resize this.
-- **Needs `secret/renovate`'s `github-pat` in Vault to be a currently-valid GitHub
-  token** — as of the 2026-08-13 recovery, this had gone stale (401 unauthorized on
-  every run), a pre-existing gap unrelated to that disaster. A dead token fails loudly
-  in the job logs; check there first if scheduled runs stop opening PRs.
+- **Authenticates as a GitHub App** (`homelab-renovate-dwoitzik`, installed on this
+  repository only; permissions: contents, pull requests, issues, workflows, statuses
+  write; checks, metadata read). The `app-token` init container signs a JWT with the
+  app's private key and exchanges it for a one-hour installation token, so no
+  long-lived token exists. Vault `secret/renovate` holds `app-id`, `installation-id`
+  and `private-key` (PEM). PRs and comments come from the app's bot account, which
+  keeps them out of the owner's participation notifications. If runs stop, read the
+  `app-token` container log first: a 401 there means the key or app ID is wrong, a
+  404 means the installation ID is.
