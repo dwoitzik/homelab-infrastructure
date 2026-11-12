@@ -79,7 +79,7 @@ services:
     command:
       - redis-server
       - --requirepass
-      - {{ rybbit_redis_password }}
+      - "{{ rybbit_redis_password }}"
       - --appendonly
       - "yes"
       - --appendfsync

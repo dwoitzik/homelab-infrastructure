@@ -25,7 +25,8 @@ The homelab follows the 3-2-1 rule: 3 copies of data, on 2 different media, with
 
 **What:** Critical namespaces only (`apps`, `vault`, `database`, `argocd`) — large volumes
 (media, Prometheus/Loki/Garage data) opted out via `backup.velero.io/backup-volumes-excludes`
-pod annotations.
+pod annotations, emptyDirs skipped by a Velero volume policy, and Postgres carried as
+`pg_dump` archives instead of raw data directories (ADR-075).
 
 - **Tool:** Velero, second `BackupStorageLocation` (`r2-offsite`)
 - **Schedule:** Daily at 04:00, TTL 3 days

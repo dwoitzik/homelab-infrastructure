@@ -1,9 +1,4 @@
 import {
-  to = proxmox_virtual_environment_container.ct_mgmt_pbs_01
-  id = "pve-mgmt-01/110"
-}
-
-import {
   to = proxmox_virtual_environment_container.ct_srv_docker_01
   id = "pve-mgmt-01/200"
 }
@@ -67,4 +62,13 @@ import {
 import {
   to = proxmox_virtual_environment_container.ct_srv_atlantis_01
   id = "pve-mgmt-01/204"
+}
+
+# The old local-zfs pool is gone (storage moved to local-lvm). Forget the
+# state entry without touching the host.
+removed {
+  from = proxmox_storage_zfspool.local_zfs
+  lifecycle {
+    destroy = false
+  }
 }
