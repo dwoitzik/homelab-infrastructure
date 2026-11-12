@@ -1,5 +1,5 @@
 # WAN upload shaping (bufferbloat). A queue tree on ether1 also shapes
-# FastTrack'ed packets and never sees inter-VLAN traffic; 45M of the 50 Mbit
+# FastTrack'ed packets and never sees inter-VLAN traffic; 68M of the 75 Mbit
 # upload keeps this queue, not the modem's buffer, as the bottleneck.
 resource "routeros_queue_type" "cake_wan_up" {
   name          = "cake-wan-up"
@@ -9,10 +9,13 @@ resource "routeros_queue_type" "cake_wan_up" {
   cake_flowmode = "dual-srchost"
 }
 
+# A queue tree leaf with an empty packet-mark receives no packets at all;
+# "no-mark" is what matches unmarked traffic (nothing here sets packet marks).
 resource "routeros_queue_tree" "wan_up" {
-  name      = "wan-up"
-  parent    = "ether1"
-  max_limit = "45000000"
-  queue     = routeros_queue_type.cake_wan_up.name
-  comment   = "SQM: CAKE on WAN upload (bufferbloat)"
+  name        = "wan-up"
+  parent      = "ether1"
+  packet_mark = ["no-mark"]
+  max_limit   = "68000000"
+  queue       = routeros_queue_type.cake_wan_up.name
+  comment     = "SQM: CAKE on WAN upload (bufferbloat)"
 }
