@@ -128,7 +128,8 @@ metadata:
 spec:
   entryPoints: [lokipush]
   routes:
-  - match: Host(`loki.woitzik.dev`) && PathPrefix(`/loki/api/v1/push`)
+  # Path only: promtail sends the IP as Host; the entrypoint already limits who connects.
+  - match: PathPrefix(`/loki/api/v1/push`)
     kind: Rule
     services: [{name: loki, port: 3100}]
   tls: {}
