@@ -4,6 +4,38 @@
     name: rsync
     state: present
 
+- name: Ensure the backup state directory exists
+  ansible.builtin.file:
+    path: "{{ immich_library_backup_state_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: Ensure the dedicated SSH key for the mirror exists
+  ansible.builtin.command:
+    cmd: ssh-keygen -q -t ed25519 -N "" -C "immich-library-backup@{{ inventory_hostname }}" -f {{ immich_library_backup_key }}
+    creates: "{{ immich_library_backup_key }}"
+
+- name: Read the mirror key's public half
+  ansible.builtin.slurp:
+    src: "{{ immich_library_backup_key }}.pub"
+  register: immich_library_backup_pubkey
+
+# rrsync confines the key to rsync inside the mirror root: no shell, no other path.
+- name: Authorize the key on the mirror host, limited to rsync in the mirror root
+  ansible.posix.authorized_key:
+    user: "{{ immich_library_backup_target_user }}"
+    key: "{{ immich_library_backup_pubkey.content | b64decode | trim }}"
+    key_options: 'command="/usr/bin/rrsync {{ immich_library_backup_target_root }}",restrict'
+    exclusive: true
+  delegate_to: "{{ immich_library_backup_target_inventory_host }}"
+  become: true
+
+- name: Pin the mirror host's SSH host key
+  ansible.builtin.known_hosts:
+    name: "{{ immich_library_backup_target_address }}"
+    key: "{{ immich_library_backup_target_address }} {{ lookup('ansible.builtin.pipe', 'ssh-keyscan -t ed25519 ' + immich_library_backup_target_address + ' 2>/dev/null | cut -d\" \" -f2-') }}"
+    path: /root/.ssh/known_hosts
+
 - name: Deploy the Immich library backup script
   ansible.builtin.template:
     src: immich-library-backup.sh.j2

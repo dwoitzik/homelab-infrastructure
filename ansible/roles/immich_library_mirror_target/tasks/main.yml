@@ -1,0 +1,32 @@
+---
+- name: Ensure the mirror user exists
+  ansible.builtin.user:
+    name: "{{ immich_library_mirror_target_user }}"
+    system: true
+    shell: /bin/sh
+    home: "/var/lib/{{ immich_library_mirror_target_user }}"
+    create_home: true
+
+- name: Ensure the mirror directories exist on the SSD
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ immich_library_mirror_target_user }}"
+    group: "{{ immich_library_mirror_target_user }}"
+    mode: '0750'
+  loop:
+    - "{{ immich_library_mirror_target_root }}"
+    - "{{ immich_library_mirror_target_root }}/snapshots"
+
+# Hard-linked snapshots: removing an old one frees only what no newer snapshot
+# still references. The newest snapshot is never removed.
+- name: Prune snapshots older than the retention window
+  ansible.builtin.cron:
+    name: immich-library-mirror-prune
+    user: "{{ immich_library_mirror_target_user }}"
+    hour: "5"
+    minute: "15"
+    job: >-
+      cd {{ immich_library_mirror_target_root }}/snapshots &&
+      ls -1d */ 2>/dev/null | sort | head -n -1 |
+      while read -r d; do [ -n "$(find "$d" -maxdepth 0 -mtime +{{ immich_library_mirror_target_retention_days }})" ] && rm -rf "$d"; done

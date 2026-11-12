@@ -1,0 +1,6 @@
+---
+# Receiving side of immich_library_backup (runs on the Proxmox host). The key
+# itself is authorized from that role, which owns it.
+immich_library_mirror_target_user: immich-backup
+immich_library_mirror_target_root: /mnt/ssd/immich-library
+immich_library_mirror_target_retention_days: 30

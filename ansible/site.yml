@@ -151,6 +151,12 @@
     # trust execution environment workflow steps run inside, not replaced.
     - github_actions_runner
 
+- name: Immich library mirror target (SSD on rpi-srv-02)
+  hosts: rpi-srv-02
+  become: true
+  roles:
+    - immich_library_mirror_target
+
 - name: Proxmox Host — Power Management
   hosts: pve_hosts
   become: true

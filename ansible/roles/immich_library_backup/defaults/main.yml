@@ -1,10 +1,16 @@
 ---
 # The Immich library lives on a USB stick bind-mounted into the NFS LXC.
-# Velero excludes the volume and vzdump skips bind mounts, so this role is
-# its only local copy.
+# Velero excludes the volume and vzdump skips bind mounts, so this role is its
+# only copy: a nightly snapshot on rpi-srv-02's SSD, a separate machine.
 immich_library_backup_source: /mnt/pve/usb-immich/immich-library
 immich_library_backup_source_mount: /mnt/pve/usb-immich
-immich_library_backup_dataset: archive/immich-library
-immich_library_backup_snapshot_retention_days: 30
 immich_library_backup_schedule: "*-*-* 01:30:00"
 immich_library_backup_textfile_dir: /var/lib/node_exporter/textfile_collector
+
+immich_library_backup_target_inventory_host: rpi-srv-02
+immich_library_backup_target_address: 10.0.20.3
+immich_library_backup_target_user: immich-backup
+immich_library_backup_target_root: /mnt/ssd/immich-library
+immich_library_backup_retention_days: 30
+immich_library_backup_key: /root/.ssh/immich_library_backup_ed25519
+immich_library_backup_state_dir: /var/lib/immich-library-backup
