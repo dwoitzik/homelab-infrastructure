@@ -51,6 +51,17 @@ spec:
     receiver: "null"
     groupBy: [alertname, namespace]
     routes:
+      # Dead man's switch: Watchdog always fires, so each repeat pings healthchecks.io
+      # and it pages when pings stop, covering Prometheus, Alertmanager and egress.
+      # Ping URL: hand-created Secret cluster-dead-mans-switch, key ping-url.
+      - receiver: heartbeat
+        groupWait: 0s
+        groupInterval: 1m
+        repeatInterval: 4m
+        matchers:
+          - matchType: "="
+            name: alertname
+            value: Watchdog
       - receiver: discord
         groupWait: 30s
         groupInterval: 15m
@@ -120,6 +131,12 @@ spec:
             value: "ProxmoxStorageCapacityHigh|ProxmoxStorageCapacityCritical"
   receivers:
     - name: "null"
+    - name: heartbeat
+      webhookConfigs:
+        - urlSecret:
+            name: cluster-dead-mans-switch
+            key: ping-url
+          sendResolved: false
     - name: discord
       discordConfigs:
         - apiURL:
