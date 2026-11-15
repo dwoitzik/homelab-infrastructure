@@ -59,9 +59,15 @@ never addressed by Service name.
 
 ## Loki
 
-`loki.yml` — log aggregation, local filesystem storage (not S3-backed — logs are
-lower-value than metrics/traces here). `loki-dashboard.yml` provisions its Grafana
-dashboard as code.
+`loki.yml` — Loki (single binary, chunks and index in the Garage `loki-data` bucket,
+30-day retention) and Grafana Alloy, the DaemonSet that ships pod logs. Alloy tails
+`/var/log/pods` on each node with the same labels the retired Promtail chart produced
+(`namespace`, `pod`, `container`, `app`, `job` = `namespace/app`, `instance`,
+`component`, `node_name`, `stream`, `filename`), so existing LogQL, dashboards and
+alerts work unchanged. Read positions live on the node (`/var/lib/alloy`), so a
+restart neither re-sends nor skips lines. Hosts outside the cluster still ship with
+the Docker Promtail from the Ansible `monitoring_agent` role. `loki-dashboard.yml`
+provisions the Grafana dashboard as code.
 
 ## Dependencies
 
