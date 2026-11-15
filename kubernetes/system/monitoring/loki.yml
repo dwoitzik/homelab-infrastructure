@@ -383,10 +383,11 @@ spec:
                 path_targets = discovery.relabel.pods.output
               }
 
+              // New files must be read from the start, or short-lived Job pods lose
+              // the lines written before discovery. Known files resume from positions.
               loki.source.file "pods" {
-                targets       = local.file_match.pods.targets
-                forward_to    = [loki.process.pods.receiver]
-                tail_from_end = true
+                targets    = local.file_match.pods.targets
+                forward_to = [loki.process.pods.receiver]
               }
 
               loki.process "pods" {
