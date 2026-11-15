@@ -81,9 +81,11 @@ rate it reaches 90 % around the end of December.
 - [x] Hypervisor patch management and account hardening under Ansible
 - [x] One ingress path for every public service, so all requests pass the same rate
       limiting and CrowdSec bouncer
-- [ ] Every NetworkPolicy under GitOps; default-deny ingress in every namespace
-- [ ] Pod Security `baseline` enforced in application namespaces
-- [ ] Encryption at rest for cluster secrets; key material kept apart from data backups
+- [x] Every NetworkPolicy under GitOps; default-deny ingress in every namespace
+- [x] Pod Security `baseline` enforced in application namespaces (`apps`,
+      `changedetection`); host-level agents live in `host-agents`
+- [x] Encryption at rest for cluster secrets; key material kept apart from data backups
+      (ADR-077)
 - [x] Merged Terraform changes planned and applied promptly
 
 ### Headscale / remote access
