@@ -1,0 +1,38 @@
+# PodMonitors for components whose charts or manifests ship no ServiceMonitor.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: traefik
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames: [kube-system]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 60s
+---
+# Garage serves /metrics on the admin port without a token while
+# admin.metrics_token is unset.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: garage
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames: [apps]
+  selector:
+    matchLabels:
+      app: garage
+  podMetricsEndpoints:
+    - port: admin
+      path: /metrics
+      interval: 60s
