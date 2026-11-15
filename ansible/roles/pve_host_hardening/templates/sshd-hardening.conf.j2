@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# sshd keeps the first value it reads and sshd_config includes this directory
+# before its own settings, so these win over the stock file.
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+# Proxmox cluster tooling, backup jobs and Ansible log in as root with keys.
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+MaxAuthTries {{ pve_host_hardening_sshd_max_auth_tries }}
+X11Forwarding no
+ClientAliveInterval 300
+ClientAliveCountMax 2

@@ -1,0 +1,11 @@
+// {{ ansible_managed }}
+Unattended-Upgrade::Origins-Pattern {
+{% for origin in pve_host_hardening_uu_origins %}
+    "{{ origin }}";
+{% endfor %}
+};
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "false";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+Unattended-Upgrade::SyslogEnable "true";
