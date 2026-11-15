@@ -15,6 +15,12 @@ spec:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
             effect: NoSchedule
+        resources:
+          requests:
+            cpu: 25m
+            memory: 96Mi
+          limits:
+            memory: 256Mi
         monitoring:
           podMonitorEnabled: true
           grafanaDashboard:

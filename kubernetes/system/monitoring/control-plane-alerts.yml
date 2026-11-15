@@ -50,3 +50,26 @@ spec:
               is far more common than full outages. WATCH/CONNECT excluded: they are
               long-lived streams that naturally reach 60s and would otherwise cause
               constant false positives.
+
+    # Replaces the chart's KubeMemoryOvercommit, which assumes the cluster survives losing
+    # its largest node. That node is the only k3s server, so losing it stops the cluster
+    # anyway; what is worth alerting on is whether a worker loss still fits.
+    - name: capacity
+      rules:
+        - alert: KubeMemoryOvercommitWorkerLoss
+          expr: |
+            sum(namespace_memory:kube_pod_container_resource_requests:sum)
+              > sum(kube_node_status_allocatable{job="kube-state-metrics", resource="memory"})
+                - max(
+                    kube_node_status_allocatable{job="kube-state-metrics", resource="memory"}
+                      unless on (node) kube_node_role{job="kube-state-metrics", role="control-plane"}
+                  )
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: Memory requests no longer fit if the largest worker node fails
+            description: >-
+              Pod memory requests ({{ $value | humanize1024 }}B) exceed what the remaining
+              nodes can allocate after losing the largest worker, so some of its pods would
+              stay Pending. Lower over-sized requests or give the nodes more memory.

@@ -114,6 +114,13 @@ spec:
                       values:
                         - vm-srv-k3s-11
         deployNodeAgent: true
+        # Server process only; kopia data movement runs in the node-agent pods.
+        resources:
+          requests:
+            cpu: 100m
+            memory: 448Mi
+          limits:
+            memory: 1536Mi
         # REL-064 load-smoothing: node-agent had NO resource limits at all
         # (confirmed live: `resources: {}` on the running DaemonSet) --
         # kopia's own internal parallel chunking/compression could burst to
