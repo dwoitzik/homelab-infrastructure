@@ -1,7 +1,7 @@
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
-  name: renovate-token
+  name: renovate-github-app
   namespace: apps
 spec:
   refreshInterval: 1h
@@ -9,13 +9,52 @@ spec:
     name: vault
     kind: ClusterSecretStore
   target:
-    name: renovate-token
+    name: renovate-github-app
     creationPolicy: Owner
   data:
-    - secretKey: token
+    - secretKey: app-id
       remoteRef:
         key: secret/renovate
-        property: github-pat
+        property: app-id
+    - secretKey: installation-id
+      remoteRef:
+        key: secret/renovate
+        property: installation-id
+    - secretKey: private-key
+      remoteRef:
+        key: secret/renovate
+        property: private-key
+---
+# Renovate authenticates as a GitHub App: its PRs and comments come from the
+# app's bot account instead of the owner's, and the token expires after an hour.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: renovate-app-token
+  namespace: apps
+data:
+  mint.js: |
+    const crypto = require('crypto');
+    const fs = require('fs');
+    const read = (k) => fs.readFileSync(`/app-secret/${k}`, 'utf8').trim();
+    const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    const now = Math.floor(Date.now() / 1000);
+    const unsigned = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({ iat: now - 60, exp: now + 540, iss: read('app-id') })}`;
+    const jwt = `${unsigned}.${crypto.sign('RSA-SHA256', Buffer.from(unsigned), read('private-key')).toString('base64url')}`;
+    (async () => {
+      const res = await fetch(`https://api.github.com/app/installations/${read('installation-id')}/access_tokens`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${jwt}`, Accept: 'application/vnd.github+json' },
+      });
+      const body = await res.json();
+      if (!res.ok || !body.token) {
+        console.error(`installation token request failed: ${res.status} ${body.message || ''}`);
+        process.exit(1);
+      }
+      fs.writeFileSync('/run/gh/token', body.token, { mode: 0o600 });
+      console.log(`installation token minted, expires ${body.expires_at}`);
+    })();
+
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -38,6 +77,32 @@ spec:
             backup.velero.io/backup-volumes-excludes: tmp
         spec:
           restartPolicy: Never
+          initContainers:
+            - name: app-token
+              image: ghcr.io/renovatebot/renovate:43.253.2@sha256:9a6cec287092c47656ecba629b7acc095c6fba7a85ca2f5b34e25f418a36c411
+              command: ["node", "/scripts/mint.js"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                seccompProfile:
+                  type: RuntimeDefault
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+              volumeMounts:
+                - name: app-secret
+                  mountPath: /app-secret
+                  readOnly: true
+                - name: app-token-script
+                  mountPath: /scripts
+                - name: gh-token
+                  mountPath: /run/gh
           containers:
             - name: renovate
               image: ghcr.io/renovatebot/renovate:43.253.2@sha256:9a6cec287092c47656ecba629b7acc095c6fba7a85ca2f5b34e25f418a36c411
@@ -53,15 +118,17 @@ spec:
                   type: RuntimeDefault
                 capabilities:
                   drop: ["ALL"]
+              args:
+                - bash
+                - -c
+                - export RENOVATE_TOKEN="$(cat /run/gh/token)"; exec renovate
               volumeMounts:
                 - name: tmp
                   mountPath: /tmp
+                - name: gh-token
+                  mountPath: /run/gh
+                  readOnly: true
               env:
-                - name: RENOVATE_TOKEN
-                  valueFrom:
-                    secretKeyRef:
-                      name: renovate-token
-                      key: token
                 - name: RENOVATE_PLATFORM
                   value: github
                 - name: RENOVATE_REPOSITORIES
@@ -155,3 +222,15 @@ spec:
           volumes:
             - name: tmp
               emptyDir: {}
+            - name: gh-token
+              emptyDir:
+                medium: Memory
+                sizeLimit: 1Mi
+            - name: app-secret
+              secret:
+                secretName: renovate-github-app
+                # The image runs with gid 0, which owns the projected files.
+                defaultMode: 0440
+            - name: app-token-script
+              configMap:
+                name: renovate-app-token
