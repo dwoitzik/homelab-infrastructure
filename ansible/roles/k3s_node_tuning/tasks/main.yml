@@ -10,16 +10,18 @@
     k3s_node_tuning_root_mount: "{{ ansible_mounts | selectattr('mount', 'equalto', '/') | first }}"
 
 # Existing atime options are stripped first: mount applies options left to
-# right, so a leftover relatime after noatime silently wins.
-- name: Set noatime and a longer ext4 commit interval on the root filesystem (fstab + live remount)
+# right, so a leftover relatime after noatime silently wins. Online discard is
+# off: QEMU counts discards against the disk's write throttle, so freeing a
+# lot of space at once starved normal writes for hours. fstrim.timer trims.
+- name: Set noatime, nodiscard and a longer ext4 commit interval on the root filesystem (fstab + live remount)
   ansible.posix.mount:
     path: /
     src: "{{ k3s_node_tuning_root_mount.device }}"
     fstype: "{{ k3s_node_tuning_root_mount.fstype }}"
     opts: >-
-      {{ (['noatime', 'commit=' ~ k3s_node_tuning_root_commit_seconds]
+      {{ (['noatime', 'nodiscard', 'commit=' ~ k3s_node_tuning_root_commit_seconds]
           + (k3s_node_tuning_root_mount.options.split(',')
-             | reject('match', '^(no|rel|strict)?atime$|^commit=')
+             | reject('match', '^(no|rel|strict)?atime$|^commit=|^(no)?discard$')
              | list))
          | join(',') }}
     state: mounted
