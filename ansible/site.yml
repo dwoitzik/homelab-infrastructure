@@ -6,6 +6,28 @@
     - common
     - docker
     - monitoring_agent
+  post_tasks:
+    # Watchtower was retired in favour of Renovate PRs, but stacks deployed
+    # before that kept running and updating :latest images outside Git.
+    - name: Check for a leftover watchtower stack
+      tags: [watchtower_cleanup]
+      ansible.builtin.stat:
+        path: /opt/watchtower
+      register: watchtower_dir
+
+    - name: Stop and remove the leftover watchtower stack
+      tags: [watchtower_cleanup]
+      community.docker.docker_compose_v2:
+        project_src: /opt/watchtower
+        state: absent
+        remove_images: all
+      when: watchtower_dir.stat.exists
+
+    - name: Remove the watchtower stack directory
+      tags: [watchtower_cleanup]
+      ansible.builtin.file:
+        path: /opt/watchtower
+        state: absent
 
 # 2026-08-17 (BRIEFING-V4.md Section C / Phase 2): watchtower removed.
 # Auto-pulling :latest on live containers directly contradicts having
@@ -42,6 +64,13 @@
   roles:
     - common
     - k3s_node_tuning
+
+- name: K3s server Secrets encryption key (ADR-077)
+  hosts: vm-srv-k3s-11
+  become: true
+  roles:
+    - role: k3s_secrets_encryption
+      tags: [k3s_secrets_encryption]
 
 - name: Provision HA Core Services & Gateway
   hosts: rpi_nodes

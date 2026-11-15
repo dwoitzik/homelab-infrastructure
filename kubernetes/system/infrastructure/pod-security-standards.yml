@@ -15,12 +15,11 @@
 # corrected to audit/warn-only for those two before anything could actually
 # break on a future pod restart.
 #
-# `apps` and `monitoring` are deliberately audit/warn only, NOT enforce:
-# `apps` runs kube-bench with hostPID (legitimate -- needs to see host
-# processes), `monitoring` runs node-exporter with hostNetwork+hostPID
+# `monitoring` is deliberately audit/warn only, NOT enforce: it runs
+# node-exporter with hostNetwork+hostPID
 # (legitimate -- needs host network/process metrics).
-# Enforcing baseline there would block both. `restricted` (audit/warn only,
-# still non-blocking) surfaces everything else in those namespaces that
+# Enforcing baseline there would block it. `restricted` (audit/warn only,
+# still non-blocking) surfaces everything else in that namespace that
 # isn't yet baseline-clean, without breaking the pods that have a real
 # reason to need host access.
 apiVersion: v1
@@ -145,6 +144,8 @@ kind: Namespace
 metadata:
   name: apps
   labels:
+    # Workloads that need host access live in host-agents instead.
+    pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/warn: restricted
 ---

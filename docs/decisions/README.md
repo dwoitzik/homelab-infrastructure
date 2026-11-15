@@ -53,6 +53,7 @@ skipped by accident.
 | [065](ADR-065-enshrouded-dedicated-server.md) | Enshrouded dedicated server on the DMZ game LXC (Wine) | Accepted, applied |
 | [066](ADR-066-tmpfs-for-sab-incomplete-downloads.md) | SABnzbd incomplete downloads on a host tmpfs | Superseded by 073 |
 | [067](ADR-067-velero-fs-backup-fail-fast-timeout.md) | Velero fails fast on a stuck volume upload (45m pod volume and item operation timeouts) | Accepted |
+| [068](ADR-068-4k-hdr-transcode-not-hardware-accelerated.md) | Jellyfin HDR tone-mapping is not hardware-accelerated on the host APU; HDR plays via Direct Play | Accepted, applied |
 | [069](ADR-069-enshrouded-1-0-linux-depot-removed.md) | Enshrouded 1.0 removed the Linux depot; Windows depot, Steamworks client path, buildid-checked updates every 15 minutes | Accepted, applied |
 | [070](ADR-070-paperless-beat-schedule-off-nfs.md) | The paperless beat schedule database moves off NFS via a symlink into a node-local volume | Accepted, applied |
 | [071](ADR-071-ansible-role-images-digest-pinned.md) | Every container image in the Ansible roles is pinned to a digest | Accepted, applied |
@@ -61,6 +62,7 @@ skipped by accident.
 | [074](ADR-074-rybbit-public-path-through-traefik.md) | Rybbit's public path goes through Traefik; only the tracker endpoints are open, the dashboard sits behind Authelia | Accepted |
 | [075](ADR-075-offsite-backup-logical-db-dumps.md) | Offsite backup carries pg_dump archives, not raw database directories or emptyDirs | Accepted |
 | [076](ADR-076-subnet-router-host-network.md) | The tailnet subnet router runs on the host network with a fixed port, so off-LAN peers can connect directly | Accepted |
+| [078](ADR-078-argocd-manages-its-own-workloads.md) | ArgoCD manages its own workloads from the upstream manifest plus resource requests, without prune | Accepted, applied |
 
 ## In review, not yet in this table
 

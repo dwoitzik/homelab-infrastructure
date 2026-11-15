@@ -21,7 +21,7 @@
 # kubernetes/system/*/manifests-application.yml file (one level deep,
 # recursive), plus 2 irregularly-named files that don't match that pattern:
 # postgres/postgres-cluster-application.yml and monitoring/loki.yml (which
-# also defines promtail).
+# also defines alloy).
 #
 # Deliberately does NOT include ArgoCD's own core config (argocd-cm.yml,
 # argocd-cmd-params-cm.yml, argocd-rbac-cm.yml, apps-applicationset.yml) --

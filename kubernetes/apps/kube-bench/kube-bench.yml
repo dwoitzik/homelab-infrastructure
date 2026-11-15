@@ -5,7 +5,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: kube-bench
-  namespace: apps
+  namespace: host-agents
   labels:
     app.kubernetes.io/name: kube-bench
 spec:

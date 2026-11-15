@@ -40,9 +40,12 @@ that keeps it that way.
 ### Monitoring and self-checking
 
 - Prometheus/Alertmanager/Grafana: metrics, alerting rules, dashboards.
-- The dead man's switch (`kubernetes/system/monitoring/dead-mans-switch.yml`) pings
-  healthchecks.io every 5 minutes — if the *entire monitoring stack* goes silent, this
-  is the one thing that can still page from outside.
+- The dead man's switch: Alertmanager routes the always-firing `Watchdog` alert to a
+  webhook that pings healthchecks.io every ~5 minutes (`heartbeat` receiver in
+  `kubernetes/system/monitoring/alertmanager-config.yml`). If Prometheus, Alertmanager,
+  egress or the cluster itself stops working, the pings stop and healthchecks.io pages
+  from outside. The ping URL lives in the hand-created Secret
+  `monitoring/cluster-dead-mans-switch` (key `ping-url`).
 - The declared-vs-live drift guard (`.github/workflows/drift-check.yml`, ADR-027) runs
   every 30 minutes, comparing every standalone manifest under `kubernetes/system/`
   against the live cluster and alerting if something merged to git was never actually

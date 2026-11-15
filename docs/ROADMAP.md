@@ -81,9 +81,11 @@ rate it reaches 90 % around the end of December.
 - [x] Hypervisor patch management and account hardening under Ansible
 - [x] One ingress path for every public service, so all requests pass the same rate
       limiting and CrowdSec bouncer
-- [ ] Every NetworkPolicy under GitOps; default-deny ingress in every namespace
-- [ ] Pod Security `baseline` enforced in application namespaces
-- [ ] Encryption at rest for cluster secrets; key material kept apart from data backups
+- [x] Every NetworkPolicy under GitOps; default-deny ingress in every namespace
+- [x] Pod Security `baseline` enforced in application namespaces (`apps`,
+      `changedetection`); host-level agents live in `host-agents`
+- [x] Encryption at rest for cluster secrets; key material kept apart from data backups
+      (ADR-077)
 - [x] Merged Terraform changes planned and applied promptly
 
 ### Headscale / remote access
@@ -115,19 +117,22 @@ rate it reaches 90 % around the end of December.
       automated via system-upgrade-controller plans that Renovate bumps
 - [ ] Platform components (External Secrets, Vault, Traefik v3, ArgoCD, CloudNativePG,
       Kyverno, Velero, MetalLB, kube-prometheus-stack) to current releases
-- [ ] Move log shipping from the deprecated Promtail chart to Grafana Alloy
+- [x] Move log shipping from the deprecated Promtail chart to Grafana Alloy
 - [ ] Application majors (Jellyfin, Immich, Headscale) kept current by Renovate
 
 ### Reliability
 
 - [ ] Real Postgres standby for Authelia on the Raspberry Pi (ADR-030 is not implemented yet)
-- [ ] Alertmanager `Watchdog` drives the dead man's switch instead of a CronJob
-- [ ] Stale failed Jobs cleaned up automatically so `KubeJobFailed` means something
+- [x] Alertmanager `Watchdog` drives the dead man's switch instead of a CronJob
+- [x] Stale failed Jobs cleaned up automatically so `KubeJobFailed` means something
 - [x] Nextcloud and Firefly III background jobs: re-enable or decommission the apps
-- [ ] Resource requests on every pod; cluster able to lose a node without memory overcommit
+- [x] Resource requests on every pod (k3s-bundled local-path-provisioner excepted); requests
+      fit after losing a worker, checked by `KubeMemoryOvercommitWorkerLoss`
 - [ ] Scheduled Ansible drift report and apply loop; fix non-idempotent tasks and the AdGuard role
-- [ ] cloudflared: two replicas, metrics and an alert on tunnel connections
-- [ ] MetalLB pool and DHCP ranges separated from static addresses
+      (check-mode noise fixed; the schedule needs a control host that reaches every VLAN)
+- [x] cloudflared: two replicas, metrics and an alert on tunnel connections
+- [ ] MetalLB pool and DHCP ranges separated from static addresses (MetalLB done; DHCP
+      pools waiting on the network apply)
 
 ### Raspberry Pi SSD
 
@@ -150,6 +155,6 @@ rate it reaches 90 % around the end of December.
       diaries moved out of the public repo; it keeps architecture, code and decisions
 - [x] README rewritten as an architecture and skills overview
 - [ ] Deployable hostnames via a private kustomize overlay (ADR-048 follow-up)
-- [ ] Observability gaps: Traefik, Garage and promtail metrics; probes for Jellyfin and Nextcloud
+- [x] Observability gaps: Traefik, Garage and log-shipper metrics; probes for Jellyfin and Nextcloud
 - [ ] SLO burn-rate rules aligned with the SRE workbook windows; annotations corrected
 - [ ] IPv6 beyond ULA once the provider delegates a prefix

@@ -7,6 +7,9 @@ live cluster state to match what's committed — a merge to `main` is a deploy.
 
 - `system-app-bootstrap.yml` — the "app of apps" root: the one Application this repo's
   operator applies manually once, everything else is bootstrapped from here.
+- ArgoCD's own Deployments/StatefulSet live in `../argocd-install/` (ADR-078): the
+  upstream `install.yaml` at the running version plus resource requests, synced by the
+  `argocd-install` Application without prune.
 - `apps-applicationset.yml` — the `homelab-apps` ApplicationSet, watches
   `kubernetes/apps/*` and creates one Application per subdirectory automatically. New
   app directories don't need a new Application written by hand.

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: tailscale-router-state
-  namespace: apps
+  namespace: host-agents
 spec:
   accessModes:
     - ReadWriteOnce
@@ -15,7 +15,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: tailscale-subnet-router
-  namespace: apps
+  namespace: host-agents
 spec:
   replicas: 1
   strategy:

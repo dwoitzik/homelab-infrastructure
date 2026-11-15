@@ -3,6 +3,28 @@
   ansible.builtin.hostname:
     name: "{{ inventory_hostname }}"
 
+# cloud-init (VMs, Pis) and Proxmox (LXCs) rewrite the 127.0.1.1 line on every
+# boot, so the line below drifted back after each reboot. Ansible owns it instead.
+- name: Check whether cloud-init is installed
+  ansible.builtin.stat:
+    path: /etc/cloud/cloud.cfg.d
+  register: common_cloud_cfg_d
+
+- name: Stop cloud-init from rewriting /etc/hosts
+  ansible.builtin.copy:
+    dest: /etc/cloud/cloud.cfg.d/99-ansible-etc-hosts.cfg
+    content: "manage_etc_hosts: false\n"
+    mode: "0644"
+  when: common_cloud_cfg_d.stat.exists
+
+- name: Stop Proxmox from rewriting /etc/hosts in the container
+  ansible.builtin.copy:
+    dest: /etc/.pve-ignore.hosts
+    content: ""
+    mode: "0644"
+    force: false
+  when: ansible_virtualization_type == "lxc"
+
 - name: Update /etc/hosts with the new hostname
   ansible.builtin.lineinfile:
     path: /etc/hosts
