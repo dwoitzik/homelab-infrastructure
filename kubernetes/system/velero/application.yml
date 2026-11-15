@@ -70,6 +70,10 @@ spec:
           # kopia jobs/hour hammering rpool NVMe, competing with etcd.
           extraArgs:
             - --default-repo-maintain-frequency=24h
+            # ADR-067: a hung kopia upload otherwise holds the backup for the
+            # 4h default. The slowest healthy volume takes about 2 minutes.
+            - --fs-backup-timeout=45m
+            - --default-item-operation-timeout=45m
         initContainers:
           - name: velero-plugin-for-aws
             # ADR-038: no tagged release fixes the unconditional empty
@@ -110,6 +114,13 @@ spec:
                       values:
                         - vm-srv-k3s-11
         deployNodeAgent: true
+        # Server process only; kopia data movement runs in the node-agent pods.
+        resources:
+          requests:
+            cpu: 100m
+            memory: 448Mi
+          limits:
+            memory: 1536Mi
         # REL-064 load-smoothing: node-agent had NO resource limits at all
         # (confirmed live: `resources: {}` on the running DaemonSet) --
         # kopia's own internal parallel chunking/compression could burst to

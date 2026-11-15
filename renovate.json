@@ -101,6 +101,13 @@
       "allowedVersions": "/^26\\.3\\./"
     },
     {
+      "description": "Gotenberg stays on 8.x until paperless-ngx supports 9. Gotenberg 9 removed the /forms/pdfengines routes and the pdfa form field that paperless-ngx 3.4's gotenberg-client 1.0 still calls, and paperless-ngx's own compose files pin 8.x. Lift this when paperless-ngx moves its pin to 9.",
+      "matchPackageNames": [
+        "gotenberg/gotenberg"
+      ],
+      "allowedVersions": "<9"
+    },
+    {
       "description": "CI tooling (GitHub Actions): low risk, easy to revert, auto-merge after soak. 'pin' included for the same first-time-pinning reason as above.",
       "matchManagers": [
         "github-actions"

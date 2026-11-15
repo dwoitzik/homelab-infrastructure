@@ -15,7 +15,25 @@ spec:
         # prometheusOperator is ignored.
         crds:
           enabled: true
+        # Replaced by KubeMemoryOvercommitWorkerLoss in control-plane-alerts.yml.
+        defaultRules:
+          disabled:
+            KubeMemoryOvercommit: true
         prometheusOperator:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 192Mi
+          # Applies to the config-reloader sidecars of Prometheus and Alertmanager.
+          prometheusConfigReloader:
+            resources:
+              requests:
+                cpu: 10m
+                memory: 32Mi
+              limits:
+                memory: 64Mi
           # ADR-036: soft preference off vm-srv-k3s-11, which had
           # accumulated most of this cluster's stateful/heavy workload with
           # nothing steering new placements elsewhere.
@@ -32,6 +50,12 @@ spec:
 
         # ADR-036: same soft preference as prometheusOperator above.
         kube-state-metrics:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 96Mi
+            limits:
+              memory: 256Mi
           affinity:
             nodeAffinity:
               preferredDuringSchedulingIgnoredDuringExecution:
@@ -87,9 +111,23 @@ spec:
         prometheus-blackbox-exporter:
           enabled: false
 
+        prometheus-node-exporter:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 96Mi
+
         grafana:
           assertNoLeakedSecrets: false
           enabled: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
           # ADR-036: soft preference off vm-srv-k3s-11, which had
           # accumulated most of this cluster's stateful/heavy workload with
           # nothing steering new placements elsewhere.
@@ -252,6 +290,12 @@ spec:
                 value: "1"
         alertmanager:
           alertmanagerSpec:
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
             # ADR-036: same reasoning as grafana's affinity below.
             affinity:
               nodeAffinity:
@@ -538,6 +582,48 @@ spec:
                     target_label: __param_target
                   - source_labels: [__param_target]
                     target_label: instance
+                  - target_label: __address__
+                    replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+              # In-cluster health of Jellyfin and Nextcloud. Targets come from the
+              # Service endpoints (pod IP), since the blackbox pod has no cluster DNS.
+              - job_name: 'blackbox-jellyfin-health'
+                scrape_interval: 60s
+                metrics_path: /probe
+                params:
+                  module: [http_2xx]
+                kubernetes_sd_configs:
+                  - role: endpoints
+                    namespaces:
+                      names: [apps]
+                relabel_configs:
+                  - source_labels: [__meta_kubernetes_service_name]
+                    regex: jellyfin
+                    action: keep
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                    replacement: http://$1/health
+                  - target_label: instance
+                    replacement: jellyfin
+                  - target_label: __address__
+                    replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+              - job_name: 'blackbox-nextcloud-health'
+                scrape_interval: 60s
+                metrics_path: /probe
+                params:
+                  module: [http_nextcloud_status]
+                kubernetes_sd_configs:
+                  - role: endpoints
+                    namespaces:
+                      names: [apps]
+                relabel_configs:
+                  - source_labels: [__meta_kubernetes_service_name]
+                    regex: nextcloud
+                    action: keep
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                    replacement: http://$1/status.php
+                  - target_label: instance
+                    replacement: nextcloud
                   - target_label: __address__
                     replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
               # The tracker endpoint woitzik.dev visitors hit, resolved via public DNS

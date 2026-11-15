@@ -94,7 +94,7 @@ spec:
             value: "1"
       containers:
         - name: postgres
-          image: postgres:18.4-alpine
+          image: postgres:18.7-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
           # SEC-012: official entrypoint runs as root and needs CAP_CHOWN/
           # CAP_SETUID/CAP_SETGID to chmod /var/run/postgresql and switch to
           # the postgres user -- confirmed live (same failure as
@@ -194,7 +194,7 @@ spec:
             value: "1"
       containers:
         - name: redis
-          image: redis:8.8.0-alpine
+          image: redis:8.10.3-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
           # REL-031-redis (2026-07-05): this container has no PVC at all, but
           # was still running with redis's default persistence settings --
           # confirmed live it kept trying (and failing) to write RDB
@@ -288,7 +288,7 @@ spec:
             value: "1"
       containers:
         - name: nextcloud
-          image: nextcloud:34.0.1-apache
+          image: nextcloud:34.0.6-apache@sha256:3031e7f87baaceb863a755921ebf463bc26ea71855c07ad7858e2ae25a5a0ad7
           # REL-029 regression (2026-07-05): re-hardening to `drop: ["ALL"]"`
           # after the upgrade chain broke the container permanently, not just
           # during upgrades -- Apache's main process needs CAP_SETGID itself
@@ -420,7 +420,7 @@ spec:
               memory: 1Gi
       initContainers:
         - name: copy-php-conf
-          image: nextcloud:34.0.1-apache
+          image: nextcloud:34.0.6-apache@sha256:3031e7f87baaceb863a755921ebf463bc26ea71855c07ad7858e2ae25a5a0ad7
           command: ["sh", "-c", "cp -a /usr/local/etc/php/conf.d/. /writable-conf/"]
           securityContext:
             allowPrivilegeEscalation: false
@@ -499,7 +499,7 @@ spec:
                   topologyKey: kubernetes.io/hostname
           containers:
             - name: nextcloud-cron
-              image: nextcloud:34.0.1-apache
+              image: nextcloud:34.0.6-apache@sha256:3031e7f87baaceb863a755921ebf463bc26ea71855c07ad7858e2ae25a5a0ad7
               command: [php, -f, /var/www/html/cron.php]
               securityContext:
                 allowPrivilegeEscalation: false

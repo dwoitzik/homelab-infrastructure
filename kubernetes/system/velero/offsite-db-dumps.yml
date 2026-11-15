@@ -180,7 +180,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: pg-dump
-          image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+          image: postgres:18.7-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
           command: ["/bin/sh", "-c", "trap 'exit 0' TERM INT; while true; do sleep 3600 & wait $!; done"]
           env:
             - name: HOME
@@ -285,7 +285,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: pg-dump
-          image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+          image: postgres:18.7-alpine@sha256:b6972e1115a4ff8eba5d7f7d19184926d1e16d7d1136ae1e1a7ebf286da0f015
           command: ["/bin/sh", "-c", "trap 'exit 0' TERM INT; while true; do sleep 3600 & wait $!; done"]
           env:
             - name: HOME

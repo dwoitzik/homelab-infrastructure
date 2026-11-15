@@ -44,4 +44,4 @@ backend "s3" {
 ## Consequences
 
 Buckets are managed via the `garage` CLI. The `terraform-state` bucket stores state for all stacks.
-Note: If state becomes corrupted or lost during migration, resources must be re-imported into a fresh bucket using `atlantis import` commands defined in `TERRAFORM_IMPORT.md`.
+Note: If state becomes corrupted or lost during migration, resources must be re-imported into a fresh bucket using the `import` blocks listed in `TERRAFORM_IMPORT.md`, applied through the PR-comment workflow (ADR-021).

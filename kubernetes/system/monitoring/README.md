@@ -27,7 +27,17 @@ kube-prometheus-stack chart lists it as a dependency but ArgoCD doesn't render t
 sub-chart from the upstream repo — so it's deployed separately here, with scrape
 configs in `application.yml` (`blackbox-http`, `blackbox-authelia-health` jobs)
 pointing at this standalone Service's DNS name. Probes every public hostname on the
-ADR-033 allowlist.
+ADR-033 allowlist, plus in-cluster health checks for Authelia and Vaultwarden (by
+ClusterIP) and Jellyfin (`/health`) and Nextcloud (`status.php` with the trusted Host
+header, failing on maintenance mode), whose targets Prometheus discovers from the
+Service endpoints. The pod resolves through public DNS only, so in-cluster targets are
+never addressed by Service name.
+
+## Extra scrape targets
+
+`scrape-targets.yml` holds PodMonitors for components whose charts ship none: Traefik
+(`:9100/metrics`) and Garage (admin port `:3903/metrics`, open while
+`admin.metrics_token` is unset).
 
 ## SLOs and alert routing
 

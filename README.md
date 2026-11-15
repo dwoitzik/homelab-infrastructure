@@ -134,7 +134,7 @@ check that would have caught it is committed so it runs whether or not anyone re
 | [drift-check.yml](.github/workflows/drift-check.yml) every 30 min | objects declared in git that never became live ([ADR-027](docs/decisions/ADR-027-declared-vs-live-drift-guard.md)) |
 | [tailnet route drift check](kubernetes/system/monitoring/tailnet-route-drift-check.yml) every 15 min | Headscale route approvals drifting from the intended state |
 | [Kyverno policy drift check](kubernetes/system/monitoring/kyverno-policy-drift-check.yml) | running pods that violate policy (background scans are off to save datastore writes) |
-| [Dead man's switch](kubernetes/system/monitoring/dead-mans-switch.yml) | the whole cluster going quiet, detected from outside |
+| [Dead man's switch](kubernetes/system/monitoring/alertmanager-config.yml) (Alertmanager `Watchdog` to healthchecks.io) | the whole cluster or its alerting path going quiet, detected from outside |
 | [Monthly restore test](kubernetes/system/velero/restore-test.yml) | backups that complete but do not restore |
 | [Quarterly DR game day](kubernetes/system/monitoring/dr-game-day.yml) | a recovery procedure that no longer matches reality |
 | [R2 usage guard](kubernetes/system/velero/r2-usage-guard.yml) | offsite backups running past the storage budget |
