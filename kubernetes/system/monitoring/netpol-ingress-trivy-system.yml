@@ -1,0 +1,11 @@
+# Default-deny ingress for trivy-system. Only short-lived scan jobs run
+# here and nothing connects to them. Egress is in network-policies-egress.yml.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: trivy-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
