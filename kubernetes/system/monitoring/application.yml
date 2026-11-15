@@ -141,27 +141,22 @@ spec:
                         operator: NotIn
                         values:
                           - vm-srv-k3s-11
-          # 2026-08-14: found live while testing the dashboards.default_home_
-          # dashboard_path change below -- a fresh Grafana pod's own SQLite
-          # migration set (accumulated schema history, not something this repo
-          # controls) can take longer than the chart's default liveness
-          # window (60s initial delay + 10 x 10s = 160s total), causing a
-          # real crash-loop on any future pod replacement (node drain, image
-          # upgrade, this exact kind of config change) -- confirmed live:
-          # watched a fresh pod get SIGKILLed by the liveness probe mid-
-          # migration twice in a row before this fix, while the untouched
-          # pod that had already finished its migrations 26h earlier stayed
-          # healthy throughout (no user-facing outage from this, just a
-          # wasted restart cycle each time). Generous headroom here costs
-          # nothing once actually healthy -- the probe still fails fast on a
-          # genuinely broken container, it just gives a legitimate slow
-          # migration run enough time to finish once instead of getting
-          # killed and restarting from a partial state repeatedly.
+          # Grafana's SQLite database lives on its own volume: on an emptyDir every
+          # pod move re-ran the full migration set, which outlasted the liveness
+          # window under node I/O load and crash-looped the pod.
+          persistence:
+            enabled: true
+            type: pvc
+            storageClassName: local-path
+            size: 2Gi
+          deploymentStrategy:
+            type: Recreate
+          # Room for the one-time migration run on a fresh volume.
           livenessProbe:
             initialDelaySeconds: 60
             periodSeconds: 10
             timeoutSeconds: 30
-            failureThreshold: 30
+            failureThreshold: 90
           readinessProbe:
             initialDelaySeconds: 10
             periodSeconds: 10
