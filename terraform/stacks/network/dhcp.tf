@@ -4,10 +4,18 @@
 
 # --- Homelab Pools & Servers ---
 
+# VLAN 20 holds static hosts, keepalived VIPs and the MetalLB pool (.200-.240)
+# across most of the /24, so its dynamic range is a block nothing else uses.
+locals {
+  dhcp_pool_overrides = {
+    "vlan20-srv" = "10.0.20.150-10.0.20.199"
+  }
+}
+
 resource "routeros_ip_pool" "vlan_pools" {
   for_each = local.homelab_vlans
   name     = "pool-${each.key}"
-  ranges   = ["10.0.${each.value}.10-10.0.${each.value}.254"]
+  ranges   = [lookup(local.dhcp_pool_overrides, each.key, "10.0.${each.value}.10-10.0.${each.value}.254")]
 }
 
 # CORRECTED 2026-07-10 (was wrong): this was originally written believing
@@ -49,9 +57,10 @@ resource "routeros_ip_dhcp_server" "vlan_dhcp" {
 
 # --- Management DHCP (VLAN 10) ---
 
+# Starts above the Proxmox host's static 10.0.10.10.
 resource "routeros_ip_pool" "vlan10_pool" {
   name   = "pool-vlan10-mgmt"
-  ranges = ["10.0.10.10-10.0.10.254"]
+  ranges = ["10.0.10.150-10.0.10.199"]
 }
 
 resource "routeros_ip_dhcp_server_network" "vlan10_network" {

@@ -29,3 +29,20 @@ This document defines the logical network structure and security zones. The Mikr
 | ether6 | Raspberry Pi A | Access | 20 |
 | ether7 | Raspberry Pi B | Access | 20 |
 | ether3,4,8| - | *Free* | - |
+
+## 4. Address Allocation (VLAN 10 and 20)
+
+Dynamic DHCP ranges stay clear of every static address and of MetalLB. Static
+leases (`routeros_ip_dhcp_server_lease`) may sit outside the dynamic range.
+
+| VLAN | Range | Use |
+| :--- | :--- | :--- |
+| 10 | `.10` | Proxmox host (static) |
+| 10 | `.110`–`.111` | Static DHCP leases |
+| 10 | `.150`–`.199` | Dynamic DHCP pool (`terraform/stacks/network/dhcp.tf`) |
+| 20 | `.2`–`.13` | Raspberry Pis (static leases), AdGuard VIP `.5`, k3s API VIP `.10`, k3s nodes `.11`–`.13` |
+| 20 | `.100` | NFS LXC |
+| 20 | `.150`–`.199` | Dynamic DHCP pool (`terraform/stacks/network/dhcp.tf`) |
+| 20 | `.200`–`.240` | MetalLB pool, minus `.205` (`kubernetes/system/metallb-config/pool.yml`) |
+| 20 | `.205` | rybbit LXC (static) |
+| 20 | `.250`–`.254` | Service LXCs (static, `.252` via static lease) |
