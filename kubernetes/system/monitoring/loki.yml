@@ -208,34 +208,7 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
 ---
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: promtail
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://grafana.github.io/helm-charts
-    targetRevision: 6.16.4
-    chart: promtail
-    helm:
-      values: |
-        config:
-          clients:
-            - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: monitoring
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
----
-# Pod log shipping, replacing the deprecated Promtail chart. The relabel rules
+# Pod log shipping (replaced the deprecated Promtail chart). The relabel rules
 # reproduce Promtail's kubernetes-pods job so existing LogQL keeps working.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -398,10 +371,6 @@ spec:
               loki.write "default" {
                 endpoint {
                   url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
-                }
-                // Side-by-side run with Promtail: keeps Alloy's streams separate for comparison.
-                external_labels = {
-                  collector = "alloy",
                 }
               }
   destination:
