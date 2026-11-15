@@ -1,0 +1,8 @@
+---
+# Models the clients use: paperless-gpt (text + vision), open-webui, Vane.
+ollama_models:
+  - qwen2.5:7b-instruct
+  - minicpm-v:latest
+# Must match the LXC's CPU count (ct_srv_ai_01 cores). llama.cpp otherwise
+# starts one thread per physical host core and thrashes under the CFS quota.
+ollama_num_thread: 4
