@@ -410,6 +410,26 @@ spec:
         - protocol: TCP
           port: 11434
 ---
+# Vane answers through the Ollama LXC, which allow-egress-web excludes (10.0.0.0/8).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-vane-ollama
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: vane
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.251/32
+      ports:
+        - protocol: TCP
+          port: 11434
+---
 # Same root gap, found via Loki: myspeed has thrown "NoServers" on every
 # hourly test since the 2026-08-23 rollout (confirmed live -- server
 # discovery works fine on 443, but the actual test servers it's handed run
