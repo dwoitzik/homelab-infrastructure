@@ -52,6 +52,7 @@ skipped by accident.
 | [064](ADR-064-jellyfin-public-exposure.md) | Jellyfin is promoted to the public allowlist via the Cloudflare Tunnel | Accepted (apply pending) |
 | [065](ADR-065-enshrouded-dedicated-server.md) | Enshrouded dedicated server on the DMZ game LXC (Wine) | Accepted, applied |
 | [066](ADR-066-tmpfs-for-sab-incomplete-downloads.md) | SABnzbd incomplete downloads on a host tmpfs | Superseded by 073 |
+| [067](ADR-067-velero-fs-backup-fail-fast-timeout.md) | Velero fails fast on a stuck volume upload (45m pod volume and item operation timeouts) | Accepted |
 | [069](ADR-069-enshrouded-1-0-linux-depot-removed.md) | Enshrouded 1.0 removed the Linux depot; Windows depot, Steamworks client path, buildid-checked updates every 15 minutes | Accepted, applied |
 | [070](ADR-070-paperless-beat-schedule-off-nfs.md) | The paperless beat schedule database moves off NFS via a symlink into a node-local volume | Accepted, applied |
 | [071](ADR-071-ansible-role-images-digest-pinned.md) | Every container image in the Ansible roles is pinned to a digest | Accepted, applied |
