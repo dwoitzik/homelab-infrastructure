@@ -67,16 +67,37 @@
     state: started
     enabled: true
 
-- name: Check whether the Gemma 4 26B-A4B model is already present
+- name: List installed models
   ansible.builtin.command: ollama list
   register: ollama_list_result
   changed_when: false
+  check_mode: false
 
-# No idempotency check before this ran a full multi-GB pull on every
-# playbook run against ai_nodes -- caused a real host I/O storm when a
-# common-role fix pulled ai_nodes into an unrelated ansible run.
-- name: Pull the Gemma 4 26B-A4B model
-  ansible.builtin.command: ollama pull gemma4:26b
-  register: ollama_pull_result
-  changed_when: "'downloading' in ollama_pull_result.stdout"
-  when: "'gemma4:26b' not in ollama_list_result.stdout"
+# Pull only what is missing: a pull on every run once caused a host I/O storm.
+- name: Pull missing models
+  ansible.builtin.command: "ollama pull {{ item }}"
+  loop: "{{ ollama_models }}"
+  when: item not in ollama_list_result.stdout
+  changed_when: true
+
+- name: Read each model's parameters
+  ansible.builtin.command: "ollama show {{ item }} --parameters"
+  loop: "{{ ollama_models }}"
+  register: ollama_params
+  changed_when: false
+  check_mode: false
+
+# Bake the thread count into the model under the same tag, so every client
+# gets it without passing options.
+- name: Pin the thread count in each model
+  ansible.builtin.shell: |
+    set -o pipefail
+    printf 'FROM {{ item.item }}\nPARAMETER num_thread {{ ollama_num_thread }}\n' > /tmp/ollama-threads.Modelfile
+    ollama create {{ item.item }} -f /tmp/ollama-threads.Modelfile
+  args:
+    executable: /bin/bash
+  loop: "{{ ollama_params.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stdout is not search('num_thread\\s+' ~ ollama_num_thread ~ '\\b')
+  changed_when: true
