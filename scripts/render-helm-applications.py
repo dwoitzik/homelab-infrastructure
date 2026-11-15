@@ -59,6 +59,9 @@ def render(app, namespace, src, kube_version, workdir):
 
 
 def kubeconform(rendered, kube_version):
+    # Schemas are vendored per minor (vX.Y.0-standalone); patch releases never change them.
+    major, minor = kube_version.lstrip("v").split(".")[:2]
+    kube_version = f"{major}.{minor}.0"
     location = str(SCHEMAS) + "/{{ .NormalizedKubernetesVersion }}-standalone/{{ .ResourceKind }}{{ .KindSuffix }}.json"
     out = subprocess.run(
         ["kubeconform", "-kubernetes-version", kube_version,
@@ -71,7 +74,7 @@ def kubeconform(rendered, kube_version):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--kube-version", default="1.31.0")
+    parser.add_argument("--kube-version", default="1.34.13")
     parser.add_argument("files", nargs="*")
     args = parser.parse_args()
 
