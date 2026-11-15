@@ -83,9 +83,10 @@ spec:
   schedule: "17 */6 * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 86400
       activeDeadlineSeconds: 240
       backoffLimit: 0
       template:
