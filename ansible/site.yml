@@ -177,3 +177,5 @@
     # fwd_04a_srv_monitoring firewall rule) -- runs directly on the host
     # instead, no dependency on that pipeline.
     - ssd_wear_check
+    - role: pve_host_hardening
+      tags: [pve_host_hardening]

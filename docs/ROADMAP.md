@@ -76,7 +76,7 @@ rate it reaches 90 % around the end of December.
 - [ ] Finish retiring the Atlantis deployment that GitHub Actions replaced (ADR-021),
       including its credentials
 - [x] Remove unused cluster tooling with broad permissions
-- [ ] Hypervisor patch management and account hardening under Ansible
+- [x] Hypervisor patch management and account hardening under Ansible
 - [x] One ingress path for every public service, so all requests pass the same rate
       limiting and CrowdSec bouncer
 - [ ] Every NetworkPolicy under GitOps; default-deny ingress in every namespace

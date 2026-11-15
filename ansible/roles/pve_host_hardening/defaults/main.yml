@@ -1,0 +1,7 @@
+---
+# Debian security suite only. Proxmox packages restart the API daemons or need a
+# reboot, so they are upgraded by hand in a planned window (see README).
+pve_host_hardening_uu_origins:
+  - "origin=Debian,codename=${distro_codename}-security,label=Debian-Security"
+
+pve_host_hardening_sshd_max_auth_tries: 3
