@@ -180,7 +180,8 @@ spec:
                     value: false
 ---
 # tailscale-subnet-router genuinely needs privileged (NET_ADMIN/NET_RAW,
-# iptables NAT) -- despite this policy's description claiming otherwise.
+# iptables NAT). The object stays in apps, the only namespace Kyverno accepts
+# exceptions from; it matches the pod in host-agents.
 apiVersion: kyverno.io/v2
 kind: PolicyException
 metadata:
@@ -196,9 +197,9 @@ spec:
     any:
       - resources:
           kinds: [Pod]
-          namespaces: [apps]
+          namespaces: [host-agents]
           names: ["tailscale-subnet-router-*"]
       - resources:
           kinds: [Deployment]
-          namespaces: [apps]
+          namespaces: [host-agents]
           names: ["tailscale-subnet-router"]
