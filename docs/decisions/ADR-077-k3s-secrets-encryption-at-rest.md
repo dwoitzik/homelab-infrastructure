@@ -31,7 +31,7 @@ kine works the same as etcd).
    `state.db` first, then set the flag, restart k3s, run
    `k3s secrets-encrypt rotate-keys`, restart again, and confirm with
    `k3s secrets-encrypt status` and by reading a Secret's raw row in `state.db`
-   (must start with `k8s:enc:aescbc:v1:`).
+   (must start with `k8s:enc:aescbc:v1:`), including `old_value` of every row.
 3. Key handling: the key file sits next to the data on VM 211, so every PBS backup of
    VM 211 holds both, and a disk image alone stays as readable as before (accepted: the
    threat closed here is a leaked `state.db` copy or datastore dump, not a full VM image).
@@ -57,3 +57,30 @@ kine works the same as etcd).
   on cannot be decrypted without the provider config. A clean rollback without the
   snapshot is `k3s secrets-encrypt disable`, restart, `k3s secrets-encrypt reencrypt`,
   then remove the flag.
+
+## Outcome
+
+Applied 2026-11-15 after snapshot `pre-secrets-encryption` of VM 211 and an SQLite
+online backup (deleted again afterwards, since it held plaintext Secrets). The first
+restart generated the aescbc config (stage `start`); `rotate-keys` rewrote all 114
+Secrets and a second restart completed it. `k3s secrets-encrypt status`: Enabled,
+`reencrypt_finished`, all hashes match. Every current Secret row in `kine` starts with
+`k8s:enc:aescbc:v1:`.
+
+Two leftovers needed more than the documented steps:
+
+- `kine` keeps older revisions until compaction (about the last 1000 revisions), and
+  every row also stores the previous value in `old_value`. After `rotate-keys` the
+  current rows still carried the plaintext previous value. `reencrypt --force` did not
+  help (an unchanged object is not rewritten). Adding and then removing an annotation on
+  every Secret wrote two new revisions each; after the next compactions no Secret row in
+  `kine` had a plaintext `value` or `old_value`.
+- Deleted rows can survive in free SQLite pages. A byte search of `state.db` and
+  `state.db-wal` for the protobuf header of a plaintext Secret found none (the same
+  search finds 143 ConfigMaps as a control), so no `VACUUM` was needed.
+
+PBS backups of VM 211 taken before this date, and the `pre-secrets-encryption` snapshot
+until it is deleted, still hold plaintext Secrets.
+
+The vault copy `vault_k3s_encryption_config` has the same SHA-256 as the live file;
+`roles/k3s_secrets_encryption` checks that on every run.
