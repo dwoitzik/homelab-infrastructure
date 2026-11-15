@@ -193,15 +193,16 @@ resource "proxmox_virtual_environment_container" "ct_srv_ai_01" {
   # effective CPU ceiling. Provider is now 0.111.0 and exposes `limit`
   # directly, so the cap is real and Terraform-tracked going forward instead
   # of depending on a manual step nobody re-runs after a recreate.
-  # 4 GB only fits a small model (qwen2.5:7b ~5 GB needs swap); a 27b run
-  # does not fit. The CFS limit keeps inference from starving the host.
+  # Sized for qwen2.5:7b (about 5 GB resident): at 4 GB it swapped and
+  # generated well under one token per second. A 27b model still does not
+  # fit; the CFS limit keeps inference from starving the host.
   cpu {
-    cores = 2
+    cores = 4
     limit = 4
   }
 
   memory {
-    dedicated = 4096
+    dedicated = 8192
     swap      = 1024
   }
 
