@@ -167,6 +167,13 @@ spec:
                         operator: NotIn
                         values:
                           - vm-srv-k3s-11
+        memcachedExporter:
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
         lokiCanary:
           enabled: false
         test:
@@ -174,6 +181,12 @@ spec:
         # ADR-036: same soft preference off vm-srv-k3s-11 as the rest of
         # this stack, for the nginx gateway frontend.
         gateway:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
           affinity:
             nodeAffinity:
               preferredDuringSchedulingIgnoredDuringExecution:
