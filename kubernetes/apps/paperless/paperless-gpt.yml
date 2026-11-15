@@ -17,18 +17,19 @@ spec:
         options:
           - name: ndots
             value: "1"
+      # Since v0.26 the entrypoint creates a user and chowns /app when started
+      # as root, which fails on the read-only root filesystem. Started as the
+      # image's own UID it skips that and only needs the mounted dirs below.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
       containers:
-      # REL-060: pinned at v0.25.1, NOT auto-mergeable past this without manual
-      # verification. v0.26.0 (PR #314, merged 2026-07-07) CrashLoopBackOff'd
-      # immediately -- confirmed live via `kubectl logs --previous`:
-      # `addgroup: /etc/group: Read-only file system`. v0.26.0's entrypoint
-      # added a startup addgroup/adduser step that fails under this
-      # deployment's `readOnlyRootFilesystem: true` (SEC-012 hardening).
-      # Rolled back rather than relaxing the security context. If bumping
-      # again, test in a scratch Deployment with the same securityContext
-      # first, not a live rollout.
+      # REL-060: stateful/critical Renovate group, never auto-merged. Test a
+      # bump in a scratch Deployment with this securityContext first.
       - name: paperless-gpt
-        image: icereed/paperless-gpt:v0.25.1
+        image: icereed/paperless-gpt:v0.31.0@sha256:d668941a829552cc0eddbc7c22506b3480dfbf61bd0d6eae881ad9fcfe2de70c
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -129,7 +130,7 @@ spec:
           failureThreshold: 4
       initContainers:
       - name: seed-prompts
-        image: icereed/paperless-gpt:v0.25.1
+        image: icereed/paperless-gpt:v0.31.0@sha256:d668941a829552cc0eddbc7c22506b3480dfbf61bd0d6eae881ad9fcfe2de70c
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
