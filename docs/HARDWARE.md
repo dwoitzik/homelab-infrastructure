@@ -188,13 +188,12 @@ counter), so this section is entirely about slowing how fast it climbs.
   extractions at once — which is specifically what pegged NVMe queue depth during
   the 2026-08-22 incident.
 
-**Investigated, found not to apply (corrected an assumption rather than acting on
-it):** Loki's and Prometheus's TSDB/chunk storage are both already on the
-`nfs-client` storage class (CT220's disk), not this NVMe — confirmed by reading
-their actual `storageClassName` values, not assumed. Shortening their retention
-periods (both currently 30d) would reduce load on the NFS server, but has no effect
-on this drive's wear. Not changed, since the reasoning behind investigating them no
-longer applies.
+**Correction:** Loki's and Prometheus's storage is on the `nfs-client` storage class,
+and that class lives on CT220's `/nfs-data` volume, an LV in `local-lvm` (the NVMe
+thin pool), not on the HDD. Their writes therefore do count toward this drive's wear.
+Loki's chunk flushing was made coarser (fewer, larger chunks) and Prometheus no longer
+stores the control-plane series duplicated by the kubelet scrape; retention stays at
+30 days.
 
 **Investigated, deliberately not changed:**
 
