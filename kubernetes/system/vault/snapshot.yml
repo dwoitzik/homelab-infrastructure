@@ -1,0 +1,134 @@
+# Raft snapshots via a Velero pre-backup hook; a raw copy of the raft directory
+# does not restore. The snapshot is barrier-encrypted, so it needs the unseal keys.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-snapshot-script
+  namespace: vault
+data:
+  vault-snapshot.sh: |
+    #!/bin/sh
+    # A new snapshot replaces the old one only after its archive checks out.
+    set -eu
+    export VAULT_TOKEN="$(cat /token/token)"
+    # Periodic token: renewing on every run keeps it alive without a TTL limit.
+    vault token renew >/dev/null
+    tmp=/snapshots/vault.snap.tmp
+    rm -f "$tmp"
+    vault operator raft snapshot save "$tmp"
+    tar -tzf "$tmp" | grep -q '^SHA256SUMS$'
+    tar -tzf "$tmp" | grep -q '^state.bin$'
+    mv "$tmp" /snapshots/vault.snap
+    date -u +%Y-%m-%dT%H:%M:%SZ > /snapshots/.last-run
+    echo "vault snapshot: $(wc -c < /snapshots/vault.snap) bytes"
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: vault-snapshot-token
+  namespace: vault
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault
+    kind: ClusterSecretStore
+  target:
+    name: vault-snapshot-token
+    creationPolicy: Owner
+  data:
+    - secretKey: token
+      remoteRef:
+        key: secret/vault-snapshot
+        property: token
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vault-snapshots
+  namespace: vault
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-snapshot
+  namespace: vault
+  labels:
+    app: vault-snapshot
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vault-snapshot
+  template:
+    metadata:
+      labels:
+        app: vault-snapshot
+      annotations:
+        pre.hook.backup.velero.io/container: vault-snapshot
+        pre.hook.backup.velero.io/command: '["/bin/sh", "/scripts/vault-snapshot.sh"]'
+        # Continue keeps the last good snapshot in the backup; the hook error
+        # still marks the backup PartiallyFailed, which is alerted on.
+        pre.hook.backup.velero.io/on-error: Continue
+        pre.hook.backup.velero.io/timeout: 5m
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: vault-snapshot
+          image: hashicorp/vault:2.2.0@sha256:e0acd3c681bdf57f002d7214e5d050b876e1704678005c6b0406dd96a65be919
+          command: ["/bin/sh", "-c", "trap 'exit 0' TERM INT; while true; do sleep 3600 & wait $!; done"]
+          env:
+            - name: VAULT_ADDR
+              value: http://vault.vault.svc.cluster.local:8200
+            - name: HOME
+              value: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: snapshots
+              mountPath: /snapshots
+            - name: script
+              mountPath: /scripts
+            - name: token
+              mountPath: /token
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: snapshots
+          persistentVolumeClaim:
+            claimName: vault-snapshots
+        - name: script
+          configMap:
+            name: vault-snapshot-script
+        - name: token
+          secret:
+            secretName: vault-snapshot-token
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
