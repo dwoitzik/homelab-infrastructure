@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudflared-metrics
+  namespace: apps
+  labels:
+    app: cloudflared
+spec:
+  selector:
+    app: cloudflared
+  ports:
+    - name: metrics
+      port: 20241
+      targetPort: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cloudflared
+  namespace: apps
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: cloudflared
+  endpoints:
+    - port: metrics
+      interval: 60s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cloudflared-alerts
+  namespace: apps
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: cloudflared
+      rules:
+        # One alert for the whole tunnel: a single replica losing its edge
+        # connections is covered by the other one and not worth a page.
+        - alert: CloudflareTunnelDown
+          expr: |
+            sum(cloudflared_tunnel_ha_connections{namespace="apps"}) < 1
+              or absent(cloudflared_tunnel_ha_connections{namespace="apps"})
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Cloudflare tunnel has no connections to the edge
+            description: >-
+              No cloudflared replica has held an edge connection for 5 minutes, so the
+              public hostnames behind the tunnel are unreachable from outside. Check
+              `kubectl -n apps logs -l app=cloudflared` and the tunnel status in the
+              Cloudflare dashboard.
