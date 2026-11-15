@@ -35,7 +35,7 @@ jobs:
     environment: terraform-apply
     steps:
       - name: Acknowledge the comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             await github.rest.reactions.createForIssueComment({
@@ -47,7 +47,7 @@ jobs:
 
       - name: Resolve PR head ref
         id: pr
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -79,7 +79,7 @@ jobs:
           echo "stack=$STACK" >> "$GITHUB_OUTPUT"
 
       - name: Checkout PR head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ steps.pr.outputs.sha }}
 
@@ -103,7 +103,7 @@ jobs:
 
       - name: Write apply output into the PR description
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const fs = require('fs');
