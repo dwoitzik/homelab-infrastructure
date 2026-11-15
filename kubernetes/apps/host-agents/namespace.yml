@@ -1,0 +1,17 @@
+# Workloads that need host access by design and cannot pass Pod Security
+# baseline (see README.md). Keeping them here lets `apps` enforce baseline.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: host-agents
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: host-agents
+automountServiceAccountToken: false
