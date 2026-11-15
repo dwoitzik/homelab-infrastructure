@@ -1,24 +1,9 @@
-# These 5 NetworkPolicies existed live in the cluster (part of ArgoCD's original
-# manual install bootstrap, 2026-05-31) but were never git-tracked at all -- same
-# orphan-config class as REL-014/035/042. Brought under git here.
+# Ingress policies for every ArgoCD component, taken over from the upstream
+# install manifest so all of them are reconciled from Git.
 #
-# All 5 originally used `namespaceSelector: {}` to mean "allow from any namespace"
-# on their metrics/cross-component ports. That's valid upstream NetworkPolicy syntax,
-# but k3s's built-in kube-router NetworkPolicy controller does not correctly enforce
-# it -- confirmed live (2026-07-07): deleting the application-controller policy
-# entirely made its metrics port immediately reachable cross-pod; re-adding it with
-# `namespaceSelector: {}` still blocked it; replacing that one rule with
-# `ipBlock: cidr: 10.42.0.0/16` (the cluster's actual pod CIDR) fixed it instantly,
-# confirmed with a real scrape returning live argocd_app_info metrics. This is the
-# reason ArgoCD's own Prometheus metrics were never reachable (REL-055's "GAP" entry)
-# -- not a broken metrics server as first suspected, a NetworkPolicy enforcement bug.
-# Applied the same ipBlock fix to every other policy using the identical
-# `namespaceSelector: {}` pattern (applicationset-controller, dex-server's port 5558
-# rule, notifications-controller, repo-server's port 8084 rule) -- all were equally
-# broken, not just the one port originally in question. Policies using explicit
-# podSelector matches (dex-server's first rule, redis, repo-server's first rule) were
-# already working correctly and are left untouched; not included in this file since
-# they don't need fixing (still enforced live from the original manual apply).
+# k3s's kube-router does not enforce `namespaceSelector: {}` ("any namespace")
+# correctly, so cross-namespace rules use the pod CIDR (10.42.0.0/16) as an
+# ipBlock instead.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -160,3 +145,53 @@ spec:
       app.kubernetes.io/name: argocd-repo-server
   policyTypes:
     - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/component: redis
+    app.kubernetes.io/name: argocd-redis
+    app.kubernetes.io/part-of: argocd
+  name: argocd-redis-network-policy
+  namespace: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-server
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-repo-server
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: argocd-application-controller
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+# The UI/API is reached through Traefik and the CLI from the LAN; access
+# control is ArgoCD's own auth plus the IngressRoute middleware.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+  name: argocd-server-network-policy
+  namespace: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-server
+  policyTypes:
+    - Ingress
+  ingress:
+    - {}
