@@ -55,14 +55,18 @@ data:
         disabled: true
       # bing parses server-rendered li.b_algo; google.com/search now JS-renders
       # and 403s from this egress, the rest are fingerprint-blocked (ADR-041).
+      # Weight only reorders merged results; Google CSE ranks far better than
+      # bing for most queries, so its hits lead the page.
       - name: bing
         disabled: false
+        weight: 0.6
       - name: google
         disabled: true
       # google cse queries the cse.google.com JSON API, a different host from
       # the JS-rendered google.com/search -- see ADR-060.
       - name: google cse
         disabled: false
+        weight: 2.0
       - name: wikipedia
         disabled: true
       - name: qwant
