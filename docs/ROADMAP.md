@@ -74,7 +74,9 @@ rate it reaches 90 % around the end of December.
 ### Security hygiene
 
 - [ ] Finish retiring the Atlantis deployment that GitHub Actions replaced (ADR-021),
-      including its credentials
+      including its credentials. Server, config, dead GitHub token and webhook secret
+      removed (ADR-021 "Retirement"); left: list HashiCorp Vault KV paths and remove any
+      Atlantis-only entry
 - [x] Remove unused cluster tooling with broad permissions
 - [x] Hypervisor patch management and account hardening under Ansible
 - [x] One ingress path for every public service, so all requests pass the same rate

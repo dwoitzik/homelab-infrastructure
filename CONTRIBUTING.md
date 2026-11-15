@@ -26,12 +26,14 @@ ansible-galaxy collection install -r ansible/requirements.yml
 
 ## Terraform Changes
 
-All Terraform applies go exclusively through Atlantis (GitOps). Never run `terraform apply` locally.
+All Terraform applies go through the PR-comment GitHub Actions workflows (ADR-021). Never run `terraform apply` locally.
 
 1. Create a branch and make changes
-2. Push and open a PR — Atlantis auto-posts `terraform plan` as a comment
-3. Review the plan, then comment `atlantis apply` to apply
+2. Push and open a PR, then comment `atlantis plan -d <stack>`; `terraform-plan.yml` posts the plan as a comment
+3. Review the plan, then comment `atlantis apply -d <stack>`; `terraform-apply.yml` waits on the `terraform-apply` Environment approval before applying
 4. Merge after apply succeeds
+
+The `atlantis` comment keywords are kept from the retired Atlantis server; no Atlantis server runs.
 
 ```bash
 git checkout -b feature/my-change

@@ -158,8 +158,9 @@ the constraints these rules exist because of:
 
 K3s (SQLite/kine datastore, not etcd -- see ADR-015) · ArgoCD (app-of-apps GitOps) ·
 `local-path`/`nfs-client` storage (NOT Longhorn) · Traefik (ingress) · MetalLB (LB) ·
-cert-manager · Authelia (auth) · Vaultwarden. Terraform via **Atlantis** (PR-driven
-plan/apply). Object storage via **Garage** (NOT MinIO). Secrets via **Ansible Vault** +
+cert-manager · Authelia (auth) · Vaultwarden. Terraform via PR-comment **GitHub Actions**
+workflows on a self-hosted runner (ADR-021; the Atlantis server is retired, only its
+`atlantis plan`/`atlantis apply` comment keywords remain). Object storage via **Garage** (NOT MinIO). Secrets via **Ansible Vault** +
 Kubernetes Secrets.
 
 ## Target useful workloads

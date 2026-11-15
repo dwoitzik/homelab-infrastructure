@@ -80,14 +80,9 @@ jobs:
         with:
           ref: ${{ steps.pr.outputs.sha }}
 
-      # Runs inside Atlantis's own custom image (base atlantis image +
-      # trusted Proxmox CA, see ansible/roles/atlantis/files/Dockerfile) so
-      # the pinned Terraform version and CA trust match exactly what the
-      # repo has used all along -- not a second, drifting toolchain.
-      # --env-file references a host-local file (ansible/roles/atlantis's
-      # terraform-runner.env.j2), the same Vault-sourced credentials
-      # Atlantis's own container already runs with -- never duplicated into
-      # GitHub Secrets.
+      # Toolbox image (ansible/roles/atlantis) pins Terraform and trusts the
+      # Proxmox CA; --env-file holds the Ansible-Vault-sourced credentials so
+      # none go into GitHub Secrets.
 
       # --user matches the container to the runner's own uid:gid -- the
       # image's baked-in uid 100 can't write $GITHUB_WORKSPACE, owned by

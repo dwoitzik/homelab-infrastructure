@@ -23,8 +23,9 @@ Renovate (`renovate.json`), scheduled every 2 hours (`kubernetes/apps/renovate/`
 - **PR-only, always**: every major-version bump, any package, regardless of tier.
 
 Terraform is **not** auto-applied by Renovate or anything else — every Terraform
-change, dependency bump or otherwise, goes through a PR and Atlantis's plan/apply gate
-(`atlantis apply` comment required). This is deliberate: Terraform changes physical/VM
+change, dependency bump or otherwise, goes through a PR and the comment-triggered
+plan/apply workflows (`atlantis apply -d <stack>` comment plus the `terraform-apply`
+Environment approval, ADR-021). This is deliberate: Terraform changes physical/VM
 state on a single-point-of-failure host (`mini`), and that always gets a human in the
 loop.
 
@@ -72,7 +73,8 @@ See `docs/STEADY-STATE-RUNBOOK.md` for what to actually do when each of these fi
 
 ## What stays manual, on purpose
 
-- **Terraform apply** — always through Atlantis, a human comments `atlantis apply`.
+- **Terraform apply** — always through the PR-comment workflow (`atlantis apply -d <stack>`)
+  behind the `terraform-apply` Environment approval (ADR-021).
   Never auto-applied, regardless of what changed.
 - **Stateful/critical service bumps** (Renovate PR-only tier above) — always reviewed
   before merge, because the failure mode for these is data loss or a full auth outage,

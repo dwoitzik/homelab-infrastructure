@@ -117,8 +117,8 @@ repoints it at the standby directly:
   access from outside the LAN: change the ingress hostname's target
   service from the in-cluster Traefik address to
   `http://10.0.20.3:8082` (headscale) / `http://10.0.20.3:8083`
-  (vaultwarden). This is a Terraform-managed resource behind Atlantis —
-  either run this through the normal PR → `atlantis plan`/`apply` flow if
+  (vaultwarden). This is a Terraform-managed resource behind the PR-comment apply
+  workflow (ADR-021) — either run this through the normal PR → `atlantis plan`/`apply` flow if
   time allows, or apply it directly via `cloudflared`/dashboard as a
   break-glass exception and reconcile the Terraform state afterward. Note
   which one you did in `phase8/LEDGER.md` either way.

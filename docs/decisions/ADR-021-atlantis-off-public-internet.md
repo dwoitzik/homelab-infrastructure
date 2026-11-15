@@ -1,7 +1,7 @@
 # ADR-021: Replace Atlantis's public webhook with a self-hosted GitHub Actions runner
 
 **Date:** 2026-08-15
-**Status:** Accepted
+**Status:** Accepted; implemented, Atlantis server fully retired 2026-11-15
 
 ## Context
 
@@ -130,3 +130,26 @@ port forward, Cloudflare Tunnel, or WAN-listening service is needed at all.
 - Until the migration lands, `atlantis plan`/`apply` PR comments have no working
   delivery path — noted in `phase8/STATE.md` as an open item, not silently assumed
   fixed.
+
+## Retirement (2026-11-15)
+
+What is left of Atlantis on purpose:
+
+- `ct-srv-atlantis-01` (CT204) keeps its name and IP; it runs the self-hosted runner.
+- `ansible/roles/atlantis` builds the terraform toolbox image (`atlantis-custom`,
+  Atlantis base image plus the Proxmox CA) and writes `/opt/atlantis/terraform-runner.env`
+  for the plan/apply workflows.
+- The `vault_atlantis_*` Ansible Vault variables that feed that env file (Garage state
+  backend keys, MikroTik password, Proxmox token secret, Cloudflare token; the Cloudflare
+  token is also cert-manager's DNS-01 token), and the Proxmox API token
+  `terraform@pve!atlantis` itself. They are the live Terraform credentials, only the
+  names are historical.
+- The `atlantis plan` / `atlantis apply` comment keywords.
+
+Removed: the Atlantis server container and its config (role tasks), the old server env
+file `/opt/atlantis/.env`, the Ansible Vault variables `atlantis_gh_token`,
+`vault_atlantis_gh_token` (the same GitHub token, already rejected by GitHub with 401),
+`atlantis_gh_webhook_secret`, `vault_atlantis_gh_webhook_secret` (the repository has no
+webhooks), and the unused `atlantis_tf_mikrotik_{url,user,password}` duplicates. The
+Uptime Kuma monitor for `atlantis.woitzik.dev` was paused; that hostname has no public
+DNS record and no ingress.
