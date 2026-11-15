@@ -43,6 +43,13 @@
     - common
     - k3s_node_tuning
 
+- name: K3s server Secrets encryption key (ADR-077)
+  hosts: vm-srv-k3s-11
+  become: true
+  roles:
+    - role: k3s_secrets_encryption
+      tags: [k3s_secrets_encryption]
+
 - name: Provision HA Core Services & Gateway
   hosts: rpi_nodes
   become: true

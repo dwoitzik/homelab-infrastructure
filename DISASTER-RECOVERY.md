@@ -45,11 +45,18 @@ the NVMe.
    (`INSTALL_K3S_VERSION`) for every node, server and agents alike. The install script
    defaults to latest, which caused a real version mismatch between server and an agent
    during this recovery.
-3. Confirm the datastore is actually SQLite (single server, no `cluster-init`), not
+3. Secrets in the datastore are encrypted (ADR-077). When the server comes back from a
+   restored `state.db` (PBS restore of VM 211 or a copied database), the key file
+   `/var/lib/rancher/k3s/server/cred/encryption-config.json` must be in place before k3s
+   starts: it is inside the VM 211 backup, and its offline copy is
+   `vault_k3s_encryption_config` in Ansible Vault (`ansible-playbook site.yml --limit
+   vm-srv-k3s-11 --tags k3s_secrets_encryption` writes it when missing). A fresh cluster
+   with no restored datastore needs nothing: k3s generates a new key.
+4. Confirm the datastore is actually SQLite (single server, no `cluster-init`), not
    etcd — `kubectl` behaves the same either way, but `docs/decisions/ADR-015` explains
    why this matters for the hardware.
-4. Apply CNI/MetalLB/Traefik/cert-manager, then bootstrap ArgoCD.
-5. **Do not bulk-apply `kubernetes/system/argocd/apps-applicationset.yml` or
+5. Apply CNI/MetalLB/Traefik/cert-manager, then bootstrap ArgoCD.
+6. **Do not bulk-apply `kubernetes/system/argocd/apps-applicationset.yml` or
    `system-app-bootstrap.yml` yet.** Apply core system components
    (`kubernetes/system/*/application.yml`) individually, in dependency order (Vault →
    ExternalSecrets → everything else), verifying each is healthy before the next. Bulk
@@ -62,7 +69,10 @@ unseal keys are gone with it, *unless* something preserved the old cluster's own
 datastore (a PBS restore of the old control-plane VM's disk counts). If so:
 
 1. Spin up a disposable, network-isolated temporary k3s server instance pointed at the
-   old cluster's preserved SQLite/kine datastore.
+   old cluster's preserved SQLite/kine datastore, with `secrets-encryption: true` and the
+   old `encryption-config.json` (Ansible Vault `vault_k3s_encryption_config`) in its
+   `server/cred/` directory. Without that key every Secret, including
+   `vault-unseal-keys`, is unreadable.
 2. Extract the `vault-unseal-keys` Secret from it — **never display the values**, extract
    straight to files, use immediately, delete the files after.
 3. Destroy the temporary instance.

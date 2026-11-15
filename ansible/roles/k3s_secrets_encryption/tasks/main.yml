@@ -1,0 +1,32 @@
+---
+# k3s generates this file on the first start with secrets-encryption; it is
+# only written here when missing, i.e. when rebuilding the server against a
+# restored state.db (ADR-077). k3s must not start before it is in place.
+- name: Restore k3s secrets encryption config if missing
+  ansible.builtin.copy:
+    dest: "{{ k3s_secrets_encryption_config_path }}"
+    content: "{{ vault_k3s_encryption_config | string }}"
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+  no_log: true
+
+# After a key rotation the offline copy must be updated too, or a restore
+# would come back with unreadable Secrets.
+- name: Read live k3s secrets encryption config
+  ansible.builtin.slurp:
+    src: "{{ k3s_secrets_encryption_config_path }}"
+  register: k3s_secrets_encryption_config_live
+  no_log: true
+
+- name: Assert the Ansible Vault copy matches the live encryption config
+  ansible.builtin.assert:
+    that:
+      - (k3s_secrets_encryption_config_live.content | b64decode | hash('sha256')) == (vault_k3s_encryption_config | string | hash('sha256'))
+    fail_msg: >-
+      encryption-config.json on {{ inventory_hostname }} differs from
+      vault_k3s_encryption_config. Re-encrypt the live file into
+      group_vars/all/vault.yml (see roles/k3s_secrets_encryption/README.md).
+    quiet: true
+  no_log: true

@@ -57,3 +57,18 @@ kine works the same as etcd).
   on cannot be decrypted without the provider config. A clean rollback without the
   snapshot is `k3s secrets-encrypt disable`, restart, `k3s secrets-encrypt reencrypt`,
   then remove the flag.
+
+## Outcome
+
+Applied 2026-11-15 after snapshot `pre-secrets-encryption` of VM 211 and an SQLite
+online backup (deleted again afterwards, since it held plaintext Secrets). The first
+restart generated the aescbc config (stage `start`); `rotate-keys` rewrote all 114
+Secrets and a second restart completed it. `k3s secrets-encrypt status`: Enabled,
+`reencrypt_finished`, all hashes match. Every current Secret row in `kine` starts with
+`k8s:enc:aescbc:v1:`. Older plaintext revisions stay in `kine` until its compaction
+(roughly the last 1000 revisions are kept), and SQLite pages are only scrubbed by a
+`VACUUM`; both were checked/run before the snapshot was removed. PBS backups of VM 211
+taken before this date still hold plaintext Secrets until they expire.
+
+The vault copy `vault_k3s_encryption_config` has the same SHA-256 as the live file;
+`roles/k3s_secrets_encryption` checks that on every run.
