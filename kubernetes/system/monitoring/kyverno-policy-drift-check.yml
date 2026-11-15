@@ -51,7 +51,6 @@ data:
        else empty end),
       (if ($pod | ns_in(["apps","monitoring","database","external-secrets","security"]))
           and ($c.securityContext.privileged // false)
-          and (($pod.metadata.namespace == "apps" and ($pod.metadata.name | startswith("tailscale-subnet-router-"))) | not)
        then "\($p) \($c.name): privileged" else empty end)
   check.sh: |
     #!/bin/sh
