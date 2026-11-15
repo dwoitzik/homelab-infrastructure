@@ -28,6 +28,29 @@ data:
   # diffs them as changes → permanent OutOfSync → selfHeal auto-sync loop that
   # churns the API server and keeps ~12 apps Degraded/OutOfSync. Ignore the
   # defaulted fields + status cluster-wide (applies to every Application).
+  # local-path binds a claim only when its first pod is scheduled
+  # (WaitForFirstConsumer). The built-in check calls such a claim Progressing,
+  # so a sync waiting on it never rolls out the pod that would bind it.
+  resource.customizations.health.PersistentVolumeClaim: |
+    hs = {}
+    if obj.status ~= nil and obj.status.phase == "Bound" then
+      hs.status = "Healthy"
+      hs.message = "Bound"
+      return hs
+    end
+    if obj.status ~= nil and obj.status.phase == "Lost" then
+      hs.status = "Degraded"
+      hs.message = "Lost"
+      return hs
+    end
+    if obj.spec ~= nil and obj.spec.storageClassName == "local-path" then
+      hs.status = "Healthy"
+      hs.message = "Waiting for first consumer"
+      return hs
+    end
+    hs.status = "Progressing"
+    hs.message = "Pending"
+    return hs
   resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret: |
     jqPathExpressions:
       - .spec.data[].remoteRef.conversionStrategy
