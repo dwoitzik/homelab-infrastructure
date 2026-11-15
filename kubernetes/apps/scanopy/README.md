@@ -16,8 +16,9 @@ deliberately excluded — see `docs/decisions/ADR-035-scanopy-topology-mapping.m
   `scanopy-final` route -- same pattern as every other internal-only tool, never the
   Cloudflare Tunnel). In-cluster consumers (the SRV daemon) use
   `scanopy-server.apps.svc.cluster.local:60072` directly.
-- **SRV daemon** (`scanopy-daemon-srv`, this file): `hostNetwork: true` pod, same
-  cluster. Bypasses NetworkPolicy entirely — see the manifest's own comment before
+- **SRV daemon** (`scanopy-daemon-srv`, this file): `hostNetwork: true` pod in the
+  `host-agents` namespace (cannot pass Pod Security baseline), same cluster. Its
+  `scanopy-daemon-srv` Secret is created by hand in `host-agents` (see the `.example`). Bypasses NetworkPolicy entirely — see the manifest's own comment before
   changing its egress assumptions.
 - **MGMT daemon**: `ct-mgmt-scanopy-01` LXC (`terraform/stacks/proxmox/lxc.tf`),
   `ansible/roles/scanopy_daemon/`.
