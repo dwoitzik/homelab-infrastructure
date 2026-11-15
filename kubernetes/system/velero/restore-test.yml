@@ -232,9 +232,10 @@ spec:
   schedule: "0 6 1 * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 6
-  failedJobsHistoryLimit: 6
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 604800
       activeDeadlineSeconds: 1800
       backoffLimit: 0
       template:

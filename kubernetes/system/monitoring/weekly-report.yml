@@ -119,9 +119,10 @@ spec:
   schedule: "0 8 * * 1"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 4
-  failedJobsHistoryLimit: 4
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 604800
       activeDeadlineSeconds: 300
       backoffLimit: 1
       template:

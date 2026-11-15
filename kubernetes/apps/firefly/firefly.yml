@@ -145,6 +145,7 @@ spec:
   failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 86400
       template:
         metadata:
           labels:

@@ -130,9 +130,10 @@ spec:
   schedule: "*/15 * * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 86400
       # 240, not the original 60: `apk add` below measured 54s wall clock, so
       # the old budget left ~6s for the check itself and every minor network
       # hiccup produced DeadlineExceeded with no logs (4 failures in 15h).

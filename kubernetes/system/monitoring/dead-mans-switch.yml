@@ -25,9 +25,10 @@ spec:
   schedule: "*/5 * * * *"
   concurrencyPolicy: Replace
   successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 86400
       activeDeadlineSeconds: 60
       backoffLimit: 0
       template:
