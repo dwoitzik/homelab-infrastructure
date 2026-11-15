@@ -34,6 +34,8 @@
   ansible.builtin.get_url:
     url: https://azlux.fr/repo.gpg.key
     dest: /etc/apt/keyrings/azlux.asc
+    # Pinned: without a checksum get_url reports a change on every --check run.
+    checksum: sha256:08e6ff0af9b742b28b44464411603d55c1436560f5869047924189c790749bd0
     mode: '0644'
 
 - name: Add Azlux repository for log2ram package
