@@ -121,7 +121,8 @@
     state: present
     extra_zfs_properties:
       mountpoint: "{{ pve_power_vzdump_tmpdir }}"
-      acltype: posixacl
+      # OpenZFS reports posixacl as "posix"; asking for posixacl never matched.
+      acltype: posix
       xattr: sa
 
 - name: Ensure vzdump throttle block is set (bwlimit + ionice + tmpdir)
