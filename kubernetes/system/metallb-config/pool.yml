@@ -4,8 +4,10 @@ metadata:
   name: first-pool
   namespace: metallb-system
 spec:
+  # 10.0.20.205 is the rybbit LXC's static address (terraform/stacks/proxmox/lxc.tf).
   addresses:
-  - 10.0.20.200-10.0.20.240
+  - 10.0.20.200-10.0.20.204
+  - 10.0.20.206-10.0.20.240
 ---
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
