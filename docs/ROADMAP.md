@@ -55,17 +55,18 @@ rate it reaches 90 % around the end of December.
   - [x] CNPG `archive_timeout` 5 → 30 min (~5–8). Found on the way: the postgres
         Application ignored every Cluster spec, so no Cluster change had ever deployed;
         it now uses server-side diff/apply
-  - [ ] Garage metadata snapshots every 6 h; Loki chunk sizing (~3–5)
-  - [ ] Prometheus: drop duplicate kubelet-scraped apiserver series (~2–3)
+  - [x] Garage metadata snapshots every 6 h; Loki chunk sizing (~3–5)
+  - [x] Prometheus: drop duplicate kubelet-scraped apiserver series (~2–3)
   - [x] Remove Chaos Mesh (no experiments; daily re-rollout from a random chart annotation)
-  - [ ] VM filesystems `noatime,commit=60` + periodic fstrim; weekly `pct fstrim`
-- [ ] Correct `docs/HARDWARE.md`: `nfs-client` volumes live on the NVMe, not the HDD.
+  - [x] VM filesystems `noatime,commit=60` + periodic fstrim; weekly `pct fstrim`
+- [x] Correct `docs/HARDWARE.md`: `nfs-client` volumes live on the NVMe, not the HDD.
 
 ### Backups that would actually restore
 
 - [ ] Immich library offsite copy (R2)
 - [x] Base backups for every CNPG cluster (Authelia's schedule also ran hourly instead of daily: CNPG cron has a seconds field)
-- [ ] Consistent database backups: `pg_dump` pre-hooks instead of file copies of live data directories
+- [x] Consistent database backups: `pg_dump` pre-hooks instead of file copies of live data directories
+- [x] Vault backed up as a consistent raft snapshot instead of a raw copy of its data directory
 - [ ] PBS: daily schedule, weekly verify job, offsite sync of the datastore
 - [ ] kine datastore `.backup` to separate storage
 - [ ] Monthly restore test extended from Vault to a Postgres database
@@ -76,16 +77,16 @@ rate it reaches 90 % around the end of December.
       including its credentials
 - [x] Remove unused cluster tooling with broad permissions
 - [ ] Hypervisor patch management and account hardening under Ansible
-- [ ] One ingress path for every public service, so all requests pass the same rate
+- [x] One ingress path for every public service, so all requests pass the same rate
       limiting and CrowdSec bouncer
 - [ ] Every NetworkPolicy under GitOps; default-deny ingress in every namespace
 - [ ] Pod Security `baseline` enforced in application namespaces
 - [ ] Encryption at rest for cluster secrets; key material kept apart from data backups
-- [ ] Merged Terraform changes planned and applied promptly
+- [x] Merged Terraform changes planned and applied promptly
 
 ### Headscale / remote access
 
-- [ ] Keep Headscale current
+- [x] Keep Headscale current
 - [ ] Exit-node route advertisements match what each node can actually serve (ADR-043).
       Blocked on an IPv6 uplink: no host here has IPv6 egress, and Tailscale has no
       IPv4-only exit node. Needs FritzBox prefix delegation to the MikroTik first.
@@ -101,8 +102,8 @@ rate it reaches 90 % around the end of December.
 
 ### DNS
 
-- [ ] DNSSEC validation in Unbound
-- [ ] Health-checked keepalived failover for the DNS VIP
+- [x] DNSSEC validation in Unbound
+- [x] Health-checked keepalived failover for the DNS VIP
 
 ## Next (December 2026 – January 2027)
 
@@ -120,7 +121,7 @@ rate it reaches 90 % around the end of December.
 - [ ] Real Postgres standby for Authelia on the Raspberry Pi (ADR-030 is not implemented yet)
 - [ ] Alertmanager `Watchdog` drives the dead man's switch instead of a CronJob
 - [ ] Stale failed Jobs cleaned up automatically so `KubeJobFailed` means something
-- [ ] Nextcloud and Firefly III background jobs: re-enable or decommission the apps
+- [x] Nextcloud and Firefly III background jobs: re-enable or decommission the apps
 - [ ] Resource requests on every pod; cluster able to lose a node without memory overcommit
 - [ ] Scheduled Ansible drift report and apply loop; fix non-idempotent tasks and the AdGuard role
 - [ ] cloudflared: two replicas, metrics and an alert on tunnel connections
@@ -136,8 +137,8 @@ rate it reaches 90 % around the end of December.
 
 ### Network
 
-- [ ] QoS with a CAKE queue tree on the WAN interface
-- [ ] Router input chain scoped per source to the ports each one needs
+- [x] QoS with a CAKE queue tree on the WAN interface
+- [x] Router input chain scoped per source to the ports each one needs
 - [ ] Router brute-force protection reworked
 - [ ] Remove stale firewall rules
 
