@@ -152,7 +152,7 @@ allow this has been in git since long before this session (commit `65a65de`), wh
 means the live router likely never actually has it -- consistent with this repo's
 known Terraform-state loss (state was wiped and needs re-import for dozens of
 MikroTik/Proxmox resources, see `phase1/LEDGER.md`/`phase8/LEDGER.md` history) rather
-than a rule nobody wrote. Not fixed directly -- MikroTik changes are Atlantis-only by
+than a rule nobody wrote. Not fixed directly -- MikroTik changes are PR-comment-apply-only by
 this repo's own hard rule (`CLAUDE.md`), and this needs a real Terraform state
 audit, not a manual router edit. Folded into the maintenance-window runbook's
 pre-check list below.

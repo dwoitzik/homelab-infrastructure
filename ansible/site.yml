@@ -134,21 +134,19 @@
     - common
     - nfs_server
 
-- name: Provision Atlantis (GitOps runner, ADR-012)
+- name: Terraform runner (GitHub Actions runner + terraform toolbox image, ADR-021)
   hosts: atlantis_nodes
   become: true
   roles:
     - common
     - docker
     - node_exporter_native
+    # Only the Atlantis image survives, as the terraform toolbox the plan/apply
+    # workflows run in; the role also removes the retired server's leftovers.
     - atlantis
-    # ADR-021: self-hosted GitHub Actions runner on the same host, replacing
-    # Atlantis's public webhook. Software staging (download/extract/deps)
-    # runs unconditionally; registration + the systemd service are gated on
-    # github_actions_runner_registration_token being supplied at run time
-    # (--extra-vars only -- never committed, never vaulted, expires within
-    # the hour). Atlantis's own container is retained as the terraform/CA-
-    # trust execution environment workflow steps run inside, not replaced.
+    # Registration and the systemd service need
+    # github_actions_runner_registration_token via --extra-vars (short-lived,
+    # never committed).
     - github_actions_runner
 
 - name: Immich library mirror target (SSD on rpi-srv-02)

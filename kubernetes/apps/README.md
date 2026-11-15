@@ -18,7 +18,6 @@ Longhorn — migrated off it, see ROADMAP.md for why.
 ## What's here
 
 - `authelia` — SSO/OIDC identity provider
-- `atlantis` — Terraform GitOps runner
 - `cloudflared` — Cloudflare Tunnel daemon (connects `photos.woitzik.dev` externally via tunnel `1f2e0f78-…`)
 - `garage` — S3-compatible object storage (Velero backend, Terraform state)
 - `gitea` — private git

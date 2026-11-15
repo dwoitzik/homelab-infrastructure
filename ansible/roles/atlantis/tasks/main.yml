@@ -38,12 +38,12 @@
     - docker-compose.yml
     - repos.yaml
     - data
+    - .env
 
-# SEC-007: custom image adds Proxmox's self-signed cluster CA to the trust
-# store so terraform/stacks/proxmox can run with insecure = false instead of
-# skipping TLS verification. Rebuilt every run (force_source) so a bump to
-# atlantis_image (Renovate) or a CA rotation is always picked up.
-- name: Copy Dockerfile and Proxmox CA cert for custom Atlantis image
+# SEC-007: the toolbox image adds Proxmox's self-signed cluster CA to the
+# trust store so terraform/stacks/proxmox runs with insecure = false. Rebuilt
+# every run (force_source) so an atlantis_image bump or CA rotation lands.
+- name: Copy Dockerfile and Proxmox CA cert for the toolbox image
   ansible.builtin.copy:
     src: "{{ item }}"
     dest: "{{ atlantis_base_dir }}/build/{{ item }}"
@@ -52,7 +52,7 @@
     - Dockerfile
     - pve-root-ca.crt
 
-- name: Build custom Atlantis image with trusted Proxmox CA
+- name: Build the terraform toolbox image with trusted Proxmox CA
   community.docker.docker_image:
     name: atlantis-custom
     tag: "{{ atlantis_image_tag }}"
@@ -64,14 +64,10 @@
         BASE_IMAGE: "{{ atlantis_image }}"
       pull: true
 
-# ADR-021: the GitHub Actions runner's terraform steps need the same
-# provider credentials the Atlantis container already gets via its own
-# docker-compose environment block -- rather than duplicating these into
-# GitHub Secrets (a worse posture: two credential stores to keep in sync,
-# one of them outside this repo's normal Vault->Ansible flow), write them
-# to a host-local env file the runner's `docker run --env-file` can
-# reference directly. Root-only readable; never leaves this host.
-- name: Deploy terraform-runner env file (same credentials as Atlantis's own container)
+# Provider credentials for the plan/apply workflows' `docker run --env-file`.
+# Kept on this host instead of in GitHub Secrets so Ansible Vault stays the
+# only credential store. Readable by root and the runner group only.
+- name: Deploy terraform-runner env file
   ansible.builtin.template:
     src: terraform-runner.env.j2
     dest: "{{ atlantis_base_dir }}/terraform-runner.env"

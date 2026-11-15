@@ -24,7 +24,6 @@ monitors = [
     ("ArgoCD", "https://argo.woitzik.dev"),
     ("Traefik", "https://traefik.woitzik.dev"),
     ("Longhorn", "https://longhorn.woitzik.dev"),
-    ("Atlantis", "https://atlantis.woitzik.dev"),
     # Security & Auth
     ("Authelia", "https://auth.woitzik.dev"),
     ("Vaultwarden", "https://vault.woitzik.dev"),

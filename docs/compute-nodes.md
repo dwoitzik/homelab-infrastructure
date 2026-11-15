@@ -27,7 +27,7 @@ defined, and 3 LXCs added since the initial pass (`ct-srv-media-acq-01`,
 | `ct-srv-nfs-01` | LXC | 2 | 2 GB | NFS storage server (`/nfs-data` bind-mount, backed by the host's `local-lvm` root disk — not ZFS; the container's own root disk is on `local-lvm` too. `nfs-client` StorageClass for all k3s PVCs) |
 | `ct-srv-media-acq-01` | LXC | 2 | 4 GB | Media acquisition stack (Mullvad-wrapped, ADR-010) |
 | `ct-srv-jellyfin-01` | LXC | 2 | 2 GB | Jellyfin (GPU-passthrough hardware transcode) |
-| `ct-srv-atlantis-01` | LXC | 2 | 2 GB | Atlantis GitOps runner (moved off k3s, ADR-012) |
+| `ct-srv-atlantis-01` | LXC | 2 | 2 GB | GitHub Actions runner + terraform toolbox image for PR-comment plan/apply (ADR-012, ADR-021; Atlantis server retired) |
 | `vm-srv-k3s-11` | VM | 4 | 12 GB | k3s control-plane + SQLite/kine datastore (sole server, not etcd — see ADR-015) |
 | `vm-srv-k3s-12` | VM | 4 | 8 GB | k3s agent (worker only, no etcd) |
 | `vm-srv-k3s-13` | VM | 4 | 8 GB | k3s agent (worker only, no etcd) |

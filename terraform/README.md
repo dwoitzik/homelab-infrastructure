@@ -1,6 +1,7 @@
 # Terraform
 
-Everything here applies through Atlantis. I don't run `terraform apply` from my own machine.
+Everything here applies through the PR-comment GitHub Actions workflows (`terraform-plan.yml`,
+`terraform-apply.yml`, ADR-021). I don't run `terraform apply` from my own machine.
 
 ## Structure
 
@@ -30,8 +31,9 @@ VMs and LXCs via the [bpg/proxmox provider](https://github.com/bpg/terraform-pro
 git checkout -b feature/my-change
 # edit terraform/stacks/<stack>/*.tf
 git push && gh pr create
-# Atlantis posts the plan as a PR comment
-# comment "atlantis apply" once it looks right
+# comment "atlantis plan -d <stack>": the plan workflow posts the plan
+# comment "atlantis apply -d <stack>" once it looks right; the apply waits
+# on the terraform-apply Environment approval
 ```
 
 ## Variables
@@ -47,6 +49,5 @@ Both stacks use a Garage S3 backend (self-hosted, in-cluster — see `docs/decis
 ```bash
 mkdir -p terraform/stacks/my_stack
 # main.tf, variables.tf, providers.tf
-# add to atlantis.yaml
 # add to .github/workflows/ci.yml
 ```
