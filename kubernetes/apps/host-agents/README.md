@@ -2,7 +2,8 @@
 
 Namespace for workloads that need host-level access by design and so cannot pass Pod
 Security `baseline`: kube-bench (hostPID, read-only hostPath mounts of the kubelet
-directories and `/proc` for the CIS checks).
+directories and `/proc` for the CIS checks) and the Scanopy SRV daemon (hostNetwork plus
+NET_RAW/NET_ADMIN for ARP and port discovery, `kubernetes/apps/scanopy/`).
 
 `enforce: privileged`, with `baseline` as audit/warn so anything new still shows up.
 Keeping these here is what lets `apps` enforce `baseline`.

@@ -27,6 +27,8 @@
   ansible.builtin.get_url:
     url: https://enterprise.proxmox.com/debian/proxmox-release-trixie.gpg
     dest: /etc/apt/trusted.gpg.d/proxmox-release-trixie.gpg
+    # Pinned: without a checksum get_url reports a change on every --check run.
+    checksum: sha256:1bcd2d5bab556076c9ea756a84fe2b7445b13f4ef6e97b2e412b68778377ba6d
     mode: '0644'
 
 # deb822 to match this host's other sources; the old one-line apt_repository

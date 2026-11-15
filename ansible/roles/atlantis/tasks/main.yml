@@ -42,7 +42,7 @@
 
 # SEC-007: the toolbox image adds Proxmox's self-signed cluster CA to the
 # trust store so terraform/stacks/proxmox runs with insecure = false. Rebuilt
-# every run (force_source) so an atlantis_image bump or CA rotation lands.
+# only when the Dockerfile, the CA or the base image reference changes.
 - name: Copy Dockerfile and Proxmox CA cert for the toolbox image
   ansible.builtin.copy:
     src: "{{ item }}"
@@ -51,13 +51,21 @@
   loop:
     - Dockerfile
     - pve-root-ca.crt
+  register: atlantis_build_files
+
+- name: Record the base image the toolbox is built from
+  ansible.builtin.copy:
+    content: "{{ atlantis_image }}\n"
+    dest: "{{ atlantis_base_dir }}/build/base-image"
+    mode: '0644'
+  register: atlantis_base_image_ref
 
 - name: Build the terraform toolbox image with trusted Proxmox CA
   community.docker.docker_image:
     name: atlantis-custom
     tag: "{{ atlantis_image_tag }}"
     source: build
-    force_source: true
+    force_source: "{{ atlantis_build_files.changed or atlantis_base_image_ref.changed }}"
     build:
       path: "{{ atlantis_base_dir }}/build"
       args:

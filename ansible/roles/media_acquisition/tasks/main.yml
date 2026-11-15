@@ -513,7 +513,6 @@
   when: (media_acquisition_sab_misc.json.config.misc.fulldisk_autoresume | int) != 1
   changed_when: true
   no_log: true
-  check_mode: false
 
 - name: Flush handlers to start SABnzbd before Sonarr/Radarr client tests
   ansible.builtin.meta: flush_handlers

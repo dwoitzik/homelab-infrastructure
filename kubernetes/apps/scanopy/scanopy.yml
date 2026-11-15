@@ -130,12 +130,13 @@ spec:
 # on the DMZ daemon specifically, mounting it would hand a scanner
 # effective root over the CrowdSec/NPM stack sitting right next to it,
 # which is the opposite of what this deployment is for. See
-# docs/decisions/ADR-035-scanopy-topology-mapping.md.
+# docs/decisions/ADR-035-scanopy-topology-mapping.md. Lives in host-agents
+# because hostNetwork and NET_RAW/NET_ADMIN cannot pass Pod Security baseline.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: scanopy-daemon-srv
-  namespace: apps
+  namespace: host-agents
 spec:
   replicas: 1
   strategy:
