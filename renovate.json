@@ -16,6 +16,18 @@
       "/ansible/roles/rybbit/templates/docker-compose.yml.j2$/"
     ]
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "CrowdSec bouncer Traefik plugin source baked into images/traefik-crowdsec-plugin (ADR-079). Bumps the tag and its commit together; the image workflow then pushes a new ghcr.io/dwoitzik/traefik-crowdsec-plugin tag, which the kubernetes manager picks up in kubernetes/system/traefik/application.yml.",
+      "managerFilePatterns": [
+        "/^images/traefik-crowdsec-plugin/Dockerfile$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG PLUGIN_VERSION=(?<currentValue>\\S+)\\nARG PLUGIN_COMMIT=(?<currentDigest>[0-9a-f]{40})"
+      ]
+    }
+  ],
   "minimumReleaseAge": "3 days",
   "packageRules": [
     {
