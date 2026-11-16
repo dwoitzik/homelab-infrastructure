@@ -120,6 +120,13 @@
       "allowedVersions": "<9"
     },
     {
+      "description": "CloudNativePG operator 1.31 (chart 0.30) removes the in-tree barmanObjectStore that every Cluster here still uses for backups and WAL archiving. Hold the chart below 0.30 until the clusters move to the Barman Cloud plugin.",
+      "matchPackageNames": [
+        "cloudnative-pg"
+      ],
+      "allowedVersions": "<0.30.0"
+    },
+    {
       "description": "CI tooling (GitHub Actions): low risk, easy to revert, auto-merge after soak. 'pin' included for the same first-time-pinning reason as above.",
       "matchManagers": [
         "github-actions"
@@ -249,6 +256,7 @@
         "dxflrs/garage",
         "vaultwarden/server",
         "postgres",
+        "ghcr.io/cloudnative-pg/postgresql",
         "ghcr.io/immich-app/postgres",
         "redis",
         "valkey/valkey",
