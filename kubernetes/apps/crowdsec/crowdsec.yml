@@ -37,6 +37,10 @@ data:
       flush:
         max_items: 5000
         max_age: 7d
+        # Every Traefik pod registers as a new bouncer (traefik@<podIP>);
+        # drop registrations that have not pulled decisions for three days.
+        bouncers_autodelete:
+          api_key: 72h
     api:
       server:
         listen_uri: 0.0.0.0:8080
