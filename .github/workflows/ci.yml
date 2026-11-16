@@ -209,6 +209,16 @@ jobs:
       - name: Render and validate every ArgoCD Helm source
         run: python3 scripts/render-helm-applications.py --kube-version 1.31.12
 
+  configmap-scripts:
+    name: ConfigMap shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Scripts inside ConfigMaps are only parsed when their CronJob runs.
+      - name: Syntax-check every embedded *.sh
+        run: python3 scripts/check-configmap-scripts.py
+
   kubeconform:
     name: Kubeconform
     runs-on: ubuntu-latest
