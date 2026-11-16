@@ -1,5 +1,5 @@
 {
-  "description": "DaemonSet represents the configuration of a daemon set.",
+  "description": "Job represents the configuration of a single job.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -8,7 +8,7 @@
         "null"
       ],
       "enum": [
-        "apps/v1"
+        "batch/v1"
       ]
     },
     "kind": {
@@ -18,7 +18,7 @@
         "null"
       ],
       "enum": [
-        "DaemonSet"
+        "Job"
       ]
     },
     "metadata": {
@@ -272,21 +272,179 @@
       ]
     },
     "spec": {
-      "description": "DaemonSetSpec is the specification of a daemon set.",
+      "description": "JobSpec describes how the job execution will look like.",
       "properties": {
-        "minReadySeconds": {
-          "description": "The minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
+        "activeDeadlineSeconds": {
+          "description": "Specifies the duration in seconds relative to the startTime that the job may be continuously active before the system tries to terminate it; value must be positive integer. If a Job is suspended (at creation or through an update), this timer will effectively be stopped and reset when the Job is resumed again.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "backoffLimit": {
+          "description": "Specifies the number of retries before marking this job failed. Defaults to 6, unless backoffLimitPerIndex (only Indexed Job) is specified. When backoffLimitPerIndex is specified, backoffLimit defaults to 2147483647.",
           "format": "int32",
           "type": [
             "integer",
             "null"
           ]
         },
-        "revisionHistoryLimit": {
-          "description": "The number of old history to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
+        "backoffLimitPerIndex": {
+          "description": "Specifies the limit for the number of retries within an index before marking this index as failed. When enabled the number of failures per index is kept in the pod's batch.kubernetes.io/job-index-failure-count annotation. It can only be set when Job's completionMode=Indexed, and the Pod's restart policy is Never. The field is immutable.",
           "format": "int32",
           "type": [
             "integer",
+            "null"
+          ]
+        },
+        "completionMode": {
+          "description": "completionMode specifies how Pod completions are tracked. It can be `NonIndexed` (default) or `Indexed`.\n\n`NonIndexed` means that the Job is considered complete when there have been .spec.completions successfully completed Pods. Each Pod completion is homologous to each other.\n\n`Indexed` means that the Pods of a Job get an associated completion index from 0 to (.spec.completions - 1), available in the annotation batch.kubernetes.io/job-completion-index. The Job is considered complete when there is one successfully completed Pod for each index. When value is `Indexed`, .spec.completions must be specified and `.spec.parallelism` must be less than or equal to 10^5. In addition, The Pod name takes the form `$(job-name)-$(index)-$(random-string)`, the Pod hostname takes the form `$(job-name)-$(index)`.\n\nMore completion modes can be added in the future. If the Job controller observes a mode that it doesn't recognize, which is possible during upgrades due to version skew, the controller skips updates for the Job.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "completions": {
+          "description": "Specifies the desired number of successfully finished pods the job should be run with.  Setting to null means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "managedBy": {
+          "description": "ManagedBy field indicates the controller that manages a Job. The k8s Job controller reconciles jobs which don't have this field at all or the field value is the reserved string `kubernetes.io/job-controller`, but skips reconciling Jobs with a custom value for this field. The value must be a valid domain-prefixed path (e.g. acme.io/foo) - all characters before the first \"/\" must be a valid subdomain as defined by RFC 1123. All characters trailing the first \"/\" must be valid HTTP Path characters as defined by RFC 3986. The value cannot exceed 63 characters. This field is immutable.\n\nThis field is beta-level. The job controller accepts setting the field when the feature gate JobManagedBy is enabled (enabled by default).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "manualSelector": {
+          "description": "manualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#specifying-your-own-pod-selector",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "maxFailedIndexes": {
+          "description": "Specifies the maximal number of failed indexes before marking the Job as failed, when backoffLimitPerIndex is set. Once the number of failed indexes exceeds this number the entire Job is marked as Failed and its execution is terminated. When left as null the job continues execution of all of its indexes and is marked with the `Complete` Job condition. It can only be specified when backoffLimitPerIndex is set. It can be null or up to completions. It is required and must be less than or equal to 10^4 when is completions greater than 10^5.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "parallelism": {
+          "description": "Specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "podFailurePolicy": {
+          "description": "PodFailurePolicy describes how failed pods influence the backoffLimit.",
+          "properties": {
+            "rules": {
+              "description": "A list of pod failure policy rules. The rules are evaluated in order. Once a rule matches a Pod failure, the remaining of the rules are ignored. When no rule matches the Pod failure, the default handling applies - the counter of pod failures is incremented and it is checked against the backoffLimit. At most 20 elements are allowed.",
+              "items": {
+                "description": "PodFailurePolicyRule describes how a pod failure is handled when the requirements are met. One of onExitCodes and onPodConditions, but not both, can be used in each rule.",
+                "properties": {
+                  "action": {
+                    "description": "Specifies the action taken on a pod failure when the requirements are satisfied. Possible values are:\n\n- FailJob: indicates that the pod's job is marked as Failed and all\n  running pods are terminated.\n- FailIndex: indicates that the pod's index is marked as Failed and will\n  not be restarted.\n- Ignore: indicates that the counter towards the .backoffLimit is not\n  incremented and a replacement pod is created.\n- Count: indicates that the pod is handled in the default way - the\n  counter towards the .backoffLimit is incremented.\nAdditional values are considered to be added in the future. Clients should react to an unknown action by skipping the rule.",
+                    "type": "string"
+                  },
+                  "onExitCodes": {
+                    "description": "PodFailurePolicyOnExitCodesRequirement describes the requirement for handling a failed pod based on its container exit codes. In particular, it lookups the .state.terminated.exitCode for each app container and init container status, represented by the .status.containerStatuses and .status.initContainerStatuses fields in the Pod status, respectively. Containers completed with success (exit code 0) are excluded from the requirement check.",
+                    "properties": {
+                      "containerName": {
+                        "description": "Restricts the check for exit codes to the container with the specified name. When null, the rule applies to all containers. When specified, it should match one the container or initContainer names in the pod template.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "operator": {
+                        "description": "Represents the relationship between the container exit code(s) and the specified values. Containers completed with success (exit code 0) are excluded from the requirement check. Possible values are:\n\n- In: the requirement is satisfied if at least one container exit code\n  (might be multiple if there are multiple containers not restricted\n  by the 'containerName' field) is in the set of specified values.\n- NotIn: the requirement is satisfied if at least one container exit code\n  (might be multiple if there are multiple containers not restricted\n  by the 'containerName' field) is not in the set of specified values.\nAdditional values are considered to be added in the future. Clients should react to an unknown operator by assuming the requirement is not satisfied.",
+                        "type": "string"
+                      },
+                      "values": {
+                        "description": "Specifies the set of values. Each returned container exit code (might be multiple in case of multiple containers) is checked against this set of values with respect to the operator. The list of values must be ordered and must not contain duplicates. Value '0' cannot be used for the In operator. At least one element is required. At most 255 elements are allowed.",
+                        "items": {
+                          "format": "int32",
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-type": "set"
+                      }
+                    },
+                    "required": [
+                      "operator",
+                      "values"
+                    ],
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "onPodConditions": {
+                    "description": "Represents the requirement on the pod conditions. The requirement is represented as a list of pod condition patterns. The requirement is satisfied if at least one pattern matches an actual pod condition. At most 20 elements are allowed.",
+                    "items": {
+                      "description": "PodFailurePolicyOnPodConditionsPattern describes a pattern for matching an actual pod condition type.",
+                      "properties": {
+                        "status": {
+                          "description": "Specifies the required Pod condition status. To match a pod condition it is required that the specified status equals the pod condition status. Defaults to True.",
+                          "type": "string"
+                        },
+                        "type": {
+                          "description": "Specifies the required Pod condition type. To match a pod condition it is required that specified type equals the pod condition type.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "status"
+                      ],
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "x-kubernetes-list-type": "atomic"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            }
+          },
+          "required": [
+            "rules"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "podReplacementPolicy": {
+          "description": "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.",
+          "type": [
+            "string",
             "null"
           ]
         },
@@ -350,8 +508,59 @@
               ]
             }
           },
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "x-kubernetes-map-type": "atomic"
+        },
+        "successPolicy": {
+          "description": "SuccessPolicy describes when a Job can be declared as succeeded based on the success of some indexes.",
+          "properties": {
+            "rules": {
+              "description": "rules represents the list of alternative rules for the declaring the Jobs as successful before `.status.succeeded >= .spec.completions`. Once any of the rules are met, the \"SuccessCriteriaMet\" condition is added, and the lingering pods are removed. The terminal state for such a Job has the \"Complete\" condition. Additionally, these rules are evaluated in order; Once the Job meets one of the rules, other rules are ignored. At most 20 elements are allowed.",
+              "items": {
+                "description": "SuccessPolicyRule describes rule for declaring a Job as succeeded. Each rule must have at least one of the \"succeededIndexes\" or \"succeededCount\" specified.",
+                "properties": {
+                  "succeededCount": {
+                    "description": "succeededCount specifies the minimal required size of the actual set of the succeeded indexes for the Job. When succeededCount is used along with succeededIndexes, the check is constrained only to the set of indexes specified by succeededIndexes. For example, given that succeededIndexes is \"1-4\", succeededCount is \"3\", and completed indexes are \"1\", \"3\", and \"5\", the Job isn't declared as succeeded because only \"1\" and \"3\" indexes are considered in that rules. When this field is null, this doesn't default to any value and is never evaluated at any time. When specified it needs to be a positive integer.",
+                    "format": "int32",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "succeededIndexes": {
+                    "description": "succeededIndexes specifies the set of indexes which need to be contained in the actual set of the succeeded indexes for the Job. The list of indexes must be within 0 to \".spec.completions-1\" and must not contain duplicates. At least one element is required. The indexes are represented as intervals separated by commas. The intervals can be a decimal integer or a pair of decimal integers separated by a hyphen. The number are listed in represented by the first and last element of the series, separated by a hyphen. For example, if the completed indexes are 1, 3, 4, 5 and 7, they are represented as \"1,3-5,7\". When this field is null, this field doesn't default to any value and is never evaluated at any time.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            }
+          },
+          "required": [
+            "rules"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "suspend": {
+          "description": "suspend specifies whether the Job controller should create Pods or not. If a Job is created with suspend set to true, no Pods are created by the Job controller. If a Job is suspended after creation (i.e. the flag goes from false to true), the Job controller will delete all active Pods associated with this Job. Users must design their workload to gracefully handle this. Suspending a Job will reset the StartTime field of the Job, effectively resetting the ActiveDeadlineSeconds timer too. Defaults to false.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "template": {
           "description": "PodTemplateSpec describes the data a pod should have when created from a template",
@@ -940,7 +1149,7 @@
                                     "x-kubernetes-map-type": "atomic"
                                   },
                                   "matchLabelKeys": {
-                                    "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set. This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).",
+                                    "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set.",
                                     "items": {
                                       "type": [
                                         "string",
@@ -954,7 +1163,7 @@
                                     "x-kubernetes-list-type": "atomic"
                                   },
                                   "mismatchLabelKeys": {
-                                    "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set. This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).",
+                                    "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set.",
                                     "items": {
                                       "type": [
                                         "string",
@@ -1150,7 +1359,7 @@
                                 "x-kubernetes-map-type": "atomic"
                               },
                               "matchLabelKeys": {
-                                "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set. This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).",
+                                "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set.",
                                 "items": {
                                   "type": [
                                     "string",
@@ -1164,7 +1373,7 @@
                                 "x-kubernetes-list-type": "atomic"
                               },
                               "mismatchLabelKeys": {
-                                "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set. This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).",
+                                "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set.",
                                 "items": {
                                   "type": [
                                     "string",
@@ -1286,7 +1495,7 @@
                       "description": "Pod anti affinity is a group of inter pod anti affinity scheduling rules.",
                       "properties": {
                         "preferredDuringSchedulingIgnoredDuringExecution": {
-                          "description": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
+                          "description": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and subtracting \"weight\" from the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
                           "items": {
                             "description": "The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)",
                             "properties": {
@@ -1360,7 +1569,7 @@
                                     "x-kubernetes-map-type": "atomic"
                                   },
                                   "matchLabelKeys": {
-                                    "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set. This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).",
+                                    "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set.",
                                     "items": {
                                       "type": [
                                         "string",
@@ -1374,7 +1583,7 @@
                                     "x-kubernetes-list-type": "atomic"
                                   },
                                   "mismatchLabelKeys": {
-                                    "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set. This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).",
+                                    "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set.",
                                     "items": {
                                       "type": [
                                         "string",
@@ -1570,7 +1779,7 @@
                                 "x-kubernetes-map-type": "atomic"
                               },
                               "matchLabelKeys": {
-                                "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set. This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).",
+                                "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set.",
                                 "items": {
                                   "type": [
                                     "string",
@@ -1584,7 +1793,7 @@
                                 "x-kubernetes-list-type": "atomic"
                               },
                               "mismatchLabelKeys": {
-                                "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set. This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).",
+                                "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set.",
                                 "items": {
                                   "type": [
                                     "string",
@@ -1754,7 +1963,7 @@
                           "description": "EnvVar represents an environment variable present in a Container.",
                           "properties": {
                             "name": {
-                              "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+                              "description": "Name of the environment variable. May consist of any printable ASCII characters except '='.",
                               "type": "string"
                             },
                             "value": {
@@ -1815,6 +2024,40 @@
                                   },
                                   "required": [
                                     "fieldPath"
+                                  ],
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "x-kubernetes-map-type": "atomic"
+                                },
+                                "fileKeyRef": {
+                                  "description": "FileKeySelector selects a key of the env file.",
+                                  "properties": {
+                                    "key": {
+                                      "description": "The key within the env file. An invalid key will prevent the pod from starting. The keys defined within a source may consist of any printable ASCII characters except '='. During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.",
+                                      "type": "string"
+                                    },
+                                    "optional": {
+                                      "description": "Specify whether the file or its key must be defined. If the file or key does not exist, then the env var is not published. If optional is set to true and the specified key does not exist, the environment variable will not be set in the Pod's containers.\n\nIf optional is set to false and the specified key does not exist, an error will be returned during Pod creation.",
+                                      "type": [
+                                        "boolean",
+                                        "null"
+                                      ]
+                                    },
+                                    "path": {
+                                      "description": "The path within the volume from which to select the file. Must be relative and may not contain the '..' path or start with '..'.",
+                                      "type": "string"
+                                    },
+                                    "volumeName": {
+                                      "description": "The name of the volume mount containing the env file.",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "volumeName",
+                                    "path",
+                                    "key"
                                   ],
                                   "type": [
                                     "object",
@@ -1920,9 +2163,9 @@
                         "x-kubernetes-patch-strategy": "merge"
                       },
                       "envFrom": {
-                        "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+                        "description": "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
                         "items": {
-                          "description": "EnvFromSource represents the source of a set of ConfigMaps",
+                          "description": "EnvFromSource represents the source of a set of ConfigMaps or Secrets",
                           "properties": {
                             "configMapRef": {
                               "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
@@ -1948,7 +2191,7 @@
                               ]
                             },
                             "prefix": {
-                              "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                              "description": "Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.",
                               "type": [
                                 "string",
                                 "null"
@@ -2329,6 +2572,13 @@
                               "object",
                               "null"
                             ]
+                          },
+                          "stopSignal": {
+                            "description": "StopSignal defines which signal will be sent to a container when it is being stopped. If not specified, the default is defined by the container runtime in use. StopSignal can only be set for Pods with a non-empty .spec.os.name",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         },
                         "type": [
@@ -2371,6 +2621,7 @@
                             ]
                           },
                           "grpc": {
+                            "description": "GRPCAction specifies an action involving a GRPC service.",
                             "properties": {
                               "port": {
                                 "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
@@ -2651,6 +2902,7 @@
                             ]
                           },
                           "grpc": {
+                            "description": "GRPCAction specifies an action involving a GRPC service.",
                             "properties": {
                               "port": {
                                 "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
@@ -2865,7 +3117,7 @@
                         "description": "ResourceRequirements describes the compute resource requirements.",
                         "properties": {
                           "claims": {
-                            "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis is an alpha field and requires enabling the DynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+                            "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis field depends on the DynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
                             "items": {
                               "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
                               "properties": {
@@ -2951,11 +3203,66 @@
                         ]
                       },
                       "restartPolicy": {
-                        "description": "RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is \"Always\". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
+                        "description": "RestartPolicy defines the restart behavior of individual containers in a pod. This overrides the pod-level restart policy. When this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Additionally, setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
                         "type": [
                           "string",
                           "null"
                         ]
+                      },
+                      "restartPolicyRules": {
+                        "description": "Represents a list of rules to be checked to determine if the container should be restarted on exit. The rules are evaluated in order. Once a rule matches a container exit condition, the remaining rules are ignored. If no rule matches the container exit condition, the Container-level restart policy determines the whether the container is restarted or not. Constraints on the rules: - At most 20 rules are allowed. - Rules can have the same action. - Identical rules are not forbidden in validations. When rules are specified, container MUST set RestartPolicy explicitly even it if matches the Pod's RestartPolicy.",
+                        "items": {
+                          "description": "ContainerRestartRule describes how a container exit is handled.",
+                          "properties": {
+                            "action": {
+                              "description": "Specifies the action taken on a container exit if the requirements are satisfied. The only possible value is \"Restart\" to restart the container.",
+                              "type": "string"
+                            },
+                            "exitCodes": {
+                              "description": "ContainerRestartRuleOnExitCodes describes the condition for handling an exited container based on its exit codes.",
+                              "properties": {
+                                "operator": {
+                                  "description": "Represents the relationship between the container exit code(s) and the specified values. Possible values are: - In: the requirement is satisfied if the container exit code is in the\n  set of specified values.\n- NotIn: the requirement is satisfied if the container exit code is\n  not in the set of specified values.",
+                                  "type": "string"
+                                },
+                                "values": {
+                                  "description": "Specifies the set of values to check for container exit codes. At most 255 elements are allowed.",
+                                  "items": {
+                                    "format": "int32",
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
+                                  "type": [
+                                    "array",
+                                    "null"
+                                  ],
+                                  "x-kubernetes-list-type": "set"
+                                }
+                              },
+                              "required": [
+                                "operator"
+                              ],
+                              "type": [
+                                "object",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "action"
+                          ],
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        },
+                        "type": [
+                          "array",
+                          "null"
+                        ],
+                        "x-kubernetes-list-type": "atomic"
                       },
                       "securityContext": {
                         "description": "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
@@ -3225,6 +3532,7 @@
                             ]
                           },
                           "grpc": {
+                            "description": "GRPCAction specifies an action involving a GRPC service.",
                             "properties": {
                               "port": {
                                 "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
@@ -3591,13 +3899,14 @@
                         "description": "PodDNSConfigOption defines DNS resolver options of a pod.",
                         "properties": {
                           "name": {
-                            "description": "Required.",
+                            "description": "Name is this DNS resolver option's name. Required.",
                             "type": [
                               "string",
                               "null"
                             ]
                           },
                           "value": {
+                            "description": "Value is this DNS resolver option's value.",
                             "type": [
                               "string",
                               "null"
@@ -3688,7 +3997,7 @@
                           "description": "EnvVar represents an environment variable present in a Container.",
                           "properties": {
                             "name": {
-                              "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+                              "description": "Name of the environment variable. May consist of any printable ASCII characters except '='.",
                               "type": "string"
                             },
                             "value": {
@@ -3749,6 +4058,40 @@
                                   },
                                   "required": [
                                     "fieldPath"
+                                  ],
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "x-kubernetes-map-type": "atomic"
+                                },
+                                "fileKeyRef": {
+                                  "description": "FileKeySelector selects a key of the env file.",
+                                  "properties": {
+                                    "key": {
+                                      "description": "The key within the env file. An invalid key will prevent the pod from starting. The keys defined within a source may consist of any printable ASCII characters except '='. During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.",
+                                      "type": "string"
+                                    },
+                                    "optional": {
+                                      "description": "Specify whether the file or its key must be defined. If the file or key does not exist, then the env var is not published. If optional is set to true and the specified key does not exist, the environment variable will not be set in the Pod's containers.\n\nIf optional is set to false and the specified key does not exist, an error will be returned during Pod creation.",
+                                      "type": [
+                                        "boolean",
+                                        "null"
+                                      ]
+                                    },
+                                    "path": {
+                                      "description": "The path within the volume from which to select the file. Must be relative and may not contain the '..' path or start with '..'.",
+                                      "type": "string"
+                                    },
+                                    "volumeName": {
+                                      "description": "The name of the volume mount containing the env file.",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "volumeName",
+                                    "path",
+                                    "key"
                                   ],
                                   "type": [
                                     "object",
@@ -3854,9 +4197,9 @@
                         "x-kubernetes-patch-strategy": "merge"
                       },
                       "envFrom": {
-                        "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+                        "description": "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
                         "items": {
-                          "description": "EnvFromSource represents the source of a set of ConfigMaps",
+                          "description": "EnvFromSource represents the source of a set of ConfigMaps or Secrets",
                           "properties": {
                             "configMapRef": {
                               "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
@@ -3882,7 +4225,7 @@
                               ]
                             },
                             "prefix": {
-                              "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                              "description": "Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.",
                               "type": [
                                 "string",
                                 "null"
@@ -4263,6 +4606,13 @@
                               "object",
                               "null"
                             ]
+                          },
+                          "stopSignal": {
+                            "description": "StopSignal defines which signal will be sent to a container when it is being stopped. If not specified, the default is defined by the container runtime in use. StopSignal can only be set for Pods with a non-empty .spec.os.name",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         },
                         "type": [
@@ -4305,6 +4655,7 @@
                             ]
                           },
                           "grpc": {
+                            "description": "GRPCAction specifies an action involving a GRPC service.",
                             "properties": {
                               "port": {
                                 "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
@@ -4585,6 +4936,7 @@
                             ]
                           },
                           "grpc": {
+                            "description": "GRPCAction specifies an action involving a GRPC service.",
                             "properties": {
                               "port": {
                                 "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
@@ -4799,7 +5151,7 @@
                         "description": "ResourceRequirements describes the compute resource requirements.",
                         "properties": {
                           "claims": {
-                            "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis is an alpha field and requires enabling the DynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+                            "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis field depends on the DynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
                             "items": {
                               "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
                               "properties": {
@@ -4885,11 +5237,66 @@
                         ]
                       },
                       "restartPolicy": {
-                        "description": "Restart policy for the container to manage the restart behavior of each container within a pod. This may only be set for init containers. You cannot set this field on ephemeral containers.",
+                        "description": "Restart policy for the container to manage the restart behavior of each container within a pod. You cannot set this field on ephemeral containers.",
                         "type": [
                           "string",
                           "null"
                         ]
+                      },
+                      "restartPolicyRules": {
+                        "description": "Represents a list of rules to be checked to determine if the container should be restarted on exit. You cannot set this field on ephemeral containers.",
+                        "items": {
+                          "description": "ContainerRestartRule describes how a container exit is handled.",
+                          "properties": {
+                            "action": {
+                              "description": "Specifies the action taken on a container exit if the requirements are satisfied. The only possible value is \"Restart\" to restart the container.",
+                              "type": "string"
+                            },
+                            "exitCodes": {
+                              "description": "ContainerRestartRuleOnExitCodes describes the condition for handling an exited container based on its exit codes.",
+                              "properties": {
+                                "operator": {
+                                  "description": "Represents the relationship between the container exit code(s) and the specified values. Possible values are: - In: the requirement is satisfied if the container exit code is in the\n  set of specified values.\n- NotIn: the requirement is satisfied if the container exit code is\n  not in the set of specified values.",
+                                  "type": "string"
+                                },
+                                "values": {
+                                  "description": "Specifies the set of values to check for container exit codes. At most 255 elements are allowed.",
+                                  "items": {
+                                    "format": "int32",
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
+                                  "type": [
+                                    "array",
+                                    "null"
+                                  ],
+                                  "x-kubernetes-list-type": "set"
+                                }
+                              },
+                              "required": [
+                                "operator"
+                              ],
+                              "type": [
+                                "object",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "action"
+                          ],
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        },
+                        "type": [
+                          "array",
+                          "null"
+                        ],
+                        "x-kubernetes-list-type": "atomic"
                       },
                       "securityContext": {
                         "description": "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
@@ -5159,6 +5566,7 @@
                             ]
                           },
                           "grpc": {
+                            "description": "GRPCAction specifies an action involving a GRPC service.",
                             "properties": {
                               "port": {
                                 "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
@@ -5563,7 +5971,7 @@
                   ]
                 },
                 "hostNetwork": {
-                  "description": "Host networking requested for this pod. Use the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false.",
+                  "description": "Host networking requested for this pod. Use the host's network namespace. When using HostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false.",
                   "type": [
                     "boolean",
                     "null"
@@ -5585,6 +5993,13 @@
                 },
                 "hostname": {
                   "description": "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "hostnameOverride": {
+                  "description": "HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod. This field only specifies the pod's hostname and does not affect its DNS records. When this field is set to a non-empty string: - It takes precedence over the values set in `hostname` and `subdomain`. - The Pod's hostname will be set to this value. - `setHostnameAsFQDN` must be nil or set to false. - `hostNetwork` must be set to false.\n\nThis field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters. Requires the HostnameOverride feature gate to be enabled.",
                   "type": [
                     "string",
                     "null"
@@ -5621,7 +6036,7 @@
                   "x-kubernetes-patch-strategy": "merge"
                 },
                 "initContainers": {
-                  "description": "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, Liveness probes, or Startup probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
+                  "description": "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, Liveness probes, or Startup probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
                   "items": {
                     "description": "A single application container that you want to run within a pod.",
                     "properties": {
@@ -5659,7 +6074,7 @@
                           "description": "EnvVar represents an environment variable present in a Container.",
                           "properties": {
                             "name": {
-                              "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+                              "description": "Name of the environment variable. May consist of any printable ASCII characters except '='.",
                               "type": "string"
                             },
                             "value": {
@@ -5720,6 +6135,40 @@
                                   },
                                   "required": [
                                     "fieldPath"
+                                  ],
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "x-kubernetes-map-type": "atomic"
+                                },
+                                "fileKeyRef": {
+                                  "description": "FileKeySelector selects a key of the env file.",
+                                  "properties": {
+                                    "key": {
+                                      "description": "The key within the env file. An invalid key will prevent the pod from starting. The keys defined within a source may consist of any printable ASCII characters except '='. During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.",
+                                      "type": "string"
+                                    },
+                                    "optional": {
+                                      "description": "Specify whether the file or its key must be defined. If the file or key does not exist, then the env var is not published. If optional is set to true and the specified key does not exist, the environment variable will not be set in the Pod's containers.\n\nIf optional is set to false and the specified key does not exist, an error will be returned during Pod creation.",
+                                      "type": [
+                                        "boolean",
+                                        "null"
+                                      ]
+                                    },
+                                    "path": {
+                                      "description": "The path within the volume from which to select the file. Must be relative and may not contain the '..' path or start with '..'.",
+                                      "type": "string"
+                                    },
+                                    "volumeName": {
+                                      "description": "The name of the volume mount containing the env file.",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "volumeName",
+                                    "path",
+                                    "key"
                                   ],
                                   "type": [
                                     "object",
@@ -5825,9 +6274,9 @@
                         "x-kubernetes-patch-strategy": "merge"
                       },
                       "envFrom": {
-                        "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+                        "description": "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
                         "items": {
-                          "description": "EnvFromSource represents the source of a set of ConfigMaps",
+                          "description": "EnvFromSource represents the source of a set of ConfigMaps or Secrets",
                           "properties": {
                             "configMapRef": {
                               "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
@@ -5853,7 +6302,7 @@
                               ]
                             },
                             "prefix": {
-                              "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                              "description": "Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.",
                               "type": [
                                 "string",
                                 "null"
@@ -6234,6 +6683,13 @@
                               "object",
                               "null"
                             ]
+                          },
+                          "stopSignal": {
+                            "description": "StopSignal defines which signal will be sent to a container when it is being stopped. If not specified, the default is defined by the container runtime in use. StopSignal can only be set for Pods with a non-empty .spec.os.name",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         },
                         "type": [
@@ -6276,6 +6732,7 @@
                             ]
                           },
                           "grpc": {
+                            "description": "GRPCAction specifies an action involving a GRPC service.",
                             "properties": {
                               "port": {
                                 "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
@@ -6556,6 +7013,7 @@
                             ]
                           },
                           "grpc": {
+                            "description": "GRPCAction specifies an action involving a GRPC service.",
                             "properties": {
                               "port": {
                                 "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
@@ -6770,7 +7228,7 @@
                         "description": "ResourceRequirements describes the compute resource requirements.",
                         "properties": {
                           "claims": {
-                            "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis is an alpha field and requires enabling the DynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+                            "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis field depends on the DynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
                             "items": {
                               "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
                               "properties": {
@@ -6856,11 +7314,66 @@
                         ]
                       },
                       "restartPolicy": {
-                        "description": "RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is \"Always\". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
+                        "description": "RestartPolicy defines the restart behavior of individual containers in a pod. This overrides the pod-level restart policy. When this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Additionally, setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
                         "type": [
                           "string",
                           "null"
                         ]
+                      },
+                      "restartPolicyRules": {
+                        "description": "Represents a list of rules to be checked to determine if the container should be restarted on exit. The rules are evaluated in order. Once a rule matches a container exit condition, the remaining rules are ignored. If no rule matches the container exit condition, the Container-level restart policy determines the whether the container is restarted or not. Constraints on the rules: - At most 20 rules are allowed. - Rules can have the same action. - Identical rules are not forbidden in validations. When rules are specified, container MUST set RestartPolicy explicitly even it if matches the Pod's RestartPolicy.",
+                        "items": {
+                          "description": "ContainerRestartRule describes how a container exit is handled.",
+                          "properties": {
+                            "action": {
+                              "description": "Specifies the action taken on a container exit if the requirements are satisfied. The only possible value is \"Restart\" to restart the container.",
+                              "type": "string"
+                            },
+                            "exitCodes": {
+                              "description": "ContainerRestartRuleOnExitCodes describes the condition for handling an exited container based on its exit codes.",
+                              "properties": {
+                                "operator": {
+                                  "description": "Represents the relationship between the container exit code(s) and the specified values. Possible values are: - In: the requirement is satisfied if the container exit code is in the\n  set of specified values.\n- NotIn: the requirement is satisfied if the container exit code is\n  not in the set of specified values.",
+                                  "type": "string"
+                                },
+                                "values": {
+                                  "description": "Specifies the set of values to check for container exit codes. At most 255 elements are allowed.",
+                                  "items": {
+                                    "format": "int32",
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
+                                  "type": [
+                                    "array",
+                                    "null"
+                                  ],
+                                  "x-kubernetes-list-type": "set"
+                                }
+                              },
+                              "required": [
+                                "operator"
+                              ],
+                              "type": [
+                                "object",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "action"
+                          ],
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        },
+                        "type": [
+                          "array",
+                          "null"
+                        ],
+                        "x-kubernetes-list-type": "atomic"
                       },
                       "securityContext": {
                         "description": "SecurityContext holds security configuration that will be applied to a container. Some fields are present in both SecurityContext and PodSecurityContext.  When both are set, the values in SecurityContext take precedence.",
@@ -7130,6 +7643,7 @@
                             ]
                           },
                           "grpc": {
+                            "description": "GRPCAction specifies an action involving a GRPC service.",
                             "properties": {
                               "port": {
                                 "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
@@ -7625,6 +8139,95 @@
                   "x-kubernetes-patch-merge-key": "name",
                   "x-kubernetes-patch-strategy": "merge,retainKeys"
                 },
+                "resources": {
+                  "description": "ResourceRequirements describes the compute resource requirements.",
+                  "properties": {
+                    "claims": {
+                      "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis field depends on the DynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+                      "items": {
+                        "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
+                        "properties": {
+                          "name": {
+                            "description": "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
+                            "type": "string"
+                          },
+                          "request": {
+                            "description": "Request is the name chosen for a request in the referenced claim. If empty, everything from the claim is made available, otherwise only the result of this request.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "type": [
+                          "object",
+                          "null"
+                        ]
+                      },
+                      "type": [
+                        "array",
+                        "null"
+                      ],
+                      "x-kubernetes-list-map-keys": [
+                        "name"
+                      ],
+                      "x-kubernetes-list-type": "map"
+                    },
+                    "limits": {
+                      "additionalProperties": {
+                        "oneOf": [
+                          {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        ]
+                      },
+                      "description": "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "requests": {
+                      "additionalProperties": {
+                        "oneOf": [
+                          {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        ]
+                      },
+                      "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
                 "restartPolicy": {
                   "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
                   "type": [
@@ -7744,6 +8347,13 @@
                       "format": "int64",
                       "type": [
                         "integer",
+                        "null"
+                      ]
+                    },
+                    "seLinuxChangePolicy": {
+                      "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod. It has no effect on nodes that do not support SELinux or to volumes does not support SELinux. Valid values are \"MountOption\" and \"Recursive\".\n\n\"Recursive\" means relabeling of all files on all Pod volumes by the container runtime. This may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.\n\n\"MountOption\" mounts all eligible Pod volumes with `-o context` mount option. This requires all Pods that share the same volume to use the same SELinux label. It is not possible to share the same volume among privileged and unprivileged Pods. Eligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes whose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their CSIDriver instance. Other volumes are always re-labelled recursively. \"MountOption\" value is allowed only when SELinuxMount feature gate is enabled.\n\nIf not specified and SELinuxMount feature gate is enabled, \"MountOption\" is used. If not specified and SELinuxMount feature gate is disabled, \"MountOption\" is used for ReadWriteOncePod volumes and \"Recursive\" for all other volumes.\n\nThis field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.\n\nAll Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state. Note that this field cannot be set when spec.os.name is windows.",
+                      "type": [
+                        "string",
                         "null"
                       ]
                     },
@@ -7924,7 +8534,7 @@
                   ]
                 },
                 "setHostnameAsFQDN": {
-                  "description": "If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default). In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname). In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN. If a pod does not have FQDN, this has no effect. Default to false.",
+                  "description": "If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default). In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname). In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\\\SYSTEM\\\\CurrentControlSet\\\\Services\\\\Tcpip\\\\Parameters to FQDN. If a pod does not have FQDN, this has no effect. Default to false.",
                   "type": [
                     "boolean",
                     "null"
@@ -8104,14 +8714,14 @@
                         ]
                       },
                       "nodeAffinityPolicy": {
-                        "description": "NodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector when calculating pod topology spread skew. Options are: - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations. - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.\n\nIf this value is nil, the behavior is equivalent to the Honor policy. This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.",
+                        "description": "NodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector when calculating pod topology spread skew. Options are: - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations. - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.\n\nIf this value is nil, the behavior is equivalent to the Honor policy.",
                         "type": [
                           "string",
                           "null"
                         ]
                       },
                       "nodeTaintsPolicy": {
-                        "description": "NodeTaintsPolicy indicates how we will treat node taints when calculating pod topology spread skew. Options are: - Honor: nodes without taints, along with tainted nodes for which the incoming pod has a toleration, are included. - Ignore: node taints are ignored. All nodes are included.\n\nIf this value is nil, the behavior is equivalent to the Ignore policy. This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.",
+                        "description": "NodeTaintsPolicy indicates how we will treat node taints when calculating pod topology spread skew. Options are: - Honor: nodes without taints, along with tainted nodes for which the incoming pod has a toleration, are included. - Ignore: node taints are ignored. All nodes are included.\n\nIf this value is nil, the behavior is equivalent to the Ignore policy.",
                         "type": [
                           "string",
                           "null"
@@ -8959,6 +9569,7 @@
                                     "x-kubernetes-map-type": "atomic"
                                   },
                                   "dataSourceRef": {
+                                    "description": "TypedObjectReference contains enough information to let you locate the typed referenced object",
                                     "properties": {
                                       "apiGroup": {
                                         "description": "APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
@@ -9121,7 +9732,7 @@
                                     ]
                                   },
                                   "volumeAttributesClassName": {
-                                    "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim. If specified, the CSI driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName, it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass will be applied to the claim but it's not allowed to reset this field to empty string once it is set. If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass will be set by the persistentvolume controller if it exists. If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource exists. More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/ (Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
+                                    "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim. If specified, the CSI driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName, it can be changed after the claim is created. An empty string or nil value indicates that no VolumeAttributesClass will be applied to the claim. If the claim enters an Infeasible error state, this field can be reset to its previous value (including nil) to cancel the modification. If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource exists. More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/",
                                     "type": [
                                       "string",
                                       "null"
@@ -9373,7 +9984,7 @@
                         "description": "Represents a Glusterfs mount that lasts the lifetime of a pod. Glusterfs volumes do not support ownership management or SELinux relabeling.",
                         "properties": {
                           "endpoints": {
-                            "description": "endpoints is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+                            "description": "endpoints is the endpoint name that details Glusterfs topology.",
                             "type": "string"
                           },
                           "path": {
@@ -9935,6 +10546,56 @@
                                     "null"
                                   ]
                                 },
+                                "podCertificate": {
+                                  "description": "PodCertificateProjection provides a private key and X.509 certificate in the pod filesystem.",
+                                  "properties": {
+                                    "certificateChainPath": {
+                                      "description": "Write the certificate chain at this path in the projected volume.\n\nMost applications should use credentialBundlePath.  When using keyPath and certificateChainPath, your application needs to check that the key and leaf certificate are consistent, because it is possible to read the files mid-rotation.",
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "credentialBundlePath": {
+                                      "description": "Write the credential bundle at this path in the projected volume.\n\nThe credential bundle is a single file that contains multiple PEM blocks. The first PEM block is a PRIVATE KEY block, containing a PKCS#8 private key.\n\nThe remaining blocks are CERTIFICATE blocks, containing the issued certificate chain from the signer (leaf and any intermediates).\n\nUsing credentialBundlePath lets your Pod's application code make a single atomic read that retrieves a consistent key and certificate chain.  If you project them to separate files, your application code will need to additionally check that the leaf certificate was issued to the key.",
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "keyPath": {
+                                      "description": "Write the key at this path in the projected volume.\n\nMost applications should use credentialBundlePath.  When using keyPath and certificateChainPath, your application needs to check that the key and leaf certificate are consistent, because it is possible to read the files mid-rotation.",
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "keyType": {
+                                      "description": "The type of keypair Kubelet will generate for the pod.\n\nValid values are \"RSA3072\", \"RSA4096\", \"ECDSAP256\", \"ECDSAP384\", \"ECDSAP521\", and \"ED25519\".",
+                                      "type": "string"
+                                    },
+                                    "maxExpirationSeconds": {
+                                      "description": "maxExpirationSeconds is the maximum lifetime permitted for the certificate.\n\nKubelet copies this value verbatim into the PodCertificateRequests it generates for this projection.\n\nIf omitted, kube-apiserver will set it to 86400(24 hours). kube-apiserver will reject values shorter than 3600 (1 hour).  The maximum allowable value is 7862400 (91 days).\n\nThe signer implementation is then free to issue a certificate with any lifetime *shorter* than MaxExpirationSeconds, but no shorter than 3600 seconds (1 hour).  This constraint is enforced by kube-apiserver. `kubernetes.io` signers will never issue certificates with a lifetime longer than 24 hours.",
+                                      "format": "int32",
+                                      "type": [
+                                        "integer",
+                                        "null"
+                                      ]
+                                    },
+                                    "signerName": {
+                                      "description": "Kubelet's generated CSRs will be addressed to this signer.",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "signerName",
+                                    "keyType"
+                                  ],
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ]
+                                },
                                 "secret": {
                                   "description": "Adapts a secret into a projected volume.\n\nThe contents of the target Secret's Data field will be presented in a projected volume as files using the keys in the Data field as the file names. Note that this is identical to a secret volume source without the default mode.",
                                   "properties": {
@@ -10449,66 +11110,16 @@
           },
           "type": "object"
         },
-        "updateStrategy": {
-          "description": "DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.",
-          "properties": {
-            "rollingUpdate": {
-              "description": "Spec to control the desired behavior of daemon set rolling update.",
-              "properties": {
-                "maxSurge": {
-                  "oneOf": [
-                    {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    {
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
-                    }
-                  ]
-                },
-                "maxUnavailable": {
-                  "oneOf": [
-                    {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    {
-                      "type": [
-                        "integer",
-                        "null"
-                      ]
-                    }
-                  ]
-                }
-              },
-              "type": [
-                "object",
-                "null"
-              ]
-            },
-            "type": {
-              "description": "Type of daemon set update. Can be \"RollingUpdate\" or \"OnDelete\". Default is RollingUpdate.",
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
+        "ttlSecondsAfterFinished": {
+          "description": "ttlSecondsAfterFinished limits the lifetime of a Job that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the Job finishes, it is eligible to be automatically deleted. When the Job is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, the Job won't be automatically deleted. If this field is set to zero, the Job becomes eligible to be deleted immediately after it finishes.",
+          "format": "int32",
           "type": [
-            "object",
+            "integer",
             "null"
           ]
         }
       },
       "required": [
-        "selector",
         "template"
       ],
       "type": [
@@ -10517,21 +11128,44 @@
       ]
     },
     "status": {
-      "description": "DaemonSetStatus represents the current status of a daemon set.",
+      "description": "JobStatus represents the current state of a Job.",
       "properties": {
-        "collisionCount": {
-          "description": "Count of hash collisions for the DaemonSet. The DaemonSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+        "active": {
+          "description": "The number of pending and running pods which are not terminating (without a deletionTimestamp). The value is zero for finished jobs.",
           "format": "int32",
           "type": [
             "integer",
             "null"
           ]
         },
+        "completedIndexes": {
+          "description": "completedIndexes holds the completed indexes when .spec.completionMode = \"Indexed\" in a text format. The indexes are represented as decimal integers separated by commas. The numbers are listed in increasing order. Three or more consecutive numbers are compressed and represented by the first and last element of the series, separated by a hyphen. For example, if the completed indexes are 1, 3, 4, 5 and 7, they are represented as \"1,3-5,7\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "completionTime": {
+          "description": "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "conditions": {
-          "description": "Represents the latest available observations of a DaemonSet's current state.",
+          "description": "The latest available observations of an object's current state. When a Job fails, one of the conditions will have type \"Failed\" and status true. When a Job is suspended, one of the conditions will have type \"Suspended\" and status true; when the Job is resumed, the status of this condition will become false. When a Job is completed, one of the conditions will have type \"Complete\" and status true.\n\nA job is considered finished when it is in a terminal condition, either \"Complete\" or \"Failed\". A Job cannot have both the \"Complete\" and \"Failed\" conditions. Additionally, it cannot be in the \"Complete\" and \"FailureTarget\" conditions. The \"Complete\", \"Failed\" and \"FailureTarget\" conditions cannot be disabled.\n\nMore info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
           "items": {
-            "description": "DaemonSetCondition describes the state of a DaemonSet at a certain point.",
+            "description": "JobCondition describes current state of a job.",
             "properties": {
+              "lastProbeTime": {
+                "description": "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "lastTransitionTime": {
                 "description": "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
                 "format": "date-time",
@@ -10541,14 +11175,14 @@
                 ]
               },
               "message": {
-                "description": "A human readable message indicating details about the transition.",
+                "description": "Human readable message indicating details about last transition.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "reason": {
-                "description": "The reason for the condition's last transition.",
+                "description": "(brief) reason for the condition's last transition.",
                 "type": [
                   "string",
                   "null"
@@ -10559,7 +11193,7 @@
                 "type": "string"
               },
               "type": {
-                "description": "Type of DaemonSet condition.",
+                "description": "Type of job condition, Complete or Failed.",
                 "type": "string"
               }
             },
@@ -10576,72 +11210,95 @@
             "array",
             "null"
           ],
-          "x-kubernetes-list-map-keys": [
-            "type"
-          ],
-          "x-kubernetes-list-type": "map",
+          "x-kubernetes-list-type": "atomic",
           "x-kubernetes-patch-merge-key": "type",
           "x-kubernetes-patch-strategy": "merge"
         },
-        "currentNumberScheduled": {
-          "description": "The number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
-          "format": "int32",
-          "type": "integer"
-        },
-        "desiredNumberScheduled": {
-          "description": "The total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
-          "format": "int32",
-          "type": "integer"
-        },
-        "numberAvailable": {
-          "description": "The number of nodes that should be running the daemon pod and have one or more of the daemon pod running and available (ready for at least spec.minReadySeconds)",
+        "failed": {
+          "description": "The number of pods which reached phase Failed. The value increases monotonically.",
           "format": "int32",
           "type": [
             "integer",
             "null"
           ]
         },
-        "numberMisscheduled": {
-          "description": "The number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/",
-          "format": "int32",
-          "type": "integer"
+        "failedIndexes": {
+          "description": "FailedIndexes holds the failed indexes when spec.backoffLimitPerIndex is set. The indexes are represented in the text format analogous as for the `completedIndexes` field, ie. they are kept as decimal integers separated by commas. The numbers are listed in increasing order. Three or more consecutive numbers are compressed and represented by the first and last element of the series, separated by a hyphen. For example, if the failed indexes are 1, 3, 4, 5 and 7, they are represented as \"1,3-5,7\". The set of failed indexes cannot overlap with the set of completed indexes.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
-        "numberReady": {
-          "description": "numberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running with a Ready Condition.",
-          "format": "int32",
-          "type": "integer"
-        },
-        "numberUnavailable": {
-          "description": "The number of nodes that should be running the daemon pod and have none of the daemon pod running and available (ready for at least spec.minReadySeconds)",
+        "ready": {
+          "description": "The number of active pods which have a Ready condition and are not terminating (without a deletionTimestamp).",
           "format": "int32",
           "type": [
             "integer",
             "null"
           ]
         },
-        "observedGeneration": {
-          "description": "The most recent generation observed by the daemon set controller.",
-          "format": "int64",
+        "startTime": {
+          "description": "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "succeeded": {
+          "description": "The number of pods which reached phase Succeeded. The value increases monotonically for a given spec. However, it may decrease in reaction to scale down of elastic indexed jobs.",
+          "format": "int32",
           "type": [
             "integer",
             "null"
           ]
         },
-        "updatedNumberScheduled": {
-          "description": "The total number of nodes that are running updated daemon pod",
+        "terminating": {
+          "description": "The number of pods which are terminating (in phase Pending or Running and have a deletionTimestamp).\n\nThis field is beta-level. The job controller populates the field when the feature gate JobPodReplacementPolicy is enabled (enabled by default).",
           "format": "int32",
           "type": [
             "integer",
+            "null"
+          ]
+        },
+        "uncountedTerminatedPods": {
+          "description": "UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't been accounted in Job status counters.",
+          "properties": {
+            "failed": {
+              "description": "failed holds UIDs of failed Pods.",
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": [
+                "array",
+                "null"
+              ],
+              "x-kubernetes-list-type": "set"
+            },
+            "succeeded": {
+              "description": "succeeded holds UIDs of succeeded Pods.",
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": [
+                "array",
+                "null"
+              ],
+              "x-kubernetes-list-type": "set"
+            }
+          },
+          "type": [
+            "object",
             "null"
           ]
         }
       },
-      "required": [
-        "currentNumberScheduled",
-        "numberMisscheduled",
-        "desiredNumberScheduled",
-        "numberReady"
-      ],
       "type": [
         "object",
         "null"
@@ -10651,8 +11308,8 @@
   "type": "object",
   "x-kubernetes-group-version-kind": [
     {
-      "group": "apps",
-      "kind": "DaemonSet",
+      "group": "batch",
+      "kind": "Job",
       "version": "v1"
     }
   ],

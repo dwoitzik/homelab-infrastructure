@@ -113,7 +113,7 @@ repos:
       - id: kubeconform
         name: Kubeconform
         description: >-
-          Validate Kubernetes manifests against the 1.31 API schema.
+          Validate Kubernetes manifests against the 1.34 API schema.
           Schemas are read entirely from the vendored ci/kubeconform-schemas/
           directory via -schema-location -- zero network calls, so this can't
           flake on raw.githubusercontent.com's rate limit. See
@@ -126,7 +126,7 @@ repos:
           find kubernetes/ -name "*.yaml" -o -name "*.yml" |
             grep -v users_database |
             xargs kubeconform
-              -kubernetes-version 1.31.0
+              -kubernetes-version 1.34.0
               -schema-location "ci/kubeconform-schemas/{{ .NormalizedKubernetesVersion }}-standalone/{{ .ResourceKind }}{{ .KindSuffix }}.json"
               -ignore-missing-schemas
               -summary

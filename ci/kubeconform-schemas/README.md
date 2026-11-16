@@ -15,7 +15,7 @@ that behavior is unchanged and doesn't depend on network either way.
 
 ## Layout
 
-`v1.31.0-standalone/<kind>-<group>-<version>.json`, matching kubeconform's own
+`v1.34.0-standalone/<kind>-<group>-<version>.json`, matching kubeconform's own
 default naming template so `-schema-location` can point straight at this
 directory with no translation:
 
@@ -31,11 +31,11 @@ check the `-summary` skip count if that's unexpected), fetch it once:
 
 ```bash
 find kubernetes/ -name "*.yaml" -o -name "*.yml" | grep -v users_database | xargs kubeconform \
-  -kubernetes-version 1.31.0 -debug -ignore-missing-schemas -summary 2>&1 \
+  -kubernetes-version 1.34.0 -debug -ignore-missing-schemas -summary 2>&1 \
   | grep 'schema found at' | grep -oP 'https://\S+\.json' | sort -u
 
 # for each new URL:
-curl -sL --fail "<url>" -o "ci/kubeconform-schemas/v1.31.0-standalone/$(basename "<url>")"
+curl -sL --fail "<url>" -o "ci/kubeconform-schemas/v1.34.0-standalone/$(basename "<url>")"
 ```
 
 Commit the new file(s) alongside the manifest change. On a Kubernetes version
