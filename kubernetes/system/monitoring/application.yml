@@ -149,8 +149,11 @@ spec:
             type: pvc
             storageClassName: local-path
             size: 2Gi
+          # null drops the chart's default rollingUpdate block, which Helm would
+          # otherwise merge in and the API rejects for Recreate.
           deploymentStrategy:
             type: Recreate
+            rollingUpdate: null
           # Room for the one-time migration run on a fresh volume.
           livenessProbe:
             initialDelaySeconds: 60
