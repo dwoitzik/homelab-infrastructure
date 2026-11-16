@@ -326,7 +326,7 @@ data:
               slug: status
         - MySpeed:
             icon: myspeed.png
-            href: https://speed.woitzik.dev
+            href: https://speed.woitzik.dev/statistics
             description: Internet Speed Tracker
             widget:
               type: myspeed
