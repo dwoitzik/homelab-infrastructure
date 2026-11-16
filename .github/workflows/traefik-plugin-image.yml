@@ -1,0 +1,71 @@
+name: Traefik CrowdSec plugin image (ADR-079)
+
+# Builds images/traefik-crowdsec-plugin and pushes it to GHCR on main. Runs on
+# GitHub-hosted runners so the build never depends on the homelab WAN. Pull
+# requests build without pushing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - images/traefik-crowdsec-plugin/**
+      - .github/workflows/traefik-plugin-image.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - images/traefik-crowdsec-plugin/**
+      - .github/workflows/traefik-plugin-image.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/traefik-crowdsec-plugin
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Read plugin version
+        id: version
+        run: |
+          version=$(sed -n 's/^ARG PLUGIN_VERSION=//p' images/traefik-crowdsec-plugin/Dockerfile)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: images/traefik-crowdsec-plugin
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          provenance: false
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.version.outputs.version }}
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.description=CrowdSec bouncer Traefik plugin source for experimental.localPlugins
+
+      - name: Summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "Pushed \`${IMAGE}:${{ steps.version.outputs.version }}@${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
