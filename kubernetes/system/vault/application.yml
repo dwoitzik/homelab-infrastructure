@@ -7,11 +7,14 @@ spec:
   project: default
   source:
     repoURL: https://helm.releases.hashicorp.com
-    targetRevision: 0.28.1
+    targetRevision: 0.32.0
     chart: vault
     helm:
       values: |
         server:
+          # Pinned: the server version moves only in its own reviewed step, never with a chart bump.
+          image:
+            tag: "1.21.2"
           ha:
             enabled: false
           standalone:
