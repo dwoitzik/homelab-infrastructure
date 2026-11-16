@@ -63,6 +63,7 @@ skipped by accident.
 | [075](ADR-075-offsite-backup-logical-db-dumps.md) | Offsite backup carries pg_dump archives, not raw database directories or emptyDirs | Accepted |
 | [076](ADR-076-subnet-router-host-network.md) | The tailnet subnet router runs on the host network with a fixed port, so off-LAN peers can connect directly | Accepted |
 | [078](ADR-078-argocd-manages-its-own-workloads.md) | ArgoCD manages its own workloads from the upstream manifest plus resource requests, without prune | Accepted, applied |
+| [079](ADR-079-traefik-crowdsec-plugin-local.md) | Traefik loads the CrowdSec plugin from a local image, and a startup probe keeps a pod without it out of service | Accepted, applied |
 
 ## In review, not yet in this table
 
