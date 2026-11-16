@@ -105,7 +105,7 @@ data:
     Restore test: ${RESTORE_TEST}
     Open PRs: ${OPEN_PRS} (${RENOVATE_PRS} from Renovate)
 
-    Drift detection: declared-vs-live check every 30 min (GitHub Actions, ADR-027); ArgoCD self-heal for the cluster.
+    Drift detection: declared-vs-live check every 30 min (GitHub Actions, ADR-027); ArgoCD self-heal for the cluster."
 
     PAYLOAD=$(jq -n --arg content "$MSG" '{content: $content}')
     timeout 15 curl -fsS -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK_URL"

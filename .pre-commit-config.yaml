@@ -148,6 +148,16 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: configmap-script-syntax
+        name: ConfigMap shell script syntax
+        description: >-
+          Runs sh -n / bash -n on every *.sh key embedded in a ConfigMap, so a
+          broken quote fails the commit instead of the next CronJob run.
+        entry: python3 scripts/check-configmap-scripts.py
+        language: system
+        files: ^kubernetes/.*\.ya?ml$
+        stages: [pre-commit]
+
       - id: argocd-include-coverage
         name: ArgoCD include coverage
         description: >-
