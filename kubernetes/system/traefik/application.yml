@@ -31,6 +31,9 @@ spec:
           # Traefik v3 default readTimeout is 60s; large Immich uploads over
           # NFS-backed USB storage exceed that → 502. Set to 0 (unlimited).
           - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=0"
+          # Plugin source comes from the plugin-source initContainer, never from
+          # plugins.traefik.io (ADR-079). Chart 27 has no localPlugins value.
+          - "--experimental.localPlugins.crowdsec.moduleName=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
         ports:
           web:
             redirectTo:
@@ -75,11 +78,28 @@ spec:
           default:
             defaultCertificate:
               secretName: wildcard-woitzik-dev-tls
-        experimental:
-          plugins:
-            crowdsec:
-              moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-              version: v1.6.0
+        # A Traefik that failed to load the plugin still answers /ping, so it
+        # would turn Ready and 404 every crowdsec-protected route. Startup only
+        # passes once the middleware is enabled; Ready waits for startup.
+        startupProbe:
+          exec:
+            command:
+              - sh
+              - -c
+              - wget -qO- -T 2 http://127.0.0.1:9000/api/http/middlewares/apps-crowdsec-bouncer@kubernetescrd | grep -q '"status":"enabled"'
+          initialDelaySeconds: 2
+          periodSeconds: 2
+          timeoutSeconds: 3
+          failureThreshold: 60
+        updateStrategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxUnavailable: 0
+            maxSurge: 1
+        additionalVolumeMounts:
+          - name: plugins-local
+            mountPath: /plugins-local
+            readOnly: true
         # 2026-08-17 (Section C, secrets hygiene): was a hardcoded plaintext
         # value committed to git -- this is the actual leak the brief named
         # ("the plaintext key in traefik/application.yml are known"). The
@@ -113,6 +133,32 @@ spec:
         # multiple replicas would fragment.
         deployment:
           replicas: 2
+          # Built by .github/workflows/traefik-plugin-image.yml. A failed pull
+          # keeps the new pod from starting while the old replica keeps serving.
+          initContainers:
+            - name: plugin-source
+              image: ghcr.io/dwoitzik/traefik-crowdsec-plugin:v1.6.0@sha256:27821bfcc8550f763682b63084bcc423e24c8f6fe142c4259907de7fa54eaa11
+              command: ["cp", "-R", "/plugins-local/.", "/target/"]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  cpu: 100m
+                  memory: 32Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: plugins-local
+                  mountPath: /target
+          additionalVolumes:
+            - name: plugins-local
+              emptyDir:
+                sizeLimit: 16Mi
         # Soft anti-affinity so the two replicas prefer different nodes --
         # actually protects against a node failure, not just a pod crash.
         # Soft, not hard: a 3-node cluster with uneven node roles shouldn't

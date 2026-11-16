@@ -32,6 +32,41 @@ covers every hostname — no per-service certificate management as new apps are 
 (`immich-ratelimit`, `loki-to-grafana-redirect`). Defined in
 `kubernetes/apps/crowdsec/middleware.yml` and inline in the IngressRoute files.
 
+## CrowdSec plugin (local, ADR-079)
+
+The CrowdSec bouncer plugin is loaded with `experimental.localPlugins`, not downloaded
+from plugins.traefik.io. The `plugin-source` initContainer copies the plugin tree from
+`ghcr.io/dwoitzik/traefik-crowdsec-plugin` (built from
+`images/traefik-crowdsec-plugin/Dockerfile` by
+`.github/workflows/traefik-plugin-image.yml`) into an emptyDir mounted at
+`/plugins-local`.
+
+A `startupProbe` asks Traefik's internal API for
+`apps-crowdsec-bouncer@kubernetescrd` and passes only on `"status":"enabled"`. A pod
+whose plugin did not load never turns Ready, so it never serves 404s for the
+CrowdSec-protected routes. If you rename that Middleware, change the probe URL in the
+same PR, or new Traefik pods will not start.
+
+Check a pod by hand:
+
+```bash
+kubectl -n kube-system exec deploy/traefik -- \
+  wget -qO- http://127.0.0.1:9000/api/http/middlewares/apps-crowdsec-bouncer@kubernetescrd
+kubectl -n kube-system logs deploy/traefik | grep -i 'plugins are disabled'   # expect nothing
+```
+
+### Bumping the plugin version
+
+1. Update `PLUGIN_VERSION` and `PLUGIN_COMMIT` in
+   `images/traefik-crowdsec-plugin/Dockerfile` (Renovate opens this PR itself). Read the
+   plugin's release notes for Middleware option changes
+   (`kubernetes/apps/crowdsec/middleware.yml`).
+2. Merge; the workflow pushes `ghcr.io/dwoitzik/traefik-crowdsec-plugin:<version>` and
+   prints the digest in its run summary.
+3. Update the `plugin-source` image tag and digest in `application.yml` (Renovate's
+   kubernetes manager picks up the new tag). Merge, then confirm both pods are Ready
+   and the log grep above is empty.
+
 ## ServersTransport
 
 `kubernetes/system/infrastructure/transport.yml` — `insecure-transport` (two copies,
@@ -40,5 +75,5 @@ self-signed-cert backends (Proxmox, PBS, Wazuh) without failing TLS verification
 
 ## Dependencies
 
-MetalLB (LoadBalancer IP), cert-manager (the wildcard cert). Everything else depends on
-this.
+MetalLB (LoadBalancer IP), cert-manager (the wildcard cert), GHCR for the plugin
+image on nodes that have not cached it yet. Everything else depends on this.
