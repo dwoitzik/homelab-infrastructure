@@ -83,6 +83,39 @@
   # extended: one stock entry names a nonexistent label.
 
 
+- name: Keep listed packages out of unattended upgrades
+  ansible.builtin.blockinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    marker: "# {mark} ANSIBLE MANAGED PACKAGE BLACKLIST"
+    block: |
+      Unattended-Upgrade::Package-Blacklist {
+      {% for pkg in common_uu_package_blacklist %}
+          "{{ pkg }}";
+      {% endfor %}
+      };
+    state: "{{ 'present' if common_uu_package_blacklist | length > 0 else 'absent' }}"
+
+- name: Ensure the apt-daily-upgrade timer drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/apt-daily-upgrade.timer.d
+    state: directory
+    mode: '0755'
+  when: common_apt_upgrade_time is defined
+
+# Hosts that back each other up (the DNS pair) upgrade at different fixed
+# times, so a package restart can never take both down at once.
+- name: Pin the unattended-upgrade time
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/apt-daily-upgrade.timer.d/time.conf
+    content: |
+      [Timer]
+      OnCalendar=
+      OnCalendar=*-*-* {{ common_apt_upgrade_time }}
+      RandomizedDelaySec=0
+    mode: '0644'
+  when: common_apt_upgrade_time is defined
+  notify: Reload systemd for apt timer
+
 - name: Set inotify limits for k3s/container workloads
   ansible.posix.sysctl:
     name: "{{ item.name }}"

@@ -1,0 +1,3 @@
+---
+# Upgrades never overlap with the other DNS Pi.
+common_apt_upgrade_time: "06:40"
