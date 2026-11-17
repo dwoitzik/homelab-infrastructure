@@ -59,19 +59,22 @@ spec:
         ports:
         - containerPort: 5678
           name: http
+        # /healthz only says the process runs; /healthz/readiness also checks the
+        # database. n8n does not reconnect after a Postgres restart, so liveness
+        # restarts it once the database has been unreachable for 5 minutes.
         readinessProbe:
           httpGet:
-            path: /healthz
+            path: /healthz/readiness
             port: 5678
           initialDelaySeconds: 30
           periodSeconds: 15
         livenessProbe:
           httpGet:
-            path: /healthz
+            path: /healthz/readiness
             port: 5678
           initialDelaySeconds: 60
           periodSeconds: 30
-          failureThreshold: 4
+          failureThreshold: 10
         resources:
           requests:
             cpu: 100m
