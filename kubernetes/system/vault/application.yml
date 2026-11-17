@@ -14,6 +14,7 @@ spec:
         server:
           # Pinned: the server version moves only in its own reviewed step, never with a chart bump.
           image:
+            # renovate: datasource=docker depName=hashicorp/vault
             tag: "2.0.4"
           ha:
             enabled: false
