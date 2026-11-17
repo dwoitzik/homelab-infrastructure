@@ -267,6 +267,7 @@
         "icereed/paperless-gpt",
         "vault",
         "cloudnative-pg",
+        "plugin-barman-cloud",
         "velero"
       ],
       "groupName": "stateful/critical services",
