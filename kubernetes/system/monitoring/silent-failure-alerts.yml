@@ -35,25 +35,8 @@ spec:
 
     - name: cnpg.backup
       rules:
-        - alert: CNPGAutheliaBackupTooOld
-          expr: |
-            (time() - cnpg_collector_last_available_backup_timestamp{namespace="database", pod=~"postgres-authelia-.*"}) > 97200
-          for: 5m
-          labels:
-            severity: critical
-          annotations:
-            summary: "postgres-authelia's last successful backup is over 27h old"
-            description: >
-              postgres-authelia's ScheduledBackup runs daily at 02:00 -- no successful
-              backup in 27+ hours (one cycle plus buffer) means the schedule stopped
-              firing or every attempt is failing. This exact gap let Authelia's backups
-              silently stop for 6 days (2026-08-25 to 2026-08-31, root cause: CNPG
-              operator down). Check:
-              kubectl get backup -n database --sort-by=.metadata.creationTimestamp | tail,
-              and CNPGOperatorDown above.
-
-        # Clusters on the Barman Cloud plugin report backup age through the
-        # plugin's own metric; the cnpg_collector_* backup series stop for them.
+        # Every cluster is on the Barman Cloud plugin, which reports backup age
+        # through its own metric; cnpg_collector_*_backup_timestamp no longer exists.
         - alert: CNPGBackupTooOld
           expr: |
             (time() - barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="database"}) > 97200
@@ -65,7 +48,8 @@ spec:
             description: >
               Every CNPG ScheduledBackup runs daily between 02:00 and 02:40, so no
               successful base backup in 27+ hours means the schedule stopped firing or
-              every attempt fails. Check:
+              every attempt fails. This gap once let Authelia's backups stop unnoticed
+              for 6 days while the CNPG operator was down. Check:
               kubectl get backup -n database --sort-by=.metadata.creationTimestamp | tail,
               the plugin-barman-cloud sidecar logs in {{ $labels.pod }},
               and CNPGOperatorDown above.

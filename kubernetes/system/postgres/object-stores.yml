@@ -1,6 +1,9 @@
 # One Barman Cloud plugin target per Cluster, on the same path (and default
 # serverName = Cluster name) the in-tree barmanObjectStore used, so backups
 # taken before the switch stay in the catalog and remain restorable.
+
+# cnpg-backups is a bucket of its own on purpose (REL-057b): a barman prefix
+# inside Velero's bucket made Velero mark its BackupStorageLocation Unavailable.
 apiVersion: barmancloud.cnpg.io/v1
 kind: ObjectStore
 metadata:
@@ -129,6 +132,41 @@ spec:
         memory: 384Mi
   configuration:
     destinationPath: s3://cnpg-backups/synapse
+    endpointURL: http://garage.apps.svc.cluster.local:3900
+    s3Credentials:
+      accessKeyId:
+        name: cnpg-garage-backup
+        key: access-key-id
+      secretAccessKey:
+        name: cnpg-garage-backup
+        key: secret-access-key
+      region:
+        name: cnpg-backup-config
+        key: region
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: postgres-authelia
+  namespace: database
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  retentionPolicy: "7d"
+  instanceSidecarConfiguration:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+  configuration:
+    destinationPath: s3://cnpg-backups/authelia
     endpointURL: http://garage.apps.svc.cluster.local:3900
     s3Credentials:
       accessKeyId:
