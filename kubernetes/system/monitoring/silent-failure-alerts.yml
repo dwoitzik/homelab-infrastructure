@@ -37,9 +37,11 @@ spec:
       rules:
         # Every cluster is on the Barman Cloud plugin, which reports backup age
         # through its own metric; cnpg_collector_*_backup_timestamp no longer exists.
+        # A freshly started sidecar reports 0 until it has read the backup catalog;
+        # that case belongs to CNPGBackupCatalogUnknown, not to this alert.
         - alert: CNPGBackupTooOld
           expr: |
-            (time() - barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="database"}) > 97200
+            (time() - (barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="database"} > 0)) > 97200
           for: 5m
           labels:
             severity: critical
@@ -53,6 +55,21 @@ spec:
               kubectl get backup -n database --sort-by=.metadata.creationTimestamp | tail,
               the plugin-barman-cloud sidecar logs in {{ $labels.pod }},
               and CNPGOperatorDown above.
+
+        - alert: CNPGBackupCatalogUnknown
+          expr: |
+            barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="database"} == 0
+          for: 27h
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.pod }} has reported no barman backup for 27h"
+            description: >
+              The plugin-barman-cloud sidecar in {{ $labels.pod }} has reported a last
+              backup time of 0 for 27+ hours, so CNPGBackupTooOld cannot judge it. Either
+              no backup has completed since the pod started or the sidecar cannot read
+              the catalog on Garage. Check the ObjectStore status
+              (kubectl -n database get objectstore -o yaml) and the sidecar logs.
 
     - name: crowdsec
       rules:
