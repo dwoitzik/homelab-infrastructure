@@ -113,6 +113,12 @@ these usually point at storage that's physically independent of the k3s cluster'
 lifecycle and may not need restoring at all — check what the PV actually points at
 before assuming a restore is needed.
 
+If the Immich library itself is lost, its daily hard-link snapshots live on rpi-srv-02
+under `/mnt/ssd/immich-library/snapshots/<date>/` (role `immich_library_backup`). Copy the
+newest snapshot back to the library path, start Immich, then run the thumbnail and video
+transcoding jobs (Administration > Jobs): `thumbs/` and `encoded-video/` are not in the
+mirror because Immich regenerates them from the originals.
+
 ## 5a. Postgres from the barman backups on Garage (PITR)
 
 The first choice while Garage's `cnpg-backups` bucket survives. Every CNPG cluster
