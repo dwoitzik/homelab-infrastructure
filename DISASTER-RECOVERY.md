@@ -113,6 +113,35 @@ these usually point at storage that's physically independent of the k3s cluster'
 lifecycle and may not need restoring at all — check what the PV actually points at
 before assuming a restore is needed.
 
+## 5a. Postgres from the barman backups on Garage (PITR)
+
+The first choice while Garage's `cnpg-backups` bucket survives. Every CNPG cluster
+archives WAL and takes a daily base backup there through the Barman Cloud plugin
+(ADR-081), 7 days of recovery window per database.
+
+1. Make sure ArgoCD has the `cloudnative-pg` and `plugin-barman-cloud` Applications
+   healthy and the `ObjectStore`s from `kubernetes/system/postgres/object-stores.yml`
+   exist (`kubectl -n database get objectstore`). Each one's `.status` shows the
+   recovery window it can see; an empty status means the plugin cannot read the bucket
+   (check Garage, the `cnpg-garage-backup` Secret and the sidecar or plugin logs).
+2. Turn off auto-sync on the `postgres-cluster` Application, then delete the broken or
+   empty Cluster (its PVC goes with it; copy it aside first if it might still matter).
+3. Apply a Cluster under the original name with `bootstrap.recovery` from an
+   `externalClusters` plugin source, as in `kubernetes/system/postgres/README.md`
+   ("How to restore"), with an optional `recoveryTarget.targetTime`. Keep the original
+   `postgresql`, `managed.roles` and `resources` settings. Do not list the plugin as WAL
+   archiver on the same path yet: the restored timeline must not mix into the archive
+   it is reading from.
+4. Verify content (row counts, the app's own login or health check), not just
+   `Cluster in healthy state`.
+5. Point the archiver at a fresh `destinationPath` (new `ObjectStore`, or bump the path
+   in Git) and commit the Cluster exactly as applied, `bootstrap.recovery` included
+   (CNPG only reads `bootstrap` when it creates the cluster), so Git matches live. Run
+   an on-demand `method: plugin` Backup and re-enable auto-sync.
+
+Tested 2026-11-17 against `postgres-scanopy`: one scratch cluster to a point before the
+plugin switch, one to the latest point; both matched the live row counts.
+
 ## 5b. Postgres from the offsite (R2) backup
 
 The offsite backup has no raw Postgres data directories, only `pg_dump` archives
