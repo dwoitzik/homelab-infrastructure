@@ -75,7 +75,9 @@ evicted pods counts as unused and gets deleted.
 - every ExternalSecret `SecretSynced`;
 - every ArgoCD app Synced/Healthy (annotate `argocd.argoproj.io/refresh=normal` to
   re-check stale ones);
-- ingress answers through Traefik for backends on each node;
+- ingress answers through Traefik for backends on each node, every request 200 (a
+  minority of 404s means one Traefik replica came up without its CrowdSec plugin
+  middleware; ADR-079 covers that failure mode and the startup probe that guards it);
 - 0 Prometheus targets down;
 - both Velero BSLs Available;
 - NetworkPolicy probe prints `denied_ok`, `control_reached`, `dns_ok`.
