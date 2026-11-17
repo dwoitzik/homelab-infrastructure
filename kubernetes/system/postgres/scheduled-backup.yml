@@ -72,4 +72,6 @@ spec:
   backupOwnerReference: self
   cluster:
     name: postgres-synapse
-  method: barmanObjectStore
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

@@ -43,22 +43,10 @@ spec:
   monitoring:
     enablePodMonitor: false
 
-  backup:
-    retentionPolicy: "7d"
-    barmanObjectStore:
-      destinationPath: s3://cnpg-backups/synapse
-      endpointURL: http://garage.apps.svc.cluster.local:3900
-      s3Credentials:
-        accessKeyId:
-          name: cnpg-garage-backup
-          key: access-key-id
-        secretAccessKey:
-          name: cnpg-garage-backup
-          key: secret-access-key
-        region:
-          name: cnpg-backup-config
-          key: region
-      wal:
-        compression: gzip
-      data:
-        compression: gzip
+  # WAL archiving and base backups through the Barman Cloud plugin; the target
+  # and retention live in the ObjectStore of the same name (object-stores.yml).
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: postgres-synapse
