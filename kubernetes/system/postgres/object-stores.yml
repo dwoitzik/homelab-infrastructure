@@ -6,14 +6,21 @@ kind: ObjectStore
 metadata:
   name: postgres-scanopy
   namespace: database
+  annotations:
+    # The plugin's pre-reconcile hook stops (without requeue) on a Cluster whose
+    # ObjectStore is missing, so the ObjectStore has to exist first.
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   retentionPolicy: "7d"
   instanceSidecarConfiguration:
+    # Kyverno require-resource-limits enforces cpu and memory limits on every
+    # container in `database`, the injected sidecar included.
     resources:
       requests:
         cpu: 10m
         memory: 64Mi
       limits:
+        cpu: 500m
         memory: 384Mi
   configuration:
     destinationPath: s3://cnpg-backups/scanopy
