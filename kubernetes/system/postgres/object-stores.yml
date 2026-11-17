@@ -39,3 +39,38 @@ spec:
       compression: gzip
     data:
       compression: gzip
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: postgres-firefly
+  namespace: database
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  retentionPolicy: "7d"
+  instanceSidecarConfiguration:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+  configuration:
+    destinationPath: s3://cnpg-backups/firefly
+    endpointURL: http://garage.apps.svc.cluster.local:3900
+    s3Credentials:
+      accessKeyId:
+        name: cnpg-garage-backup
+        key: access-key-id
+      secretAccessKey:
+        name: cnpg-garage-backup
+        key: secret-access-key
+      region:
+        name: cnpg-backup-config
+        key: region
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
