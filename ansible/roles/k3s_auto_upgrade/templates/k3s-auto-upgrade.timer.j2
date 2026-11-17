@@ -1,0 +1,9 @@
+[Unit]
+Description=Nightly k3s upgrade window
+
+[Timer]
+OnCalendar={{ k3s_auto_upgrade_on_calendar }}
+Persistent=false
+
+[Install]
+WantedBy=timers.target

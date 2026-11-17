@@ -1,0 +1,6 @@
+---
+- name: Reload k3s auto-upgrade timer
+  ansible.builtin.systemd:
+    name: k3s-auto-upgrade.timer
+    daemon_reload: true
+    state: restarted

@@ -26,6 +26,19 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG PLUGIN_VERSION=(?<currentValue>\\S+)\\nARG PLUGIN_COMMIT=(?<currentDigest>[0-9a-f]{40})"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "k3s version pinned for the cluster (ansible/k3s-cluster/inventory.yml). The k3s_auto_upgrade role on the Proxmox host rolls a merged pin out on the next backup night, one minor at a time, with snapshot rollback.",
+      "managerFilePatterns": [
+        "/^ansible/k3s-cluster/inventory\\.yml$/"
+      ],
+      "matchStrings": [
+        "k3s_version:\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+\\+k3s\\d+)"
+      ],
+      "depNameTemplate": "k3s-io/k3s",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\+k3s(?<build>\\d+)$"
     }
   ],
   "minimumReleaseAge": "3 days",
@@ -274,6 +287,24 @@
         "stateful-critical"
       ],
       "automerge": false
+    },
+    {
+      "description": "k3s: patch releases merge themselves after a week; minors come as one PR per step and need a manual merge.",
+      "matchDepNames": [
+        "k3s-io/k3s"
+      ],
+      "minimumReleaseAge": "7 days",
+      "separateMultipleMinor": true,
+      "automerge": false
+    },
+    {
+      "matchDepNames": [
+        "k3s-io/k3s"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true
     }
   ],
   "hostRules": [

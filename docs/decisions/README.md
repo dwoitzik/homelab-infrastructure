@@ -61,9 +61,10 @@ skipped by accident.
 | [073](ADR-073-sab-incomplete-on-hdd-4k-without-remux.md) | SABnzbd scratch back on the archive HDD; 4K HDR releases without Remux | Accepted, applied |
 | [074](ADR-074-rybbit-public-path-through-traefik.md) | Rybbit's public path goes through Traefik; only the tracker endpoints are open, the dashboard sits behind Authelia | Accepted |
 | [075](ADR-075-offsite-backup-logical-db-dumps.md) | Offsite backup carries pg_dump archives, not raw database directories or emptyDirs | Accepted |
-| [076](ADR-076-subnet-router-host-network.md) | The tailnet subnet router runs on the host network with a fixed port, so off-LAN peers can connect directly | Accepted |
+| [076](ADR-076-subnet-router-host-network.md) | The tailnet subnet router runs on the host network with a fixed port, so off-LAN peers can connect directly | Superseded the same day (reverted, see the ADR) |
 | [078](ADR-078-argocd-manages-its-own-workloads.md) | ArgoCD manages its own workloads from the upstream manifest plus resource requests, without prune | Accepted, applied |
 | [079](ADR-079-traefik-crowdsec-plugin-local.md) | Traefik loads the CrowdSec plugin from a local image, and a startup probe keeps a pod without it out of service | Accepted, applied |
+| [081](ADR-081-nightly-k3s-auto-upgrade.md) | Nightly k3s upgrades from the Proxmox host, with snapshot rollback | Accepted |
 
 ## In review, not yet in this table
 
