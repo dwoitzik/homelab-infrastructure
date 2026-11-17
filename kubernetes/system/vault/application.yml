@@ -7,14 +7,15 @@ spec:
   project: default
   source:
     repoURL: https://helm.releases.hashicorp.com
-    targetRevision: 0.32.0
+    targetRevision: 0.34.1
     chart: vault
     helm:
       values: |
         server:
           # Pinned: the server version moves only in its own reviewed step, never with a chart bump.
           image:
-            tag: "1.21.2"
+            # renovate: datasource=docker depName=hashicorp/vault
+            tag: "2.0.4"
           ha:
             enabled: false
           standalone:

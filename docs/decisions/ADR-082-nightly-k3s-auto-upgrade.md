@@ -1,4 +1,4 @@
-# ADR-081: Nightly k3s upgrades from the Proxmox host, with snapshot rollback
+# ADR-082: Nightly k3s upgrades from the Proxmox host, with snapshot rollback
 
 ## Status
 

@@ -18,7 +18,9 @@ spec:
   backupOwnerReference: self
   cluster:
     name: postgres-authelia
-  method: barmanObjectStore
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
@@ -30,7 +32,9 @@ spec:
   backupOwnerReference: self
   cluster:
     name: postgres-firefly
-  method: barmanObjectStore
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
@@ -42,7 +46,9 @@ spec:
   backupOwnerReference: self
   cluster:
     name: postgres-n8n
-  method: barmanObjectStore
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
@@ -54,7 +60,9 @@ spec:
   backupOwnerReference: self
   cluster:
     name: postgres-scanopy
-  method: barmanObjectStore
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
@@ -66,4 +74,6 @@ spec:
   backupOwnerReference: self
   cluster:
     name: postgres-synapse
-  method: barmanObjectStore
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

@@ -64,7 +64,9 @@ skipped by accident.
 | [076](ADR-076-subnet-router-host-network.md) | The tailnet subnet router runs on the host network with a fixed port, so off-LAN peers can connect directly | Superseded the same day (reverted, see the ADR) |
 | [078](ADR-078-argocd-manages-its-own-workloads.md) | ArgoCD manages its own workloads from the upstream manifest plus resource requests, without prune | Accepted, applied |
 | [079](ADR-079-traefik-crowdsec-plugin-local.md) | Traefik loads the CrowdSec plugin from a local image, and a startup probe keeps a pod without it out of service | Accepted, applied |
-| [081](ADR-081-nightly-k3s-auto-upgrade.md) | Nightly k3s upgrades from the Proxmox host, with snapshot rollback | Accepted |
+| [080](ADR-080-k3s-upgrade-by-binary-swap.md) | k3s upgrades swap the binary one minor at a time and drain only pods that can move | Accepted, applied |
+| [081](ADR-081-cnpg-barman-cloud-plugin.md) | CNPG backups run through the Barman Cloud plugin, on the same bucket paths as the in-tree method | Accepted, applied |
+| [082](ADR-082-nightly-k3s-auto-upgrade.md) | Nightly k3s upgrades from the Proxmox host, with snapshot rollback | Accepted |
 
 ## In review, not yet in this table
 

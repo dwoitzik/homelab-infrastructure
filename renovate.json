@@ -29,6 +29,16 @@
     },
     {
       "customType": "regex",
+      "description": "Image tags pinned inside inline Helm values (the Vault server tag in kubernetes/system/vault/application.yml). Neither the argocd nor the kubernetes manager reads a bare tag: line, so without this the pinned server version never gets an update PR.",
+      "managerFilePatterns": [
+        "/^kubernetes/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s*tag: \"?(?<currentValue>[^\"\\s]+)\"?"
+      ]
+    },
+    {
+      "customType": "regex",
       "description": "k3s version pinned for the cluster (ansible/k3s-cluster/inventory.yml). The k3s_auto_upgrade role on the Proxmox host rolls a merged pin out on the next backup night, one minor at a time, with snapshot rollback.",
       "managerFilePatterns": [
         "/^ansible/k3s-cluster/inventory\\.yml$/"
@@ -131,13 +141,6 @@
         "gotenberg/gotenberg"
       ],
       "allowedVersions": "<9"
-    },
-    {
-      "description": "CloudNativePG operator 1.31 (chart 0.30) removes the in-tree barmanObjectStore that every Cluster here still uses for backups and WAL archiving. Hold the chart below 0.30 until the clusters move to the Barman Cloud plugin.",
-      "matchPackageNames": [
-        "cloudnative-pg"
-      ],
-      "allowedVersions": "<0.30.0"
     },
     {
       "description": "CI tooling (GitHub Actions): low risk, easy to revert, auto-merge after soak. 'pin' included for the same first-time-pinning reason as above.",
@@ -261,7 +264,8 @@
       "description": "Stateful/critical services -- databases, Vault, Authelia, Garage, Vaultwarden, and apps whose upgrades need a manual data migration (Nextcloud, Paperless, Gitea) or whose breakage takes out backups/auth cluster-wide (Velero's own restic/kopia plugin). Immich used to be here but is NOT anymore: the store auto-updates the mobile app, so an older server silently breaks backup (2026-09-05 outage) -- immich minor+patch+digest auto-merge instead (own rule above); only immich major stays PR-only. ALL update types (patch/minor/major) stay PR-only, grouped into one PR per bump wave so they're one glance instead of scattered across the inbox. Listed last so it wins over the stateless auto-merge rule above for these specific packages. icereed/paperless-gpt was added after a version auto-merged and immediately CrashLoopBackOff'd -- its entrypoint isn't stable against this repo's readOnlyRootFilesystem hardening across versions, needs manual verification per bump.",
       "matchManagers": [
         "argocd",
-        "kubernetes"
+        "kubernetes",
+        "custom.regex"
       ],
       "matchPackageNames": [
         "hashicorp/vault",
@@ -280,6 +284,7 @@
         "icereed/paperless-gpt",
         "vault",
         "cloudnative-pg",
+        "plugin-barman-cloud",
         "velero"
       ],
       "groupName": "stateful/critical services",

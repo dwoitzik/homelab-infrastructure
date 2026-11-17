@@ -14,3 +14,8 @@ immich_library_backup_target_root: /mnt/ssd/immich-library
 immich_library_backup_retention_days: 30
 immich_library_backup_key: /root/.ssh/immich_library_backup_ed25519
 immich_library_backup_state_dir: /var/lib/immich-library-backup
+# Derived files Immich regenerates from the originals (Administration > Jobs):
+# left out so the mirror holds only data that cannot be recreated.
+immich_library_backup_excludes:
+  - /thumbs/
+  - /encoded-video/

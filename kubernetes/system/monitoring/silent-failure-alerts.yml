@@ -35,22 +35,40 @@ spec:
 
     - name: cnpg.backup
       rules:
-        - alert: CNPGAutheliaBackupTooOld
+        # Backup age comes from the Barman Cloud plugin's metric. A fresh sidecar
+        # reports 0 until it has read the catalog; CNPGBackupCatalogUnknown covers
+        # that case.
+        - alert: CNPGBackupTooOld
           expr: |
-            (time() - cnpg_collector_last_available_backup_timestamp{namespace="database", pod=~"postgres-authelia-.*"}) > 97200
+            (time() - (barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="database"} > 0)) > 97200
           for: 5m
           labels:
             severity: critical
           annotations:
-            summary: "postgres-authelia's last successful backup is over 27h old"
+            summary: "{{ $labels.pod }}'s last successful barman backup is over 27h old"
             description: >
-              postgres-authelia's ScheduledBackup runs daily at 02:00 -- no successful
-              backup in 27+ hours (one cycle plus buffer) means the schedule stopped
-              firing or every attempt is failing. This exact gap let Authelia's backups
-              silently stop for 6 days (2026-08-25 to 2026-08-31, root cause: CNPG
-              operator down). Check:
+              Every CNPG ScheduledBackup runs daily between 02:00 and 02:40, so no
+              successful base backup in 27+ hours means the schedule stopped firing or
+              every attempt fails. This gap once let Authelia's backups stop unnoticed
+              for 6 days while the CNPG operator was down. Check:
               kubectl get backup -n database --sort-by=.metadata.creationTimestamp | tail,
+              the plugin-barman-cloud sidecar logs in {{ $labels.pod }},
               and CNPGOperatorDown above.
+
+        - alert: CNPGBackupCatalogUnknown
+          expr: |
+            barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="database"} == 0
+          for: 27h
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.pod }} has reported no barman backup for 27h"
+            description: >
+              The plugin-barman-cloud sidecar in {{ $labels.pod }} has reported a last
+              backup time of 0 for 27+ hours, so CNPGBackupTooOld cannot judge it. Either
+              no backup has completed since the pod started or the sidecar cannot read
+              the catalog on Garage. Check the ObjectStore status
+              (kubectl -n database get objectstore -o yaml) and the sidecar logs.
 
     - name: crowdsec
       rules:

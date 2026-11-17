@@ -1,7 +1,7 @@
 # k3s_auto_upgrade
 
 Nightly k3s upgrade orchestrated from the Proxmox host, with automatic rollback
-(ADR-081). Runs on `pve_hosts`.
+(ADR-082). Runs on `pve_hosts`.
 
 - `/usr/local/sbin/k3s-auto-upgrade`: upgrades the cluster to the `k3s_version` pinned in
   `ansible/k3s-cluster/inventory.yml` on `main`, one node at a time, through the QEMU
