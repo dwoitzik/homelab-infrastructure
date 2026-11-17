@@ -1,0 +1,34 @@
+# One Barman Cloud plugin target per Cluster, on the same path (and default
+# serverName = Cluster name) the in-tree barmanObjectStore used, so backups
+# taken before the switch stay in the catalog and remain restorable.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: postgres-scanopy
+  namespace: database
+spec:
+  retentionPolicy: "7d"
+  instanceSidecarConfiguration:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 384Mi
+  configuration:
+    destinationPath: s3://cnpg-backups/scanopy
+    endpointURL: http://garage.apps.svc.cluster.local:3900
+    s3Credentials:
+      accessKeyId:
+        name: cnpg-garage-backup
+        key: access-key-id
+      secretAccessKey:
+        name: cnpg-garage-backup
+        key: secret-access-key
+      region:
+        name: cnpg-backup-config
+        key: region
+    wal:
+      compression: gzip
+    data:
+      compression: gzip

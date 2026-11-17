@@ -29,7 +29,7 @@ spec:
     directory:
       # cluster-scanopy was missing here, so the live postgres-scanopy Cluster
       # carried no tracking-id and a rebuild would have dropped it silently.
-      include: '{cluster,cluster-n8n,cluster-synapse,cluster-firefly,cluster-scanopy,external-secret,scheduled-backup,backup-config,network-policies,postgres-monitoring,standby-replication-service}.yml'
+      include: '{cluster,cluster-n8n,cluster-synapse,cluster-firefly,cluster-scanopy,object-stores,external-secret,scheduled-backup,backup-config,network-policies,postgres-monitoring,standby-replication-service}.yml'
   destination:
     server: https://kubernetes.default.svc
     namespace: database
