@@ -52,6 +52,24 @@ spec:
               kubectl get backup -n database --sort-by=.metadata.creationTimestamp | tail,
               and CNPGOperatorDown above.
 
+        # Clusters on the Barman Cloud plugin report backup age through the
+        # plugin's own metric; the cnpg_collector_* backup series stop for them.
+        - alert: CNPGBackupTooOld
+          expr: |
+            (time() - barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="database"}) > 97200
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.pod }}'s last successful barman backup is over 27h old"
+            description: >
+              Every CNPG ScheduledBackup runs daily between 02:00 and 02:40, so no
+              successful base backup in 27+ hours means the schedule stopped firing or
+              every attempt fails. Check:
+              kubectl get backup -n database --sort-by=.metadata.creationTimestamp | tail,
+              the plugin-barman-cloud sidecar logs in {{ $labels.pod }},
+              and CNPGOperatorDown above.
+
     - name: crowdsec
       rules:
         # These rules can only fire if this series exists, and it never has: the
