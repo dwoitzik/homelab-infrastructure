@@ -113,8 +113,8 @@ rate it reaches 90 % around the end of December.
 
 ### Platform upgrades, one step at a time
 
-- [ ] k3s to a supported minor, one minor per step with a snapshot before each,
-      automated via system-upgrade-controller plans that Renovate bumps
+- [x] k3s to a supported minor (1.31 to 1.34), one minor per step with a snapshot before
+      each; the binary-swap procedure is in `docs/runbooks/k3s-upgrade.md` (ADR-080)
 - [ ] Platform components (External Secrets, Vault, Traefik v3, ArgoCD, CloudNativePG,
       Kyverno, Velero, MetalLB, kube-prometheus-stack) to current releases
 - [x] Move log shipping from the deprecated Promtail chart to Grafana Alloy

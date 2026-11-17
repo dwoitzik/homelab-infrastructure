@@ -2,7 +2,7 @@
 
 ## 1. Cluster Topology
 
-3-node k3s v1.31 cluster on Proxmox VMs (Debian 13 trixie). **Single-server, not HA, by
+3-node k3s v1.34 cluster on Proxmox VMs (Debian 13 trixie). **Single-server, not HA, by
 deliberate design (corrected 2026-06-23):** a prior attempt at 3-way embedded-etcd HA
 caused repeated host freezes — all three VMs share one physical host (`mini`) and one ZFS
 pool, so 3 concurrent etcd writers produced enough I/O contention to lock up the host.
