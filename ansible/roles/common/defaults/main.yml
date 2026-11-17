@@ -1,0 +1,5 @@
+---
+# Packages unattended-upgrades must leave alone on this host.
+common_uu_package_blacklist: []
+# Set (HH:MM) to give a host a fixed daily upgrade time instead of the
+# randomized default.
