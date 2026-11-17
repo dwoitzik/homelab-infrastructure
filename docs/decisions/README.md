@@ -65,6 +65,7 @@ skipped by accident.
 | [078](ADR-078-argocd-manages-its-own-workloads.md) | ArgoCD manages its own workloads from the upstream manifest plus resource requests, without prune | Accepted, applied |
 | [079](ADR-079-traefik-crowdsec-plugin-local.md) | Traefik loads the CrowdSec plugin from a local image, and a startup probe keeps a pod without it out of service | Accepted, applied |
 | [080](ADR-080-k3s-upgrade-by-binary-swap.md) | k3s upgrades swap the binary one minor at a time and drain only pods that can move | Accepted, applied |
+| [081](ADR-081-cnpg-barman-cloud-plugin.md) | CNPG backups run through the Barman Cloud plugin, on the same bucket paths as the in-tree method | Accepted, applied |
 
 ## In review, not yet in this table
 

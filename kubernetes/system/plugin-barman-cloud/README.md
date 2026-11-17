@@ -4,7 +4,7 @@ The [Barman Cloud plugin](https://cloudnative-pg.io/plugin-barman-cloud/) for
 CloudNativePG (CNPG-I). It replaces the operator's in-tree
 `spec.backup.barmanObjectStore`, which CNPG deprecated in 1.26 and is removing. Every
 `Cluster` in `kubernetes/system/postgres/` archives WAL and takes base backups through
-it, to Garage at `s3://cnpg-backups/<name>`.
+it, to Garage at `s3://cnpg-backups/<name>`. ADR-081 has the reasoning.
 
 Deployed from the official Helm chart (`cloudnative-pg/charts`, `plugin-barman-cloud`)
 into `cnpg-system`, next to the operator. The plugin has to live in the operator's
