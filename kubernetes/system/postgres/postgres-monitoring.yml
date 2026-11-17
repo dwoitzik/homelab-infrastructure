@@ -98,3 +98,22 @@ spec:
       cnpg.io/cluster: postgres-synapse
   podMetricsEndpoints:
     - port: metrics
+---
+# Without it CNPGBackupTooOld and the WAL backlog alerts can't see firefly.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres-firefly-metrics
+  namespace: database
+  labels:
+    cnpg.io/cluster: postgres-firefly
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - database
+  selector:
+    matchLabels:
+      cnpg.io/cluster: postgres-firefly
+  podMetricsEndpoints:
+    - port: metrics
