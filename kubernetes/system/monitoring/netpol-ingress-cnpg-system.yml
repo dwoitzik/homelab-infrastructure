@@ -44,3 +44,24 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+---
+# The operator calls the Barman Cloud plugin's CNPG-I gRPC endpoint (mTLS).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-barman-cloud-plugin-from-operator
+  namespace: cnpg-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: plugin-barman-cloud
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudnative-pg
+      ports:
+        - protocol: TCP
+          port: 9090
