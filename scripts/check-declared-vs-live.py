@@ -82,7 +82,7 @@ def find_declared_objects(repo_root: Path) -> list[dict]:
     return objects
 
 
-def check_live(obj: dict, kubeconfig: str) -> bool:
+def check_live(obj: dict, kubeconfig: str) -> str:
     # Several kinds collide across API groups in this cluster (IngressRoute
     # exists under both traefik.io and the deprecated traefik.containo.us;
     # Schedule exists under both velero.io and chaos-mesh.org) -- a bare
@@ -94,7 +94,12 @@ def check_live(obj: dict, kubeconfig: str) -> bool:
     if obj["kind"] not in CLUSTER_SCOPED_KINDS and obj["namespace"]:
         cmd += ["-n", obj["namespace"]]
     result = subprocess.run(cmd, capture_output=True, text=True)
-    return result.returncode == 0
+    if result.returncode == 0:
+        return "ok"
+    # A kind the checker may not read is a gap in its RBAC, not drift.
+    if "forbidden" in result.stderr.lower():
+        return "forbidden"
+    return "missing"
 
 
 def main():
@@ -107,16 +112,21 @@ def main():
     declared = find_declared_objects(repo_root)
     print(f"Checking {len(declared)} declared objects across kubernetes/system/...")
 
-    missing = []
+    missing, unreadable = [], []
     for obj in declared:
-        if not check_live(obj, args.kubeconfig):
+        state = check_live(obj, args.kubeconfig)
+        where = f"{obj['kind']}/{obj['name']} (namespace={obj['namespace']}, declared in {obj['file']})"
+        if state == "missing":
             missing.append(obj)
-            print(f"  MISSING: {obj['kind']}/{obj['name']} (namespace={obj['namespace']}, declared in {obj['file']})")
+            print(f"  MISSING: {where}")
+        elif state == "forbidden":
+            unreadable.append(obj)
+            print(f"  NO READ ACCESS: {where} -- add {obj['kind'].lower()}s.{obj['group']} to ClusterRole drift-checker-extra-read")
         else:
             print(f"  ok: {obj['kind']}/{obj['name']}")
 
-    if missing:
-        print(f"\n{len(missing)}/{len(declared)} declared objects are NOT live.")
+    if missing or unreadable:
+        print(f"\n{len(missing)} declared objects are NOT live, {len(unreadable)} could not be read.")
         sys.exit(1)
 
     print(f"\nAll {len(declared)} declared objects are live.")
