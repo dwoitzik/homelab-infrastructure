@@ -118,6 +118,7 @@ spec:
         app.kubernetes.io/name: crowdsec
     spec:
       serviceAccountName: crowdsec
+      priorityClassName: node-daemon
       tolerations:
         - operator: Exists
       containers:

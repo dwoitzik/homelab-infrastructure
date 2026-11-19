@@ -155,6 +155,7 @@ spec:
         # it schedulable without reserving much when idle (backups are once
         # nightly, not constant).
         nodeAgent:
+          priorityClassName: node-daemon
           resources:
             requests:
               cpu: 250m

@@ -112,6 +112,7 @@ spec:
           enabled: false
 
         prometheus-node-exporter:
+          priorityClassName: node-daemon
           resources:
             requests:
               cpu: 10m
