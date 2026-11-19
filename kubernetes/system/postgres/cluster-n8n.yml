@@ -14,6 +14,7 @@ spec:
   # via database contents matching the Phase 1 EVIDENCE.md record), then
   # un-hibernated. Real recovered data, not a fresh-empty cluster.
   instances: 1
+  priorityClassName: node-pinned-stateful
   # Pinned so an operator upgrade never moves the cluster to a new default image or major.
   imageName: ghcr.io/cloudnative-pg/postgresql:17.2
 
