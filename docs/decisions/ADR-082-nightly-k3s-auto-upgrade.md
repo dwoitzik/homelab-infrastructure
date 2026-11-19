@@ -39,16 +39,24 @@ systemd timer (06:00) on the Proxmox host. Each run:
    checksum, uncordon), running the full health check after every node: all nodes
    Ready, no serving pod unready, ingress through Traefik answering repeatedly, every
    ExternalSecret synced.
-5. On any failure, stops all three VMs, rolls them back to the snapshot, starts them
-   server first and checks health again. One ntfy message reports the result.
-6. On success, deletes the snapshots, expires the silence and reports once.
+5. On any failure, stops all three VMs, rolls them back to the snapshot and starts them
+   server first. The rollback also restores Alertmanager's volume to before the silence
+   existed, so once the API answers the script adds the silence again (retrying while
+   Alertmanager starts), then checks health, expires the new silence and sends one ntfy
+   message with the result.
+6. On success, deletes the snapshots, expires the silence and reports once. Expiring
+   tolerates a silence that no longer exists.
 
 Renovate tracks the pin: patch releases merge themselves after a week, minor releases
 come as one PR per minor and need a manual merge. A merge is the approval; the timer
 does the rest.
 
-`--dry-run`, `--check` and `--drill` (snapshot, roll straight back, verify) make the
-script testable without upgrading anything.
+`--dry-run`, `--check` and `--drill` (snapshot, roll straight back, re-silence, verify)
+make the script testable without upgrading anything.
+
+After a rollback all three VMs start at once, so pods that can only run on one node
+(local-path volumes, DaemonSets) must not lose that node to movable pods; ADR-083 gives
+them a priority class that lets the scheduler preempt movable pods instead.
 
 ## Consequences
 

@@ -121,17 +121,47 @@ if [ "$CHECK" = 1 ]; then
 fi
 
 silence_id=""
+AMTOOL="amtool --alertmanager.url=http://localhost:9093"
+am_pod() { kc "-n monitoring get pods -l app.kubernetes.io/name=alertmanager -o jsonpath='{.items[0].metadata.name}'" 2>/dev/null | tr -d '\r\n'; }
+# Add the maintenance silence; retry up to $1 times, 10 s apart, while Alertmanager starts.
 silence() {
-  local am
-  am=$(kc "-n monitoring get pods -l app.kubernetes.io/name=alertmanager -o jsonpath='{.items[0].metadata.name}'")
-  silence_id=$(kc "-n monitoring exec $am -c alertmanager -- amtool silence add --alertmanager.url=http://localhost:9093 -d 2h -a k3s-auto-upgrade -c 'k3s upgrade to $target' 'alertname=~\"SLO.*|KubePod.*|KubeDeployment.*|KubeStatefulSet.*|KubeDaemonSet.*|KubeNode.*|TargetDown|ExternalProbeFailed|TailnetRouteDrift.*|KubeJobFailed\"'" | tr -d '\r\n')
-  log "silence $silence_id"
+  local tries=${1:-1} am id
+  for _ in $(seq 1 "$tries"); do
+    am=$(am_pod)
+    if [ -n "$am" ]; then
+      id=$(kc "-n monitoring exec $am -c alertmanager -- $AMTOOL silence add -d 2h -a k3s-auto-upgrade -c 'k3s upgrade to $target' 'alertname=~\"SLO.*|KubePod.*|KubeDeployment.*|KubeStatefulSet.*|KubeDaemonSet.*|KubeNode.*|TargetDown|ExternalProbeFailed|TailnetRouteDrift.*|KubeJobFailed\"'" 2>/dev/null | tr -d '\r\n')
+      if [[ $id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+        silence_id=$id
+        log "silence $silence_id"
+        return 0
+      fi
+    fi
+    sleep 10
+  done
+  log "could not add the Alertmanager silence"
+  return 1
 }
+# A silence can be gone already: a rollback restores Alertmanager's volume to before it existed.
 unsilence() {
   [ -n "$silence_id" ] || return 0
-  local am
-  am=$(kc "-n monitoring get pods -l app.kubernetes.io/name=alertmanager -o jsonpath='{.items[0].metadata.name}'")
-  kc "-n monitoring exec $am -c alertmanager -- amtool silence expire --alertmanager.url=http://localhost:9093 $silence_id" >/dev/null || true
+  local am active
+  am=$(am_pod)
+  if [ -z "$am" ]; then
+    log "no Alertmanager pod; silence $silence_id runs out on its own"
+  else
+    active=$(kc "-n monitoring exec $am -c alertmanager -- $AMTOOL silence query -q" 2>/dev/null | tr -d '\r')
+    if grep -qxF "$silence_id" <<<"$active"; then
+      kc "-n monitoring exec $am -c alertmanager -- $AMTOOL silence expire $silence_id" >/dev/null 2>&1 \
+        || log "could not expire silence $silence_id; it runs out on its own"
+    else
+      log "silence $silence_id no longer exists"
+    fi
+  fi
+  silence_id=""
+}
+wait_api() {
+  for _ in $(seq 1 60); do KC_TIMEOUT=30 kc "get --raw=/readyz" >/dev/null 2>&1 && return 0; sleep 10; done
+  return 1
 }
 
 snap="auto-k3s-$(echo "$target" | tr -c 'a-zA-Z0-9\n' '-')$([ "$DRILL" = 1 ] && echo -drill)"
@@ -146,6 +176,13 @@ rollback() {
   for id in "${AGENTS[@]}"; do
     for _ in $(seq 1 60); do qm guest cmd "${id%%:*}" ping >/dev/null 2>&1 && break; sleep 5; done
   done
+  # The silence added before the upgrade was rolled back with Alertmanager's volume.
+  silence_id=""
+  if wait_api; then
+    silence 60 || true
+  else
+    log "API not back after the rollback, no silence"
+  fi
   if [ "$DRILL" = 1 ] && health "$current" >/dev/null; then
     for id in "${ALL_VMIDS[@]}"; do qm delsnapshot "$id" "$snap" || true; done
     unsilence
@@ -198,7 +235,7 @@ health "$current" >/dev/null || { log "cluster not healthy before the upgrade, s
 for id in "${ALL_VMIDS[@]}"; do
   qm snapshot "$id" "$snap" --description "before k3s $target (k3s-auto-upgrade)" || { log "snapshot of $id failed"; exit 1; }
 done
-silence
+silence 6 || true
 [ "$DRILL" = 1 ] && rollback "drill"
 
 upgrade_node "$SERVER_VMID" "$SERVER_NAME" "$SERVER_SVC" || rollback "server upgrade"
