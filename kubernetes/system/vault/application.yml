@@ -12,6 +12,7 @@ spec:
     helm:
       values: |
         server:
+          priorityClassName: node-pinned-stateful
           # Pinned: the server version moves only in its own reviewed step, never with a chart bump.
           image:
             # renovate: datasource=docker depName=hashicorp/vault

@@ -6,6 +6,11 @@ CloudNativePG `Cluster` resources for every Postgres-backed app: Authelia
 single-instance (`instances: 1`): this is a single-physical-host homelab, CNPG's
 multi-replica failover doesn't add real resilience here, just complexity.
 
+Every Cluster sets `priorityClassName: node-pinned-stateful` (ADR-083): its data sits on
+a `local-path` volume on one node, so after a cold start the instance must be able to
+preempt movable pods there. CNPG does not restart instances when only this field changes;
+delete the `postgres-*-1` pod once to apply it.
+
 ## Backups
 
 1. **Barman Cloud plugin** (`kubernetes/system/plugin-barman-cloud`, ADR-081):

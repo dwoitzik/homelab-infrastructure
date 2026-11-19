@@ -219,6 +219,19 @@ spec:
             description: >
               The next snapshot may fail. Shorten the retention in the
               immich_library_mirror_target role or replace the SSD with a larger one.
+        # ext4 remounts read-only (errors=remount-ro or emergency_ro) when a disk
+        # drops off; every service on it fails quietly until someone looks.
+        - alert: HostFilesystemReadOnly
+          expr: node_filesystem_readonly{fstype=~"ext4|xfs|btrfs", mountpoint!~"/boot.*"} == 1
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} is read-only"
+            description: >
+              The filesystem went read-only, usually after I/O errors or a disk
+              that dropped off the bus. Check dmesg on the host; anything writing
+              there (backups, replicas) has stopped.
 
     - name: pbs-backup
       rules:

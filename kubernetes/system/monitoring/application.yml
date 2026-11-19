@@ -112,6 +112,7 @@ spec:
           enabled: false
 
         prometheus-node-exporter:
+          priorityClassName: node-daemon
           resources:
             requests:
               cpu: 10m
@@ -120,6 +121,7 @@ spec:
               memory: 96Mi
 
         grafana:
+          priorityClassName: node-pinned-stateful
           assertNoLeakedSecrets: false
           enabled: true
           resources:
