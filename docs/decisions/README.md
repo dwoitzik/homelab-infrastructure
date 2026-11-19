@@ -66,6 +66,7 @@ skipped by accident.
 | [079](ADR-079-traefik-crowdsec-plugin-local.md) | Traefik loads the CrowdSec plugin from a local image, and a startup probe keeps a pod without it out of service | Accepted, applied |
 | [080](ADR-080-k3s-upgrade-by-binary-swap.md) | k3s upgrades swap the binary one minor at a time and drain only pods that can move | Accepted, applied |
 | [081](ADR-081-cnpg-barman-cloud-plugin.md) | CNPG backups run through the Barman Cloud plugin, on the same bucket paths as the in-tree method | Accepted, applied |
+| [083](ADR-083-node-pinned-pod-priority.md) | Pods pinned to a node by a local-path volume or a DaemonSet outrank movable pods | Accepted, rolling out |
 
 ## In review, not yet in this table
 

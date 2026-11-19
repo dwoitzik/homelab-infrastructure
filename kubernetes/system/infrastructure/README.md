@@ -13,6 +13,11 @@ Miscellaneous cluster-wide, low-level fixes that don't belong to any single app.
 - `sysctl-fix.yml` — a `hostNetwork`/`hostPID` DaemonSet applying host-level sysctls
   cluster-wide (e.g. inotify/connection-tracking limits) that can't be set any other
   way in k3s.
+- `priority-classes.yml` — `node-pinned-stateful` and `node-daemon`, both at
+  1000000. Every workload that mounts a local-path PVC uses the first, every
+  DaemonSet the second, so a pod that can only run on one node preempts movable
+  default-priority pods there instead of staying Pending (ADR-083). A new
+  local-path workload or DaemonSet must set the matching `priorityClassName`.
 - `transport.yml` — `insecure-transport` ServersTransport (two copies, `apps` and
   `kube-system` namespaces) letting Traefik route to self-signed-cert backends
   (Proxmox, PBS, Wazuh) without failing TLS verification.
