@@ -170,9 +170,10 @@ rollback() {
   for id in "${AGENTS[@]}"; do qm stop "${id%%:*}" --timeout 120 || true; done
   qm stop "$SERVER_VMID" --timeout 120 || true
   for id in "${ALL_VMIDS[@]}"; do qm rollback "$id" "$snap" || log "rollback of $id failed"; done
-  qm start "$SERVER_VMID"
+  # 9>&-: the VM processes outlive this script and would keep holding the lock.
+  qm start "$SERVER_VMID" 9>&-
   for _ in $(seq 1 60); do qm guest cmd "$SERVER_VMID" ping >/dev/null 2>&1 && break; sleep 5; done
-  for id in "${AGENTS[@]}"; do qm start "${id%%:*}"; done
+  for id in "${AGENTS[@]}"; do qm start "${id%%:*}" 9>&-; done
   for id in "${AGENTS[@]}"; do
     for _ in $(seq 1 60); do qm guest cmd "${id%%:*}" ping >/dev/null 2>&1 && break; sleep 5; done
   done
