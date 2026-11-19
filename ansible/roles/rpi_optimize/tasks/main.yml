@@ -61,6 +61,15 @@
   ansible.builtin.set_fact:
     rpi_optimize_config_txt: "{{ '/boot/firmware/config.txt' if rpi_optimize_firmware_config.stat.exists else '/boot/config.txt' }}"
 
+# Some USB-SATA/NVMe bridges drop off the bus under UAS on the Pi 4; the
+# quirk makes the kernel use plain usb-storage for them. Takes effect at boot.
+- name: Set usb-storage quirks on the kernel command line
+  ansible.builtin.replace:
+    path: "{{ rpi_optimize_config_txt | dirname }}/cmdline.txt"
+    regexp: '^(.*?)(\s+usb-storage\.quirks=\S+)?\s*$'
+    replace: '\1 usb-storage.quirks={{ rpi_optimize_usb_storage_quirks | join(",") }}'
+  when: rpi_optimize_usb_storage_quirks | length > 0
+
 - name: Install cpufrequtils for persistent governor configuration
   ansible.builtin.apt:
     name: cpufrequtils

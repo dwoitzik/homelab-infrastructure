@@ -1,2 +1,4 @@
 ---
 rpi_optimize_reboot: false
+# VID:PID:flags entries for usb-storage.quirks (e.g. "152d:0583:u" disables UAS).
+rpi_optimize_usb_storage_quirks: []
