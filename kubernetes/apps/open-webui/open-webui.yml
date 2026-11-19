@@ -44,6 +44,7 @@ spec:
       labels:
         app: open-webui
     spec:
+      priorityClassName: node-pinned-stateful
       # SEC-012: open-webui rewrites some of its own static branding assets
       # (splash.png, favicon*.png, loader.js) at startup -- under
       # readOnlyRootFilesystem this failed with EROFS. /app/backend/open_webui/static

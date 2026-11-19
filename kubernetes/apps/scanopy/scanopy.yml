@@ -28,6 +28,7 @@ spec:
       labels:
         app: scanopy-server
     spec:
+      priorityClassName: node-pinned-stateful
       # Kubernetes auto-injects Docker-link-style env vars for every Service
       # in the namespace, uppercased+underscored from the Service's own name
       # -- the "scanopy-server" Service collides directly with this app's own

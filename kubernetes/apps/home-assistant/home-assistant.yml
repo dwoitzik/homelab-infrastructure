@@ -39,6 +39,7 @@ spec:
       labels:
         app: home-assistant
     spec:
+      priorityClassName: node-pinned-stateful
       dnsConfig:
         options:
           - name: ndots
