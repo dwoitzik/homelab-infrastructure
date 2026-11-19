@@ -276,6 +276,7 @@ spec:
       labels:
         app: nextcloud
     spec:
+      priorityClassName: node-pinned-stateful
       tolerations:
       - key: node-role.kubernetes.io/control-plane
         operator: Exists

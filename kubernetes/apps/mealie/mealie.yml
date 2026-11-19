@@ -31,6 +31,7 @@ spec:
       labels:
         app: mealie
     spec:
+      priorityClassName: node-pinned-stateful
       dnsConfig:
         options:
           - name: ndots
