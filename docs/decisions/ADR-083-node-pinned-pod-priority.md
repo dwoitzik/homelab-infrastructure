@@ -1,7 +1,7 @@
 # ADR-083: Pods pinned to a node outrank movable pods
 
 **Date:** 2026-11-19
-**Status:** Accepted, rolling out
+**Status:** Accepted, applied
 
 ## Context
 
@@ -60,7 +60,22 @@ when the node is tight, and a missed run is harmless.
 - A cold start can evict a movable pod (Traefik, ArgoCD, an app) from a full node. It
   reschedules on another node. If the whole cluster is short of memory the movable pod
   stays Pending instead of the database, which is the intended trade.
-- Setting `priorityClassName` restarts each pod once. The rollout went one group per PR
-  (classes, DaemonSets, apps, monitoring and Vault, databases one at a time).
+- Setting `priorityClassName` restarts Deployment and DaemonSet pods once. Two
+  workloads do not roll on their own: the Vault StatefulSet uses `OnDelete`, and
+  CNPG 1.30 leaves `priorityClassName` out of its pod spec comparison
+  (`ComparePodSpecs`), so a Cluster change alone never restarts the instance. vault-0
+  and each `postgres-*-1` pod were deleted once by hand, databases one at a time, and
+  came back on the same node and volume. A rebuilt instance gets the class from the
+  Cluster spec directly.
 - New `local-path` workloads and new DaemonSets must set the matching class.
   `kubernetes/system/infrastructure/README.md` says so next to the class definitions.
+
+## Verification
+
+A throwaway namespace on `vm-srv-k3s-13` reproduced the drill failure: a pause pod at
+`node-pinned-stateful` with a `local-path` PVC (no nodeSelector, only the PV affinity)
+was scaled to 0, a default-priority filler took the node to 99% of allocatable memory
+with one filler replica left Pending ("No preemption victims found"), then the pinned
+pod was scaled back to 1. The scheduler preempted two filler pods and the pinned pod
+was Running within seconds; no pod outside the namespace was preempted. The namespace
+and its PV were deleted afterwards.
