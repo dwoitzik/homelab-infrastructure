@@ -1,3 +1,6 @@
 ---
 # Upgrades never overlap with the other DNS Pi.
 common_apt_upgrade_time: "06:40"
+# The SSD's JMicron JMS583 bridge (152d:0583) aborts and disconnects under UAS.
+rpi_optimize_usb_storage_quirks:
+  - "152d:0583:u"
