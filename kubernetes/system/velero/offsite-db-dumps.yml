@@ -169,6 +169,7 @@ spec:
         pre.hook.backup.velero.io/on-error: Continue
         pre.hook.backup.velero.io/timeout: 15m
     spec:
+      priorityClassName: node-pinned-stateful
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 5
       securityContext:
