@@ -12,6 +12,7 @@ spec:
       labels:
         app: sysctl-fix
     spec:
+      priorityClassName: node-daemon
       tolerations:
         - operator: Exists
       hostNetwork: true

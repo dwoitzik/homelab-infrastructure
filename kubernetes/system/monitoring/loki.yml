@@ -230,6 +230,7 @@ spec:
             runAsGroup: 0
         controller:
           type: daemonset
+          priorityClassName: node-daemon
           tolerations:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists

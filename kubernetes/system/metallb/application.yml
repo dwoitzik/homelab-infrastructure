@@ -23,6 +23,7 @@ spec:
               operator: Exists
               effect: NoSchedule
         speaker:
+          priorityClassName: node-daemon
           resources:
             requests:
               cpu: 25m
