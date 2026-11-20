@@ -148,6 +148,17 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: drift-checker-kind-coverage
+        name: Drift checker can read every declared kind
+        description: >-
+          Fails when kubernetes/system declares a kind the drift-checker
+          ServiceAccount cannot read; see scripts/check-drift-checker-coverage.py.
+        entry: python3 scripts/check-drift-checker-coverage.py
+        language: system
+        files: ^(kubernetes/system/.*\.ya?ml|ci/drift-checker-readable-kinds\.txt)$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: configmap-script-syntax
         name: ConfigMap shell script syntax
         description: >-
