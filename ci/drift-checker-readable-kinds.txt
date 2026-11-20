@@ -1,0 +1,40 @@
+# Kinds under kubernetes/system that the drift-checker ServiceAccount can read
+# (via the built-in view role or drift-checker-extra-read). Adding a manifest of
+# a new kind fails CI until its RBAC is extended and it is listed here.
+apps/DaemonSet
+apps/Deployment
+apps/StatefulSet
+barmancloud.cnpg.io/ObjectStore
+batch/CronJob
+cert-manager.io/Certificate
+cert-manager.io/ClusterIssuer
+core/ConfigMap
+core/Endpoints
+core/Namespace
+core/PersistentVolumeClaim
+core/Service
+core/ServiceAccount
+external-secrets.io/ClusterSecretStore
+external-secrets.io/ExternalSecret
+kyverno.io/ClusterPolicy
+kyverno.io/PolicyException
+metallb.io/IPAddressPool
+metallb.io/L2Advertisement
+monitoring.coreos.com/AlertmanagerConfig
+monitoring.coreos.com/PodMonitor
+monitoring.coreos.com/PrometheusRule
+monitoring.coreos.com/ServiceMonitor
+networking.k8s.io/NetworkPolicy
+policy/PodDisruptionBudget
+postgresql.cnpg.io/Cluster
+postgresql.cnpg.io/ScheduledBackup
+rbac.authorization.k8s.io/ClusterRole
+rbac.authorization.k8s.io/ClusterRoleBinding
+rbac.authorization.k8s.io/Role
+rbac.authorization.k8s.io/RoleBinding
+scheduling.k8s.io/PriorityClass
+traefik.io/IngressRoute
+traefik.io/Middleware
+traefik.io/ServersTransport
+velero.io/BackupStorageLocation
+velero.io/Schedule

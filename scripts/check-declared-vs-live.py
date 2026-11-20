@@ -121,7 +121,7 @@ def main():
             print(f"  MISSING: {where}")
         elif state == "forbidden":
             unreadable.append(obj)
-            print(f"  NO READ ACCESS: {where} -- add {obj['kind'].lower()}s.{obj['group']} to ClusterRole drift-checker-extra-read")
+            print(f"  NO READ ACCESS: {where} -- grant get/list on kind {obj['kind']} (group {obj['group'] or 'core'}) in ClusterRole drift-checker-extra-read")
         else:
             print(f"  ok: {obj['kind']}/{obj['name']}")
 
