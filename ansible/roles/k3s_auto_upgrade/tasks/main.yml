@@ -1,0 +1,43 @@
+---
+- name: Create the k3s auto-upgrade directory
+  ansible.builtin.file:
+    path: /usr/local/lib/k3s-auto-upgrade
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install the node drain helper
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../scripts/k3s/drain-movable.py"
+    dest: /usr/local/lib/k3s-auto-upgrade/drain-movable.py
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Install the k3s auto-upgrade orchestrator
+  ansible.builtin.template:
+    src: k3s-auto-upgrade.sh.j2
+    dest: /usr/local/sbin/k3s-auto-upgrade
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install the k3s auto-upgrade service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - k3s-auto-upgrade.service
+    - k3s-auto-upgrade.timer
+  notify: Reload k3s auto-upgrade timer
+
+- name: Enable the k3s auto-upgrade timer
+  ansible.builtin.systemd:
+    name: k3s-auto-upgrade.timer
+    enabled: true
+    state: started
+    daemon_reload: true

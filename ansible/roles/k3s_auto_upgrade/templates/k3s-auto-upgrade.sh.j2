@@ -1,0 +1,256 @@
+#!/bin/bash
+# Upgrade k3s to the Git-pinned version node by node; roll all k3s VMs back on failure.
+# Options --dry-run --force --check --drill: see the role README and ADR-082.
+set -uo pipefail
+
+SERVER_VMID={{ k3s_auto_upgrade_server.vmid }}
+SERVER_NAME={{ k3s_auto_upgrade_server.name }}
+SERVER_SVC={{ k3s_auto_upgrade_server.service }}
+AGENTS=({% for a in k3s_auto_upgrade_agents %}"{{ a.vmid }}:{{ a.name }}:{{ a.service }}" {% endfor %})
+ALL_VMIDS=($SERVER_VMID{% for a in k3s_auto_upgrade_agents %} {{ a.vmid }}{% endfor %})
+PIN_URL="{{ k3s_auto_upgrade_pin_url }}"
+LB="{{ k3s_auto_upgrade_ingress_lb }}"
+NTFY="https://ntfy.sh/{{ k3s_auto_upgrade_ntfy_topic }}"
+LIB=/usr/local/lib/k3s-auto-upgrade
+LOG=/var/log/k3s-auto-upgrade.log
+DRY=0 FORCE=0 CHECK=0 DRILL=0
+for a in "$@"; do
+  case $a in --dry-run) DRY=1 ;; --force) FORCE=1 ;; --check) CHECK=1 ;; --drill) DRILL=1 ;; esac
+done
+
+exec 9>/run/k3s-auto-upgrade.lock
+flock -n 9 || { echo "another run is active"; exit 0; }
+exec > >(tee -a "$LOG") 2>&1
+
+log() { echo "[k3s-auto-upgrade] $(date -Is) $*"; }
+notify() { curl -fsS -m 15 -H "Title: $1" -H "Tags: $2" -d "$3" "$NTFY" >/dev/null || true; }
+
+# Run a command in a VM through the guest agent; prints its output, returns its exit code.
+ge() {
+  local vmid=$1 timeout=$2; shift 2
+  local json
+  json=$(qm guest exec "$vmid" --timeout "$timeout" -- bash -c "$*" 2>&1) || { echo "$json"; return 1; }
+  python3 -c 'import json,sys
+d=json.loads(sys.stdin.read())
+sys.stdout.write(d.get("out-data","")); sys.stderr.write(d.get("err-data",""))
+sys.exit(d.get("exitcode",1) if d.get("exited",1) else 124)' <<<"$json"
+}
+# Same, with the script read from stdin.
+ge_script() {
+  local vmid=$1 timeout=$2
+  local json
+  json=$(qm guest exec "$vmid" --timeout "$timeout" --pass-stdin 1 -- bash -s 2>&1) || { echo "$json"; return 1; }
+  python3 -c 'import json,sys
+d=json.loads(sys.stdin.read())
+sys.stdout.write(d.get("out-data","")); sys.stderr.write(d.get("err-data",""))
+sys.exit(d.get("exitcode",1) if d.get("exited",1) else 124)' <<<"$json"
+}
+kc() { ge "$SERVER_VMID" "${KC_TIMEOUT:-120}" "kubectl $*"; }
+
+minor() { echo "$1" | sed -E 's/^v1\.([0-9]+)\..*/\1/'; }
+
+# ---- gates -----------------------------------------------------------------
+target=$(curl -fsS -m 30 "$PIN_URL" | sed -nE 's/^\s*k3s_version:\s*"?([^" ]+)"?.*/\1/p' | head -1)
+[ -n "$target" ] || { log "could not read the pinned version"; exit 1; }
+current=$(ge "$SERVER_VMID" 30 "k3s --version | head -1 | awk '{print \$3}'" | tr -d '\r\n')
+[ -n "$current" ] || { log "could not read the running version"; exit 1; }
+log "running $current, pinned $target"
+
+agent_versions=$(kc "get nodes --no-headers -o custom-columns=V:.status.nodeInfo.kubeletVersion" | sort -u | tr '\n' ' ')
+if [ "$CHECK" = 0 ] && [ "$DRILL" = 0 ] && [ "$current" = "$target" ] && [ "$(echo "$agent_versions" | xargs)" = "$target" ]; then
+  log "all nodes already on $target"; exit 0
+fi
+if [ "$CHECK" = 0 ] && { [ $(( $(minor "$target") - $(minor "$current") )) -gt 1 ] || [ "$(minor "$target")" -lt "$(minor "$current")" ]; }; then
+  log "refusing: $current -> $target is not a single minor step forward"
+  notify "k3s upgrade skipped" "warning" "Pinned $target is not a single minor step from $current. Upgrade one minor at a time."
+  exit 1
+fi
+
+if [ "$FORCE" = 0 ] && [ "$CHECK" = 0 ] && [ "$DRILL" = 0 ]; then
+  # Only on nights with a fresh, successful PBS backup of the VMs.
+  backup_ok=$(pvesh get /nodes/$(hostname)/tasks --typefilter vzdump --limit 1 --output-format json | python3 -c '
+import json,sys,time
+t=json.load(sys.stdin)
+ok=t and t[0].get("status")=="OK" and t[0].get("endtime",0) > time.time()-6*3600
+print("yes" if ok else "no")')
+  [ "$backup_ok" = yes ] || { log "no successful PBS backup in the last 6h, skipping"; exit 0; }
+  velero_busy=$(kc "-n velero get backups.velero.io -o jsonpath='{range .items[*]}{.status.phase}{\"\\n\"}{end}'" | grep -cE '^(New|InProgress|WaitingForPluginOperations)$' || true)
+  [ "$velero_busy" = 0 ] || { log "a Velero backup is still running, skipping"; exit 0; }
+fi
+
+if [ "$DRY" = 1 ]; then
+  log "dry run: would snapshot ${ALL_VMIDS[*]}, upgrade $SERVER_NAME then ${AGENTS[*]} to $target"
+  exit 0
+fi
+
+# ---- checks ----------------------------------------------------------------
+# Every node Ready, nothing stuck, ingress answering, secrets synced.
+health() {
+  local want_server=$1
+  ge_script "$SERVER_VMID" 900 <<CHECK
+set -u
+fail=0
+for i in \$(seq 1 60); do
+  bad=\$(kubectl get nodes --no-headers | awk '\$2!="Ready"' | wc -l)
+  [ "\$bad" = 0 ] && break; sleep 10
+done
+[ "\$bad" = 0 ] || { echo "nodes not Ready"; fail=1; }
+v=\$(kubectl get node $SERVER_NAME -o jsonpath='{.status.nodeInfo.kubeletVersion}')
+[ "\$v" = "$want_server" ] || { echo "server on \$v, want $want_server"; fail=1; }
+# Pods that should be serving: not finished Jobs, and not all containers ready.
+notready() { kubectl get pods -A --no-headers --field-selector=status.phase!=Succeeded,status.phase!=Failed | awk '{split(\$3,r,"/"); if (r[1]!=r[2] || \$4!="Running") print}'; }
+for i in \$(seq 1 60); do
+  stuck=\$(notready | wc -l)
+  [ "\$stuck" = 0 ] && break; sleep 10
+done
+[ "\$stuck" = 0 ] || { echo "pods not ready:"; notready | head; fail=1; }
+for host in photos.woitzik.dev auth.woitzik.dev vault.woitzik.dev; do
+  for n in 1 2 3 4; do
+    c=\$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 --resolve \$host:443:$LB https://\$host/)
+    case \$c in 200|302) ;; *) echo "\$host -> \$c"; fail=1 ;; esac
+  done
+done
+es=\$(kubectl get externalsecrets.external-secrets.io -A --no-headers | awk '\$(NF-1)!="SecretSynced"' | wc -l)
+[ "\$es" = 0 ] || { echo "\$es ExternalSecrets not synced"; fail=1; }
+exit \$fail
+CHECK
+}
+
+if [ "$CHECK" = 1 ]; then
+  health "$current" && { log "health checks passed"; exit 0; } || { log "health checks FAILED"; exit 1; }
+fi
+
+silence_id=""
+AMTOOL="amtool --alertmanager.url=http://localhost:9093"
+am_pod() { kc "-n monitoring get pods -l app.kubernetes.io/name=alertmanager -o jsonpath='{.items[0].metadata.name}'" 2>/dev/null | tr -d '\r\n'; }
+# Add the maintenance silence; retry up to $1 times, 10 s apart, while Alertmanager starts.
+silence() {
+  local tries=${1:-1} am id
+  for _ in $(seq 1 "$tries"); do
+    am=$(am_pod)
+    if [ -n "$am" ]; then
+      id=$(kc "-n monitoring exec $am -c alertmanager -- $AMTOOL silence add -d 2h -a k3s-auto-upgrade -c 'k3s upgrade to $target' 'alertname=~\"SLO.*|KubePod.*|KubeDeployment.*|KubeStatefulSet.*|KubeDaemonSet.*|KubeNode.*|TargetDown|ExternalProbeFailed|TailnetRouteDrift.*|KubeJobFailed\"'" 2>/dev/null | tr -d '\r\n')
+      if [[ $id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+        silence_id=$id
+        log "silence $silence_id"
+        return 0
+      fi
+    fi
+    sleep 10
+  done
+  log "could not add the Alertmanager silence"
+  return 1
+}
+# A silence can be gone already: a rollback restores Alertmanager's volume to before it existed.
+unsilence() {
+  [ -n "$silence_id" ] || return 0
+  local am active
+  am=$(am_pod)
+  if [ -z "$am" ]; then
+    log "no Alertmanager pod; silence $silence_id runs out on its own"
+  else
+    active=$(kc "-n monitoring exec $am -c alertmanager -- $AMTOOL silence query -q" 2>/dev/null | tr -d '\r')
+    if grep -qxF "$silence_id" <<<"$active"; then
+      kc "-n monitoring exec $am -c alertmanager -- $AMTOOL silence expire $silence_id" >/dev/null 2>&1 \
+        || log "could not expire silence $silence_id; it runs out on its own"
+    else
+      log "silence $silence_id no longer exists"
+    fi
+  fi
+  silence_id=""
+}
+wait_api() {
+  for _ in $(seq 1 60); do KC_TIMEOUT=30 kc "get --raw=/readyz" >/dev/null 2>&1 && return 0; sleep 10; done
+  return 1
+}
+
+snap="auto-k3s-$(echo "$target" | tr -c 'a-zA-Z0-9\n' '-')$([ "$DRILL" = 1 ] && echo -drill)"
+rollback() {
+  log "ROLLBACK: $1"
+  for id in "${AGENTS[@]}"; do qm stop "${id%%:*}" --timeout 120 || true; done
+  qm stop "$SERVER_VMID" --timeout 120 || true
+  for id in "${ALL_VMIDS[@]}"; do qm rollback "$id" "$snap" || log "rollback of $id failed"; done
+  # 9>&-: the VM processes outlive this script and would keep holding the lock.
+  qm start "$SERVER_VMID" 9>&-
+  for _ in $(seq 1 60); do qm guest cmd "$SERVER_VMID" ping >/dev/null 2>&1 && break; sleep 5; done
+  for id in "${AGENTS[@]}"; do qm start "${id%%:*}" 9>&-; done
+  for id in "${AGENTS[@]}"; do
+    for _ in $(seq 1 60); do qm guest cmd "${id%%:*}" ping >/dev/null 2>&1 && break; sleep 5; done
+  done
+  # The silence added before the upgrade was rolled back with Alertmanager's volume.
+  silence_id=""
+  if wait_api; then
+    silence 60 || true
+  else
+    log "API not back after the rollback, no silence"
+  fi
+  if [ "$DRILL" = 1 ] && health "$current" >/dev/null; then
+    for id in "${ALL_VMIDS[@]}"; do qm delsnapshot "$id" "$snap" || true; done
+    unsilence
+    log "drill passed: rolled back and healthy on $current"
+    notify "k3s rollback drill passed" "white_check_mark" "Snapshot, rollback and restart of all k3s VMs worked; cluster healthy on $current."
+    exit 0
+  fi
+  if health "$current" >/dev/null; then
+    notify "k3s upgrade rolled back" "warning" "Upgrade to $target failed ($1). All k3s VMs are back on $current and healthy. Snapshots $snap kept for inspection."
+  else
+    notify "k3s upgrade rollback NEEDS ATTENTION" "rotating_light" "Upgrade to $target failed ($1) and the cluster is not healthy after rolling back to $current. Snapshots: $snap. Log: $LOG on the Proxmox host."
+  fi
+  unsilence
+  exit 1
+}
+
+upgrade_node() {
+  local vmid=$1 name=$2 svc=$3
+  local enc=${target/+/%2B}
+  ge_script "$vmid" 900 <<NODE || return 1
+set -euo pipefail
+d=/root/k3s-dl-$target
+mkdir -p -m 700 \$d && cd \$d
+[ -s sums ] || curl -fsSL --retry 3 -o sums https://github.com/k3s-io/k3s/releases/download/$enc/sha256sum-amd64.txt
+want=\$(awk '\$2=="k3s"{print \$1}' sums)
+if [ ! -s k3s ] || [ "\$(sha256sum k3s | awk '{print \$1}')" != "\$want" ]; then
+  curl -fsSL --retry 3 -o k3s.part https://github.com/k3s-io/k3s/releases/download/$enc/k3s && mv k3s.part k3s
+fi
+[ -n "\$want" ] && [ "\$want" = "\$(sha256sum k3s | awk '{print \$1}')" ] || { echo "checksum mismatch"; exit 1; }
+install -m 0755 -o root -g root k3s /usr/local/bin/k3s.new
+mv -f /usr/local/bin/k3s.new /usr/local/bin/k3s
+systemctl restart $svc
+cd / && rm -rf \$d
+NODE
+  for _ in $(seq 1 60); do
+    [ "$(kc "get node $name -o jsonpath='{.status.nodeInfo.kubeletVersion} {.status.conditions[?(@.type==\"Ready\")].status}'" 2>/dev/null)" = "$target True" ] && return 0
+    sleep 10
+  done
+  return 1
+}
+
+# ---- upgrade ---------------------------------------------------------------
+if [ "$DRILL" = 1 ]; then
+  log "rollback drill on $current"
+else
+  log "upgrading $current -> $target"
+  notify "k3s upgrade started" "arrows_counterclockwise" "Upgrading k3s $current -> $target, one node at a time."
+fi
+health "$current" >/dev/null || { log "cluster not healthy before the upgrade, skipping"; notify "k3s upgrade skipped" "warning" "Cluster was not healthy before the upgrade to $target; nothing changed."; exit 1; }
+for id in "${ALL_VMIDS[@]}"; do
+  qm snapshot "$id" "$snap" --description "before k3s $target (k3s-auto-upgrade)" || { log "snapshot of $id failed"; exit 1; }
+done
+silence 6 || true
+[ "$DRILL" = 1 ] && rollback "drill"
+
+upgrade_node "$SERVER_VMID" "$SERVER_NAME" "$SERVER_SVC" || rollback "server upgrade"
+health "$target" || rollback "checks after the server"
+for entry in "${AGENTS[@]}"; do
+  IFS=: read -r vmid name svc <<<"$entry"
+  { echo "cat > /root/drain-movable.py <<'PY'"; cat "$LIB/drain-movable.py"; echo "PY"; echo "python3 /root/drain-movable.py $name; rc=\$?; rm -f /root/drain-movable.py; exit \$rc"; } \
+    | ge_script "$SERVER_VMID" 900 || rollback "drain of $name"
+  upgrade_node "$vmid" "$name" "$svc" || rollback "upgrade of $name"
+  kc "uncordon $name" >/dev/null || rollback "uncordon of $name"
+  health "$target" || rollback "checks after $name"
+done
+
+for id in "${ALL_VMIDS[@]}"; do qm delsnapshot "$id" "$snap" || log "could not delete snapshot on $id"; done
+unsilence
+log "done: all nodes on $target"
+notify "k3s upgraded" "white_check_mark" "All k3s nodes are on $target and healthy."

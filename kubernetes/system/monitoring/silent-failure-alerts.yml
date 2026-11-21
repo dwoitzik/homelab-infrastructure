@@ -35,10 +35,9 @@ spec:
 
     - name: cnpg.backup
       rules:
-        # Every cluster is on the Barman Cloud plugin, which reports backup age
-        # through its own metric; cnpg_collector_*_backup_timestamp no longer exists.
-        # A freshly started sidecar reports 0 until it has read the backup catalog;
-        # that case belongs to CNPGBackupCatalogUnknown, not to this alert.
+        # Backup age comes from the Barman Cloud plugin's metric. A fresh sidecar
+        # reports 0 until it has read the catalog; CNPGBackupCatalogUnknown covers
+        # that case.
         - alert: CNPGBackupTooOld
           expr: |
             (time() - (barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="database"} > 0)) > 97200
