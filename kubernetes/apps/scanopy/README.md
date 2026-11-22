@@ -59,9 +59,13 @@ path). No WAN/dstnat involvement at all — this stays fully internal.
 - The rate applies per scanned host, and all hosts are scanned in parallel. Probes that a
   firewall or NetworkPolicy drops stay in the daemon node's conntrack table as
   `UNREPLIED SYN_SENT` for 120 s; at the 500 pps default a full scan filled the SRV
-  node's whole table. The SRV discovery runs at `scan_rate_pps: 50`, and
-  `SCANOPY_INTERFACES=eth0` keeps the daemon off the node's pod CIDR (`cni0`), where
-  every probe is dropped. `HostConntrackTableFull` alerts at 90 %.
+  node's whole table. Most SRV hosts drop closed-port probes, so the table holds roughly
+  hosts x rate x 120 s x 2: at 50 pps a full scan of 16 hosts passed 75 % of the 131k
+  table within two minutes. The SRV discovery runs at `scan_rate_pps: 10`, which held
+  20-30 % on the same scan (a full 65k-port scan then takes about two hours). Lower it
+  further if the host count grows a lot. `SCANOPY_INTERFACES=eth0` keeps the daemon off
+  the node's pod CIDR (`cni0`), where every probe is dropped. `HostConntrackTableFull`
+  alerts at 90 %.
 - A daemon's identity lives in its config dir (`/root/.config/daemon/config.json`, a
   PVC for the SRV daemon, a bind mount for the compose daemons). Lose it and the daemon
   registers again as a new daemon with a new scheduled discovery at default scan
