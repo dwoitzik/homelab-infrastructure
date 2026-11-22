@@ -69,3 +69,6 @@ docs/runbooks/pending-major-upgrades.md
 
 # Working notes with evidence for open security findings. Never published.
 docs/private/
+
+__pycache__/
+*.pyc

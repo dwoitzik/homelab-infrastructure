@@ -172,6 +172,12 @@ spec:
             capabilities:
               drop: ["ALL"]
               add: ["NET_RAW", "NET_ADMIN"]
+          env:
+            # Probes the firewall drops stay in the node's conntrack table as
+            # UNREPLIED SYN_SENT for 120 s. The 500 pps default filled all
+            # 196k entries on the server node and dropped real traffic.
+            - name: SCANOPY_SCAN_RATE_PPS
+              value: "50"
           envFrom:
             - secretRef:
                 name: scanopy-daemon-srv
