@@ -48,6 +48,7 @@ again: `docker logs adguardhome | grep "i/o timeout"`, then check `private_netwo
 
 | Symptom | Root cause | Where it's documented |
 |---|---|---|
+| Jellyfin 4K remux stutters on a TV/phone on the Fritzbox LAN, server idle, no transcode | Traffic to `192.168.178.0/24` leaves through ether1, the same port as the WAN upload. If it falls into the `wan-up` CAKE queue it is capped at 68 Mbit/s, below a UHD remux (~90-100 Mbit/s). `lan_bypass_wan_shaper` plus the FastTrack exclusion keep it out. Check: stream throughput equals the queue cap | `terraform/stacks/network/qos.tf` |
 | AdGuard query count spikes, DNS feels slow | `private_networks` too broad, PTR queries for 10.42.x.x routed to Fritzbox and timing out | See above |
 | App in `apps` ns can't reach something in `monitoring` ns (or vice versa) | NetworkPolicy default-deny with no explicit allow rule for the calling namespace | `docs/k3s-architecture.md` §5, `kubernetes/apps/network-policies.yml`, `kubernetes/system/monitoring/network-policies.yml` |
 | ExternalSecret stuck on stale "Vault is sealed" error after Vault was unsealed | ClusterSecretStore caches status; force a resync or recreate it | — |

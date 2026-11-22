@@ -40,6 +40,12 @@ hardware tone-mapping (Intel Arc, NVIDIA).
 
 ## Known gotchas
 
+- **Stutter on a Fritzbox-LAN client with Direct Play is a network cap, not the
+  server.** UHD remuxes here run 80-100 Mbit/s. Clients on the Fritzbox LAN reach
+  Traefik through the router's WAN port (ether1), which also carries the 68 Mbit/s
+  CAKE upload shaper; LAN traffic must stay exempt from it
+  (`terraform/stacks/network/qos.tf`, `lan_bypass_wan_shaper`). The server path
+  itself sustains ~400 Mbit/s end to end.
 - **Use `Endpoints`, not `EndpointSlice`, for this pattern.** A bare `EndpointSlice`
   looks correct via `kubectl` but Traefik's Kubernetes CRD provider resolves Service
   backends through the legacy v1 `Endpoints` API ("subsets") regardless — confirmed
