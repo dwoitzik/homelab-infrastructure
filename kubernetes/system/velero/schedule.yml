@@ -54,3 +54,10 @@ spec:
     # only captured via filesystem backup (kopia, deployed by velero node-agent).
     # Without this, backups only contain k8s manifests, not actual volume data.
     defaultVolumesToFsBackup: true
+    # CronJob pods (nextcloud-cron, firefly-iii-cron run every 5 min) mount the
+    # same PVCs as their app pods, which are backed up anyway. When one exits
+    # mid-backup its pod volume backup fails and the run ends PartiallyFailed.
+    labelSelector:
+      matchExpressions:
+        - key: batch.kubernetes.io/job-name
+          operator: DoesNotExist
