@@ -132,7 +132,7 @@ check that would have caught it is committed so it runs whether or not anyone re
 | Guard | What it catches |
 |---|---|
 | [drift-check.yml](.github/workflows/drift-check.yml) every 30 min | objects declared in git that never became live ([ADR-027](docs/decisions/ADR-027-declared-vs-live-drift-guard.md)) |
-| [tailnet route drift check](kubernetes/system/monitoring/tailnet-route-drift-check.yml) every 15 min | Headscale route approvals drifting from the intended state |
+| [tailnet route drift check](kubernetes/system/monitoring/tailnet-route-drift-check.yml) every 15 min | Headscale route approvals drifting from the intended state, or MagicDNS handing tailnet clients a non-public control server address |
 | [Kyverno policy drift check](kubernetes/system/monitoring/kyverno-policy-drift-check.yml) | running pods that violate policy (background scans are off to save datastore writes) |
 | [Dead man's switch](kubernetes/system/monitoring/alertmanager-config.yml) (Alertmanager `Watchdog` to healthchecks.io) | the whole cluster or its alerting path going quiet, detected from outside |
 | [Monthly restore test](kubernetes/system/velero/restore-test.yml) | backups that complete but do not restore |
