@@ -107,7 +107,7 @@
 # added a second DNAT rule (the first one still wins) every time it moved.
 - name: Set Traefik target facts
   ansible.builtin.set_fact:
-    tailscale_traefik_nodeport_target_dynamic: "{{ tailscale_traefik_k3s_api_host }}:{{ tailscale_traefik_nodeport_discovered.stdout }}"
+    tailscale_traefik_nodeport_target_dynamic: "{{ hostvars[tailscale_traefik_k3s_api_host].ansible_host }}:{{ tailscale_traefik_nodeport_discovered.stdout }}"
 
 - name: DNAT Traefik VIP:443 → NodePort on k3s node (workaround for MetalLB L2 flannel issue)
   ansible.builtin.iptables:
