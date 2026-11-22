@@ -46,7 +46,10 @@ data:
       nameservers:
         global:
           - 10.0.20.5
-      extra_records: []
+      # Written by the public-ip-record sidecar. Tailnet clients must get the
+      # public address for the control server: their tailscaled dials it
+      # outside the tunnel, where AdGuard's internal answer is unreachable.
+      extra_records_path: /var/lib/headscale/extra-records.json
 
     oidc:
       issuer: "https://auth.woitzik.dev"

@@ -217,6 +217,32 @@ spec:
         - protocol: TCP
           port: 22
 ---
+# The public-ip-record sidecar on headscale resolves headscale.woitzik.dev
+# against public DNS, because AdGuard deliberately answers with the internal
+# address.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-headscale-public-dns
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: headscale
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 1.1.1.1/32
+        - ipBlock:
+            cidr: 1.0.0.1/32
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
 # Jellyfin runs on the GPU-passthrough LXC (10.0.20.254), not an in-cluster
 # pod, so cloudflared's default-deny egress needs an explicit allow on Jellyfin's port.
 apiVersion: networking.k8s.io/v1
