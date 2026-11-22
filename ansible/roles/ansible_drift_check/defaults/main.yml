@@ -10,8 +10,10 @@ ansible_drift_check_key: /root/.ssh/ansible_drift_check_ed25519
 # traffic to the SRV gateway (srcnat_masquerade_mgmt_to_srv), so SRV hosts see
 # 10.0.20.1; DMZ hosts and the Proxmox host itself see 10.0.10.10.
 ansible_drift_check_source_addresses: "10.0.10.10,10.0.20.1"
-# Inside the range CI lints with (ansible-core >=2.16,<2.19).
-ansible_drift_check_ansible_core_version: "2.18.*"
+# Must match the ansible-core that applies changes (the workstation's Ubuntu
+# 24.04 package): modules such as deb822_repository render files differently
+# across versions, so a newer checker reports every such file as drift.
+ansible_drift_check_ansible_core_version: "2.16.3"
 ansible_drift_check_schedule: "Sun *-*-* 06:30:00"
 ansible_drift_check_textfile_dir: /var/lib/node_exporter/textfile_collector
 
