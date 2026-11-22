@@ -233,6 +233,20 @@ spec:
               The filesystem went read-only, usually after I/O errors or a disk
               that dropped off the bus. Check dmesg on the host; anything writing
               there (backups, replicas) has stopped.
+        # The upstream rule fires at 75 % as a warning, which is not routed.
+        # A full table silently drops new connections on that host.
+        - alert: HostConntrackTableFull
+          expr: (node_nf_conntrack_entries / node_nf_conntrack_entries_limit) > 0.9
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "conntrack table on {{ $labels.instance }} is {{ $value | humanizePercentage }} full"
+            description: >
+              New connections on this host are dropped once the table is full
+              (dmesg "nf_conntrack: table full, dropping packet"). Group
+              /proc/net/nf_conntrack by src/dst/state to find the source;
+              thousands of UNREPLIED SYN_SENT entries point at a scanner.
 
     - name: pbs-backup
       rules:
