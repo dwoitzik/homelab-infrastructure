@@ -17,3 +17,4 @@ rpi_ha_standby_vaultwarden_image: "vaultwarden/server:1.37.1@sha256:ebdfe70701c6
 rpi_ha_standby_vaultwarden_host_port: 8083
 rpi_ha_standby_vaultwarden_uid: 1000
 rpi_ha_standby_vaultwarden_gid: 1000
+rpi_ha_standby_busybox_image: "busybox:1.38@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4"

@@ -21,6 +21,31 @@ services:
       - {{ rpi_ha_standby_compose_root }}/headscale/config.yaml:/etc/headscale/config.yaml:ro
       - {{ rpi_ha_standby_compose_root }}/headscale/policy.hujson:/etc/headscale/policy.hujson:ro
       - {{ rpi_ha_standby_data_root }}/headscale/data:/var/lib/headscale
+    depends_on:
+      - headscale-public-ip-record
+
+  # Tailnet clients need the public control server address (see
+  # kubernetes/apps/headscale/headscale.yml, public-ip-record sidecar).
+  headscale-public-ip-record:
+    image: {{ rpi_ha_standby_busybox_image }}
+    container_name: headscale-public-ip-record
+    restart: unless-stopped
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        f=/var/lib/headscale/extra-records.json
+        while true; do
+          ip=$$(nslookup -type=a headscale.woitzik.dev 1.1.1.1 2>/dev/null | awk '/^Address: /{print $$2}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$$' | head -1)
+          if [ -n "$$ip" ]; then
+            new="[{\"name\":\"headscale.woitzik.dev\",\"type\":\"A\",\"value\":\"$$ip\"}]"
+            [ "$$(cat $$f 2>/dev/null)" != "$$new" ] && echo "$$new" > $$f.tmp && mv $$f.tmp $$f && echo "extra record -> $$ip"
+          elif [ ! -f $$f ]; then
+            echo "[]" > $$f
+          fi
+          sleep 300
+        done
+    volumes:
+      - {{ rpi_ha_standby_data_root }}/headscale/data:/var/lib/headscale
 
   vaultwarden-standby:
     image: {{ rpi_ha_standby_vaultwarden_image }}

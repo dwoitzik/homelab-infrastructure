@@ -43,7 +43,9 @@ dns:
   nameservers:
     global:
       - 10.0.20.5
-  extra_records: []
+  # Written by the headscale-public-ip-record service in docker-compose.yml;
+  # same reason as kubernetes/apps/headscale/config.yml.
+  extra_records_path: /var/lib/headscale/extra-records.json
 
 oidc:
   issuer: "https://auth.woitzik.dev"
