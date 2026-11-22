@@ -567,6 +567,7 @@
       path = '{{ media_acquisition_base_dir }}/jellyseerr/config/settings.json'
       with open(path) as f:
           d = json.load(f)
+      before = json.dumps(d, sort_keys=True)
       d['jellyfin']['ip'] = '10.0.20.254'
       seen_sonarr, seen_radarr = False, False
       new_sonarr = []
@@ -596,12 +597,18 @@
           new_radarr.append(r)
           seen_radarr = True
       d['radarr'] = new_radarr
-      with open(path, 'w') as f:
-          json.dump(d, f, indent=2)
-      print('ok')
+      if json.dumps(d, sort_keys=True) == before:
+          print('unchanged')
+          sys.exit(0)
+      if '{{ ansible_check_mode }}' != 'True':
+          with open(path, 'w') as f:
+              json.dump(d, f, indent=2)
+      print('changed')
       "
   register: media_acquisition_jellyseerr_result
-  changed_when: "'ok' in media_acquisition_jellyseerr_result.stdout"
+  # Runs in check mode too: the script only writes outside check mode.
+  check_mode: false
+  changed_when: media_acquisition_jellyseerr_result.stdout == 'changed'
   notify: Restart jellyseerr
 
 # ── Bazarr: single_language guard ─────────────────────────────────
