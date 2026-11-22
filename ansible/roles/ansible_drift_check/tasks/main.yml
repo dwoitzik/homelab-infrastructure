@@ -40,13 +40,13 @@
     src: "{{ ansible_drift_check_key }}.pub"
   register: ansible_drift_check_pubkey
 
-# Check mode needs the same root access a real run has; from= keeps the key
-# useless anywhere but on this host.
+# Check mode needs the same root access a real run has; from= limits where the
+# key is accepted.
 - name: Authorize the key on every inventory host
   ansible.posix.authorized_key:
     user: "{{ hostvars[item].ansible_user }}"
     key: "{{ ansible_drift_check_pubkey.content | b64decode | trim }}"
-    key_options: 'from="{{ ansible_drift_check_source_address }}"'
+    key_options: 'from="{{ ansible_drift_check_source_addresses }}"'
   delegate_to: "{{ item }}"
   loop: "{{ groups['all'] | reject('equalto', 'localhost') | list }}"
 

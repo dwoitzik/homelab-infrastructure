@@ -31,7 +31,10 @@ Option 3. Role `ansible_drift_check` on `pve_hosts`:
   repo reset to `origin/main` on every run, the vault password and the ntfy topic in
   `/etc/ansible-drift-check` (0600).
 - A dedicated ed25519 key, authorized on every inventory host with
-  `from="10.0.10.10"`.
+  `from="10.0.10.10,10.0.20.1"`. The router masquerades MGMT -> SRV traffic to the SRV
+  gateway (`srcnat_masquerade_mgmt_to_srv`), so SRV hosts see 10.0.20.1, which admin
+  and home-network sessions share; on those hosts `from=` only keeps the key out of
+  the DMZ and IoT VLANs.
 - `ansible-drift-check.timer` (Sundays 06:30) runs `site.yml --check --diff` once per
   inventory host, then `rpi-ha-standby`, `litestream-standby` and `tailscale`. Left
   out: the `k3s-cluster/` collection (k3s install and upgrade), the localhost-only
