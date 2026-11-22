@@ -1,0 +1,10 @@
+[Unit]
+Description=Check-mode run of the Ansible playbooks against all hosts
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ansible-drift-check.sh
+Nice=10
+TimeoutStartSec=3h

@@ -128,8 +128,8 @@ rate it reaches 90 % around the end of December.
 - [x] Nextcloud and Firefly III background jobs: re-enable or decommission the apps
 - [x] Resource requests on every pod (k3s-bundled local-path-provisioner excepted); requests
       fit after losing a worker, checked by `KubeMemoryOvercommitWorkerLoss`
-- [ ] Scheduled Ansible drift report and apply loop; fix non-idempotent tasks and the AdGuard role
-      (check-mode noise fixed; the schedule needs a control host that reaches every VLAN)
+- [x] Scheduled Ansible drift report: weekly check-mode run from the Proxmox host, ntfy only
+      on drift (ADR-084). Applying stays manual.
 - [x] cloudflared: two replicas, metrics and an alert on tunnel connections
 - [ ] MetalLB pool and DHCP ranges separated from static addresses (MetalLB done; DHCP
       pools waiting on the network apply)

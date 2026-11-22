@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# Runs every playbook in check mode against origin/main and reports any host
+# where a task would change something. Silent when clean.
+set -euo pipefail
+
+base="{{ ansible_drift_check_dir }}"
+conf="{{ ansible_drift_check_config_dir }}"
+repo="$base/repo"
+prom="{{ ansible_drift_check_textfile_dir }}/ansible_drift_check.prom"
+run_dir="$base/logs/$(date +%Y%m%d-%H%M%S)"
+key="{{ ansible_drift_check_key }}"
+
+export PATH="$base/venv/bin:$PATH"
+export ANSIBLE_COLLECTIONS_PATH="$base/collections"
+export ANSIBLE_NOCOLOR=1
+export ANSIBLE_FORCE_COLOR=0
+
+notify() {
+  local title="$1" body="$2"
+  curl -fsS --max-time 30 -H "Title: $title" -H "Tags: warning" \
+    --data-binary "$body" "https://ntfy.sh/$(cat "$conf/ntfy-topic")" > /dev/null
+}
+
+write_metrics() {
+  local ok="$1" drifted="${2:-0}" errors="${3:-0}" tmp="$prom.$$"
+  {
+    echo "# HELP ansible_drift_check_success 1 if the last run completed."
+    echo "# TYPE ansible_drift_check_success gauge"
+    echo "ansible_drift_check_success $ok"
+    echo "# HELP ansible_drift_check_last_run_timestamp_seconds When the check last ran."
+    echo "# TYPE ansible_drift_check_last_run_timestamp_seconds gauge"
+    echo "ansible_drift_check_last_run_timestamp_seconds $(date +%s)"
+    echo "# HELP ansible_drift_check_drifted_targets Playbook/host pairs with pending changes."
+    echo "# TYPE ansible_drift_check_drifted_targets gauge"
+    echo "ansible_drift_check_drifted_targets $drifted"
+    echo "# HELP ansible_drift_check_error_targets Playbook/host pairs that failed or were unreachable."
+    echo "# TYPE ansible_drift_check_error_targets gauge"
+    echo "ansible_drift_check_error_targets $errors"
+  } > "$tmp"
+  mv "$tmp" "$prom"
+}
+
+on_error() {
+  write_metrics 0
+  notify "Ansible drift check broken" "The check itself failed on $(hostname) before it could compare hosts. journalctl -u ansible-drift-check.service" || true
+}
+trap on_error ERR
+
+mkdir -p "$run_dir"
+if [ ! -d "$repo/.git" ]; then
+  git clone --quiet "{{ ansible_drift_check_repo_url }}" "$repo"
+fi
+git -C "$repo" fetch --quiet origin main
+git -C "$repo" reset --quiet --hard origin/main
+ln -sf "$conf/vault-pass" "$repo/ansible/.ansible_vault_pass"
+cd "$repo/ansible"
+ansible-galaxy collection install -r requirements.yml -p "$ANSIBLE_COLLECTIONS_PATH" > /dev/null
+
+trap - ERR
+
+report=""
+drifted=0
+errors=0
+
+# Prints "changed" task names from one playbook log.
+changed_tasks() {
+  awk '/^TASK \[/ { t = $0; sub(/^TASK \[/, "", t); sub(/\] \**$/, "", t) }
+       /^changed: / { if (!(t in seen)) { seen[t] = 1; print "  - " t } }' "$1" | head -n 8 || true
+}
+
+check() {
+  local name="$1" playbook="$2" limit="${3:-}" log rc=0
+  log="$run_dir/${name}.log"
+  local args=(--check --diff -e "ansible_ssh_private_key_file=$key")
+  [ -n "$limit" ] && args+=(--limit "$limit")
+  timeout 1800 ansible-playbook "$playbook" "${args[@]}" > "$log" 2>&1 || rc=$?
+
+  local recap
+  recap=$(sed -n '/^PLAY RECAP/,$p' "$log" | grep -E ' : ok=' || true)
+  if [ -z "$recap" ]; then
+    errors=$((errors + 1))
+    report+="$name: no recap (rc=$rc)"$'\n'
+    return
+  fi
+  while read -r host _ ok changed unreachable failed _; do
+    changed=${changed#changed=}; unreachable=${unreachable#unreachable=}; failed=${failed#failed=}
+    if [ "$unreachable" != 0 ] || [ "$failed" != 0 ]; then
+      errors=$((errors + 1))
+      report+="$name $host: failed=$failed unreachable=$unreachable"$'\n'
+    elif [ "$changed" != 0 ]; then
+      drifted=$((drifted + 1))
+      report+="$name $host: $changed change(s)"$'\n'"$(changed_tasks "$log")"$'\n'
+    fi
+  done <<< "$recap"
+}
+
+for host in $(ansible all --list-hosts 2>/dev/null | tail -n +2); do
+  check "site-$host" site.yml "$host"
+done
+{% for pb in ansible_drift_check_extra_playbooks %}
+check "{{ pb | regex_replace('\.yml$', '') }}" {{ pb }}
+{% endfor %}
+
+write_metrics 1 "$drifted" "$errors"
+find "$base/logs" -mindepth 1 -maxdepth 1 -type d -mtime +56 -exec rm -rf {} +
+
+if [ -n "$report" ]; then
+  body="$(printf '%s' "$report" | head -c 3500)"
+  notify "Ansible drift: $drifted drifted, $errors errors" "$body
+Logs: $(hostname):$run_dir (origin/main $(git -C "$repo" rev-parse --short HEAD))"
+fi

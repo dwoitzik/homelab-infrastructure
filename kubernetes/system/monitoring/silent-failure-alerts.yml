@@ -186,6 +186,23 @@ spec:
               is scraped. Check the controller pod and that its ServiceMonitor carries the
               release=kube-prometheus-stack label.
 
+    - name: ansible-drift-check
+      rules:
+        - alert: AnsibleDriftCheckStale
+          expr: |
+            (time() - ansible_drift_check_last_run_timestamp_seconds > 8 * 86400)
+            or ansible_drift_check_success == 0
+            or absent(ansible_drift_check_last_run_timestamp_seconds)
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "The weekly Ansible drift check has not completed"
+            description: >
+              ansible-drift-check.timer on the Proxmox host runs every playbook in check
+              mode and reports drift to ntfy. While it is not running, drift between the
+              repo and the hosts goes unnoticed. Check:
+              systemctl status ansible-drift-check.service; journalctl -u ansible-drift-check.service
     - name: immich-library-backup
       rules:
         - alert: ImmichLibraryBackupStale

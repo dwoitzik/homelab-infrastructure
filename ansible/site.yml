@@ -206,3 +206,5 @@
     - ssd_wear_check
     - role: pve_host_hardening
       tags: [pve_host_hardening]
+    # The only host with an SSH path into every VLAN (ADR-084).
+    - ansible_drift_check
