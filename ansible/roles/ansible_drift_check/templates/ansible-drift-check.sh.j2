@@ -40,11 +40,9 @@ write_metrics() {
   mv "$tmp" "$prom"
 }
 
-on_error() {
-  write_metrics 0
-  notify "Ansible drift check broken" "The check itself failed on $(hostname) before it could compare hosts. journalctl -u ansible-drift-check.service" || true
-}
-trap on_error ERR
+# A broken check is reported once by AnsibleDriftCheckStale (Prometheus), not
+# by ntfy on every run.
+trap 'write_metrics 0' ERR
 
 mkdir -p "$run_dir"
 if [ ! -d "$repo/.git" ]; then
@@ -94,12 +92,22 @@ check() {
   done <<< "$recap"
 }
 
+targets=0
 for host in $(ansible all --list-hosts 2>/dev/null | tail -n +2); do
   check "site-$host" site.yml "$host"
+  targets=$((targets + 1))
 done
 {% for pb in ansible_drift_check_extra_playbooks %}
 check "{{ pb | regex_replace('\.yml$', '') }}" {{ pb }}
 {% endfor %}
+
+# More than half the targets failing means the control side is broken (network,
+# key, inventory), not the hosts: mark the run failed for the alert, no ntfy.
+if [ "$targets" -eq 0 ] || [ $((errors * 2)) -gt "$targets" ]; then
+  write_metrics 0 "$drifted" "$errors"
+  echo "$errors of $targets targets failed, treating the run as broken" >&2
+  exit 1
+fi
 
 write_metrics 1 "$drifted" "$errors"
 find "$base/logs" -mindepth 1 -maxdepth 1 -type d -mtime +56 -exec rm -rf {} +

@@ -42,7 +42,9 @@ Option 3. Role `ansible_drift_check` on `pve_hosts`:
   first applied (the role has never run, so it would report itself every week).
 - Any host with `changed>0`, `failed>0` or `unreachable>0` goes into one ntfy message
   per run (the same topic as ADR-027), with the changed task names and the log path.
-  A clean run sends nothing.
+  A clean run sends nothing. When more than half the targets fail, the problem is the
+  control side (network path, key), not the hosts: the run is marked failed, no ntfy
+  is sent, and `AnsibleDriftCheckStale` reports it once through Alertmanager.
 - Metrics in the node_exporter textfile directory; `AnsibleDriftCheckStale` fires when
   the check has not completed for 8 days, so a dead timer is not mistaken for silence.
 
