@@ -3,6 +3,9 @@
   ansible.builtin.get_url:
     url: https://pkgs.tailscale.com/stable/raspbian/bookworm.noarmor.gpg
     dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+    # Pinned: without a checksum get_url reports a change on every check-mode
+    # run, and a rotated signing key should fail here rather than be trusted silently.
+    checksum: "sha256:3e03dacf222698c60b8e2f990b809ca1b3e104de127767864284e6c228f1fb39"
     mode: "0644"
 
 - name: Add Tailscale apt repository
@@ -22,6 +25,8 @@
     name: net.ipv4.ip_forward
     value: "1"
     sysctl_set: true
+    # Debian 13 no longer reads /etc/sysctl.conf at boot.
+    sysctl_file: /etc/sysctl.d/99-tailscale-forwarding.conf
     state: present
     reload: true
 
@@ -30,6 +35,8 @@
     name: net.ipv6.conf.all.forwarding
     value: "1"
     sysctl_set: true
+    # Debian 13 no longer reads /etc/sysctl.conf at boot.
+    sysctl_file: /etc/sysctl.d/99-tailscale-forwarding.conf
     state: present
     reload: true
 
@@ -95,20 +102,12 @@
   check_mode: false
   failed_when: tailscale_traefik_nodeport_discovered.stdout == ""
 
-- name: Discover Traefik pod node IP from k3s API
-  ansible.builtin.shell: >
-    kubectl get pod -n kube-system -l app.kubernetes.io/name=traefik
-    -o jsonpath='{.items[0].status.hostIP}'
-    --kubeconfig /etc/rancher/k3s/k3s.yaml
-  register: tailscale_traefik_node_ip_discovered
-  delegate_to: "{{ tailscale_traefik_k3s_api_host }}"
-  changed_when: false
-  check_mode: false
-  failed_when: tailscale_traefik_node_ip_discovered.stdout == ""
-
+# The Service uses externalTrafficPolicy: Cluster, so the NodePort answers on
+# every node. A fixed node keeps the rule stable; following the Traefik pod
+# added a second DNAT rule (the first one still wins) every time it moved.
 - name: Set Traefik target facts
   ansible.builtin.set_fact:
-    tailscale_traefik_nodeport_target_dynamic: "{{ tailscale_traefik_node_ip_discovered.stdout }}:{{ tailscale_traefik_nodeport_discovered.stdout }}"
+    tailscale_traefik_nodeport_target_dynamic: "{{ tailscale_traefik_k3s_api_host }}:{{ tailscale_traefik_nodeport_discovered.stdout }}"
 
 - name: DNAT Traefik VIP:443 → NodePort on k3s node (workaround for MetalLB L2 flannel issue)
   ansible.builtin.iptables:

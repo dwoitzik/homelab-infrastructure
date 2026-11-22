@@ -45,13 +45,21 @@
     validate: /usr/sbin/sshd -t -f %s
   notify: Reload sshd
 
-- name: Download the litestream .deb (arm64, checksum-verified)
-  ansible.builtin.get_url:
-    url: "{{ litestream_standby_deb_url }}"
-    dest: /tmp/litestream_{{ litestream_standby_version }}_arm64.deb
-    checksum: "{{ litestream_standby_deb_sha256 }}"
-    mode: '0644'
+- name: Read installed package versions
+  ansible.builtin.package_facts:
 
-- name: Install litestream
-  ansible.builtin.apt:
-    deb: /tmp/litestream_{{ litestream_standby_version }}_arm64.deb
+# /tmp is emptied on reboot, so only fetch the .deb when the pinned version is
+# not installed; otherwise every run (and every check-mode run) reports a change.
+- name: Download and install the pinned litestream .deb
+  when: ansible_facts.packages['litestream'] | default([]) | map(attribute='version') | select('equalto', litestream_standby_version) | list | length == 0
+  block:
+    - name: Download the litestream .deb (arm64, checksum-verified)
+      ansible.builtin.get_url:
+        url: "{{ litestream_standby_deb_url }}"
+        dest: /tmp/litestream_{{ litestream_standby_version }}_arm64.deb
+        checksum: "{{ litestream_standby_deb_sha256 }}"
+        mode: '0644'
+
+    - name: Install litestream
+      ansible.builtin.apt:
+        deb: /tmp/litestream_{{ litestream_standby_version }}_arm64.deb

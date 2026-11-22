@@ -66,6 +66,8 @@
     value: "{{ item.value }}"
     state: present
     sysctl_set: true
+    # Debian 13 no longer reads /etc/sysctl.conf at boot.
+    sysctl_file: /etc/sysctl.d/99-unbound-buffers.conf
   loop:
     - {name: "net.core.rmem_max", value: "4194304"}
     - {name: "net.core.wmem_max", value: "4194304"}
