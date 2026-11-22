@@ -115,6 +115,19 @@ spec:
   selector:
     app: scanopy-server
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scanopy-daemon-srv-config
+  namespace: host-agents
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 64Mi
+---
 # SRV-VLAN daemon. hostNetwork: true because ARP discovery needs the real
 # node NIC on 10.0.20.0/24 -- flannel's overlay hides real L2 traffic from a
 # normal pod IP. This bypasses NetworkPolicy entirely (hostNetwork pods use
@@ -150,6 +163,7 @@ spec:
       labels:
         app: scanopy-daemon-srv
     spec:
+      priorityClassName: node-pinned-stateful
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       enableServiceLinks: false
@@ -173,17 +187,19 @@ spec:
               drop: ["ALL"]
               add: ["NET_RAW", "NET_ADMIN"]
           env:
-            # Probes the firewall drops stay in the node's conntrack table as
-            # UNREPLIED SYN_SENT for 120 s. The 500 pps default filled all
-            # 196k entries on the server node and dropped real traffic.
-            - name: SCANOPY_SCAN_RATE_PPS
-              value: "50"
+            # Keeps the scan off the pod CIDR on cni0, where dropped probes fill
+            # conntrack. Scan rate is a server-side discovery setting, see README;
+            # SCANOPY_SCAN_RATE_PPS is deprecated and ignored by the daemon.
+            - name: SCANOPY_INTERFACES
+              value: eth0
           envFrom:
             - secretRef:
                 name: scanopy-daemon-srv
           volumeMounts:
+            # Holds the daemon id; without it every restart registers a new
+            # daemon and orphans the old one with its scheduled discovery.
             - name: config
-              mountPath: /root/.config/scanopy/daemon
+              mountPath: /root/.config/daemon
           resources:
             requests:
               cpu: 50m
@@ -193,4 +209,5 @@ spec:
               memory: 256Mi
       volumes:
         - name: config
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: scanopy-daemon-srv-config

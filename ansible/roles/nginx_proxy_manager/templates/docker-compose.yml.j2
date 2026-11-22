@@ -74,4 +74,7 @@ services:
       - SCANOPY_SERVER_URL={{ scanopy_server_url }}
       - SCANOPY_DAEMON_API_KEY={{ scanopy_daemon_api_key }}
       - SCANOPY_NETWORK_ID={{ scanopy_network_id }}
+    # Holds the daemon id, so a recreated container keeps its registration.
+    volumes:
+      - /opt/npm/scanopy-daemon:/root/.config/daemon
 {% endif %}
