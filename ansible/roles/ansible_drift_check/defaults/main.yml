@@ -1,0 +1,23 @@
+---
+# Weekly check-mode run of every playbook against every host, from the Proxmox
+# host: the management VLAN is the only place with an SSH path to all VLANs.
+# Silent when nothing drifts; one ntfy message per run that finds drift.
+ansible_drift_check_dir: /opt/ansible-drift-check
+ansible_drift_check_repo_url: https://github.com/dwoitzik/homelab-infrastructure.git
+ansible_drift_check_config_dir: /etc/ansible-drift-check
+ansible_drift_check_key: /root/.ssh/ansible_drift_check_ed25519
+# Source address the key is pinned to in every authorized_keys entry.
+ansible_drift_check_source_address: 10.0.10.10
+# Inside the range CI lints with (ansible-core >=2.16,<2.19).
+ansible_drift_check_ansible_core_version: "2.18.*"
+ansible_drift_check_schedule: "Sun *-*-* 06:30:00"
+ansible_drift_check_textfile_dir: /var/lib/node_exporter/textfile_collector
+
+# site.yml runs once per inventory host; these playbooks run once each.
+ansible_drift_check_extra_playbooks:
+  - rpi-ha-standby.yml
+  - litestream-standby.yml
+  - postgres-authelia-standby.yml
+  - tailscale.yml
+  - k3s-pv-links.yml
+  - k3s-vip.yml

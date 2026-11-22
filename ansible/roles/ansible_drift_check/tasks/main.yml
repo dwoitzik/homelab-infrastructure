@@ -1,0 +1,76 @@
+---
+- name: Install the control-node prerequisites
+  ansible.builtin.apt:
+    name: [git, python3-venv, curl]
+    state: present
+
+- name: Install ansible-core into a dedicated venv
+  ansible.builtin.pip:
+    name: "ansible-core=={{ ansible_drift_check_ansible_core_version }}"
+    virtualenv: "{{ ansible_drift_check_dir }}/venv"
+    virtualenv_command: python3 -m venv
+
+- name: Create the config directory
+  ansible.builtin.file:
+    path: "{{ ansible_drift_check_config_dir }}"
+    state: directory
+    mode: '0700'
+
+- name: Deploy the Ansible Vault password
+  ansible.builtin.copy:
+    content: "{{ lookup('ansible.builtin.file', playbook_dir + '/.ansible_vault_pass') }}"
+    dest: "{{ ansible_drift_check_config_dir }}/vault-pass"
+    mode: '0600'
+  no_log: true
+
+- name: Deploy the ntfy topic
+  ansible.builtin.copy:
+    content: "{{ vault_drift_check_ntfy_topic }}"
+    dest: "{{ ansible_drift_check_config_dir }}/ntfy-topic"
+    mode: '0600'
+  no_log: true
+
+- name: Ensure the dedicated SSH key exists
+  ansible.builtin.command:
+    cmd: ssh-keygen -q -t ed25519 -N "" -C "ansible-drift-check@{{ inventory_hostname }}" -f {{ ansible_drift_check_key }}
+    creates: "{{ ansible_drift_check_key }}"
+
+- name: Read the key's public half
+  ansible.builtin.slurp:
+    src: "{{ ansible_drift_check_key }}.pub"
+  register: ansible_drift_check_pubkey
+
+# Check mode needs the same root access a real run has; from= keeps the key
+# useless anywhere but on this host.
+- name: Authorize the key on every inventory host
+  ansible.posix.authorized_key:
+    user: "{{ hostvars[item].ansible_user }}"
+    key: "{{ ansible_drift_check_pubkey.content | b64decode | trim }}"
+    key_options: 'from="{{ ansible_drift_check_source_address }}"'
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['all'] | reject('equalto', 'localhost') | list }}"
+
+- name: Deploy the drift check script
+  ansible.builtin.template:
+    src: ansible-drift-check.sh.j2
+    dest: /usr/local/sbin/ansible-drift-check.sh
+    mode: '0750'
+
+- name: Deploy the drift check service
+  ansible.builtin.template:
+    src: ansible-drift-check.service.j2
+    dest: /etc/systemd/system/ansible-drift-check.service
+    mode: '0644'
+
+- name: Deploy the drift check timer
+  ansible.builtin.template:
+    src: ansible-drift-check.timer.j2
+    dest: /etc/systemd/system/ansible-drift-check.timer
+    mode: '0644'
+
+- name: Enable the drift check timer
+  ansible.builtin.systemd:
+    name: ansible-drift-check.timer
+    daemon_reload: true
+    enabled: true
+    state: started
