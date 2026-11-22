@@ -43,9 +43,15 @@ data:
     dns:
       magic_dns: true
       base_domain: headscale.net
+      # Only woitzik.dev needs the internal AdGuard answers. Forcing all client
+      # DNS through the tunnel made phones lose name resolution entirely
+      # whenever the tailnet path to 10.0.20.5 hiccupped.
+      override_local_dns: false
       nameservers:
-        global:
-          - 10.0.20.5
+        global: []
+        split:
+          woitzik.dev:
+            - 10.0.20.5
       extra_records: []
 
     oidc:

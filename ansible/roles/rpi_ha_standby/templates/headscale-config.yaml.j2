@@ -40,9 +40,13 @@ derp:
 dns:
   magic_dns: true
   base_domain: headscale.net
+  # Must match kubernetes/apps/headscale/config.yml: split DNS only.
+  override_local_dns: false
   nameservers:
-    global:
-      - 10.0.20.5
+    global: []
+    split:
+      woitzik.dev:
+        - 10.0.20.5
   extra_records: []
 
 oidc:
