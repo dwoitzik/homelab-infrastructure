@@ -10,7 +10,7 @@ resource "routeros_queue_type" "cake_wan_up" {
 }
 
 # A queue tree leaf with an empty packet-mark receives no packets at all;
-# "no-mark" is what matches unmarked traffic (nothing here sets packet marks).
+# "no-mark" is what matches unmarked traffic.
 resource "routeros_queue_tree" "wan_up" {
   name        = "wan-up"
   parent      = "ether1"
@@ -18,4 +18,17 @@ resource "routeros_queue_tree" "wan_up" {
   max_limit   = "68000000"
   queue       = routeros_queue_type.cake_wan_up.name
   comment     = "SQM: CAKE on WAN upload (bufferbloat)"
+}
+
+# ether1 also leads to the Fritzbox LAN, which never touches the ISP uplink: a
+# marked packet matches no queue tree leaf and leaves at line rate (4K remux
+# needs ~95M). Relies on the FastTrack exclusion in firewall_deterministic.tf.
+resource "routeros_ip_firewall_mangle" "lan_bypass_wan_shaper" {
+  chain           = "postrouting"
+  action          = "mark-packet"
+  new_packet_mark = "lan-bypass"
+  passthrough     = false
+  out_interface   = "ether1"
+  dst_address     = "192.168.178.0/24"
+  comment         = "QoS: Fritzbox LAN traffic bypasses the WAN upload shaper"
 }

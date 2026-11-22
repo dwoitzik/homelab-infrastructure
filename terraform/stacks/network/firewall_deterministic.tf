@@ -137,10 +137,14 @@ resource "routeros_ip_firewall_filter" "fwd_00b_antispoofing" {
   }
 }
 
+# Heimnetz flows stay off FastTrack: FastTrack'ed packets skip mangle, so the
+# lan_bypass_wan_shaper mark in qos.tf could not exempt them from wan-up.
 resource "routeros_ip_firewall_filter" "fwd_00_fasttrack" {
   action           = "fasttrack-connection"
   chain            = "forward"
   connection_state = "established,related"
+  src_address      = "!192.168.178.0/24"
+  dst_address      = "!192.168.178.0/24"
   place_before     = routeros_ip_firewall_filter.fwd_01_established.id
   comment          = "00: Global - Fasttrack for CPU efficiency"
 
