@@ -24,16 +24,10 @@ failure either way.
 
 All three have `on_boot = true` in Terraform — they auto-start on host reboot.
 
-**API endpoint**: a Keepalived VIP (VRRP, router-id 52) sits in front of
-the API server, currently always resolving to k3s-11 since it's the only node actually
-running `kube-apiserver`. **Known caveat:** Keepalived's failover priority list still
-includes k3s-12/13 from the old 3-master design — if k3s-11 goes down, the VIP could float
-to a node with no API server at all, making it *more* broken than just using k3s-11's IP
-directly. If k3s-11 is down, go straight to k3s-11's own address (or rebuild it — see
-`DISASTER-RECOVERY.md`) rather than trusting the VIP to land somewhere useful.
-
-- Ansible: `ansible/k3s-vip.yml` (Keepalived setup) — priorities need revisiting given the
-  topology correction above; not yet done as of 2026-06-23.
+**API endpoint**: `https://10.0.20.11:6443`, the server node itself. There is no VIP: with a
+single server a floating address adds a failure mode (landing on an agent with no API
+server) without adding availability. If k3s-11 is down, rebuild it (see
+`DISASTER-RECOVERY.md`).
 
 ## 2. Storage (NFS + local-path)
 
