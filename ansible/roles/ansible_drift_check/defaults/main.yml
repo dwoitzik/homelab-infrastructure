@@ -14,10 +14,9 @@ ansible_drift_check_schedule: "Sun *-*-* 06:30:00"
 ansible_drift_check_textfile_dir: /var/lib/node_exporter/textfile_collector
 
 # site.yml runs once per inventory host; these playbooks run once each.
+# postgres-authelia-standby.yml joins once ADR-030 is first applied; until
+# then it would report the whole role every week.
 ansible_drift_check_extra_playbooks:
   - rpi-ha-standby.yml
   - litestream-standby.yml
-  - postgres-authelia-standby.yml
   - tailscale.yml
-  - k3s-pv-links.yml
-  - k3s-vip.yml
