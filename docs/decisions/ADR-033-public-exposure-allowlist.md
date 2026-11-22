@@ -69,6 +69,10 @@ Internal Authelia login (everything on the LAN/VPN path) is unaffected — that 
 `auth.woitzik.dev` via the same internal AdGuard rewrite as everything else, never
 Cloudflare's public DNS.
 
+That reasoning covers forward-auth only. OIDC clients behind public hostnames still send
+the browser to `auth.woitzik.dev`: Headscale's device login and the Jellyfin SSO button
+(ADR-064). Those flows complete only on the LAN or tailnet; see Trade-offs.
+
 ## Current allowlist
 
 The list has grown since this ADR by deliberate, individually recorded decisions. The
@@ -118,6 +122,12 @@ Everything else is LAN/VPN only.
 - Future new services need a deliberate decision to add them to this allowlist, not
   just an IngressRoute — a small amount of added process, in exchange for the
   default-deny guarantee.
+- Authelia OIDC logins only complete where `auth.woitzik.dev` resolves internally (LAN,
+  FritzBox LAN via its AdGuard upstream, tailnet). Off-network, a new or logged-out
+  Tailscale device cannot finish the Headscale OIDC login; register it from home or with
+  a pre-auth key. Jellyfin apps off-network use the password login, not SSO. Node keys
+  do not expire (`headscale nodes list` shows no expiry), so existing devices are not
+  affected.
 
 ## Consequences
 

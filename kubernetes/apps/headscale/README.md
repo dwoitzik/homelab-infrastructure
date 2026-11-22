@@ -28,3 +28,11 @@ Copy `db.sqlite` + `noise_private.key` onto the PVC, restart. `sqlite3 db.sqlite
 - The Traefik IngressRoute for `auth.woitzik.dev` (OIDC discovery) is a *separate*
   resource (`apps-ingressroute.yml`'s `auth-final` entry) from Headscale's own manifests
   here — a missing route there looks exactly like an OIDC config problem but isn't one.
+- **OIDC login is LAN/tailnet-only.** `auth.woitzik.dev` has no public DNS (ADR-033), so
+  registering a new device or re-logging a logged-out one fails on mobile data at the
+  browser step. Do it from home Wi-Fi, or use a pre-auth key.
+- **Tailnet clients must get the public control address.** AdGuard answers
+  `headscale.woitzik.dev` with the internal Traefik IP, but tailscaled dials control
+  outside the tunnel. The `public-ip-record` sidecar writes the public address to
+  `extra_records_path`, which MagicDNS serves to tailnet clients;
+  `tailnet-route-drift-check` alerts if that answer is ever private or unreachable.
