@@ -31,7 +31,10 @@ Option 3. Role `ansible_drift_check` on `pve_hosts`:
   repo reset to `origin/main` on every run, the vault password and the ntfy topic in
   `/etc/ansible-drift-check` (0600).
 - A dedicated ed25519 key, authorized on every inventory host with
-  `from="10.0.10.10"`.
+  `from="10.0.10.10,10.0.20.1"`. The router masquerades MGMT -> SRV traffic to the SRV
+  gateway (`srcnat_masquerade_mgmt_to_srv`), so SRV hosts see 10.0.20.1, which admin
+  and home-network sessions share; on those hosts `from=` only keeps the key out of
+  the DMZ and IoT VLANs.
 - `ansible-drift-check.timer` (Sundays 06:30) runs `site.yml --check --diff` once per
   inventory host, then `rpi-ha-standby`, `litestream-standby` and `tailscale`. Left
   out: the `k3s-cluster/` collection (k3s install and upgrade), the localhost-only
@@ -39,7 +42,9 @@ Option 3. Role `ansible_drift_check` on `pve_hosts`:
   first applied (the role has never run, so it would report itself every week).
 - Any host with `changed>0`, `failed>0` or `unreachable>0` goes into one ntfy message
   per run (the same topic as ADR-027), with the changed task names and the log path.
-  A clean run sends nothing.
+  A clean run sends nothing. When more than half the targets fail, the problem is the
+  control side (network path, key), not the hosts: the run is marked failed, no ntfy
+  is sent, and `AnsibleDriftCheckStale` reports it once through Alertmanager.
 - Metrics in the node_exporter textfile directory; `AnsibleDriftCheckStale` fires when
   the check has not completed for 8 days, so a dead timer is not mistaken for silence.
 

@@ -72,14 +72,16 @@ spec:
             value: "ProxmoxHostHighTemp|RpiHighTemp"
       # Drive wear only pages at the critical threshold, and once a day: it moves
       # slowly, and the warning level is tracked in the weekly report instead.
+      # The weekly Ansible drift check only changes state once a week, so a
+      # daily reminder is enough.
       - receiver: discord
         groupWait: 30s
         groupInterval: 15m
         repeatInterval: 24h
         matchers:
-          - matchType: "="
+          - matchType: "=~"
             name: alertname
-            value: NVMeWearCritical
+            value: "NVMeWearCritical|AnsibleDriftCheckStale"
       - receiver: discord
         groupWait: 30s
         groupInterval: 15m

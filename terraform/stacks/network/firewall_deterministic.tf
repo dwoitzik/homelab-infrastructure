@@ -332,7 +332,7 @@ resource "routeros_ip_firewall_filter" "fwd_09e_pve_to_pi_backup" {
 
 # Proxmox host -> SSH on the server and DMZ VLANs: control node for the weekly
 # Ansible check-mode run (ADR-084). MGMT reaching into lower-trust zones, never
-# the reverse; the key is pinned to this source in every authorized_keys entry.
+# the reverse.
 resource "routeros_ip_firewall_filter" "fwd_09h_pve_ansible_srv" {
   chain        = "forward"
   action       = "accept"
