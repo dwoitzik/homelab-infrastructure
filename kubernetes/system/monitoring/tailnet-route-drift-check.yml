@@ -52,6 +52,34 @@ roleRef:
   name: tailnet-route-drift-checker
   apiGroup: rbac.authorization.k8s.io
 ---
+# Exec into the in-cluster tailnet node to see DNS the way a tailnet client does.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tailnet-route-drift-checker
+  namespace: host-agents
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tailnet-route-drift-checker
+  namespace: host-agents
+subjects:
+  - kind: ServiceAccount
+    name: tailnet-route-drift-checker
+    namespace: monitoring
+roleRef:
+  kind: Role
+  name: tailnet-route-drift-checker
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -111,15 +139,44 @@ data:
       fi
     done
 
+    # tailscaled dials the control server outside the tunnel, so the MagicDNS
+    # answer for it must be public; an AdGuard internal answer leaking through
+    # cuts off every client off the LAN (headscale extra_records).
+    CONTROL_HOST=headscale.woitzik.dev
+    control_ok() {
+      ANSWER=$(kubectl exec -n host-agents "$TS_POD" -- tailscale dns query "$CONTROL_HOST" 2>/dev/null \
+        | awk '$4 == "TypeA" { print $5; exit }')
+      case "$ANSWER" in
+        "" | 10.* | 192.168.* | 172.1[6-9].* | 172.2[0-9].* | 172.3[01].* | 100.6[4-9].* | 100.[7-9][0-9].* | 100.1[01][0-9].* | 100.12[0-7].*)
+          return 1 ;;
+      esac
+      curl -fsS -m 10 -o /dev/null --resolve "$CONTROL_HOST:443:$ANSWER" "https://$CONTROL_HOST/health"
+    }
+    TS_POD=$(kubectl get pods -n host-agents -l app=tailscale-subnet-router -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [ -n "$TS_POD" ]; then
+      TRY=1
+      until control_ok; do
+        if [ "$TRY" -ge 3 ]; then
+          DRIFT="${DRIFT}\n- Tailnet clients resolve \`$CONTROL_HOST\` to \`${ANSWER:-nothing}\`, not a working public address: clients off the LAN lose the control server. Check the \`public-ip-record\` sidecar in the headscale pod."
+          break
+        fi
+        TRY=$((TRY + 1))
+        sleep 20
+      done
+      log "control server answer for tailnet clients: ${ANSWER:-none}"
+    else
+      log "no tailscale-subnet-router pod, skipping control server DNS check"
+    fi
+
     if [ -n "$DRIFT" ]; then
       log "DRIFT DETECTED:$DRIFT"
-      post_discord "@here **Tailnet route drift detected** -- this is exactly the failure class that broke Vaultwarden/general tailnet traffic on 2026-09-09 (see ADR-043), caught automatically this time instead of waiting for someone to notice:$DRIFT
+      post_discord "@here **Tailnet drift detected** (route approvals per ADR-043, control server DNS per headscale extra_records):$DRIFT
 
-    Check: \`headscale nodes list-routes --output json\` (exec into the headscale pod). Fix with \`headscale nodes approve-routes --identifier <id> --routes \"<csv>\" --force\` to restore the expected set."
+    Routes: \`headscale nodes list-routes --output json\` (exec into the headscale pod). Fix with \`headscale nodes approve-routes --identifier <id> --routes \"<csv>\" --force\` to restore the expected set."
       exit 1
     fi
 
-    log "OK: both nodes online and approved_routes match the expected baseline"
+    log "OK: both nodes online, approved_routes match the baseline, control server answer is public"
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -137,7 +194,7 @@ spec:
       # 240, not the original 60: `apk add` below measured 54s wall clock, so
       # the old budget left ~6s for the check itself and every minor network
       # hiccup produced DeadlineExceeded with no logs (4 failures in 15h).
-      activeDeadlineSeconds: 240
+      activeDeadlineSeconds: 300
       backoffLimit: 0
       template:
         spec:
