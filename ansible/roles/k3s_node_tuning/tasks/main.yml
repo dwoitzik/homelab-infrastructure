@@ -16,7 +16,8 @@
 - name: Set noatime, nodiscard and a longer ext4 commit interval on the root filesystem (fstab + live remount)
   ansible.posix.mount:
     path: /
-    src: "{{ k3s_node_tuning_root_mount.device }}"
+    # By UUID: k3s-11 has a second disk, and sda/sdb swap between boots.
+    src: "UUID={{ k3s_node_tuning_root_mount.uuid }}"
     fstype: "{{ k3s_node_tuning_root_mount.fstype }}"
     opts: >-
       {{ (['noatime', 'nodiscard', 'commit=' ~ k3s_node_tuning_root_commit_seconds]
