@@ -25,6 +25,21 @@
     force: false
   when: ansible_virtualization_type == "lxc"
 
+# Proxmox's cloud-init user-data sets manage_etc_hosts: true, which overrides
+# the drop-in above, so cloud-init still renders /etc/hosts from this template
+# on every boot. Make the template produce the same 127.0.1.1 line.
+- name: Check whether cloud-init renders /etc/hosts from a template
+  ansible.builtin.stat:
+    path: /etc/cloud/templates/hosts.debian.tmpl
+  register: common_cloud_hosts_tmpl
+
+- name: Render only the short hostname on the 127.0.1.1 line at boot
+  ansible.builtin.lineinfile:
+    path: /etc/cloud/templates/hosts.debian.tmpl
+    regexp: '^127\.0\.1\.1 '
+    line: !unsafe "127.0.1.1 {{ hostname }}"
+  when: common_cloud_hosts_tmpl.stat.exists
+
 - name: Update /etc/hosts with the new hostname
   ansible.builtin.lineinfile:
     path: /etc/hosts
