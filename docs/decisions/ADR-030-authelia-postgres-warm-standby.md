@@ -1,9 +1,10 @@
 # ADR-030: Physical Streaming-Replication Warm Standby for Authelia's Postgres
 
 **Date:** 2026-08-27
-**Status:** Accepted, implemented — pending the operator's Atlantis-equivalent
-review of the new externally-reachable Postgres endpoint before this is
-considered load-bearing (see Consequences).
+**Status:** Accepted and live since 2026-11-23: `rpi-srv-02` streams from
+`postgres-authelia` in recovery mode, alerted by
+`AutheliaPostgresStandbyNotStreaming`. Promotion has not been rehearsed (see the
+last status update).
 
 ## Context
 
@@ -296,3 +297,59 @@ Still open: the `postgres_authelia_standby` role has never been run
 against `rpi-srv-02` (no `postgresql` unit, no
 `/mnt/ssd/postgres-authelia-standby`), so there is no standby replicating
 yet. The Service fix removes the network blocker for that first run.
+
+## Status update: live (2026-11-23)
+
+The role was run against `rpi-srv-02` for the first time. What it took, and what
+differs from the design above:
+
+- **Versions and architecture.** Primary: `ghcr.io/cloudnative-pg/postgresql:17.2`
+  (x86_64). Standby: Debian 13's own `postgresql-17` (17.12, aarch64); no PGDG
+  repository needed, and a newer minor on the standby is the supported direction.
+  Physical replication across x86_64 and aarch64 works because the on-disk format
+  matches; the remaining risks are collation and `char` signedness, and neither
+  applies here (`C` collation everywhere, only btree indexes, no extensions in
+  `authelia`). The runbook says to re-check this if an extension is added.
+- **Backups moved to the Barman Cloud plugin (ADR-081)** since this ADR was written.
+  It changes nothing here: the plugin still owns `archive_command`, so the
+  push-based alternative stays rejected for the same reason.
+- **CNPG's config in PGDATA.** `pg_basebackup` copies `custom.conf` and
+  `override.conf`, which point `restore_command`, `archive_command`, logging, the
+  socket and the TLS files at `/controller/*` paths that only exist in the pod. The
+  role now replaces `override.conf` (included last) with standby settings; archiving
+  is off, so a promoted standby is not backed up until failback.
+- **The replication password** comes from Ansible Vault into a 0600
+  `~postgres/.pgpass`; the Vault value was compared (by hash) with the CNPG Secret
+  before the run.
+- **Bounded WAL on the primary.** The physical slot `rpi02_standby_slot` would pin
+  WAL indefinitely while the Pi is down, on the same disk as the primary.
+  `max_slot_wal_keep_size: 2GB` caps that; past it the slot is lost and the standby
+  must be reseeded (runbook).
+- **The replication role could open SQL sessions.** Point 2 of the Implementation
+  section claimed it could not, but CNPG's trailing `host all all all
+  scram-sha-256` rule let `rpi02_replica` connect to `authelia` from `rpi-srv-02`
+  (it had no table privileges). A `host all rpi02_replica all reject` rule now
+  closes that.
+- **Failover path pre-wired.** Authelia's egress policy to `10.0.20.3:5432` exists
+  ahead of time, and the standby's `pg_hba.conf` admits only `authelia` from the k3s
+  node IPs, so failover is a promotion plus a configmap change
+  (`docs/runbooks/failover-authelia-postgres.md`).
+- **Storage.** PGDATA is on the USB SSD (`/mnt/ssd/postgres-authelia-standby`, about
+  600 MB). The unit has `RequiresMountsFor=/mnt/ssd` and the role refuses to run
+  without the mount, so a dropped SSD (the JMicron bridge did drop off the bus on
+  2026-11-19) stops the standby instead of moving it to the SD card. It then shows up
+  as `HostFilesystemReadOnly` or, at the latest after 30 minutes, as the standby alert.
+- **Monitoring.** `AutheliaPostgresStandbyNotStreaming` (critical, Discord) in
+  `kubernetes/system/monitoring/postgres-alerts.yml` fires when the slot is
+  inactive, more than 1 GiB behind, or missing for 30 minutes, from the CNPG
+  exporter's `cnpg_pg_replication_slots_*` metrics on the primary. It is silent while
+  streaming.
+- **Drift check.** `postgres-authelia-standby.yml` is back in the weekly
+  `ansible-drift-check` (ADR-084); a check-mode run against the live standby reports
+  no changes.
+- **Exposure review.** The LoadBalancer IP is pinned (`10.0.20.203`) and still
+  restricted three ways (source range, NetworkPolicy, `pg_hba`). It is on VLAN 20
+  only and not on the ADR-033 internet allowlist; the router does not forward it.
+
+Not done: a promotion rehearsal. It needs a second, throw-away copy so the real
+standby is never promoted; the runbook lists the exact promotion commands instead.

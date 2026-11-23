@@ -232,6 +232,25 @@ written yet. See `docs/decisions/ADR-029-warm-standby-ha-headscale-vaultwarden.m
 (2026-11-12 status) for what is missing. Every component, these two included, follows
 this document's rebuild path.
 
+## 7c. Authelia's Postgres: a streaming standby on rpi-srv-02
+
+`postgres-authelia` streams to a hot standby on `rpi-srv-02`
+(`/mnt/ssd/postgres-authelia-standby`, ADR-030), normally seconds behind. After a
+`pve-mgmt-01` loss it is the freshest copy of Authelia's data, fresher than the barman
+backups (5a) and the nightly dump (5b). It accepts reads without being promoted, so for
+a cluster rebuild take a dump from it and restore that into the new CNPG cluster:
+
+```bash
+# on rpi-srv-02
+cd /tmp && sudo -u postgres pg_dump -Fc -d authelia -f /mnt/ssd/authelia-from-standby.dump
+```
+
+Restore it as in 5b step 4 (copy the file into the primary pod and run
+`pg_restore --clean --if-exists --no-owner`). Promoting the standby and pointing
+Authelia at it while the cluster is still partly up is in
+`docs/runbooks/failover-authelia-postgres.md`. Once a new primary exists, the standby
+has to be reseeded (same runbook).
+
 ## 8. Prove it, don't assume it
 
 Before declaring the recovery done, actually demonstrate (not just configure):
