@@ -1,0 +1,8 @@
+[Unit]
+Description=Upgrade k3s to the version pinned in Git, roll back on failure
+After=network-online.target pve-guests.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/k3s-auto-upgrade
+TimeoutStartSec=3h

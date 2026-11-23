@@ -6,7 +6,7 @@ and why the drain skips node-pinned pods, is in
 `docs/decisions/ADR-080-k3s-upgrade-by-binary-swap.md`.
 
 The automated path is the nightly `k3s_auto_upgrade` Ansible role on the Proxmox host
-(ADR-081), which runs the same steps with `scripts/k3s/drain-movable.py`; this runbook is
+(ADR-082), which runs the same steps with `scripts/k3s/drain-movable.py`; this runbook is
 the manual procedure and the reference for what that role does.
 
 | Node | VM | Service |

@@ -1,0 +1,14 @@
+---
+# Nightly k3s upgrade orchestrated from the Proxmox host (ADR in
+# docs/decisions, runbook docs/runbooks/k3s-upgrade.md). The host reaches the
+# VMs through the QEMU guest agent, not the network.
+k3s_auto_upgrade_server: {vmid: 211, name: vm-srv-k3s-11, service: k3s}
+k3s_auto_upgrade_agents:
+  - {vmid: 212, name: vm-srv-k3s-12, service: k3s-agent}
+  - {vmid: 213, name: vm-srv-k3s-13, service: k3s-agent}
+# Source of truth for the wanted version: the k3s-ansible inventory on main.
+k3s_auto_upgrade_pin_url: https://raw.githubusercontent.com/dwoitzik/homelab-infrastructure/main/ansible/k3s-cluster/inventory.yml
+# Runs after the PBS backup (odd days 03:00) and Velero's 05:00 backup.
+k3s_auto_upgrade_on_calendar: "*-*-* 06:00:00"
+k3s_auto_upgrade_ingress_lb: 10.0.20.200
+k3s_auto_upgrade_ntfy_topic: "{{ pve_power_watchdog_ntfy_topic | default('dw-homelab-a12a7b540943') }}"
