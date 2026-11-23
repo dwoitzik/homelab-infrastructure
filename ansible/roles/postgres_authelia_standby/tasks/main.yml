@@ -94,14 +94,16 @@
   changed_when: true
   notify: Reload systemd and restart postgres-authelia-standby
 
-- name: Mark the data directory as a standby
+# Only right after seeding: promotion removes standby.signal, and putting it
+# back on a later run would drag a promoted instance back into recovery.
+- name: Mark the freshly seeded data directory as a standby
   ansible.builtin.copy:
     content: ""
     dest: "{{ postgres_authelia_standby_data_dir }}/standby.signal"
     owner: postgres
     group: postgres
     mode: '0600'
-    force: false
+  when: not postgres_authelia_standby_seeded.stat.exists
   notify: Reload systemd and restart postgres-authelia-standby
 
 - name: Deploy the standby settings over CNPG's override.conf

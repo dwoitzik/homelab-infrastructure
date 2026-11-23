@@ -36,10 +36,10 @@ Option 3. Role `ansible_drift_check` on `pve_hosts`:
   and home-network sessions share; on those hosts `from=` only keeps the key out of
   the DMZ and IoT VLANs.
 - `ansible-drift-check.timer` (Sundays 06:30) runs `site.yml --check --diff` once per
-  inventory host, then `rpi-ha-standby`, `litestream-standby` and `tailscale`. Left
-  out: the `k3s-cluster/` collection (k3s install and upgrade), the localhost-only
-  `vault-unseal-secret.yml`, and `postgres-authelia-standby.yml` until ADR-030 is
-  first applied (the role has never run, so it would report itself every week).
+  inventory host, then `rpi-ha-standby`, `litestream-standby`,
+  `postgres-authelia-standby` (added once ADR-030 was first applied) and `tailscale`.
+  Left out: the `k3s-cluster/` collection (k3s install and upgrade) and the
+  localhost-only `vault-unseal-secret.yml`.
 - Any host with `changed>0`, `failed>0` or `unreachable>0` goes into one ntfy message
   per run (the same topic as ADR-027), with the changed task names and the log path.
   A clean run sends nothing. When more than half the targets fail, the problem is the

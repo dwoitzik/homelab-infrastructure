@@ -47,6 +47,9 @@ spec:
     # rules are cert-authenticated and don't cover an external standby.
     pg_hba:
       - hostssl replication rpi02_replica 10.0.20.3/32 scram-sha-256
+      # Without this the trailing `host all all all` default lets the role open
+      # normal SQL sessions; "all" never matches replication connections.
+      - host all rpi02_replica all reject
 
   managed:
     roles:

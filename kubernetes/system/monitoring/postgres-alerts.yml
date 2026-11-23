@@ -48,3 +48,25 @@ spec:
               files (40 GB) on node 13 (REL-021). Immediate action required: check archiving
               connectivity to Garage S3, NetworkPolicies in apps namespace, and S3 region
               configuration.
+
+    - name: postgres.authelia-standby
+      rules:
+        # ADR-030. Inactive slot: rpi-srv-02 not streaming; growing diff: falling
+        # behind; missing slot: standby needs a reseed. 30m rides out reboots.
+        - alert: AutheliaPostgresStandbyNotStreaming
+          expr: |
+            max(cnpg_pg_replication_slots_active{namespace="database", slot_name="rpi02_standby_slot"}) < 1
+            or max(cnpg_pg_replication_slots_pg_wal_lsn_diff{namespace="database", slot_name="rpi02_standby_slot"}) > 1073741824
+            or absent(cnpg_pg_replication_slots_active{namespace="database", slot_name="rpi02_standby_slot"})
+          for: 30m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Authelia's Postgres standby on rpi-srv-02 is not streaming"
+            description: >
+              Slot rpi02_standby_slot on postgres-authelia is inactive, more than
+              1 GiB behind, or gone. Failover to rpi-srv-02 would lose data or
+              not work at all. The primary keeps at most 2 GB of WAL for the slot
+              (max_slot_wal_keep_size), after which the standby must be reseeded.
+              Check `systemctl status postgres-authelia-standby` and dmesg on
+              rpi-srv-02 (USB SSD) and docs/runbooks/failover-authelia-postgres.md.
