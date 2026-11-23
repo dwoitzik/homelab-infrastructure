@@ -10,4 +10,5 @@ tailscale_accept_dns: false
 # so we DNAT VIP:443 to Traefik's NodePort (discovered at runtime) on the k3s server node
 tailscale_traefik_metallb_vip: "10.0.20.200"
 # k3s server node: runs kubectl for the NodePort lookup and is the DNAT target
-tailscale_traefik_k3s_api_host: "10.0.20.11"
+# Inventory name, so the delegated kubectl call uses that host's ansible_user.
+tailscale_traefik_k3s_api_host: vm-srv-k3s-11

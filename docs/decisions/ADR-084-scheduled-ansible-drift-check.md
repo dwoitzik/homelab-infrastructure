@@ -27,7 +27,7 @@ unattended. Candidates for the control host:
 
 Option 3. Role `ansible_drift_check` on `pve_hosts`:
 
-- ansible-core 2.18 in a venv under `/opt/ansible-drift-check`, a clone of the public
+- ansible-core 2.16.3 (the workstation's version) in a venv under `/opt/ansible-drift-check`, a clone of the public
   repo reset to `origin/main` on every run, the vault password and the ntfy topic in
   `/etc/ansible-drift-check` (0600).
 - A dedicated ed25519 key, authorized on every inventory host with

@@ -6,7 +6,10 @@
 
 - name: Install ansible-core into a dedicated venv
   ansible.builtin.pip:
-    name: "ansible-core=={{ ansible_drift_check_ansible_core_version }}"
+    # passlib: password_hash() in the adguard role.
+    name:
+      - "ansible-core=={{ ansible_drift_check_ansible_core_version }}"
+      - passlib
     virtualenv: "{{ ansible_drift_check_dir }}/venv"
     virtualenv_command: python3 -m venv
 
