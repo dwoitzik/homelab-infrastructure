@@ -44,8 +44,9 @@ systemd timer (06:00) on the Proxmox host. Each run:
    existed, so once the API answers the script adds the silence again (retrying while
    Alertmanager starts), then checks health, expires the new silence and sends one ntfy
    message with the result.
-6. On success, deletes the snapshots, expires the silence and reports once. Expiring
-   tolerates a silence that no longer exists.
+6. On success, deletes the snapshots and expires the silence, and only logs. Expiring
+   tolerates a silence that no longer exists. ntfy is used for failures, skips and
+   rollbacks only, so a healthy night sends nothing.
 
 Renovate tracks the pin: patch releases merge themselves after a week, minor releases
 come as one PR per minor and need a manual merge. A merge is the approval; the timer

@@ -9,7 +9,8 @@ Nightly k3s upgrade orchestrated from the Proxmox host, with automatic rollback
   of them back.
 - `k3s-auto-upgrade.timer`: daily at 06:00; the run exits early unless there was a
   successful PBS backup in the last six hours (odd days) and no Velero backup is running.
-- Notifications go to the ntfy topic used by the other host checks.
+- Notifications go to the ntfy topic used by the other host checks, only for skips,
+  rollbacks and failures. Successful upgrades and drills only write to the log.
 - Log: `/var/log/k3s-auto-upgrade.log`.
 
 ## Manual use
