@@ -4,75 +4,122 @@
 # (docs/decisions/ADR-030-authelia-postgres-warm-standby.md). Runs
 # continuously; failover is `SELECT pg_promote();`, see failover-authelia-postgres.md.
 
-# Prerequisites this role does NOT set up: the k8s Secret, Vault password,
-# and standby-replication-service.yml applied (see cluster.yml's header
-# comment and ADR-030 for all three).
+# The SSD is a USB disk that has dropped off the bus before. Without the
+# mount the data dir would silently land on the SD card.
+- name: Fail unless the SSD is mounted
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.mounts | selectattr('mount', 'equalto', postgres_authelia_standby_ssd_mount) | list | length > 0
+    fail_msg: "{{ postgres_authelia_standby_ssd_mount }} is not mounted"
+    quiet: true
 
-- name: Install postgresql-17 (Debian 13 trixie ships this version natively)
+# become_user to an unprivileged user needs setfacl for Ansible's temp files.
+- name: Install postgresql-17 and acl
   ansible.builtin.apt:
     name:
+      - acl
       - "postgresql-{{ postgres_authelia_standby_pg_version }}"
       - "postgresql-client-{{ postgres_authelia_standby_pg_version }}"
     state: present
     update_cache: true
+    cache_valid_time: 3600
 
 - name: Check whether Debian's own default cluster still exists
   ansible.builtin.stat:
     path: "/etc/postgresql/{{ postgres_authelia_standby_pg_version }}/main"
   register: postgres_authelia_standby_default_cluster
 
-# apt auto-creates a fresh "main" cluster on install, competing for port
-# 5432 with the actual standby this role builds. Drop it.
+# apt auto-creates a "main" cluster on install, competing for port 5432.
 - name: Drop Debian's default postgresql cluster
   ansible.builtin.command:
     cmd: "pg_dropcluster {{ postgres_authelia_standby_pg_version }} main --stop"
   when: postgres_authelia_standby_default_cluster.stat.exists
   changed_when: true
 
-- name: Create the standby PGDATA directory (on the USB SSD, not the SD card)
+- name: Create the standby directory tree on the SSD
   ansible.builtin.file:
-    path: "{{ postgres_authelia_standby_data_dir }}"
+    path: "{{ item }}"
     state: directory
     owner: postgres
     group: postgres
     mode: '0700'
-    recurse: true
+  loop:
+    - "{{ postgres_authelia_standby_data_dir | dirname | dirname }}"
+    - "{{ postgres_authelia_standby_data_dir | dirname }}"
+    - "{{ postgres_authelia_standby_data_dir }}"
+
+- name: Deploy the replication password for libpq
+  ansible.builtin.template:
+    src: pgpass.j2
+    dest: /var/lib/postgresql/.pgpass
+    owner: postgres
+    group: postgres
+    mode: '0600'
+  no_log: true
 
 - name: Check whether the standby has already been seeded
   ansible.builtin.stat:
     path: "{{ postgres_authelia_standby_data_dir }}/PG_VERSION"
   register: postgres_authelia_standby_seeded
 
-# -R writes standby.signal + primary_conninfo automatically -- this
-# pg_basebackup IS the seeding step. Needs the Vault password prerequisite set.
+# A seed attempt that failed after creating the slot must not try to create it again.
+- name: Check whether the replication slot exists on the primary
+  ansible.builtin.command:
+    cmd: >-
+      psql -AtX
+      "host={{ postgres_authelia_standby_primary_host }} port={{ postgres_authelia_standby_primary_port }}
+      user={{ postgres_authelia_standby_replication_user }} replication=true sslmode=require"
+      -c "READ_REPLICATION_SLOT {{ postgres_authelia_standby_replication_slot }}"
+  become: true
+  become_user: postgres
+  register: postgres_authelia_standby_slot
+  when: not postgres_authelia_standby_seeded.stat.exists
+  changed_when: false
+  check_mode: false
+
 - name: Seed the standby via pg_basebackup against the live primary
   ansible.builtin.command:
     cmd: >-
       pg_basebackup
-      -h {{ postgres_authelia_standby_primary_host }}
-      -p {{ postgres_authelia_standby_primary_port }}
-      -U {{ postgres_authelia_standby_replication_user }}
+      -d "host={{ postgres_authelia_standby_primary_host }} port={{ postgres_authelia_standby_primary_port }}
+      user={{ postgres_authelia_standby_replication_user }} sslmode=require"
       -D {{ postgres_authelia_standby_data_dir }}
-      -X stream -P -R
+      -X stream
       -S {{ postgres_authelia_standby_replication_slot }}
-      -C
+      {{ '-C' if postgres_authelia_standby_slot.stdout | regex_search('^physical') is none else '' }}
   become: true
   become_user: postgres
-  environment:
-    PGPASSWORD: "{{ vault_postgres_authelia_rpi02_replica_password }}"
-    PGSSLMODE: require
   when: not postgres_authelia_standby_seeded.stat.exists
   changed_when: true
+  notify: Reload systemd and restart postgres-authelia-standby
 
-# pg_basebackup copies the primary's postgresql.conf verbatim, including
-# CNPG's TLS cert paths (only meaningful inside that pod) -- postgres won't
-# start with a missing cert file. ssl=off is a deliberate LAN-only trade-off.
-- name: Disable TLS for the standby (primary's cert paths don't exist here)
-  ansible.builtin.lineinfile:
-    path: "{{ postgres_authelia_standby_data_dir }}/postgresql.auto.conf"
-    regexp: "^ssl\\s*="
-    line: "ssl = off"
-    create: false
+- name: Mark the data directory as a standby
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ postgres_authelia_standby_data_dir }}/standby.signal"
+    owner: postgres
+    group: postgres
+    mode: '0600'
+    force: false
+  notify: Reload systemd and restart postgres-authelia-standby
+
+- name: Deploy the standby settings over CNPG's override.conf
+  ansible.builtin.template:
+    src: override.conf.j2
+    dest: "{{ postgres_authelia_standby_data_dir }}/override.conf"
+    owner: postgres
+    group: postgres
+    mode: '0600'
+  notify: Reload systemd and restart postgres-authelia-standby
+
+- name: Deploy the standby pg_hba.conf
+  ansible.builtin.template:
+    src: pg_hba.conf.j2
+    dest: "{{ postgres_authelia_standby_data_dir }}/pg_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: '0600'
+  notify: Reload systemd and restart postgres-authelia-standby
 
 - name: Deploy the standalone systemd unit (not Debian's pg_ctlcluster wrapper)
   ansible.builtin.template:

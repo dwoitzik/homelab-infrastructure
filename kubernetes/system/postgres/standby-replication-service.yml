@@ -6,6 +6,9 @@ kind: Service
 metadata:
   name: postgres-authelia-standby-replication
   namespace: database
+  annotations:
+    # Pinned: the standby's primary_conninfo (ansible postgres_authelia_standby) uses it.
+    metallb.universe.tf/loadBalancerIPs: 10.0.20.203
 spec:
   type: LoadBalancer
   # Local keeps rpi-srv-02's source IP. Cluster SNATs it to a node address,

@@ -39,6 +39,9 @@ spec:
       shared_buffers: "64MB"
       # Default 5min forces a 16 MB WAL segment per cluster every 5 minutes, even idle.
       archive_timeout: "30min"
+      # ADR-030: caps the WAL the rpi-srv-02 standby's slot can pin when the Pi
+      # is down; past this the slot is invalidated and the standby must be reseeded.
+      max_slot_wal_keep_size: "2GB"
     # ADR-030: password-authenticated replication for the rpi-srv-02 warm
     # standby, restricted to its exact LAN IP -- CNPG's own default pg_hba
     # rules are cert-authenticated and don't cover an external standby.
