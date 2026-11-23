@@ -188,7 +188,6 @@ rollback() {
     for id in "${ALL_VMIDS[@]}"; do qm delsnapshot "$id" "$snap" || true; done
     unsilence
     log "drill passed: rolled back and healthy on $current"
-    notify "k3s rollback drill passed" "white_check_mark" "Snapshot, rollback and restart of all k3s VMs worked; cluster healthy on $current."
     exit 0
   fi
   if health "$current" >/dev/null; then
@@ -230,7 +229,6 @@ if [ "$DRILL" = 1 ]; then
   log "rollback drill on $current"
 else
   log "upgrading $current -> $target"
-  notify "k3s upgrade started" "arrows_counterclockwise" "Upgrading k3s $current -> $target, one node at a time."
 fi
 health "$current" >/dev/null || { log "cluster not healthy before the upgrade, skipping"; notify "k3s upgrade skipped" "warning" "Cluster was not healthy before the upgrade to $target; nothing changed."; exit 1; }
 for id in "${ALL_VMIDS[@]}"; do
@@ -253,4 +251,3 @@ done
 for id in "${ALL_VMIDS[@]}"; do qm delsnapshot "$id" "$snap" || log "could not delete snapshot on $id"; done
 unsilence
 log "done: all nodes on $target"
-notify "k3s upgraded" "white_check_mark" "All k3s nodes are on $target and healthy."
