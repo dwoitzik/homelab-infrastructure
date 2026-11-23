@@ -1,0 +1,31 @@
+# {{ ansible_managed }}
+
+# Replaces CNPG's override.conf copied in by pg_basebackup. CNPG's custom.conf
+# points at /controller/* paths and certs that only exist inside the pod, so
+# every such setting is overridden here (this file is included after it).
+
+primary_conninfo = 'host={{ postgres_authelia_standby_primary_host }} port={{ postgres_authelia_standby_primary_port }} user={{ postgres_authelia_standby_replication_user }} sslmode=require application_name=rpi-srv-02'
+primary_slot_name = '{{ postgres_authelia_standby_replication_slot }}'
+recovery_target_timeline = 'latest'
+# A missing restore_command binary aborts recovery; WAL comes only via streaming.
+restore_command = ''
+# CNPG's archive_command would fill pg_wal after a promotion.
+archive_mode = 'off'
+archive_command = ''
+
+listen_addresses = '*'
+unix_socket_directories = '/var/run/postgresql'
+ssl = 'off'
+ssl_ca_file = ''
+ssl_cert_file = ''
+ssl_key_file = ''
+logging_collector = 'off'
+log_destination = 'stderr'
+log_directory = 'log'
+# en_US.utf8 is not generated on this host and an unknown locale stops startup.
+lc_messages = 'C.utf8'
+lc_monetary = 'C.utf8'
+lc_numeric = 'C.utf8'
+lc_time = 'C.utf8'
+wal_receiver_timeout = '60s'
+wal_sender_timeout = '60s'

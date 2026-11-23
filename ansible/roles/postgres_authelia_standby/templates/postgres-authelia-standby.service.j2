@@ -3,12 +3,17 @@ Description=Authelia Postgres warm-standby (ADR-030) -- physical streaming repli
 Documentation=https://github.com/dwoitzik/homelab-infrastructure/blob/main/docs/decisions/ADR-030-authelia-postgres-warm-standby.md
 After=network-online.target
 Wants=network-online.target
+# Refuse to start on the SD card's empty mount point when the USB SSD is gone.
+RequiresMountsFor={{ postgres_authelia_standby_ssd_mount }}
 
 [Service]
 Type=notify
 User=postgres
 Group=postgres
 Environment=PGDATA={{ postgres_authelia_standby_data_dir }}
+RuntimeDirectory=postgresql
+RuntimeDirectoryMode=2775
+RuntimeDirectoryPreserve=yes
 ExecStart=/usr/lib/postgresql/{{ postgres_authelia_standby_pg_version }}/bin/postgres -D {{ postgres_authelia_standby_data_dir }}
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=mixed

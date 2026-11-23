@@ -4,14 +4,22 @@
 # (docs/decisions/ADR-030-authelia-postgres-warm-standby.md). Runs
 # continuously in recovery mode, unlike the stopped-by-default docker-compose standbys.
 
+# Must match the primary's major version (cluster.yml imageName). Debian 13
+# ships 17 natively; a newer minor than the primary is fine for a standby.
 postgres_authelia_standby_pg_version: "17"
+postgres_authelia_standby_ssd_mount: /mnt/ssd
 postgres_authelia_standby_data_dir: /mnt/ssd/postgres-authelia-standby/17/main
 
-# MetalLB-assigned once standby-replication-service.yml is applied, not
-# knowable ahead of time. Set for real via `kubectl get svc
-# postgres-authelia-standby-replication -n database`; a placeholder just fails fast.
-postgres_authelia_standby_primary_host: "REPLACE-ME-with-the-real-LoadBalancer-IP"
+# Pinned on the Service (standby-replication-service.yml) so it cannot move.
+postgres_authelia_standby_primary_host: 10.0.20.203
 postgres_authelia_standby_primary_port: 5432
 
 postgres_authelia_standby_replication_user: rpi02_replica
 postgres_authelia_standby_replication_slot: rpi02_standby_slot
+
+# k3s node IPs. Authelia pods reach the standby SNATed to these after a
+# promotion (failover-authelia-postgres.md); nothing else may connect over TCP.
+postgres_authelia_standby_client_ips:
+  - 10.0.20.11
+  - 10.0.20.12
+  - 10.0.20.13

@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# Replaces the primary's pg_hba.conf copied in by pg_basebackup.
+local   all       postgres                    peer
+{% for ip in postgres_authelia_standby_client_ips %}
+host    authelia  authelia  {{ ip }}/32  scram-sha-256
+{% endfor %}

@@ -217,6 +217,27 @@ spec:
         - protocol: TCP
           port: 22
 ---
+# ADR-030: after the rpi-srv-02 Postgres standby is promoted, Authelia
+# connects to it directly. Allowed ahead of time so failover is a config change.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-authelia-pg-standby
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: authelia
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.20.3/32
+      ports:
+        - protocol: TCP
+          port: 5432
+---
 # The public-ip-record sidecar on headscale resolves headscale.woitzik.dev
 # against public DNS, because AdGuard deliberately answers with the internal
 # address.
