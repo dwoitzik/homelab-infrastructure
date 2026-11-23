@@ -63,12 +63,13 @@
   register: postgres_authelia_standby_seeded
 
 # A seed attempt that failed after creating the slot must not try to create it again.
+# dbname=replication selects the .pgpass entry; -w fails instead of prompting.
 - name: Check whether the replication slot exists on the primary
   ansible.builtin.command:
     cmd: >-
-      psql -AtX
+      psql -wAtX
       "host={{ postgres_authelia_standby_primary_host }} port={{ postgres_authelia_standby_primary_port }}
-      user={{ postgres_authelia_standby_replication_user }} replication=true sslmode=require"
+      user={{ postgres_authelia_standby_replication_user }} dbname=replication replication=true sslmode=require"
       -c "READ_REPLICATION_SLOT {{ postgres_authelia_standby_replication_slot }}"
   become: true
   become_user: postgres
@@ -80,7 +81,7 @@
 - name: Seed the standby via pg_basebackup against the live primary
   ansible.builtin.command:
     cmd: >-
-      pg_basebackup
+      pg_basebackup -w
       -d "host={{ postgres_authelia_standby_primary_host }} port={{ postgres_authelia_standby_primary_port }}
       user={{ postgres_authelia_standby_replication_user }} sslmode=require"
       -D {{ postgres_authelia_standby_data_dir }}
