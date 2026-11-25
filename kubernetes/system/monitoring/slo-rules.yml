@@ -1,9 +1,6 @@
-# SLO definitions for woitzik.dev homelab services.
-# Target: 99.9% availability (43.2 min/month error budget).
-#
-# Multi-window burn-rate alerts (SRE Workbook), 30d budget:
-#   - Page (2h+1h): ≥30x → budget gone in ~24h, 2h window spends ~8%
-#   - Ticket (6h+30m): ≥6x → budget gone in ~5d, 6h window spends 5%
+# 99.9% availability over 30d for every blackbox probe; burn-rate windows per ADR-085.
+# Only the page alerts are critical (Discord); the 3d ticket is warning (not routed).
+# The page rules need for: because one failed probe in 60/h already exceeds 14.4x.
 
 ---
 apiVersion: monitoring.coreos.com/v1
@@ -20,32 +17,26 @@ spec:
     - name: slo.availability.1m
       interval: 1m
       rules:
-        # SLI: fraction of successful HTTP probes in the last 5 minutes
         - record: job_instance:probe_success:rate5m
           expr: avg_over_time(probe_success[5m])
 
-        # Error rate per instance (1 - success rate)
         - record: job_instance:probe_error:rate5m
           expr: 1 - avg_over_time(probe_success[5m])
 
     - name: slo.availability.windows
       interval: 1m
       rules:
-        # Short windows (for fast-burn detection)
-        - record: job_instance:probe_success:rate1h
-          expr: avg_over_time(probe_success[1h])
-        - record: job_instance:probe_success:rate2h
-          expr: avg_over_time(probe_success[2h])
-
-        # Medium windows
-        - record: job_instance:probe_success:rate6h
-          expr: avg_over_time(probe_success[6h])
         - record: job_instance:probe_success:rate30m
           expr: avg_over_time(probe_success[30m])
-
-        # Long windows (for slow-burn detection)
+        - record: job_instance:probe_success:rate1h
+          expr: avg_over_time(probe_success[1h])
+        - record: job_instance:probe_success:rate6h
+          expr: avg_over_time(probe_success[6h])
+        # Dashboard only.
         - record: job_instance:probe_success:rate24h
           expr: avg_over_time(probe_success[24h])
+        - record: job_instance:probe_success:rate3d
+          expr: avg_over_time(probe_success[3d])
 
 ---
 apiVersion: monitoring.coreos.com/v1
@@ -61,41 +52,57 @@ spec:
   groups:
     - name: slo.burn-rate.page
       rules:
-        # Fast burn: ≥30x error budget consumption over 2h + 1h window
-        # Fires when ~8% of the 30d budget is gone in 2 hours
+        # $value is the burn rate over the long window, as a multiple of the budget rate.
         - alert: SLOAvailabilityFastBurn
           expr: |
-            (1 - job_instance:probe_success:rate2h) > (30 * (1 - 0.999))
+            (1 - job_instance:probe_success:rate1h) / (1 - 0.999) > 14.4
             and
-            (1 - job_instance:probe_success:rate1h) > (30 * (1 - 0.999))
-          for: 2m
+            (1 - job_instance:probe_success:rate5m) / (1 - 0.999) > 14.4
+          for: 10m
           labels:
             severity: critical
             slo: availability
           annotations:
             summary: "SLO fast burn: {{ $labels.instance }}"
-            description: >
-              {{ $labels.instance }} error rate is burning through the monthly error budget
-              at ≥30x the allowed rate (2h and 1h windows). At this pace the 30d
-              99.9% budget is exhausted in ~24h.
-              Current 2h error rate: {{ $value | humanizePercentage }}
+            description: >-
+              {{ $labels.instance }} ({{ $labels.job }}) is burning the 30d 99.9% error
+              budget at {{ $value | printf "%.1f" }}x over the last 1h (page threshold
+              14.4x on 1h and 5m). Sustained 14.4x empties the budget in about 2 days.
+            runbook_url: https://github.com/dwoitzik/homelab-infrastructure/blob/main/docs/RUNBOOK-alert-response.md
+
+        - alert: SLOAvailabilitySlowBurn
+          expr: |
+            (1 - job_instance:probe_success:rate6h) / (1 - 0.999) > 6
+            and
+            (1 - job_instance:probe_success:rate30m) / (1 - 0.999) > 6
+          for: 1h
+          labels:
+            severity: critical
+            slo: availability
+          annotations:
+            summary: "SLO slow burn: {{ $labels.instance }}"
+            description: >-
+              {{ $labels.instance }} ({{ $labels.job }}) is burning the 30d 99.9% error
+              budget at {{ $value | printf "%.1f" }}x over the last 6h (page threshold
+              6x on 6h and 30m). Sustained 6x empties the budget in 5 days.
+            runbook_url: https://github.com/dwoitzik/homelab-infrastructure/blob/main/docs/RUNBOOK-alert-response.md
 
     - name: slo.burn-rate.ticket
       rules:
-        # Slow-medium burn: ≥6x over 6h + 30m window
-        - alert: SLOAvailabilitySlowBurn
+        - alert: SLOAvailabilityBudgetBurn
           expr: |
-            (1 - job_instance:probe_success:rate6h) > (6 * (1 - 0.999))
+            (1 - job_instance:probe_success:rate3d) / (1 - 0.999) > 1
             and
-            (1 - job_instance:probe_success:rate30m) > (6 * (1 - 0.999))
-          for: 15m
+            (1 - job_instance:probe_success:rate6h) / (1 - 0.999) > 1
+          for: 1h
           labels:
             severity: warning
             slo: availability
           annotations:
-            summary: "SLO slow burn: {{ $labels.instance }}"
-            description: >
-              {{ $labels.instance }} error rate is burning through the monthly error budget
-              at ≥6x the allowed rate (6h and 30m windows). At this pace the 30d
-              99.9% budget is exhausted in ~5 days.
-              Current 6h error rate: {{ $value | humanizePercentage }}
+            summary: "SLO budget burn: {{ $labels.instance }}"
+            description: >-
+              {{ $labels.instance }} ({{ $labels.job }}) has spent the 30d 99.9% error
+              budget at {{ $value | printf "%.2f" }}x the sustainable rate over the
+              last 3 days (ticket threshold 1x on 3d and 6h). Not paged; look at it
+              during the week.
+            runbook_url: https://github.com/dwoitzik/homelab-infrastructure/blob/main/docs/RUNBOOK-alert-response.md
