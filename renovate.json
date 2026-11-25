@@ -13,7 +13,8 @@
   "docker-compose": {
     "managerFilePatterns": [
       "/ansible/files/media-acquisition/docker-compose.yml$/",
-      "/ansible/roles/rybbit/templates/docker-compose.yml.j2$/"
+      "/ansible/roles/rybbit/templates/docker-compose.yml.j2$/",
+      "/ansible/roles/jellyfin/templates/docker-compose.yml.j2$/"
     ]
   },
   "customManagers": [
@@ -49,6 +50,17 @@
       "depNameTemplate": "k3s-io/k3s",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\+k3s(?<build>\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "CloudNativePG Cluster imageName pins (kubernetes/system/postgres). The kubernetes manager only reads image: keys, so these PostgreSQL pins sat at 17.2 for ten minor releases without an update PR. Falls into the stateful/critical group (PR-only).",
+      "managerFilePatterns": [
+        "/^kubernetes/system/postgres/cluster[^/]*\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "imageName:\\s*(?<depName>[^:\\s]+):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[0-9a-f]{64})"
+      ],
+      "datasourceTemplate": "docker"
     }
   ],
   "minimumReleaseAge": "3 days",
@@ -310,6 +322,17 @@
         "patch"
       ],
       "automerge": true
+    },
+    {
+      "description": "Jellyfin (ansible/roles/jellyfin, ct-srv-jellyfin-01): never auto-merged, because nothing converges the LXC; a merged bump takes effect only when the jellyfin role runs. Held below 12: Jellyfin 12 migrates the database one way and needs third-party plugins removed first, and the Community SSO plugin that provides the Authelia login has no 12.x build yet (targetAbi 10.11). Lift the cap once it does, and follow the 12.0 upgrade notes (backup /opt/jellyfin/config, remove plugins, full library scan).",
+      "matchPackageNames": [
+        "jellyfin/jellyfin"
+      ],
+      "allowedVersions": "<12",
+      "automerge": false,
+      "labels": [
+        "jellyfin"
+      ]
     }
   ],
   "hostRules": [
