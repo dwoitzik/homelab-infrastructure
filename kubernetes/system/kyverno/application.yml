@@ -7,7 +7,7 @@ spec:
   project: default
   sources:
     - repoURL: https://kyverno.github.io/kyverno/
-      targetRevision: 3.5.3
+      targetRevision: 3.9.2
       chart: kyverno
       helm:
         values: |
@@ -30,17 +30,18 @@ spec:
             container:
               extraArgs:
                 leaderElectionRetryPeriod: 10s
+              # The chart reads container.resources; a resources key beside it is ignored.
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 384Mi
             tolerations:
               - key: node-role.kubernetes.io/control-plane
                 operator: Exists
                 effect: NoSchedule
-            resources:
-              requests:
-                cpu: 100m
-                memory: 128Mi
-              limits:
-                cpu: 500m
-                memory: 384Mi
           # Policy reports are one datastore write per resource; enforcement happens at
           # admission, and kyverno-policy-drift-check covers running pods instead.
           backgroundController:
