@@ -117,5 +117,5 @@ Proven with an off-LAN client. The FritzBox forwards UDP 41641 to the MikroTik, 
 forwards it to rpi-srv-02 (`dstnat_tailscale_wireguard`, 181 packets on the dst-nat rule
 by 2026-11-25). Between 2026-11-22 and 2026-11-25 rpi-srv-02's tailscaled switched the
 Pixel to a direct path (`magicsock: disco: ... now using <public address>:<port>`) on
-eleven different mobile-carrier addresses, about 230 times, instead of staying on DERP.
+eleven different mobile-carrier addresses, about 190 times, instead of staying on DERP.
 `tailscale netcheck` on rpi-srv-02 reports `MappingVariesByDestIP: false`.
