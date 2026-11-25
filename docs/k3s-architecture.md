@@ -114,4 +114,4 @@ Prometheus scrapes from both in-cluster and external targets:
 | DMZ proxy + games LXCs | Static config (`monitoring_agent` role's docker-based node_exporter, distinct from `node_exporter_native` used elsewhere) | 9100 |
 | Proxmox host | PVE exporter in-cluster | 9221 |
 
-Grafana dashboards (auto-downloaded): 1860 (Node Exporter Full), 10347 + 19022 (Proxmox).
+Grafana dashboards (auto-downloaded): 1860 (Node Exporter Full), 10347 (Proxmox).
