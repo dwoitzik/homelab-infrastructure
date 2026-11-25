@@ -28,6 +28,12 @@
     state: directory
     mode: "0755"
 
+- name: Ensure promtail positions directory exists
+  ansible.builtin.file:
+    path: /opt/docker/promtail/positions
+    state: directory
+    mode: "0755"
+
 - name: Deploy promtail configuration
   ansible.builtin.template:
     src: promtail.yml.j2

@@ -7,5 +7,6 @@ services:
     volumes:
       - ./promtail.yml:/etc/promtail/promtail.yml:ro
       - /var/log:/var/log:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./positions:/var/lib/promtail
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command: -config.file=/etc/promtail/promtail.yml
