@@ -149,6 +149,35 @@ rate it reaches 90 % around the end of December.
 - [ ] Router brute-force protection reworked
 - [ ] Remove stale firewall rules
 
+### Corrections found by the blog audit (2026-11-25)
+
+A technical audit of every woitzik.dev post checked its claims against this repo.
+These are the places where the repo itself is wrong or internally inconsistent; the
+posts already say the correct thing.
+
+- [ ] `kubernetes/apps/garage/garage.yml` sets `GARAGE_CONFIG`, which Garage ignores
+      (it reads `GARAGE_CONFIG_FILE`). It only works because `/etc/garage.toml` is the
+      default path. Rename the variable or drop it.
+- [ ] ADR-046: port 8200 is `0x2008`, not `0x2014`; the `/proc/net/tcp` check looked
+      for port 8212 and proves nothing. A timeout instead of a refusal means the
+      listener still existed but was not serving, so the "nothing was listening"
+      reasoning needs rewriting.
+- [ ] Alert on LXC memory-cgroup pressure (`memory.events` `high` rate or
+      `memory.pressure`). The tmpfs stall in ADR-066 showed up only as host load;
+      ~8 million `memory.high` events had accumulated before anything paged.
+- [ ] ADR-066: tmpfs pages cannot stay resident "well past" the 4 GB limit; the excess
+      was reclaimed and swapped. Reword.
+- [ ] ADR-069: "24 deleted files" (SteamCMD log) and "the executable and 32 `.dat`
+      containers were missing" contradict each other. Settle the count.
+- [ ] ADR-045: the access log shows `wiso+steuer`, the direct test `wiso steuerung`,
+      both described as "the same queries".
+- [ ] ADR-040: `auth.woitzik.dev` has no public A record; inside the LAN and the
+      cluster it resolves to the Traefik VIP through the AdGuard rewrite. Fix the wording.
+- [ ] `ansible/roles/monitoring_agent/templates/promtail.yml.j2` labels `container`
+      from `attrs.name`, but `daemon.json` sets no `labels`/`env`/`tag` log-opts, so
+      `attrs` is empty and the label is never set. Use Docker service discovery
+      (`__meta_docker_container_name`) or retire the template if Alloy has replaced it.
+
 ## Later
 
 - [x] Publication hygiene: provider IDs, WAN details, audit lists and investigation
