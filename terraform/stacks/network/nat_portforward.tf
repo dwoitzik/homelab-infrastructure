@@ -48,6 +48,44 @@ resource "routeros_ip_firewall_nat" "dstnat_headscale_dmz" {
   comment      = "headscale.woitzik.dev -> DMZ reverse proxy (nginx+CrowdSec), see nat_portforward.tf header"
 }
 
+# Flood guard for the WAN-exposed TCP port (>32 concurrent per source: 1h drop).
+# FritzBox-LAN hairpin traffic is exempt, it can share one source. ADR-085.
+resource "routeros_ip_firewall_filter" "fwd_wan_headscale_flood_drop" {
+  chain            = "forward"
+  action           = "drop"
+  in_interface     = "ether1"
+  dst_address      = "10.0.30.2"
+  dst_port         = "443"
+  protocol         = "tcp"
+  src_address_list = "wan_conn_flood"
+  place_before     = routeros_ip_firewall_filter.fwd_wan_headscale_dmz.id
+  comment          = "WAN -> DMZ 443: drop sources on wan_conn_flood, ADR-085"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
+resource "routeros_ip_firewall_filter" "fwd_wan_headscale_flood_detect" {
+  chain                = "forward"
+  action               = "add-src-to-address-list"
+  in_interface         = "ether1"
+  dst_address          = "10.0.30.2"
+  dst_port             = "443"
+  protocol             = "tcp"
+  connection_state     = "new"
+  src_address          = "!192.168.178.0/24"
+  connection_limit     = "32,32"
+  address_list         = "wan_conn_flood"
+  address_list_timeout = "1h"
+  place_before         = routeros_ip_firewall_filter.fwd_wan_headscale_flood_drop.id
+  comment              = "WAN -> DMZ 443: >32 concurrent connections per source, ADR-085"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
 resource "routeros_ip_firewall_filter" "fwd_wan_headscale_dmz" {
   chain        = "forward"
   action       = "accept"
