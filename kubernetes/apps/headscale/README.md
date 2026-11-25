@@ -15,6 +15,21 @@ Copy `db.sqlite` + `noise_private.key` onto the PVC, restart. `sqlite3 db.sqlite
 "PRAGMA integrity_check;"` before trusting it. Verified 2026-08-13: schema intact,
 `nodes`/`users`/`api_keys`/`pre_auth_keys`/`policies` tables present.
 
+## Client setup
+
+The LAN is reached through the subnet route `10.0.20.0/24` (rpi-srv-02 primary) and DNS
+through AdGuard at `10.0.20.5`; both only work if the client accepts them.
+
+- **Linux:** `--accept-routes` defaults to off. Join with
+  `sudo tailscale up --login-server https://headscale.woitzik.dev --accept-routes`, or on
+  an existing node `sudo tailscale set --accept-routes`. Without it the node shows online
+  but no 10.0.20.x address answers.
+- **Android:** Settings, VPN, Tailscale: "Always-on VPN" on, "Block connections without
+  VPN" off; battery usage for the Tailscale app "Unrestricted", otherwise Android stops it
+  and the node drops offline. Private DNS off, exit node "None".
+- Check from any client: `tailscale status` lists the node online, and
+  `tailscale ping rpi-srv-02` answers.
+
 ## Known gotchas
 
 - **Pre-auth keys expire.** The one this recovery relied on had genuinely expired by the
