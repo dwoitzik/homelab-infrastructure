@@ -42,7 +42,11 @@ never addressed by Service name.
 ## SLOs and alert routing
 
 - `slo-rules.yml` / `slo-dashboard.yml` — 99.9% availability (blackbox `probe_success`)
-  PrometheusRules and the paired Grafana error-budget dashboard. These were deployed
+  PrometheusRules and the paired Grafana error-budget dashboard. Burn-rate alerts use
+  the SRE Workbook windows (ADR-085): `SLOAvailabilityFastBurn` (14.4x, 1h/5m) and
+  `SLOAvailabilitySlowBurn` (6x, 6h/30m) page via the severity=critical Discord route;
+  `SLOAvailabilityBudgetBurn` (1x, 3d/6h) is a severity=warning ticket that is not sent
+  anywhere. These were deployed
   once but never actually evaluated for a while — a missing `release:
   kube-prometheus-stack` label meant Prometheus's `ruleSelector` never matched them
   (the same gap silently affected `hardware-temp-alerts.yml` too). Check that label is

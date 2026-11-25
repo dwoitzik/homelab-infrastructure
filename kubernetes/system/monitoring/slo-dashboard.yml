@@ -96,7 +96,7 @@ data:
         {
           "id": 4,
           "type": "timeseries",
-          "title": "Burn Rate (1h window) — SLO Threshold 30x = 3%",
+          "title": "Burn Rate (1h window), page at 14.4x",
           "gridPos": {"x": 0, "y": 12, "w": 24, "h": 8},
           "targets": [
             {
@@ -104,12 +104,16 @@ data:
               "legendFormat": "{{instance}} burn rate"
             },
             {
-              "expr": "vector(30)",
-              "legendFormat": "Page threshold (30x)"
+              "expr": "vector(14.4)",
+              "legendFormat": "Fast-burn page (14.4x)"
             },
             {
               "expr": "vector(6)",
-              "legendFormat": "Ticket threshold (6x)"
+              "legendFormat": "Slow-burn page (6x, on 6h)"
+            },
+            {
+              "expr": "vector(1)",
+              "legendFormat": "Ticket (1x, on 3d)"
             }
           ],
           "fieldConfig": {
