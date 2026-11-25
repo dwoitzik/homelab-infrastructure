@@ -12,7 +12,7 @@ for f in "${files[@]:{{ k3s_kine_backup_target_keep_min }}}"; do
 done
 
 newest_ts=0 newest_bytes=0
-if [ "${#files[@]}" -gt 0 ] && [ -f "${files[0]}" ]; then
+if [ -n "${files[0]:-}" ] && [ -f "${files[0]}" ]; then
   newest_ts=$(stat -c %Y "${files[0]}")
   newest_bytes=$(stat -c %s "${files[0]}")
 fi
