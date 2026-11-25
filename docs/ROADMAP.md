@@ -177,9 +177,6 @@ posts already say the correct thing.
       from `attrs.name`, but `daemon.json` sets no `labels`/`env`/`tag` log-opts, so
       `attrs` is empty and the label is never set. Use Docker service discovery
       (`__meta_docker_container_name`) or retire the template if Alloy has replaced it.
-- [ ] `docs/private/RECOVERY-REPORT-2026-08-13.md` says the root token was extracted
-      from the old datastore; check it against #553 (generate-and-revoke) so both
-      records tell the same story.
 
 ## Later
 
