@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://metallb.github.io/metallb
-    targetRevision: 0.14.3
+    targetRevision: 0.16.2
     chart: metallb
     helm:
       values: |
@@ -47,6 +47,9 @@ spec:
           # that restart noise, not a real functional loss.
           frr:
             enabled: false
+        # 0.16 makes frr-k8s the default BGP backend and deploys its DaemonSet; L2-only here.
+        frrk8s:
+          enabled: false
   destination:
     server: https://kubernetes.default.svc
     namespace: metallb-system
