@@ -70,21 +70,6 @@ import {
 }
 
 import {
-  to = routeros_ip_firewall_filter.fwd_vpn_mobile_dmz
-  id = "*4F"
-}
-
-import {
-  to = routeros_ip_firewall_filter.fwd_vpn_mobile_internal
-  id = "*53"
-}
-
-import {
-  to = routeros_ip_firewall_filter.fwd_vpn_laptop_full
-  id = "*54"
-}
-
-import {
   to = routeros_ip_firewall_filter.fwd_monitoring_dmz_scrape
   id = "*55"
 }
@@ -92,11 +77,6 @@ import {
 import {
   to = routeros_ip_firewall_filter.fwd_mgmt_internet
   id = "*5E"
-}
-
-import {
-  to = routeros_ip_firewall_filter.fwd_vpn_full_tunnel
-  id = "*63"
 }
 
 import {
@@ -415,10 +395,6 @@ import {
   id = "*A9"
 }
 import {
-  to = routeros_ip_firewall_filter.fwd_09_dmz_to_backends
-  id = "*78"
-}
-import {
   to = routeros_ip_firewall_filter.fwd_10_srv_to_wan
   id = "*62"
 }
@@ -526,13 +502,13 @@ import {
 }
 
 
-import {
-  to = routeros_ip_firewall_filter.fwd_k3s_nfs_media
-  id = "*B8"
-}
-
 # Added out-of-band to unblock Enshrouded LAN play ahead of the normal apply
 # cycle, then adopted here so the next apply reconciles instead of conflicting.
+import {
+  to = routeros_ip_firewall_filter.fwd_k3s_nfs_media_duplicate
+  id = "*B6"
+}
+
 import {
   to = routeros_ip_firewall_filter.fwd_internal_to_dmz_enshrouded
   id = "*C3"
