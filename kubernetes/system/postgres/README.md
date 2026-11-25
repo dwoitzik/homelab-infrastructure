@@ -119,6 +119,10 @@ the restore Cluster under the original name with the spec above plus its
 `spec.plugins` entry pointing at a fresh path, and move the Git manifest to match before
 re-enabling sync. `DISASTER-RECOVERY.md` section 5a has the full sequence.
 
+The restore path is exercised monthly: `monthly-restore-test` (in
+`kubernetes/system/velero/`) restores `postgres-firefly` this way into the scratch
+namespace `cnpg-restore-test`, checks the data and deletes the scratch cluster.
+
 ## Dependencies
 
 CloudNativePG operator, Barman Cloud plugin, cert-manager (plugin TLS), Garage (backup

@@ -148,6 +148,11 @@ archives WAL and takes a daily base backup there through the Barman Cloud plugin
 Tested 2026-11-17 against `postgres-scanopy`: one scratch cluster to a point before the
 plugin switch, one to the latest point; both matched the live row counts.
 
+`monthly-restore-test` (`kubernetes/system/velero/restore-test.yml`) repeats this every
+month for `postgres-firefly`: a throwaway Cluster in `cnpg-restore-test` restored to the
+latest point, checked (tables, rows, past the newest base backup's end LSN) and deleted.
+A failure pages through ntfy.
+
 ## 5b. Postgres from the offsite (R2) backup
 
 The offsite backup has no raw Postgres data directories, only `pg_dump` archives

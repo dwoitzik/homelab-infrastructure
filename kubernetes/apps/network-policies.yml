@@ -150,6 +150,27 @@ spec:
         - port: 3900
           protocol: TCP
 ---
+# monthly-restore-test's scratch Postgres cluster reads the barman backups.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-cnpg-restore-test-to-garage
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: garage
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-restore-test
+      ports:
+        - port: 3900
+          protocol: TCP
+---
 # The Scanopy SRV daemon runs on the host network in host-agents. Its traffic
 # to a pod on another node leaves through flannel.1 with the node's 10.42.x.0
 # address, so no namespace or pod selector can match it.
