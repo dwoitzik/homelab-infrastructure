@@ -8,7 +8,8 @@ limits. Synced by the `argocd-install` Application with `prune: false`.
 ## Upgrade
 
 1. Apply the new release's CRDs by hand:
-   `kubectl apply --server-side -k https://github.com/argoproj/argo-cd/manifests/crds?ref=<version>`
+   `kubectl apply --server-side --force-conflicts -k https://github.com/argoproj/argo-cd/manifests/crds?ref=<version>`
+   (`--force-conflicts`: the live CRDs carry fields owned by an earlier client-side apply).
 2. Change the version in the `resources` URL of `kustomization.yaml` and merge.
 
 ## Restore
