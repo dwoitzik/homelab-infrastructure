@@ -15,3 +15,11 @@ pve_host_mounts_datasets:
     owner: "101000"
     group: "101000"
     mode: "0777"
+  # Kept outside /mnt/pbs-storage: PBS garbage collection walks the whole datastore
+  # directory and aborts on any subdirectory it cannot read.
+  - name: archive/jellyfin-cache
+    mountpoint: /mnt/jellyfin-cache
+    quota: 20G
+    owner: "100000"
+    group: "100000"
+    mode: "0755"

@@ -450,15 +450,11 @@ resource "proxmox_virtual_environment_container" "ct_srv_jellyfin_01" {
     path   = "/media"
   }
 
-  # Jellyfin cache (transcodes + image extraction). ZFS dataset
-  # archive/jellyfin-cache (20 G quota) on the "archive" zpool -- this pool lives
-  # on the USB HDD, not NVMe; rpool (NVMe ZFS root) no longer exists on this host
-  # (see the storage-migration note in `locals` above). Re-pointed here 2026-08-16
-  # after the NVMe/local-lvm migration orphaned the original rpool dataset. Added
-  # live via pct set 203 -mp1; declared here to match and avoid drift. Owner must
-  # be host uid 100000 (= LXC root via Proxmox default subuid mapping).
+  # Jellyfin cache (transcodes + image extraction): ZFS dataset
+  # archive/jellyfin-cache on the USB HDD pool, managed by the pve_host_mounts role.
+  # Not under /mnt/pbs-storage: PBS garbage collection aborts on its 0700 subdirectories.
   mount_point {
-    volume = "/mnt/pbs-storage/jellyfin-cache"
+    volume = "/mnt/jellyfin-cache"
     path   = "/jellyfin-cache"
   }
 

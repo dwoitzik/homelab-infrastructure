@@ -20,8 +20,7 @@
   community.general.zfs:
     name: "{{ item.name }}"
     state: present
-    extra_zfs_properties:
-      mountpoint: "{{ item.mountpoint }}"
+    extra_zfs_properties: "{{ {'mountpoint': item.mountpoint} | combine({'quota': item.quota} if item.quota is defined else {}) }}"
   loop: "{{ pve_host_mounts_datasets }}"
   loop_control:
     label: "{{ item.name }}"

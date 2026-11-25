@@ -6,9 +6,13 @@ reproducible, not hand-edited into `/etc/fstab`.
 
 ## What it sets up
 
-- `/mnt/sab-incomplete` — a 10 GB tmpfs holding SABnzbd's incomplete downloads.
-  Bind-mounted into `ct-srv-media-acq-01` as `/downloads/incomplete`. See
-  `docs/decisions/ADR-066-tmpfs-for-sab-incomplete-downloads.md`.
+- `archive/sab-incomplete` at `/mnt/sab-incomplete`: SABnzbd's incomplete downloads,
+  bind-mounted into `ct-srv-media-acq-01` as `/downloads/incomplete` (ADR-073 replaced
+  the earlier tmpfs from ADR-066).
+- `archive/jellyfin-cache` at `/mnt/jellyfin-cache` (20 G quota): Jellyfin's cache,
+  bind-mounted into `ct-srv-jellyfin-01` as `/jellyfin-cache`. It must stay outside
+  `/mnt/pbs-storage`, the PBS datastore: garbage collection walks every directory
+  there and aborts on the cache's 0700 shader directories.
 
 ## Deploy
 
