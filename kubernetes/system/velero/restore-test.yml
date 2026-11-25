@@ -18,6 +18,9 @@
 # safe, real, working test for now. A dedicated CNPG-native restore test
 # (via `.spec.bootstrap.recovery`, CNPG's own supported recovery path) is a
 # reasonable follow-up, not built here -- see phase8/LEDGER.md Entry 37/38.
+# That follow-up now exists as the second half: postgres-firefly restored through
+# bootstrap.recovery (ADR-081) into a throwaway Cluster in cnpg-restore-test, which
+# only reads the backups and never archives into the live cluster's WAL path.
 #
 # Deliberate split: the ServiceAccount/ConfigMap/CronJob all live in `velero`
 # (stable, persistent), NOT in `velero-restore-test`. That namespace is pure
@@ -108,6 +111,61 @@ rules:
     verbs: ["get", "list", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: restore-test-postgres-scratch
+  namespace: cnpg-restore-test
+rules:
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters"]
+    verbs: ["get", "list", "watch", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: restore-test-postgres-scratch
+  namespace: cnpg-restore-test
+subjects:
+  - kind: ServiceAccount
+    name: restore-test-runner
+    namespace: velero
+roleRef:
+  kind: Role
+  name: restore-test-postgres-scratch
+  apiGroup: rbac.authorization.k8s.io
+---
+# Read-only: the newest base backup's end LSN is the floor the restore must reach.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: restore-test-postgres-backups
+  namespace: database
+rules:
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["backups"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: restore-test-postgres-backups
+  namespace: database
+subjects:
+  - kind: ServiceAccount
+    name: restore-test-runner
+    namespace: velero
+roleRef:
+  kind: Role
+  name: restore-test-postgres-backups
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: restore-test-scratch-access
@@ -142,7 +200,7 @@ data:
       log "FAIL: $*"
       curl -fsS -H "Title: Monthly restore test FAILED" -H "Priority: high" \
         -H "Tags: warning,floppy_disk" \
-        -d "Monthly Velero restore-test failed: $*" "$NTFY_URL" || true
+        -d "Monthly restore-test failed: $*" "$NTFY_URL" || true
       exit 1
     }
 
@@ -238,6 +296,59 @@ data:
       --all -n "$NS" --ignore-not-found --wait=false || true
     timeout 30 kubectl delete networkpolicies -l velero.io/restore-name -n "$NS" --ignore-not-found || true
 
+    PG_NS=cnpg-restore-test
+    PG_SRC=postgres-firefly
+    PG_CLUSTER=firefly-restore
+    PG_DB=firefly
+
+    pg_cleanup() {
+      # Deleting the Cluster removes its pods and PVC through owner references.
+      timeout 300 kubectl delete cluster.postgresql.cnpg.io "$PG_CLUSTER" -n "$PG_NS" \
+        --ignore-not-found --wait=true --timeout=280s || return 1
+      # A PVC still terminating under the same name would block the next restore.
+      timeout 200 kubectl wait --for=delete pvc -l "cnpg.io/cluster=$PG_CLUSTER" -n "$PG_NS" \
+        --timeout=180s 2>/dev/null || [ -z "$(kubectl get pvc -l "cnpg.io/cluster=$PG_CLUSTER" -n "$PG_NS" -o name)" ]
+    }
+    psql_restored() {
+      timeout 60 kubectl exec -n "$PG_NS" "${PG_CLUSTER}-1" -c postgres -- \
+        psql -X -d "$PG_DB" -Atc "$1"
+    }
+
+    log "postgres: clearing any scratch cluster left from a previous run"
+    pg_cleanup || fail "postgres: could not delete leftover scratch cluster $PG_CLUSTER"
+
+    FLOOR_LSN=$(timeout 30 kubectl get backups.postgresql.cnpg.io -n database -o json \
+      | jq -r --arg c "$PG_SRC" '[.items[] | select(.spec.cluster.name==$c and .status.phase=="completed")]
+          | sort_by(.status.stoppedAt) | last | .status.endLSN') \
+      || fail "postgres: listing CNPG backups of $PG_SRC failed"
+    if [ -z "$FLOOR_LSN" ] || [ "$FLOOR_LSN" = "null" ]; then
+      fail "postgres: no completed base backup of $PG_SRC found"
+    fi
+    log "postgres: newest base backup of $PG_SRC ends at LSN $FLOOR_LSN"
+
+    log "postgres: restoring $PG_SRC into $PG_NS/$PG_CLUSTER from its barman backups"
+    timeout 60 kubectl apply -f /pg/cluster.yml || fail "postgres: creating scratch cluster failed"
+    if ! timeout 960 kubectl wait --for=condition=Ready "cluster.postgresql.cnpg.io/$PG_CLUSTER" \
+        -n "$PG_NS" --timeout=900s; then
+      kubectl get cluster.postgresql.cnpg.io "$PG_CLUSTER" -n "$PG_NS" -o jsonpath='{.status.phase}' || true
+      pg_cleanup || true
+      fail "postgres: restored cluster $PG_CLUSTER never became Ready (recovery from barman backups failed)"
+    fi
+
+    TABLES=$(psql_restored "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'") \
+      || TABLES=0
+    MIGRATIONS=$(psql_restored "SELECT count(*) FROM migrations") || MIGRATIONS=0
+    REACHED=$(psql_restored "SELECT pg_current_wal_lsn() >= '$FLOOR_LSN'::pg_lsn") || REACHED=f
+    log "postgres: restored $PG_DB has $TABLES public tables, $MIGRATIONS migrations rows, past base backup end: $REACHED"
+    if [ "$TABLES" -lt 1 ] || [ "$MIGRATIONS" -lt 1 ] || [ "$REACHED" != "t" ]; then
+      pg_cleanup || true
+      fail "postgres: restored $PG_DB failed content checks (tables=$TABLES migrations=$MIGRATIONS past_backup_end=$REACHED)"
+    fi
+    log "PASS: $PG_SRC restored from barman backups and its data is readable"
+
+    log "postgres: cleaning up"
+    pg_cleanup || fail "postgres: could not delete scratch cluster $PG_CLUSTER after a passing test"
+
     log "done"
 ---
 apiVersion: batch/v1
@@ -255,7 +366,8 @@ spec:
   jobTemplate:
     spec:
       ttlSecondsAfterFinished: 604800
-      activeDeadlineSeconds: 1800
+      # Vault restore (~2 min) plus the Postgres recovery (~5 min, up to 16 min waits).
+      activeDeadlineSeconds: 2700
       backoffLimit: 0
       template:
         spec:
@@ -268,6 +380,8 @@ spec:
               volumeMounts:
                 - name: script
                   mountPath: /scripts
+                - name: pg-cluster
+                  mountPath: /pg
               resources:
                 requests:
                   cpu: 100m
@@ -280,3 +394,6 @@ spec:
               configMap:
                 name: restore-test-script
                 defaultMode: 0755
+            - name: pg-cluster
+              configMap:
+                name: restore-test-postgres-cluster

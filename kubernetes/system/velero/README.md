@@ -84,6 +84,12 @@ See `docs/backup-strategy.md` / `DISASTER-RECOVERY.md` for the full procedure. I
 `velero restore create --from-backup <name>`, verify data in place afterward — this
 repo's own non-negotiable rule (never trust a backup that hasn't been restore-tested).
 
+`monthly-restore-test` (`restore-test.yml`, 1st of the month 06:00) proves both kinds:
+it restores the `vault` namespace from the newest Velero backup into
+`velero-restore-test`, then restores `postgres-firefly` from its barman backups into a
+throwaway CNPG Cluster in `cnpg-restore-test` (`restore-test-postgres.yml`). Each part
+checks the restored data, cleans up, and sends ntfy only on failure.
+
 ## Dependencies
 
 Garage (local target), a working R2 credential (offsite target).
