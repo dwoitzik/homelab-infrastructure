@@ -84,6 +84,12 @@ you need. `K3sDatastoreBackupStale` fires when the newest copy is over 13 hours 
    `systemctl start k3s`. The cluster comes back at the copy's point in time; ArgoCD
    reconciles anything committed since.
 
+Tested 2026-11-25 with the first copy (`state-20261125T185952Z.db.zst`, 12.8 MB) pulled
+from rpi-srv-02 into a scratch directory: `integrity_check` ok, 8266 kine rows, and the
+live objects in it (22 namespaces, 117 Secrets, 107 ConfigMaps, 72 Deployments, 61
+ArgoCD Applications) matched `kubectl` against the running cluster. Steps 2 and 3 were
+not run against the live server.
+
 ## 4. Vault — the circular dependency
 
 A fresh Vault instance can't unseal itself. If the old cluster is truly gone, its
