@@ -107,6 +107,24 @@ datastore (a PBS restore of the old control-plane VM's disk counts). If so:
 4. Restore Vault's own PVC (same local-path swap-restore pattern as any other stateful
    service — see step 5) and unseal with the recovered keys.
 
+External Secrets authenticates with its service account through Vault's Kubernetes auth
+(role and policy `external-secrets`), not with a stored token. A restored Vault keeps
+that configuration. A freshly initialised one needs it written once, with a temporary
+root token that is revoked afterwards:
+
+```bash
+vault auth enable kubernetes
+vault write auth/kubernetes/config kubernetes_host=https://kubernetes.default.svc
+vault policy write external-secrets - <<'EOF'
+path "secret/data/*" { capabilities = ["read"] }
+path "secret/metadata/*" { capabilities = ["read", "list"] }
+EOF
+vault write auth/kubernetes/role/external-secrets \
+  bound_service_account_names=external-secrets \
+  bound_service_account_namespaces=external-secrets \
+  token_policies=external-secrets token_ttl=1h
+```
+
 If the old cluster's datastore is *also* gone, there is currently no tested recovery
 path for Vault — see the honest gap noted in `kubernetes/system/vault/README.md`. Build
 and test a `vault operator raft snapshot`-based backup before this becomes a real
