@@ -289,14 +289,52 @@ spec:
               Written by the vzdump job-end hook on the Proxmox host. Find the guest with
               pve_pbs_backup_age_seconds > 86400 or == -1, then read its task log:
               pvesh get /nodes/pve-mgmt-01/tasks --typefilter vzdump --limit 5
-        # The job runs every second day, so a check older than 52h means a run was missed.
+        # The job runs daily at 03:00; a check older than 28h means a run was missed.
         - alert: PBSBackupHealthcheckStale
-          expr: time() - pve_pbs_backup_healthcheck_timestamp_seconds > 52 * 3600
+          expr: time() - pve_pbs_backup_healthcheck_timestamp_seconds > 28 * 3600
           for: 1h
           labels:
             severity: critical
           annotations:
-            summary: "No PBS backup run has reported in over 52 hours"
+            summary: "No PBS backup run has reported in over 28 hours"
             description: >
               The vzdump job-end hook last ran {{ $value | humanizeDuration }} ago. Check the
               backup job schedule (pvesh get /cluster/backup) and the PBS datastore.
+        # Written by pbs-job-metrics.py (pbs role) from the PBS task status.
+        - alert: PBSGarbageCollectionFailed
+          expr: pbs_gc_last_run_ok == 0 or time() - pbs_gc_last_run_end_timestamp_seconds > 28 * 3600
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "PBS garbage collection on {{ $labels.store }} failed or has not run for 28h"
+            description: >
+              Without GC no chunk is ever freed and the datastore only grows. Read the last
+              task: proxmox-backup-manager task list --all --limit 20 on pve-mgmt-01, then
+              proxmox-backup-manager garbage-collection status {{ $labels.store }}.
+        - alert: PBSVerifyFailed
+          expr: |
+            (pbs_verify_job_last_run_ok == 0 and pbs_verify_job_last_run_end_timestamp_seconds > 0)
+            or pbs_snapshots{verify_state="failed"} > 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PBS verification found a broken backup or the verify job failed"
+            description: >
+              A snapshot that fails verification will not restore. Check the weekly-verify
+              task log on pve-mgmt-01 (proxmox-backup-manager task list --all) and which
+              snapshots are marked failed in the PBS UI.
+        - alert: PBSVerifyStale
+          expr: |
+            time() - pbs_verify_job_last_run_end_timestamp_seconds > 8 * 86400
+            or time() - node_textfile_mtime_seconds{file=~".*pbs_jobs.prom"} > 3600
+            or absent(pbs_verify_job_last_run_end_timestamp_seconds)
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "PBS weekly verify has not finished in 8 days, or its metrics stopped"
+            description: >
+              Either the weekly-verify job (Sundays 06:30) did not complete, or the
+              pbs-job-metrics cron on pve-mgmt-01 stopped writing pbs_jobs.prom.

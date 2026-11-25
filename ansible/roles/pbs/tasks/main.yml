@@ -88,3 +88,63 @@
     name: "PBS to GDrive offsite backup"
     user: root
     state: absent
+
+- name: Read the vzdump backup job
+  ansible.builtin.command:
+    cmd: pvesh get /cluster/backup/{{ pbs_vzdump_job_id }} --output-format json
+  register: pbs_vzdump_job
+  changed_when: false
+  check_mode: false
+
+- name: Run the vzdump backup job daily
+  ansible.builtin.command:
+    cmd: pvesh set /cluster/backup/{{ pbs_vzdump_job_id }} --schedule '{{ pbs_vzdump_schedule }}'
+  when: (pbs_vzdump_job.stdout | from_json).schedule != pbs_vzdump_schedule
+  changed_when: true
+
+- name: Read the PBS verify jobs
+  ansible.builtin.command:
+    cmd: proxmox-backup-manager verify-job list --output-format json
+  register: pbs_verify_jobs
+  changed_when: false
+  check_mode: false
+
+- name: Create the weekly verify job
+  ansible.builtin.command:
+    cmd: >-
+      proxmox-backup-manager verify-job create {{ pbs_verify_job_id }}
+      --store {{ pbs_datastore }} --schedule '{{ pbs_verify_schedule }}'
+      --ignore-verified true --outdated-after {{ pbs_verify_outdated_after_days }}
+  when: pbs_verify_job_id not in (pbs_verify_jobs.stdout | from_json | map(attribute='id') | list)
+  changed_when: true
+
+- name: Keep the weekly verify job's settings
+  ansible.builtin.command:
+    cmd: >-
+      proxmox-backup-manager verify-job update {{ pbs_verify_job_id }}
+      --schedule '{{ pbs_verify_schedule }}'
+      --ignore-verified true --outdated-after {{ pbs_verify_outdated_after_days }}
+  vars:
+    pbs_verify_job_live: "{{ pbs_verify_jobs.stdout | from_json | selectattr('id', 'equalto', pbs_verify_job_id) | first | default({}) }}"
+  when:
+    - pbs_verify_job_live | length > 0
+    - (pbs_verify_job_live.schedule | default('') != pbs_verify_schedule)
+      or (pbs_verify_job_live['outdated-after'] | default(0) | int != pbs_verify_outdated_after_days)
+      or (pbs_verify_job_live['ignore-verified'] | default(true) | bool is false)
+  changed_when: true
+
+# GC and verify only report in the PBS task log; this publishes their outcome.
+- name: Deploy the PBS job metrics script
+  ansible.builtin.copy:
+    src: pbs-job-metrics.py
+    dest: /usr/local/sbin/pbs-job-metrics.py
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Publish PBS job metrics every 15 minutes
+  ansible.builtin.cron:
+    name: pbs-job-metrics
+    user: root
+    minute: "*/15"
+    job: /usr/local/sbin/pbs-job-metrics.py {{ pbs_datastore }} {{ pbs_verify_job_id }} {{ pbs_textfile_dir }}

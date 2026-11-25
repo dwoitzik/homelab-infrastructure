@@ -220,6 +220,10 @@ when only R2 is left.
 
 1. Confirm a PBS backup job actually exists (`pvesh get /cluster/backup`) — this
    recovery found it completely missing, not something to assume is configured.
+   The `pbs` Ansible role (`site.yml`, `mgmt_nodes`) sets the `nightly-backup` job to
+   daily 03:00 and creates the `weekly-verify` PBS verify job, but it cannot create the
+   vzdump job itself: create it by hand first (`all 1`, `exclude 9000`, storage
+   `local-pbs`, snapshot mode, zstd, `keep-daily=7,keep-weekly=4`), then run the role.
 2. Deploy Velero + Garage, prove a real restore into a scratch namespace before trusting
    the schedule (brief §8's own explicit requirement — "a scheduled backup is not a
    restorable backup").

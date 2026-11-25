@@ -1,0 +1,12 @@
+---
+pbs_datastore: Local-Backups
+# vzdump job in /etc/pve/jobs.cfg. Created by hand (the Terraform provider cannot
+# express all-guests-but-one); only its schedule is enforced here.
+pbs_vzdump_job_id: nightly-backup
+pbs_vzdump_schedule: "*-*-* 03:00:00"
+# Weekly, after the 03:00 backup and 05:00 Velero run. ignore-verified skips
+# snapshots verified within pbs_verify_outdated_after_days, so a run only reads new chunks.
+pbs_verify_job_id: weekly-verify
+pbs_verify_schedule: "sun 06:30"
+pbs_verify_outdated_after_days: 30
+pbs_textfile_dir: /var/lib/node_exporter/textfile_collector
