@@ -1,7 +1,9 @@
 # ADR-059: headscale's public name resolves via a Cloudflare A record, not the MikroTik DDNS CNAME
 
-- **Status**: Accepted, 2026-10-18. Apply pending the `terraform-apply` Environment
-  gate; the CronJob auto-syncs once the PR merges.
+- **Status**: Accepted 2026-10-18, applied. Checked 2026-11-25: `headscale.woitzik.dev` is
+  a DNS-only A record (TTL 300) on Cloudflare's nameservers with the current WAN address,
+  the `cloudflare-ddns` CronJob runs every 5 minutes without failures, and the
+  `blackbox-http` probe over 7 days shows p95 DNS lookup 0.03s and 99.98% success.
 - **Relates to**: ADR-033 (public-exposure allowlist), ADR-022 (headscale runs off-cluster),
   `kubernetes/system/monitoring/application.yml` (the `blackbox-http` probe),
   `kubernetes/system/monitoring/slo-rules.yml`, `terraform/stacks/cloudflare/main.tf`,
