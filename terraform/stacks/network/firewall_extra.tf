@@ -9,6 +9,46 @@ removed {
   lifecycle { destroy = true }
 }
 
+# Retired: the WireGuard VPN (10.6.0.0/24, replaced by Headscale) and the
+# MGMT-host NFS export for media (now ct-srv-nfs-01 and LXC bind mounts).
+removed {
+  from = routeros_ip_firewall_filter.fwd_vpn_mobile_dmz
+  lifecycle { destroy = true }
+}
+removed {
+  from = routeros_ip_firewall_filter.fwd_vpn_mobile_internal
+  lifecycle { destroy = true }
+}
+removed {
+  from = routeros_ip_firewall_filter.fwd_vpn_laptop_full
+  lifecycle { destroy = true }
+}
+removed {
+  from = routeros_ip_firewall_filter.fwd_vpn_full_tunnel
+  lifecycle { destroy = true }
+}
+removed {
+  from = routeros_ip_firewall_filter.fwd_k3s_nfs_media
+  lifecycle { destroy = true }
+}
+
+# Untracked live duplicate of the NFS rule above (same match, never in state).
+# Adopted here unchanged so the follow-up change can destroy it through Terraform.
+resource "routeros_ip_firewall_filter" "fwd_k3s_nfs_media_duplicate" {
+  action       = "accept"
+  chain        = "forward"
+  protocol     = "tcp"
+  src_address  = "10.0.20.0/24"
+  dst_address  = "10.0.10.10"
+  dst_port     = "2049"
+  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment      = "19: Server VLAN -> MGMT NFSv4 export for Jellyfin/usenet media PVC (mnt/media)"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
 # ===============================================
 # Rules that existed live on the router but were never added to Terraform.
 # Found during the 2026-06-21 firewall audit (see CHANGELOG/OPERATIONS.md).
@@ -66,45 +106,6 @@ resource "routeros_ip_firewall_filter" "in_04_atlantis_api" {
   }
 }
 
-resource "routeros_ip_firewall_filter" "fwd_vpn_mobile_dmz" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = "10.6.0.2"
-  dst_address  = "10.0.30.0/24"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "08: VPN - Mobile access to DMZ (External Proxy)"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
-}
-
-resource "routeros_ip_firewall_filter" "fwd_vpn_mobile_internal" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = "10.6.0.2"
-  dst_address  = "10.0.20.0/24"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "07: VPN - Mobile limited to internal services"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
-}
-
-resource "routeros_ip_firewall_filter" "fwd_vpn_laptop_full" {
-  action       = "accept"
-  chain        = "forward"
-  src_address  = "10.6.0.3"
-  dst_address  = "10.0.0.0/16"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "06: VPN - Laptop Full Access"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
-}
-
 # src_address was a single host (ct-srv-docker-01) from before Prometheus
 # moved into k3s -- the actual scraper (a pod on vm-srv-k3s-12) was never
 # covered by this rule, causing a permanent TargetDown for these exporters.
@@ -123,7 +124,6 @@ resource "routeros_ip_firewall_filter" "fwd_monitoring_dmz_scrape" {
   }
 }
 
-
 resource "routeros_ip_firewall_filter" "fwd_mgmt_internet" {
   action        = "accept"
   chain         = "forward"
@@ -131,20 +131,6 @@ resource "routeros_ip_firewall_filter" "fwd_mgmt_internet" {
   out_interface = "ether1"
   place_before  = routeros_ip_firewall_filter.fwd_99_drop_all.id
   comment       = "11: MGMT - Internet access (Critical for PBS rclone & Updates)"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
-}
-
-
-resource "routeros_ip_firewall_filter" "fwd_vpn_full_tunnel" {
-  action        = "accept"
-  chain         = "forward"
-  src_address   = "10.6.0.0/24"
-  out_interface = "ether1"
-  place_before  = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment       = "14: VPN - Allow Internet Access for Full Tunnel"
 
   lifecycle {
     ignore_changes = [place_before]
@@ -194,27 +180,6 @@ resource "routeros_ip_firewall_filter" "fwd_mgmt_oidc_traefik" {
   lifecycle {
     ignore_changes = [place_before]
   }
-}
-
-# ADR-027 backlog, corrected: an earlier pass here flagged this resource as
-# having no `import` block and assumed it was a live-but-unadopted risk,
-# same class as wan_egress_sqm/mgmt_port/vlan10. Checked against a real
-# live plan instead of guessing further: it's already in state (id *B8,
-# confirmed via `terraform plan` showing a clean refresh and zero diff for
-# it) -- someone ran a one-off `terraform import` for it previously without
-# ever adding the matching declarative block. Not a risk, just a
-# documentation gap; the import block below closes it so a fresh
-# `terraform init` from scratch (state loss, GIT-007-style) would still
-# adopt it correctly instead of trying to create a duplicate.
-resource "routeros_ip_firewall_filter" "fwd_k3s_nfs_media" {
-  action       = "accept"
-  chain        = "forward"
-  protocol     = "tcp"
-  src_address  = "10.0.20.0/24"
-  dst_address  = "10.0.10.10"
-  dst_port     = "2049"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "19: Server VLAN -> MGMT NFSv4 export for Jellyfin/usenet media PVC (mnt/media)"
 }
 
 # Minecraft is the one player-facing service that has to be reachable from

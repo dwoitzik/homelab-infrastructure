@@ -255,23 +255,8 @@ resource "routeros_ip_firewall_filter" "fwd_08b_allow_dns_tcp" {
   dst_address  = "10.0.20.5"
   dst_port     = "53"
   protocol     = "tcp"
-  place_before = routeros_ip_firewall_filter.fwd_09_dmz_to_backends.id
+  place_before = routeros_ip_firewall_filter.fwd_10_srv_to_wan.id
   comment      = "08b: DNS - Allow internal DNS queries to AdGuard VIP (TCP)"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
-}
-
-resource "routeros_ip_firewall_filter" "fwd_09_dmz_to_backends" {
-  chain            = "forward"
-  action           = "accept"
-  src_address      = "10.0.30.0/24"
-  dst_address_list = "Reverse_Proxy_Targets"
-  dst_port         = "80,443,8006,8007"
-  protocol         = "tcp"
-  place_before     = routeros_ip_firewall_filter.fwd_10_srv_to_wan.id
-  comment          = "09: DMZ - Access to specific Reverse Proxy Backends"
 
   lifecycle {
     ignore_changes = [place_before]
@@ -292,7 +277,6 @@ resource "routeros_ip_firewall_filter" "fwd_09b_dmz_to_headscale" {
     ignore_changes = [place_before]
   }
 }
-
 
 # Scanopy MGMT/DMZ daemons -> scanopy-server-daemon-lb (10.0.20.202:60072).
 # DaemonPoll mode -- daemon-initiated only, no inbound path to either
@@ -417,4 +401,10 @@ resource "routeros_ip_firewall_filter" "fwd_11_dmz_to_wan" {
   lifecycle {
     ignore_changes = [place_before]
   }
+}
+
+# Reverse_Proxy_Targets has no entries, so this rule matched nothing.
+removed {
+  from = routeros_ip_firewall_filter.fwd_09_dmz_to_backends
+  lifecycle { destroy = true }
 }
