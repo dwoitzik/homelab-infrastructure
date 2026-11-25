@@ -205,15 +205,11 @@ spec:
             grafana-com:
               proxmox-pve:
                 gnetId: 10347
-                revision: 9
+                revision: 5
                 datasource: Prometheus
               node-exporter-full:
                 gnetId: 1860
                 revision: 37
-                datasource: Prometheus
-              proxmox-summary:
-                gnetId: 19022
-                revision: 5
                 datasource: Prometheus
           additionalDataSources:
             - name: Loki
