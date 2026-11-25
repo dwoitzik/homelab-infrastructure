@@ -1,0 +1,10 @@
+[Unit]
+Description=Copy the k3s datastore off-host every 6 hours
+
+[Timer]
+OnCalendar={{ k3s_kine_backup_schedule }}
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

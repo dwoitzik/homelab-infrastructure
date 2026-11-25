@@ -1,0 +1,63 @@
+---
+- name: Install sqlite3, zstd and rsync
+  ansible.builtin.apt:
+    name:
+      - sqlite3
+      - zstd
+      - rsync
+    state: present
+
+- name: Ensure the dedicated SSH key for the datastore copies exists
+  ansible.builtin.command:
+    cmd: ssh-keygen -q -t ed25519 -N "" -C "kine-backup@{{ inventory_hostname }}" -f {{ k3s_kine_backup_key }}
+    creates: "{{ k3s_kine_backup_key }}"
+
+- name: Read the key's public half
+  ansible.builtin.slurp:
+    src: "{{ k3s_kine_backup_key }}.pub"
+  register: k3s_kine_backup_pubkey
+
+# rrsync -wo: the key can only write into the target root, never read the
+# copies back or reach any other path.
+- name: Authorize the key on the target host, write-only rsync into the target root
+  ansible.posix.authorized_key:
+    user: "{{ k3s_kine_backup_target_user }}"
+    key: "{{ k3s_kine_backup_pubkey.content | b64decode | trim }}"
+    key_options: 'command="/usr/bin/rrsync -wo {{ k3s_kine_backup_target_root }}",restrict'
+    exclusive: true
+  delegate_to: "{{ k3s_kine_backup_target_inventory_host }}"
+  become: true
+
+# OpenSSH 10's ssh-keyscan prints a '# host:port banner' line on stdout.
+- name: Pin the target host's SSH host key
+  ansible.builtin.known_hosts:
+    name: "{{ k3s_kine_backup_target_address }}"
+    key: "{{ k3s_kine_backup_target_address }} {{ lookup('ansible.builtin.pipe', 'ssh-keyscan -t ed25519 ' + k3s_kine_backup_target_address + ' 2>/dev/null | grep -v \"^#\" | cut -d\" \" -f2-') }}"
+    path: /root/.ssh/known_hosts
+
+- name: Deploy the datastore backup script
+  ansible.builtin.template:
+    src: k3s-kine-backup.sh.j2
+    dest: /usr/local/sbin/k3s-kine-backup.sh
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Deploy the datastore backup service
+  ansible.builtin.template:
+    src: k3s-kine-backup.service.j2
+    dest: /etc/systemd/system/k3s-kine-backup.service
+    mode: '0644'
+
+- name: Deploy the datastore backup timer
+  ansible.builtin.template:
+    src: k3s-kine-backup.timer.j2
+    dest: /etc/systemd/system/k3s-kine-backup.timer
+    mode: '0644'
+
+- name: Enable the datastore backup timer
+  ansible.builtin.systemd:
+    name: k3s-kine-backup.timer
+    daemon_reload: true
+    enabled: true
+    state: started

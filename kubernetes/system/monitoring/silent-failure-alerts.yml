@@ -202,6 +202,25 @@ spec:
               mode and reports drift to ntfy. While it is not running, drift between the
               repo and the hosts goes unnoticed. Check:
               systemctl status ansible-drift-check.service; journalctl -u ansible-drift-check.service
+    - name: k3s-kine-backup
+      rules:
+        # Every 6h; two missed runs before this fires. A compressed copy under
+        # 1 MiB is not a real datastore (the live one is ~65 MB, ~12 MB packed).
+        - alert: K3sDatastoreBackupStale
+          expr: |
+            (time() - k3s_kine_backup_newest_timestamp_seconds > 13 * 3600)
+            or (k3s_kine_backup_newest_bytes < 1048576)
+            or absent(k3s_kine_backup_newest_timestamp_seconds)
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "No fresh off-host copy of the k3s datastore for 13h+"
+            description: >
+              k3s-kine-backup.timer on vm-srv-k3s-11 copies state.db to rpi-srv-02
+              (/mnt/ssd/k3s-kine); this is the only copy of the cluster's datastore
+              outside the Proxmox host. Check on vm-srv-k3s-11:
+              systemctl status k3s-kine-backup.service; journalctl -u k3s-kine-backup.service
     - name: immich-library-backup
       rules:
         - alert: ImmichLibraryBackupStale

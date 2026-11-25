@@ -1,0 +1,9 @@
+[Unit]
+Description=Copy the k3s datastore to {{ k3s_kine_backup_target_inventory_host }}
+After=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/k3s-kine-backup.sh
+Nice=10
+IOSchedulingClass=idle

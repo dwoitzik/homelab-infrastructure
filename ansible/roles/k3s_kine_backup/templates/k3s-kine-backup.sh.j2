@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Consistent copy of the k3s datastore, shipped to {{ k3s_kine_backup_target_inventory_host }}.
+set -euo pipefail
+db="{{ k3s_kine_backup_db }}"
+name="state-$(date -u +%Y%m%dT%H%M%SZ).db"
+work="$(mktemp -d {{ k3s_kine_backup_staging_dir }}/kine-backup.XXXXXX)"
+trap 'rm -rf "$work"' EXIT
+
+# VACUUM INTO reads in one transaction: a single point in time while k3s writes.
+# .backup restarts its page copy on every foreign write, and kine writes every few seconds.
+sqlite3 "$db" ".timeout 30000" "VACUUM INTO '$work/$name'"
+
+check="$(sqlite3 "$work/$name" "PRAGMA integrity_check;")"
+if [ "$check" != "ok" ]; then
+  echo "integrity_check on the copy failed: $check" >&2
+  exit 1
+fi
+rows="$(sqlite3 "$work/$name" "SELECT count(*) FROM kine;")"
+
+zstd -q -10 --rm "$work/$name"
+rsync -t -e "ssh -i {{ k3s_kine_backup_key }} -o BatchMode=yes -o StrictHostKeyChecking=yes" \
+  "$work/$name.zst" "{{ k3s_kine_backup_target_user }}@{{ k3s_kine_backup_target_address }}:"
+echo "$name.zst ($rows kine rows, $(stat -c %s "$work/$name.zst") bytes) copied to {{ k3s_kine_backup_target_inventory_host }}"
