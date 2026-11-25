@@ -140,8 +140,10 @@ spec:
                   value: "false"
                 - name: RENOVATE_REQUIRE_CONFIG
                   value: optional
+                # Must be the App's bot identity: commits go through the API as the bot,
+                # and any other author makes Renovate treat its own branches as edited.
                 - name: RENOVATE_GIT_AUTHOR
-                  value: "dwoitzik <woitzikdavid18@gmail.com>"
+                  value: "homelab-renovate-dwoitzik[bot] <357019668+homelab-renovate-dwoitzik[bot]@users.noreply.github.com>"
                 - name: LOG_LEVEL
                   value: info
                 # REL-066: repo growth (this session's IAC-GAPS work added
