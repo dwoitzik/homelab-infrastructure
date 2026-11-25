@@ -9,6 +9,10 @@ services:
     environment:
       - TZ={{ jellyfin_tz }}
       - JELLYFIN_PublishedServerUrl={{ jellyfin_published_url }}
+      # The image points XDG_CACHE_HOME at /cache, so Mesa puts its 0700 shader caches
+      # there. /cache sits inside the PBS datastore directory on the host, and PBS
+      # garbage collection aborts on any subdirectory it cannot read.
+      - XDG_CACHE_HOME=/config/xdg-cache
     devices:
       - /dev/dri/renderD128:/dev/dri/renderD128
     group_add:
