@@ -151,7 +151,7 @@ spec:
             capabilities:
               drop: ["ALL"]
           env:
-            - name: GARAGE_CONFIG
+            - name: GARAGE_CONFIG_FILE
               value: /etc/garage.toml
             - name: GARAGE_ALLOW_WORLD_READABLE_SECRETS
               value: "true"
