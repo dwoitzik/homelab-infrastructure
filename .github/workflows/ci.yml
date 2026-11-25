@@ -219,6 +219,16 @@ jobs:
       - name: Every declared kind is readable by drift-checker
         run: pip install --quiet pyyaml && python3 scripts/check-drift-checker-coverage.py
 
+  image-lockstep:
+    name: Image lockstep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Renovate can bump Immich server without ML when one GHCR lookup fails.
+      - name: Images released together share one tag
+        run: python3 scripts/check-image-lockstep.py
+
   configmap-scripts:
     name: ConfigMap shell scripts
     runs-on: ubuntu-latest

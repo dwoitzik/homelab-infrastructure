@@ -172,7 +172,7 @@
       "platformAutomerge": true
     },
     {
-      "description": "Immich server + ML: MUST follow the mobile app releases. The store auto-updates the app, and an older server blocks mobile backup/sync (2026-09-05 outage: app 3.2.1 vs server 3.1.0). Unlike the generic stateful/critical rule below, minor+patch+digest auto-merge here so the server never lags the app; only major stays PR-only.",
+      "description": "Immich server + ML: MUST follow the mobile app releases. The store auto-updates the app, and an older server blocks mobile backup/sync (2026-09-05 outage: app 3.2.1 vs server 3.1.0). Unlike the generic stateful/critical rule below, minor+patch+digest auto-merge here so the server never lags the app; only major stays PR-only. platformAutomerge is off so Renovate merges only when every check is green, including the image-lockstep job that keeps a server-only bump (failed ML lookup) from landing; the repository ruleset has no required status checks, so GitHub's own auto-merge would not wait for CI.",
       "matchManagers": [
         "kubernetes"
       ],
@@ -186,7 +186,7 @@
         "digest"
       ],
       "automerge": true,
-      "platformAutomerge": true,
+      "platformAutomerge": false,
       "labels": [
         "immich",
         "auto-merge"
@@ -317,6 +317,12 @@
       "description": "2026-07-09 OOM root cause: a major hashicorp/aws provider bump (5.x->6.53.0) makes Renovate's terraform manager fetch and SHA256-hash every platform build of the release (14 builds) to keep .terraform.lock.hcl valid. Renovate's default concurrentRequestLimit (16) meant up to 16 of those provider zips could be buffered in memory at once, producing a real transient peak of ~4GiB in a single ~30s window (confirmed via an isolated, generously-capped diagnostic run -- not a leak, the process finished cleanly at exit 0 given real headroom). Under the CronJob's tight memory limit, the cgroup killed it mid-spike before GC could reclaim. Capping concurrency here flattens the peak at the source instead of just hoping a bigger ceiling survives it.",
       "matchHost": "releases.hashicorp.com",
       "concurrentRequestLimit": 2
+    },
+    {
+      "description": "The immich-machine-learning GHCR repository has 230+ pages of tags and Renovate must read all of them (GHCR sorts oldest first). Scheduled runs regularly ended with 'no-result' for it while manual runs succeeded; a longer per-request timeout and fewer parallel requests keep one slow page from failing the whole lookup.",
+      "matchHost": "ghcr.io",
+      "timeout": 120000,
+      "concurrentRequestLimit": 4
     }
   ],
   "argocd": {
