@@ -16,13 +16,16 @@ spec:
           # Pinned: the server version moves only in its own reviewed step, never with a chart bump.
           image:
             # renovate: datasource=docker depName=hashicorp/vault
-            tag: "2.0.4"
+            tag: "2.2.2"
           ha:
             enabled: false
           standalone:
             enabled: true
             config: |
               ui = true
+              # 2.2 authenticates generate-root and rekey by default; recovery from the
+              # unseal shares (ADR-025) needs them without a token, as before.
+              enable_unauthenticated_access = ["generate-root", "rekey"]
               listener "tcp" {
                 tls_disable = 1
                 address = "[::]:8200"
