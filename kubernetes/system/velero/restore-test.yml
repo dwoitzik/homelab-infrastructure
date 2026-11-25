@@ -1,9 +1,9 @@
 # BRIEFING-V4.md Section D: automated monthly restore-test. Proves the real,
 # working daily Velero backup (kubernetes/system/velero/schedule.yml) actually
 # restores, not just that it completes -- restores the `vault` namespace into
-# a scratch namespace and confirms the restored Vault storage starts cleanly
-# and reports itself Initialized (i.e. the raft data genuinely came back
-# intact), rather than trusting the backup job's own exit code alone.
+# a scratch namespace and checks the raft snapshot that came back with it
+# (vault/snapshot.yml): every member matches the archive's SHA256SUMS and it is
+# no older than the backup schedule allows.
 #
 # Scoped to `vault` deliberately, not `database` (CNPG-managed Postgres):
 # investigated restoring `database` too and found a real blocker -- CNPG's
@@ -273,22 +273,37 @@ data:
       fail "restore reported $ERRORS errors"
     fi
 
-    log "waiting for restored vault-0 pod to be Ready"
-    if ! kubectl wait --for=condition=Ready pod/vault-0 -n "$NS" --timeout=180s; then
-      fail "restored vault-0 pod never became Ready"
+    # vault-0's data volume is excluded from Velero; the raft snapshot in the
+    # vault-snapshots PVC is what a Vault restore would use.
+    log "waiting for the restored vault-snapshot pod"
+    if ! kubectl wait --for=condition=Ready pod -l app=vault-snapshot -n "$NS" --timeout=180s; then
+      fail "restored vault-snapshot pod never became Ready"
+    fi
+    SNAP_POD=$(kubectl get pod -l app=vault-snapshot -n "$NS" -o jsonpath='{.items[0].metadata.name}')
+
+    log "checking the restored raft snapshot against its own SHA256SUMS"
+    SUMS_OUT=$(timeout 60 kubectl exec -n "$NS" "$SNAP_POD" -c vault-snapshot -- sh -c '
+      set -eu
+      f=/snapshots/vault.snap
+      tar -xzOf "$f" SHA256SUMS > /tmp/sums
+      grep -q " state.bin$" /tmp/sums
+      while read -r sum member; do
+        [ "$(tar -xzOf "$f" "$member" | sha256sum | cut -d" " -f1)" = "$sum" ] || { echo "MISMATCH $member"; exit 1; }
+      done < /tmp/sums
+      echo "SUMS_OK $(wc -c < "$f")"
+      cat /snapshots/.last-run') || fail "restored Vault raft snapshot is missing or corrupt: $SUMS_OUT"
+    echo "$SUMS_OUT"
+    SNAP_BYTES=$(echo "$SUMS_OUT" | awk '/^SUMS_OK/ {print $2}')
+    SNAP_TIME=$(echo "$SUMS_OUT" | tail -1)
+    SNAP_EPOCH=$(date -u -d "$(echo "$SNAP_TIME" | sed 's/T/ /; s/Z$//')" +%s) \
+      || fail "restored Vault snapshot has no readable .last-run ($SNAP_TIME)"
+    SNAP_AGE_H=$(( ($(date +%s) - SNAP_EPOCH) / 3600 ))
+    # Daily backup at 05:00, test at 06:00: anything past two days means the hook stopped.
+    if [ "$SNAP_AGE_H" -gt 48 ]; then
+      fail "restored Vault raft snapshot is ${SNAP_AGE_H}h old (taken $SNAP_TIME)"
     fi
 
-    log "checking restored Vault's storage integrity"
-    STATUS_OUT=$(timeout 30 kubectl exec -n "$NS" vault-0 -- vault status 2>&1 || true)
-    echo "$STATUS_OUT"
-    if ! echo "$STATUS_OUT" | grep -Eq "Initialized[[:space:]]+true"; then
-      fail "restored Vault did not report Initialized: true -- raft storage may not have restored correctly"
-    fi
-    if ! echo "$STATUS_OUT" | grep -qi "Sealed"; then
-      fail "restored Vault status output missing Sealed line -- unexpected/corrupt output"
-    fi
-
-    log "PASS: restored Vault storage is intact (Initialized: true), pod started cleanly from backup $LATEST"
+    log "PASS: Vault raft snapshot from backup $LATEST is intact (${SNAP_BYTES} bytes, ${SNAP_AGE_H}h old)"
 
     log "cleaning up"
     timeout 30 velero restore delete "$RESTORE_NAME" --confirm || true
