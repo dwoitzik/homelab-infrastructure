@@ -505,11 +505,6 @@ import {
 # Added out-of-band to unblock Enshrouded LAN play ahead of the normal apply
 # cycle, then adopted here so the next apply reconciles instead of conflicting.
 import {
-  to = routeros_ip_firewall_filter.fwd_k3s_nfs_media_duplicate
-  id = "*B6"
-}
-
-import {
   to = routeros_ip_firewall_filter.fwd_internal_to_dmz_enshrouded
   id = "*C3"
 }
