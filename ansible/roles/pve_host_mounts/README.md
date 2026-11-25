@@ -10,11 +10,6 @@ reproducible, not hand-edited into `/etc/fstab`.
   Bind-mounted into `ct-srv-media-acq-01` as `/downloads/incomplete`. See
   `docs/decisions/ADR-066-tmpfs-for-sab-incomplete-downloads.md`.
 
-- `archive/backups` at `/mnt/retired-pbs-datastore`: the datastore of the retired PBS
-  container (April 2026 backups of CTs 110, 200, 301, 302), kept read-only in place
-  until someone decides it can go. It must stay outside `/mnt/pbs-storage`: the live
-  PBS garbage collection reads every index file under its datastore directory.
-
 ## Deploy
 
 ```sh
