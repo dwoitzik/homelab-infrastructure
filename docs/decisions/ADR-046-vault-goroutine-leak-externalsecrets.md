@@ -20,9 +20,19 @@ read as incidents.
 Two independent faults stacked on top of each other.
 
 **1. Vault was wedged, not merely sealed.** The process was alive (5h50m of CPU)
-and the PVC was `Bound`, but nothing was listening on 8200 — no `0x2014` entry in
-`/proc/net/tcp` — and every `wget`/`vault status` against it timed out rather than
-being refused. A `SIGQUIT` goroutine dump explained it: over 160,000 goroutines,
+and the PVC was `Bound`, but every `wget`/`vault status` against port 8200 timed
+out. A timeout is not a refusal: with no socket bound to the port, the kernel
+answers the SYN with a reset and the client fails immediately with `connection
+refused`. Unless something in the path drops packets, a timeout means the
+listening socket still existed and the kernel was accepting or queueing
+connections on it, but Vault never served them. The listener was there; the
+process behind it had stopped answering.
+
+The `/proc/net/tcp` check run during the incident does not change that reading,
+because it checked the wrong port: it searched for `0x2014`, which is port 8212.
+Port 8200 is `0x2008`, so the absence of `0x2014` proves nothing about 8200.
+
+A `SIGQUIT` goroutine dump explained the hang: over 160,000 goroutines,
 every one of them parked in `[select, 29459 minutes]`, i.e. for 20.5 days, spawned
 from `serviceregistration/kubernetes/client.(*Client).do`. The service-registration
 client had accumulated a goroutine per failed retry and never released any of them.

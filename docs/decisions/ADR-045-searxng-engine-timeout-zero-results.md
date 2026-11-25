@@ -48,7 +48,9 @@ Entscheidend: Der Fehler präsentiert sich als **leere Seite**, nicht als Fehler
 Ein Engine-Timeout ist damit nicht von "Dienst kaputt" unterscheidbar, was die
 Fehlersuche deutlich verlängert hat.
 
-Gegenprobe mit denselben Queries direkt gegen den Pod:
+Gegenprobe direkt gegen den Pod. `rthth` ist dieselbe Query wie im Accesslog; die
+geloggte `wiso steuer` (`wiso+steuer`) wurde dabei nicht exakt wiederholt, sondern als
+`wiso steuerung` getestet, also eine ähnliche, keine identische Anfrage:
 
 ```text
 wiso steuerung    -> 20 Treffer  524 / 251 / 1020 ms
