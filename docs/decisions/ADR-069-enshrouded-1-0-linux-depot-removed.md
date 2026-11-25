@@ -34,15 +34,23 @@ AppID 2278520 starting commit from ".../steamapps/downloading/2278520" to
 "/home/enshrouded/enshroudedserver" : 4 updated, 0 moved, 24 deleted files
 ```
 
-Four runtime files were updated and 24 game files deleted. The server binary was
-gone, the unit failed with `wine: failed to open ".../enshrouded_server.exe":
+Four runtime files were updated and 24 game files deleted. The 24 are the whole
+content depot: the initial install on 2026-10-19 committed `24 updated` for the
+same app, and the corrected run at 16:16 put the same number back
+(`24 updated, 0 moved, 4 deleted`, in the same run that logged `removed depots 1006`). The
+server binary was gone, the unit failed with `wine: failed to open ".../enshrouded_server.exe":
 c0000135`, and the systemd unit crash-looped with `Restart=on-failure`.
 
 Two further facts made this hard to see:
 
 - The **savegame was never touched**. `savegame/world0.ksd` kept its content and
-  `enshrouded_server.json` its password throughout; only the executable and the
-  32 `.dat` containers were missing. The loss was entirely re-downloadable.
+  `enshrouded_server.json` its password throughout; what was missing was the
+  content depot, the executable and its `.dat` data containers among it. The
+  loss was entirely re-downloadable. An earlier version of this ADR put the
+  `.dat` count at 32; no log backs that number, and the 24 deleted files are the
+  only count on record. (The current 1.0 install has 10 `.dat` files, but later
+  updates have changed the file set since, so that is not a count of what was
+  lost.)
 - SteamCMD's three-argument depot form (`+app_update <appid> <depot> <manifest>`)
   was **silently ignored** by the current client build, so explicitly asking for
   the content depot fetched zero bytes and still reported success.

@@ -7,9 +7,12 @@ Accepted
 ## Context
 
 Headscale crashlooped: its OIDC provider init does a startup fetch of
-`https://auth.woitzik.dev/.well-known/openid-configuration`. In-cluster, that
-hostname resolves to its public A record, Traefik's external LoadBalancer VIP
-(`10.0.20.200`), so the request hairpins out to the VIP and back in. That path
+`https://auth.woitzik.dev/.well-known/openid-configuration`. That hostname has
+no public A record. Inside the LAN it resolves through AdGuard's `*.woitzik.dev`
+rewrite to Traefik's LoadBalancer VIP (`10.0.20.200`), and the cluster gets the
+same answer, because CoreDNS forwards to the nodes' resolver, which is AdGuard
+(`10.0.20.5`). So the request from the pod leaves through the VIP and comes back
+in. That path
 proved intermittently unreliable -- repeated `curl` probes from an in-cluster
 pod showed the first request succeeding and the next several instantly
 returning `connection refused`. Triggered `SLOAvailabilityFastBurn` and
@@ -32,8 +35,8 @@ main server block, no CoreDNS image/Corefile fork needed.
 
 Scope stays narrow and additive: only hostnames with a confirmed in-cluster
 caller get an entry (currently just `auth.woitzik.dev`, for headscale's OIDC
-check). External clients still resolve the same names publicly and still hit
-the real external VIP -- this only changes what pods inside the cluster
+check). LAN clients still resolve the same names through the AdGuard rewrite
+and still hit the Traefik VIP -- this only changes what pods inside the cluster
 resolve to.
 
 ## Alternatives considered

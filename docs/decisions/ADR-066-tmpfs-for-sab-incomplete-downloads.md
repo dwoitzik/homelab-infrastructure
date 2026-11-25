@@ -50,9 +50,11 @@ pool. A ramdisk therefore does not give a container free memory; it consumes the
 container's own budget, and once that budget is gone the kernel's answer is not
 "evict host page cache" but "reclaim inside the cgroup, then throttle".
 
-What that looked like: one 8.9 GB Blu-ray rip filled the tmpfs well past the
-container's 4 GB limit, the kernel logged ~8 million `memory.high` throttle
-events, and roughly 130 threads (the whole media stack, plus Enshrouded's game
+What that looked like: one 8.9 GB Blu-ray rip was written into the tmpfs against
+the container's 4 GB limit. tmpfs pages cannot stay resident beyond the cgroup
+limit, so everything above it had to be reclaimed into swap and faulted back in
+whenever SABnzbd touched it again. The kernel logged ~8 million `memory.high`
+throttle events, and roughly 130 threads (the whole media stack, plus Enshrouded's game
 process competing on the same node) parked in uninterruptible sleep in
 `folio_wait_bit_common` → `filemap_fault` on those tmpfs pages. Host load sat
 near 150 and `memory.pressure` for the container reported `full avg10=14.36`.
