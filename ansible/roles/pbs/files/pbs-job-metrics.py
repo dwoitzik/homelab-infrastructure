@@ -20,8 +20,24 @@ def api(path):
 
 lines = []
 
+# While a GC or verify task runs, PBS drops last-run-state/-endtime from the job
+# status; the values from the previous write stand in until it finishes.
+previous = {}
+try:
+    with open(PROM) as f:
+        for line in f:
+            if line and not line.startswith("#"):
+                key, _, value = line.rstrip("\n").rpartition(" ")
+                previous[key] = value
+except FileNotFoundError:
+    pass
 
-def metric(name, value, help_text, labels=""):
+
+def metric(name, value, help_text, labels="", running=False):
+    if running:
+        value = previous.get(f"{name}{labels}")
+        if value is None:
+            return
     lines.append(f"# HELP {name} {help_text}")
     lines.append(f"# TYPE {name} gauge")
     lines.append(f"{name}{labels} {value}")
@@ -29,18 +45,22 @@ def metric(name, value, help_text, labels=""):
 
 lbl = f'{{store="{STORE}"}}'
 gc = next((g for g in api("/admin/gc") if g.get("store") == STORE), {})
+gc_running = "last-run-state" not in gc
 metric("pbs_gc_last_run_ok", int(gc.get("last-run-state") == "OK"),
-       "1 if the last garbage collection finished OK.", lbl)
+       "1 if the last garbage collection finished OK.", lbl, gc_running)
 metric("pbs_gc_last_run_end_timestamp_seconds", gc.get("last-run-endtime", 0),
-       "When the last garbage collection ended.", lbl)
+       "When the last garbage collection ended.", lbl, gc_running)
 metric("pbs_gc_pending_bytes", gc.get("pending-bytes", 0),
        "Bytes the last garbage collection could not yet remove.", lbl)
 
 job = next((j for j in api("/admin/verify") if j.get("id") == VERIFY_JOB), {})
+# A job that has never run has no last-run-upid either; that is a real 0.
+verify_running = "last-run-upid" in job and "last-run-state" not in job
+jlbl = f'{{job_id="{VERIFY_JOB}"}}'
 metric("pbs_verify_job_last_run_ok", int(job.get("last-run-state") == "OK"),
-       "1 if the last run of the verify job finished OK.", f'{{job_id="{VERIFY_JOB}"}}')
+       "1 if the last run of the verify job finished OK.", jlbl, verify_running)
 metric("pbs_verify_job_last_run_end_timestamp_seconds", job.get("last-run-endtime", 0),
-       "When the verify job last finished.", f'{{job_id="{VERIFY_JOB}"}}')
+       "When the verify job last finished.", jlbl, verify_running)
 
 snaps = api(f"/admin/datastore/{STORE}/snapshots")
 states = [(s.get("verification") or {}).get("state", "none") for s in snaps]
