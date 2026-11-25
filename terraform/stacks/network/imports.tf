@@ -335,14 +335,6 @@ import {
   id = "*AC"
 }
 import {
-  to = routeros_ip_firewall_filter.in_00a_brute_detect
-  id = "*AA"
-}
-import {
-  to = routeros_ip_firewall_filter.in_00b_brute_drop
-  id = "*A8"
-}
-import {
   to = routeros_ip_firewall_filter.in_01_established
   id = "*5B"
 }

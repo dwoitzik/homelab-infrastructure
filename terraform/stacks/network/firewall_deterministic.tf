@@ -43,7 +43,7 @@ resource "routeros_ip_firewall_filter" "in_00_antispoofing" {
   chain        = "input"
   src_address  = "10.0.0.0/8"
   in_interface = "ether1"
-  place_before = routeros_ip_firewall_filter.in_00a_brute_detect.id
+  place_before = routeros_ip_firewall_filter.drop_all_input.id
   comment      = "IN-00: Anti-spoofing — drop internal src IPs from WAN"
 
   lifecycle {
@@ -51,34 +51,15 @@ resource "routeros_ip_firewall_filter" "in_00_antispoofing" {
   }
 }
 
-# Brute-force: add source to blocklist after 3 new connections to management ports
-resource "routeros_ip_firewall_filter" "in_00a_brute_detect" {
-  action               = "add-src-to-address-list"
-  chain                = "input"
-  protocol             = "tcp"
-  dst_port             = "22,8291"
-  connection_state     = "new"
-  connection_limit     = "3,32"
-  address_list         = "brute_force_blocked"
-  address_list_timeout = "1d"
-  place_before         = routeros_ip_firewall_filter.in_00b_brute_drop.id
-  comment              = "IN-00a: Brute-force detect — SSH/Winbox (3 attempts/IP)"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
+# SSH/WinBox/API are reachable only from Mgmt_Devices (in_02_mgmt); the default
+# drop handles every other source, WAN included. ADR-086.
+removed {
+  from = routeros_ip_firewall_filter.in_00a_brute_detect
+  lifecycle { destroy = true }
 }
-
-resource "routeros_ip_firewall_filter" "in_00b_brute_drop" {
-  action           = "drop"
-  chain            = "input"
-  src_address_list = "brute_force_blocked"
-  place_before     = routeros_ip_firewall_filter.in_01_established.id
-  comment          = "IN-00b: Brute-force drop — blocked source list"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
+removed {
+  from = routeros_ip_firewall_filter.in_00b_brute_drop
+  lifecycle { destroy = true }
 }
 
 resource "routeros_ip_firewall_filter" "in_01_established" {

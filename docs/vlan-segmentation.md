@@ -16,6 +16,8 @@ This document defines the logical network structure and security zones. The Mikr
 
 * **Default Drop:** All inter-VLAN traffic is blocked at the end of the FORWARD chain.
 * **Management Access:** Only the **ADMIN** zone is authorized to access the **MGMT** interfaces.
+* **Router management:** SSH/WinBox/API only from `Mgmt_Devices` (VLAN 10 and 100); MAC-Telnet/MAC-WinBox only on the `mac-access` interface list, never ether1 (ADR-086).
+* **WAN exposure:** TCP 443 to the DMZ proxy (headscale, with a per-source connection-flood guard) and UDP 41641 to rpi-srv-02 (Tailscale). Nothing on the router itself.
 * **DMZ Isolation:** The **DMZ** can only respond to established traffic and reach the WAN. Lateral movement to internal segments is hard-dropped.
 * **Proxy Pinholing:** Specific pinholes exist for the External Proxy (DMZ) to reach designated internal backends on defined ports (80/443).
 
