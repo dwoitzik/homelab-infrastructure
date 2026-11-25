@@ -26,7 +26,7 @@
     content: |
       services:
         unbound:
-          image: klutchell/unbound:1.26.1@sha256:9a3939ca33d6d3b42b81a70391bb8e43f0a08d2bd7a3fdffb43d427493345c36
+          image: klutchell/unbound:v1.26.2@sha256:de8e624f84337bdb2d16540c0b203d5df2a981180421cb50ab4212b67542d8b4
           container_name: unbound
           restart: unless-stopped
           mem_limit: 256m
