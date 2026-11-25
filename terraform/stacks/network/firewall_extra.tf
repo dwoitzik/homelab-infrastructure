@@ -32,21 +32,9 @@ removed {
   lifecycle { destroy = true }
 }
 
-# Untracked live duplicate of the NFS rule above (same match, never in state).
-# Adopted here unchanged so the follow-up change can destroy it through Terraform.
-resource "routeros_ip_firewall_filter" "fwd_k3s_nfs_media_duplicate" {
-  action       = "accept"
-  chain        = "forward"
-  protocol     = "tcp"
-  src_address  = "10.0.20.0/24"
-  dst_address  = "10.0.10.10"
-  dst_port     = "2049"
-  place_before = routeros_ip_firewall_filter.fwd_99_drop_all.id
-  comment      = "19: Server VLAN -> MGMT NFSv4 export for Jellyfin/usenet media PVC (mnt/media)"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
+removed {
+  from = routeros_ip_firewall_filter.fwd_k3s_nfs_media_duplicate
+  lifecycle { destroy = true }
 }
 
 # ===============================================
