@@ -13,76 +13,9 @@ locals {
   template = "local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
 }
 
-# --- Management Stack ---
-
 # REL-016: onboot=1 is set manually (`pct set <id> -onboot 1`), not through
 # start_on_boot: bpg/proxmox does not read it back into state, so Terraform
 # cannot enforce it. A recreated container needs it set again.
-resource "proxmox_virtual_environment_container" "ct_mgmt_scanopy_01" {
-  # ADR-035 mgmt-VLAN daemon, not built yet: its address and firewall path to
-  # the scanopy server are still open, so it stays off until that exists.
-  count        = var.enable_scanopy_mgmt_daemon ? 1 : 0
-  vm_id        = 111
-  node_name    = local.target_node
-  tags         = ["network", "management"]
-  started      = true
-  unprivileged = true
-
-  startup {
-    order    = 5
-    up_delay = 10
-  }
-
-  initialization {
-    hostname = "ct-mgmt-scanopy-01"
-    ip_config {
-      ipv4 {
-        address = "dhcp"
-      }
-      ipv6 {
-        address = "auto"
-      }
-    }
-  }
-
-  cpu {
-    cores = 1
-  }
-
-  memory {
-    dedicated = 512
-    swap      = 512
-  }
-
-  features {
-    nesting = true
-  }
-
-  disk {
-    datastore_id = local.storage
-    size         = 8
-  }
-
-  network_interface {
-    name        = "eth0"
-    bridge      = "vmbr0"
-    mac_address = "bc:24:11:7d:c3:9a"
-    vlan_id     = 10
-  }
-
-  operating_system {
-    template_file_id = local.template
-    type             = "debian"
-  }
-
-  lifecycle {
-    ignore_changes = [
-      description,
-      initialization[0].user_account,
-      operating_system[0].template_file_id,
-    ]
-  }
-}
 
 # --- Server Stack ---
 
