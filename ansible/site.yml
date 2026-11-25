@@ -106,16 +106,9 @@
     - nginx_proxy_manager
     - crowdsec_bouncer
 
-# These 6 groups were never in `nodes` and had no dedicated play running
+# These groups were never in `nodes` and had no dedicated play running
 # `common` either -- same gap class as the k3s_nodes fix above, never
 # closed for them (no unattended-upgrades on any of them).
-- name: Provision Scanopy MGMT-VLAN Daemon
-  hosts: scanopy_daemon_nodes
-  become: true
-  roles:
-    - common
-    - scanopy_daemon
-
 - name: Provision Rybbit Analytics
   hosts: rybbit_nodes
   become: true

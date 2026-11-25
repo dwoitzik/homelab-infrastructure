@@ -93,28 +93,6 @@ spec:
   selector:
     app: scanopy-server
 ---
-# Reachable from the MGMT and DMZ daemons, which live on different VLANs and
-# can't resolve the in-cluster ClusterIP. Scoped to exactly those two daemon
-# hosts (see terraform/stacks/network/firewall_deterministic.tf for the
-# matching forward rules) -- not a LAN-wide LB, same pattern as
-# headscale-dmz-lb.
-apiVersion: v1
-kind: Service
-metadata:
-  name: scanopy-server-daemon-lb
-  namespace: apps
-spec:
-  type: LoadBalancer
-  loadBalancerSourceRanges:
-    - 10.0.30.2/32
-    - 10.0.10.111/32
-  ports:
-    - port: 60072
-      targetPort: 60072
-      name: http
-  selector:
-    app: scanopy-server
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

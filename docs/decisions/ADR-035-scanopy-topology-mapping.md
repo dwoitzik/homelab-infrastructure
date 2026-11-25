@@ -1,7 +1,7 @@
 # ADR-035: Scanopy for Network Topology Mapping
 
 **Date:** 2026-08-28
-**Status:** Accepted
+**Status:** Accepted; MGMT and DMZ daemons retired 2026-11-25 (see Amendment)
 
 ## Context
 
@@ -79,3 +79,20 @@ has zero public/WAN-facing component — it is fully internal by design.
 - No automatic Docker-container-to-open-port correlation (see the privileged/socket
   trade-off above) — open ports show up, but connecting them to "which container" is
   manual.
+
+## Amendment (2026-11-25): MGMT and DMZ daemons retired
+
+Only the SRV daemon was ever built. `ct-mgmt-scanopy-01` was never created (its
+Terraform resource sat behind `enable_scanopy_mgmt_daemon = false`) and the DMZ sidecar
+on `ct-dmz-proxy-01` stayed disabled, so the Scanopy server only ever held the SRV
+daemon. Finishing them is not worth it: VLAN10 and VLAN30 hold a handful of hosts, all
+already defined in Terraform and Ansible, while each scanner adds conntrack load on its
+host (see the scan-rate gotcha in `kubernetes/apps/scanopy/README.md`) and needs its own
+firewall opening into SRV.
+
+Removed: forward rules 09c/09d, the `ct-mgmt-scanopy-01` static DHCP lease and LXC
+definition, the `scanopy-server-daemon-lb` LoadBalancer Service, the `scanopy_daemon`
+Ansible role and its inventory group, and the `npm_enable_scanopy_daemon` sidecar in
+`nginx_proxy_manager`. Coverage is now VLAN20 only. The Decision and Consequences above
+describe the original three-VLAN design; the LXC and the daemon LoadBalancer no longer
+exist.
