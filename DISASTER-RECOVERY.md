@@ -62,6 +62,28 @@ the NVMe.
    ExternalSecrets → everything else), verifying each is healthy before the next. Bulk
    auto-apply comes later, once the foundation is proven — see step 6.
 
+## 3a. k3s datastore from the off-host copy
+
+Every 6 hours `k3s-kine-backup.timer` on `vm-srv-k3s-11` writes a consistent copy of
+`state.db` (`VACUUM INTO`, integrity-checked before it leaves the VM) to `rpi-srv-02`,
+`/mnt/ssd/k3s-kine/state-<UTC time>.db.zst`, kept 14 days (roles `k3s_kine_backup` and
+`k3s_kine_backup_target`). Use it when PBS's copy of VM 211 is gone or older than what
+you need. `K3sDatastoreBackupStale` fires when the newest copy is over 13 hours old.
+
+1. Check the copy before using it, anywhere but the k3s server:
+
+   ```bash
+   zstd -d state-<time>.db.zst -o /tmp/state.db
+   sqlite3 /tmp/state.db "PRAGMA integrity_check; SELECT count(*) FROM kine;"
+   ```
+
+2. On the k3s server: `systemctl stop k3s`, move `/var/lib/rancher/k3s/server/db/` aside,
+   create it again (mode 0700) and put the copy in as `state.db` (no `-wal`/`-shm`
+   files: the copy is self-contained).
+3. Put the encryption key in place as in step 3 above (`k3s_secrets_encryption`), then
+   `systemctl start k3s`. The cluster comes back at the copy's point in time; ArgoCD
+   reconciles anything committed since.
+
 ## 4. Vault — the circular dependency
 
 A fresh Vault instance can't unseal itself. If the old cluster is truly gone, its

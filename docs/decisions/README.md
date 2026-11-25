@@ -69,7 +69,8 @@ skipped by accident.
 | [082](ADR-082-nightly-k3s-auto-upgrade.md) | Nightly k3s upgrades from the Proxmox host, with snapshot rollback | Accepted |
 | [083](ADR-083-node-pinned-pod-priority.md) | Pods pinned to a node by a local-path volume or a DaemonSet outrank movable pods | Accepted, applied |
 | [084](ADR-084-scheduled-ansible-drift-check.md) | Weekly Ansible check-mode drift report from the Proxmox host | Accepted, applied |
-| [085](ADR-085-router-brute-force-protection.md) | Router brute-force protection matches what is exposed: MAC access off the WAN port, a flood guard on WAN 443 | Accepted, applied |
+| [085](ADR-085-slo-burn-rate-windows.md) | SLO burn-rate alerts on the SRE Workbook windows, `for:` against low probe volume | Accepted, applied |
+| [086](ADR-086-router-brute-force-protection.md) | Router brute-force protection matches what is exposed: MAC access off the WAN port, a flood guard on WAN 443 | Accepted, applied |
 
 ## In review, not yet in this table
 

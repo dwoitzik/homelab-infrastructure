@@ -52,7 +52,7 @@ resource "routeros_ip_firewall_filter" "in_00_antispoofing" {
 }
 
 # SSH/WinBox/API are reachable only from Mgmt_Devices (in_02_mgmt); the default
-# drop handles every other source, WAN included. ADR-085.
+# drop handles every other source, WAN included. ADR-086.
 removed {
   from = routeros_ip_firewall_filter.in_00a_brute_detect
   lifecycle { destroy = true }

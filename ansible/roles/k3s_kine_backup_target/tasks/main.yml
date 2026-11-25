@@ -1,0 +1,35 @@
+---
+- name: Ensure the datastore backup user exists
+  ansible.builtin.user:
+    name: "{{ k3s_kine_backup_target_user }}"
+    system: true
+    shell: /bin/sh
+    home: "/var/lib/{{ k3s_kine_backup_target_user }}"
+    create_home: true
+
+# The copies hold every non-Secret object in plain text; Secrets are encrypted
+# with a key that is not part of them (ADR-077).
+- name: Ensure the datastore backup directory exists on the SSD
+  ansible.builtin.file:
+    path: "{{ k3s_kine_backup_target_root }}"
+    state: directory
+    owner: "{{ k3s_kine_backup_target_user }}"
+    group: "{{ k3s_kine_backup_target_user }}"
+    mode: '0700'
+
+- name: Deploy the prune and freshness-metrics script
+  ansible.builtin.template:
+    src: k3s-kine-backup-check.sh.j2
+    dest: /usr/local/sbin/k3s-kine-backup-check.sh
+    owner: root
+    group: root
+    mode: '0750'
+
+# Measured here, on the receiving side, so the metric reports copies that
+# actually arrived off-host rather than what the sender believes it sent.
+- name: Schedule the prune and freshness-metrics script
+  ansible.builtin.cron:
+    name: k3s-kine-backup-check
+    user: root
+    minute: "*/15"
+    job: /usr/local/sbin/k3s-kine-backup-check.sh

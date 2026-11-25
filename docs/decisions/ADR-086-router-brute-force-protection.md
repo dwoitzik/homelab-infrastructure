@@ -1,4 +1,4 @@
-# ADR-085: Router brute-force protection matches what is actually exposed
+# ADR-086: Router brute-force protection matches what is actually exposed
 
 **Date:** 2026-11-25
 **Status:** Accepted, applied

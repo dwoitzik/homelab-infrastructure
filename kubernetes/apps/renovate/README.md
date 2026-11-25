@@ -35,3 +35,9 @@ None — clones the repo fresh into a `/tmp` emptyDir on every run.
   keeps them out of the owner's participation notifications. If runs stop, read the
   `app-token` container log first: a 401 there means the key or app ID is wrong, a
   404 means the installation ID is.
+- **`RENOVATE_GIT_AUTHOR` is the App's bot identity**
+  (`homelab-renovate-dwoitzik[bot] <357019668+...@users.noreply.github.com>`). Renovate
+  commits through the API, so GitHub records the bot as author; Renovate compares that
+  with `gitAuthor` to decide whether a human edited the branch. With the old personal
+  address every Renovate PR showed up under "PR Edited (Blocked)" on the dashboard and
+  was never rebased or auto-merged.

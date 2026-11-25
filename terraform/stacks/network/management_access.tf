@@ -1,8 +1,8 @@
 # MAC-Telnet/MAC-WinBox bypass the IP firewall; on ether1 they were open to the
-# whole FritzBox LAN. ether4 is the non-bridged out-of-band port. ADR-085.
+# whole FritzBox LAN. ether4 is the non-bridged out-of-band port. ADR-086.
 resource "routeros_interface_list" "mac_access" {
   name    = "mac-access"
-  comment = "Interfaces that accept MAC-Telnet/MAC-WinBox, ADR-085"
+  comment = "Interfaces that accept MAC-Telnet/MAC-WinBox, ADR-086"
 }
 
 resource "routeros_interface_list_member" "mac_access" {

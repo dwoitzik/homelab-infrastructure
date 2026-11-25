@@ -49,7 +49,7 @@ resource "routeros_ip_firewall_nat" "dstnat_headscale_dmz" {
 }
 
 # Flood guard for the WAN-exposed TCP port (>32 concurrent per source: 1h drop).
-# FritzBox-LAN hairpin traffic is exempt, it can share one source. ADR-085.
+# FritzBox-LAN hairpin traffic is exempt, it can share one source. ADR-086.
 resource "routeros_ip_firewall_filter" "fwd_wan_headscale_flood_drop" {
   chain            = "forward"
   action           = "drop"
@@ -59,7 +59,7 @@ resource "routeros_ip_firewall_filter" "fwd_wan_headscale_flood_drop" {
   protocol         = "tcp"
   src_address_list = "wan_conn_flood"
   place_before     = routeros_ip_firewall_filter.fwd_wan_headscale_dmz.id
-  comment          = "WAN -> DMZ 443: drop sources on wan_conn_flood, ADR-085"
+  comment          = "WAN -> DMZ 443: drop sources on wan_conn_flood, ADR-086"
 
   lifecycle {
     ignore_changes = [place_before]
@@ -79,7 +79,7 @@ resource "routeros_ip_firewall_filter" "fwd_wan_headscale_flood_detect" {
   address_list         = "wan_conn_flood"
   address_list_timeout = "1h"
   place_before         = routeros_ip_firewall_filter.fwd_wan_headscale_flood_drop.id
-  comment              = "WAN -> DMZ 443: >32 concurrent connections per source, ADR-085"
+  comment              = "WAN -> DMZ 443: >32 concurrent connections per source, ADR-086"
 
   lifecycle {
     ignore_changes = [place_before]
