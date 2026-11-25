@@ -15,3 +15,11 @@ pve_host_mounts_datasets:
     owner: "101000"
     group: "101000"
     mode: "0777"
+  # The retired ct-mgmt-pbs-01's datastore (2026-04, guests 110/200/301/302). It
+  # inherited a mountpoint inside the live datastore, where every GC read its
+  # indexes and warned about thousands of chunks that live store does not have.
+  - name: archive/backups
+    mountpoint: /mnt/retired-pbs-datastore
+    owner: "100034"
+    group: "100034"
+    mode: "0755"
