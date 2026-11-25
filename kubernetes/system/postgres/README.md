@@ -88,7 +88,7 @@ metadata:
   namespace: database
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.2
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.12-standard-trixie
   storage:
     size: 5Gi
     storageClass: local-path
