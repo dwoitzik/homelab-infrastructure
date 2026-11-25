@@ -1,0 +1,13 @@
+---
+# Off-host copies of the k3s datastore (kine/SQLite, ADR-015). PBS backs up the whole
+# VM, but to the same physical host; these copies land on rpi-srv-02's SSD.
+k3s_kine_backup_db: /var/lib/rancher/k3s/server/db/state.db
+# Staged in RAM so a backup run adds no writes to the DRAM-less host NVMe (HARDWARE.md).
+k3s_kine_backup_staging_dir: /dev/shm
+k3s_kine_backup_schedule: "*-*-* 00/6:20:00"
+k3s_kine_backup_key: /root/.ssh/kine_backup_ed25519
+
+k3s_kine_backup_target_inventory_host: rpi-srv-02
+k3s_kine_backup_target_address: 10.0.20.3
+k3s_kine_backup_target_user: kine-backup
+k3s_kine_backup_target_root: /mnt/ssd/k3s-kine

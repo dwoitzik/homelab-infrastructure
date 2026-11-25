@@ -1,0 +1,9 @@
+---
+# Receiving side of k3s_kine_backup. The key itself is authorized from that role,
+# which owns it.
+k3s_kine_backup_target_user: kine-backup
+k3s_kine_backup_target_root: /mnt/ssd/k3s-kine
+k3s_kine_backup_target_retention_days: 14
+# The newest copies survive pruning even when the source has stopped sending.
+k3s_kine_backup_target_keep_min: 8
+k3s_kine_backup_target_textfile_dir: /opt/docker/node_exporter/textfile_collector
