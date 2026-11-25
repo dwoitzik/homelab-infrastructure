@@ -1,0 +1,3 @@
+---
+pve_lxc_memory_metrics_textfile_dir: /var/lib/node_exporter/textfile_collector
+pve_lxc_memory_metrics_interval: 30s

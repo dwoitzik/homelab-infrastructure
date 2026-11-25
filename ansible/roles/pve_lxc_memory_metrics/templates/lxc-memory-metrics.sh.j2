@@ -1,0 +1,63 @@
+#!/bin/bash
+# Per-LXC memory cgroup counters for the node_exporter textfile collector:
+# node_exporter only has host-wide PSI and pve-exporter only API usage figures.
+set -euo pipefail
+
+out="{{ pve_lxc_memory_metrics_textfile_dir }}/lxc_memory.prom"
+tmp="$out.$$"
+trap 'rm -f "$tmp"' EXIT
+
+events=() psi=() current=() swap=() high=() max=()
+
+limit() {
+  local v
+  v=$(cat "$1")
+  [ "$v" = "max" ] && echo "+Inf" || echo "$v"
+}
+
+for cg in /sys/fs/cgroup/lxc/*/; do
+  id=$(basename "$cg")
+  [[ "$id" =~ ^[0-9]+$ ]] || continue
+  [ -r "$cg/memory.events" ] || continue
+  name=$(sed -n 's/^hostname: *//p' "/etc/pve/lxc/$id.conf" 2>/dev/null | head -n1)
+  l="ctid=\"$id\",name=\"${name:-unknown}\""
+
+  while read -r key value; do
+    events+=("lxc_cgroup_memory_events_total{$l,event=\"$key\"} $value")
+  done < "$cg/memory.events"
+
+  # PSI totals are microseconds.
+  while read -r kind _ _ _ total; do
+    psi+=("lxc_cgroup_memory_pressure_seconds_total{$l,kind=\"$kind\"} $(awk -v t="${total#total=}" 'BEGIN { printf "%.6f", t / 1e6 }')")
+  done < "$cg/memory.pressure"
+
+  current+=("lxc_cgroup_memory_current_bytes{$l} $(cat "$cg/memory.current")")
+  swap+=("lxc_cgroup_memory_swap_current_bytes{$l} $(cat "$cg/memory.swap.current")")
+  high+=("lxc_cgroup_memory_high_bytes{$l} $(limit "$cg/memory.high")")
+  max+=("lxc_cgroup_memory_max_bytes{$l} $(limit "$cg/memory.max")")
+done
+
+emit() {
+  local metric=$1 type=$2 help=$3
+  shift 3
+  echo "# HELP $metric $help"
+  echo "# TYPE $metric $type"
+  [ $# -gt 0 ] && printf '%s\n' "$@"
+  return 0
+}
+
+{
+  emit lxc_cgroup_memory_events_total counter "memory.events counters of each LXC cgroup." "${events[@]}"
+  emit lxc_cgroup_memory_pressure_seconds_total counter "memory.pressure (PSI) stall time of each LXC cgroup." "${psi[@]}"
+  emit lxc_cgroup_memory_current_bytes gauge "memory.current of each LXC cgroup." "${current[@]}"
+  emit lxc_cgroup_memory_swap_current_bytes gauge "memory.swap.current of each LXC cgroup." "${swap[@]}"
+  emit lxc_cgroup_memory_high_bytes gauge "memory.high of each LXC cgroup." "${high[@]}"
+  emit lxc_cgroup_memory_max_bytes gauge "memory.max of each LXC cgroup." "${max[@]}"
+  echo "# HELP lxc_cgroup_memory_metrics_last_run_timestamp_seconds Last successful collection."
+  echo "# TYPE lxc_cgroup_memory_metrics_last_run_timestamp_seconds gauge"
+  echo "lxc_cgroup_memory_metrics_last_run_timestamp_seconds $(date +%s)"
+} > "$tmp"
+
+chmod 0644 "$tmp"
+mv "$tmp" "$out"
+trap - EXIT

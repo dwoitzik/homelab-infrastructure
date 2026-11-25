@@ -1,0 +1,26 @@
+---
+- name: Deploy the LXC memory metrics script
+  ansible.builtin.template:
+    src: lxc-memory-metrics.sh.j2
+    dest: /usr/local/bin/lxc-memory-metrics.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the LXC memory metrics service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - lxc-memory-metrics.service
+    - lxc-memory-metrics.timer
+
+- name: Enable and start the LXC memory metrics timer
+  ansible.builtin.systemd:
+    name: lxc-memory-metrics.timer
+    enabled: true
+    state: started
+    daemon_reload: true

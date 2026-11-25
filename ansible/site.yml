@@ -218,6 +218,8 @@
     # fwd_04a_srv_monitoring firewall rule) -- runs directly on the host
     # instead, no dependency on that pipeline.
     - ssd_wear_check
+    # Per-LXC memory.events and memory.pressure for the LXCMemory* alerts.
+    - pve_lxc_memory_metrics
     - role: pve_host_hardening
       tags: [pve_host_hardening]
     # The only host with an SSH path into every VLAN (ADR-084).
