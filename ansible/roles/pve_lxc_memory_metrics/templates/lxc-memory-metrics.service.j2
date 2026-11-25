@@ -1,0 +1,6 @@
+[Unit]
+Description=Export LXC memory cgroup counters for node_exporter
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/lxc-memory-metrics.sh

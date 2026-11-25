@@ -1,0 +1,10 @@
+[Unit]
+Description=Export LXC memory cgroup counters every {{ pve_lxc_memory_metrics_interval }}
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec={{ pve_lxc_memory_metrics_interval }}
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

@@ -76,3 +76,44 @@ spec:
               smartctl's smart_status.passed is false, or the metrics script
               couldn't read the drive at all (both report as 0 here) -- check
               `smartctl -a /dev/nvme0n1` on pve-mgmt-01 directly.
+
+    # Per-LXC memory cgroup counters from the pve_lxc_memory_metrics textfile
+    # collector. A container held at memory.high reclaims and stalls without
+    # an OOM; on the host that only shows up as load (ADR-066).
+    - name: pve.lxc_memory
+      rules:
+        - alert: LXCMemoryThrottled
+          expr: rate(lxc_cgroup_memory_events_total{event="high"}[10m]) > 100
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "LXC {{ $labels.ctid }} ({{ $labels.name }}) throttled at memory.high: {{ $value | printf \"%.0f\" }} events/s"
+            description: >
+              The container keeps hitting memory.high and the kernel is reclaiming
+              inside its cgroup. Check what is filling it (tmpfs/shmem counts
+              against the container) with `cat /sys/fs/cgroup/lxc/{{ $labels.ctid }}/memory.stat`
+              on pve-mgmt-01 before it turns into a stall.
+        - alert: LXCMemoryStall
+          expr: rate(lxc_cgroup_memory_pressure_seconds_total{kind="full"}[10m]) > 0.10
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "LXC {{ $labels.ctid }} ({{ $labels.name }}) fully stalled on memory {{ $value | humanizePercentage }} of the time"
+            description: >
+              Every task in the container has been waiting on memory reclaim for
+              more than 10% of wall time for 15 minutes. Nothing OOMs in this
+              state; the processes hang in D state and host load climbs. Raise
+              the container's memory or remove what is filling its cgroup.
+        - alert: LXCMemoryMetricsStale
+          expr: time() - lxc_cgroup_memory_metrics_last_run_timestamp_seconds > 600
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "LXC memory cgroup metrics have not been refreshed for {{ $value | humanizeDuration }}"
+            description: >
+              lxc-memory-metrics.timer on pve-mgmt-01 stopped writing
+              lxc_memory.prom, so LXCMemoryThrottled and LXCMemoryStall cannot
+              fire. Check `systemctl status lxc-memory-metrics.service`.
