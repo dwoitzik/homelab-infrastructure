@@ -203,3 +203,187 @@ spec:
           kinds: [Deployment]
           namespaces: [host-agents]
           names: ["tailscale-subnet-router"]
+---
+# CEL replacements for the ClusterPolicies above (Kyverno 1.20 stops enforcing
+# ClusterPolicy). Same rules and namespaces. Pod controllers are listed explicitly
+# instead of relying on autogen, so a bad Deployment is rejected before its pods.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require Resource Limits
+    policies.kyverno.io/description: >
+      Pods without resource limits can starve other workloads on the same node.
+spec:
+  validationActions: [Deny]
+  # Fail-open: a Kyverno outage or CEL error must not block admission.
+  failurePolicy: Ignore
+  evaluation:
+    admission:
+      enabled: true
+    # The reports controller is off; kyverno-policy-drift-check covers running pods.
+    background:
+      enabled: false
+  autogen:
+    validatingAdmissionPolicy:
+      enabled: false
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [apps, database, security]
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets, replicasets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+  variables:
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec :
+        (object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec)
+    - name: allContainers
+      expression: >-
+        variables.podSpec.containers + variables.podSpec.?initContainers.orValue([])
+  validations:
+    - expression: >-
+        variables.allContainers.all(c,
+        'cpu' in c.?resources.?limits.orValue({}) && 'memory' in c.?resources.?limits.orValue({}))
+      messageExpression: >-
+        'Containers must define resources.limits (cpu and memory): ' +
+        variables.allContainers.filter(c,
+        !('cpu' in c.?resources.?limits.orValue({}) && 'memory' in c.?resources.?limits.orValue({}))).map(c, c.name).join(', ')
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-privileged-containers
+  annotations:
+    policies.kyverno.io/title: Disallow Privileged Containers
+    policies.kyverno.io/description: >
+      Privileged containers have host-level access and should never run in this cluster.
+spec:
+  validationActions: [Deny]
+  failurePolicy: Ignore
+  evaluation:
+    admission:
+      enabled: true
+    background:
+      enabled: false
+  autogen:
+    validatingAdmissionPolicy:
+      enabled: false
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [apps, monitoring, database, external-secrets, security]
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets, replicasets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+  variables:
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec :
+        (object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec)
+    - name: allContainers
+      expression: >-
+        variables.podSpec.containers + variables.podSpec.?initContainers.orValue([])
+  validations:
+    - expression: >-
+        variables.allContainers.all(c, !c.?securityContext.?privileged.orValue(false))
+      messageExpression: >-
+        'Privileged containers are not allowed: ' +
+        variables.allContainers.filter(c, c.?securityContext.?privileged.orValue(false)).map(c, c.name).join(', ')
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow :latest Image Tag
+    policies.kyverno.io/description: >
+      Images pinned to :latest are non-deterministic and make rollbacks impossible.
+spec:
+  validationActions: [Deny]
+  failurePolicy: Ignore
+  evaluation:
+    admission:
+      enabled: true
+    background:
+      enabled: false
+  autogen:
+    validatingAdmissionPolicy:
+      enabled: false
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [apps, database, security]
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets, replicasets]
+      - apiGroups: [batch]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [jobs, cronjobs]
+  variables:
+    - name: podSpec
+      expression: >-
+        object.kind == 'Pod' ? object.spec :
+        (object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec)
+    - name: allContainers
+      expression: >-
+        variables.podSpec.containers + variables.podSpec.?initContainers.orValue([])
+  validations:
+    - expression: >-
+        variables.allContainers.all(c, c.image.contains(':') && !c.image.endsWith(':latest'))
+      messageExpression: >-
+        'Images must use a specific tag, not :latest or untagged: ' +
+        variables.allContainers.filter(c, !(c.image.contains(':') && !c.image.endsWith(':latest'))).map(c, c.image).join(', ')
+---
+# tailscale-subnet-router needs privileged (iptables NAT). Exceptions are only read
+# from apps (features.policyExceptions.namespace).
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: allow-privileged-tailscale-subnet-router-cel
+  namespace: apps
+spec:
+  policyRefs:
+    - kind: ValidatingPolicy
+      name: disallow-privileged-containers
+  matchConditions:
+    - name: tailscale-subnet-router
+      expression: >-
+        request.namespace == 'host-agents' &&
+        (object.metadata.?name.orValue('').startsWith('tailscale-subnet-router') ||
+        object.metadata.?generateName.orValue('').startsWith('tailscale-subnet-router'))
