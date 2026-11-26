@@ -11,8 +11,9 @@ PROM = os.path.join(TEXTFILE_DIR, "pbs_jobs.prom")
 
 
 def api(path):
+    # Absolute path: cron's PATH lacks /usr/sbin, so a bare name fails there.
     out = subprocess.run(
-        ["proxmox-backup-debug", "api", "get", path, "--output-format", "json"],
+        ["/usr/sbin/proxmox-backup-debug", "api", "get", path, "--output-format", "json"],
         check=True, capture_output=True, text=True, timeout=120,
     ).stdout
     return json.loads(out)

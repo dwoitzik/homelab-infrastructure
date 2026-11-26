@@ -82,6 +82,16 @@ spec:
           - matchType: "=~"
             name: alertname
             value: "NVMeWearCritical|AnsibleDriftCheckStale"
+      # Persistent conditions that need a manual fix, not a retry: page once, then
+      # again only if still unresolved after a week.
+      - receiver: discord
+        groupWait: 30s
+        groupInterval: 15m
+        repeatInterval: 168h
+        matchers:
+          - matchType: "=~"
+            name: alertname
+            value: "PBSVerifyFailed"
       - receiver: discord
         groupWait: 30s
         groupInterval: 15m
