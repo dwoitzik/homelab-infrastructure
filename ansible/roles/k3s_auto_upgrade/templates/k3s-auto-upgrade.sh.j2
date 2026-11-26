@@ -110,7 +110,8 @@ for host in photos.woitzik.dev auth.woitzik.dev vault.woitzik.dev; do
     case \$c in 200|302) ;; *) echo "\$host -> \$c"; fail=1 ;; esac
   done
 done
-es=\$(kubectl get externalsecrets.external-secrets.io -A --no-headers | awk '\$(NF-1)!="SecretSynced"' | wc -l)
+# Ready condition by jsonpath: printed columns differ between ESO versions.
+es=\$(kubectl get externalsecrets.external-secrets.io -A -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\\n"}{end}' | grep -vc '^True\$')
 [ "\$es" = 0 ] || { echo "\$es ExternalSecrets not synced"; fail=1; }
 exit \$fail
 CHECK

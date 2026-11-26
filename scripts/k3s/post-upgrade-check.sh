@@ -15,7 +15,7 @@ echo "== pods not Running/Completed, or Running but not ready"
 kubectl get pods -A --no-headers | awk '($4!="Running" && $4!="Completed") || ($4=="Running" && substr($3,1,index($3,"/")-1)!=substr($3,index($3,"/")+1))'
 
 echo "== ExternalSecrets by reason"
-kubectl get externalsecret -A --no-headers | awk '{print $(NF-1)}' | sort | uniq -c
+kubectl get externalsecret -A -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].reason}{"\n"}{end}' | sort | uniq -c
 
 echo "== ArgoCD apps not Synced/Healthy"
 kubectl -n argocd get applications --no-headers | awk '$2!="Synced" || $3!="Healthy"'
