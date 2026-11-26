@@ -41,7 +41,15 @@ Confirmed the hard way; do not re-enable it "to be safe."
 
 Adding a database: add it to `DUMP_TARGETS` (and its `<NAME>_*` env) in
 `offsite-db-dumps.yml`; a new plain Postgres StatefulSet also goes into the Schedule's
-`labelSelector`.
+`labelSelector`, and its data PVC gets the same `app` label.
+
+Since Velero 1.15 the Schedule's `labelSelector` only decides what the item collector
+starts from. A selected PVC brings every running pod that mounts it into the same item
+block, and those pods are backed up with their volumes whatever their labels. So an
+excluded database pod stays out only if its PVC is excluded too (the `app` label above,
+or `cnpg.io/pvcRole` for CNPG), and the 5-minute CronJob pods that share app PVCs
+(`nextcloud-cron`, `firefly-iii-cron`) carry `velero.io/exclude-from-backup: "true"`,
+which Velero checks for every item it adds.
 
 Check after any change to the offsite scope, before trusting it:
 
