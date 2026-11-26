@@ -119,9 +119,11 @@ rate it reaches 90 % around the end of December.
       each; the binary-swap procedure is in `docs/runbooks/k3s-upgrade.md` (ADR-080)
 - [x] Platform components to current releases: Vault 2.2.2, ArgoCD 3.6.3, CloudNativePG
       1.30.2 with PostgreSQL 17.12, Kyverno 1.19, MetalLB 0.16.2, kube-prometheus-stack 93
-- [ ] Remaining platform majors, each needing its own migration: External Secrets (v1beta1
-      to v1), Traefik v2 to v3, Velero one minor at a time to 1.18, Kyverno 1.20 (policies
-      to ValidatingPolicy)
+- [x] Remaining platform majors: External Secrets 2.15 (manifests on v1, Vault login via
+      Kubernetes auth instead of a stored root token), Traefik v3.7 (ADR-087), Velero 1.18,
+      Kyverno 1.20 with ValidatingPolicy
+- [ ] Second disk for the `archive` pool: a single USB disk without redundancy or SMART
+      holds the PBS datastore, Garage and media; ZFS integrity alerts exist since 2026-11-26
 - [x] Move log shipping from the deprecated Promtail chart to Grafana Alloy
 - [x] Application majors (Jellyfin, Immich, Headscale) kept current by Renovate (Renovate
       auto-merge was stalled since 2026-11-15 by a wrong git author; Immich server and ML
