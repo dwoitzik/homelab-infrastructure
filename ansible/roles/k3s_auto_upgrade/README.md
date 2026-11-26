@@ -7,7 +7,7 @@ Nightly k3s upgrade orchestrated from the Proxmox host, with automatic rollback
   `ansible/k3s-cluster/inventory.yml` on `main`, one node at a time, through the QEMU
   guest agent (`qm guest exec`). Snapshots all k3s VMs first; any failed check rolls all
   of them back.
-- `k3s-auto-upgrade.timer`: daily at 06:00; the run exits early unless there was a
+- `k3s-auto-upgrade.timer`: daily at 07:00, after the 03:00 PBS run and the 06:00 Velero daily-backup; the run exits early unless there was a
   successful PBS backup in the last six hours (odd days) and no Velero backup is running.
 - Notifications go to the ntfy topic used by the other host checks, only for skips,
   rollbacks and failures. Successful upgrades and drills only write to the log.

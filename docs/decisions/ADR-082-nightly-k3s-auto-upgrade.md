@@ -27,7 +27,7 @@ Constraints found on the way:
 ## Decision
 
 An Ansible role, `k3s_auto_upgrade`, installs `/usr/local/sbin/k3s-auto-upgrade` and a
-systemd timer (06:00) on the Proxmox host. Each run:
+systemd timer (07:00, after the 03:00 PBS backup and the 06:00 Velero daily-backup, which takes about 20 minutes since Velero 1.17) on the Proxmox host. Each run:
 
 1. Reads the wanted version from `ansible/k3s-cluster/inventory.yml` on `main` and the
    running version through the guest agent. Nothing to do: exit.
@@ -63,7 +63,7 @@ them a priority class that lets the scheduler preempt movable pods instead.
 
 - Upgrades happen at most every other night and never during a backup.
 - A rollback restores the VMs to the moment before the upgrade, so writes made inside the
-  VMs during the window (minutes, at 06:00) are lost. Application data on NFS and on the
+  VMs during the window (minutes, at 07:00) are lost. Application data on NFS and on the
   archive pool is outside these disks and unaffected.
 - Proxmox host packages stay manual: if the host itself breaks, nothing can roll it back
   at night.

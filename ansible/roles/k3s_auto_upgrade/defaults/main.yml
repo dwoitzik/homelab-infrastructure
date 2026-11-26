@@ -9,6 +9,6 @@ k3s_auto_upgrade_agents:
 # Source of truth for the wanted version: the k3s-ansible inventory on main.
 k3s_auto_upgrade_pin_url: https://raw.githubusercontent.com/dwoitzik/homelab-infrastructure/main/ansible/k3s-cluster/inventory.yml
 # Runs after the PBS backup (odd days 03:00) and Velero's 05:00 backup.
-k3s_auto_upgrade_on_calendar: "*-*-* 06:00:00"
+k3s_auto_upgrade_on_calendar: "*-*-* 07:00:00"
 k3s_auto_upgrade_ingress_lb: 10.0.20.200
 k3s_auto_upgrade_ntfy_topic: "{{ pve_power_watchdog_ntfy_topic | default('dw-homelab-a12a7b540943') }}"
