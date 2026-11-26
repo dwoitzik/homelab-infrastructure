@@ -67,12 +67,12 @@ them), the `spec.plugins` entry on the Cluster, a ScheduledBackup with `method: 
 and a PodMonitor. Add the new file names to `postgres-cluster-application.yml`'s
 include list.
 
-## User Secrets — `.example` files
+## User Secrets
 
-`user-n8n.yml.example` / `user-synapse.yml.example` / `user-scanopy.yml.example` are
-templates, not applied directly — the real Secret (matching password already in
-Vault/the app's own config) is created out-of-band per `cluster.yml`'s own
-migration-steps comment, never committed with real values.
+`postgres-n8n-user` and `postgres-synapse-user` come from Vault (`n8n`/`synapse`,
+property `db-password`) through ExternalSecrets in `external-secret.yml`.
+`user-scanopy.yml.example` is still a template: that Secret is created out-of-band and
+never committed with real values.
 
 ## How to restore
 
