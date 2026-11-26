@@ -213,6 +213,8 @@
     - ssd_wear_check
     # Per-LXC memory.events and memory.pressure for the LXCMemory* alerts.
     - pve_lxc_memory_metrics
+    # Pool state, error counters and scrub age for the storage.zfs alerts.
+    - pve_zfs_health
     - role: pve_host_hardening
       tags: [pve_host_hardening]
     # The only host with an SSH path into every VLAN (ADR-084).

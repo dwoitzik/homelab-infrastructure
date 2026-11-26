@@ -44,3 +44,74 @@ spec:
               I/O error (status: io-error in `qm status`), as happened in REL-019. Free space
               now: check `zfs list -o name,used,avail -s used` on mini for the largest
               consumers.
+
+    # Written by zfs-pool-metrics.py (Ansible role pve_zfs_health) on pve-mgmt-01.
+    # The archive pool is a single USB disk with no redundancy, so ZFS can detect
+    # corruption there but never repair it.
+    - name: storage.zfs
+      rules:
+        - alert: ZFSPoolNotOnline
+          expr: zfs_pool_online == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "ZFS pool {{ $labels.pool }} is not ONLINE"
+            description: >
+              Run `zpool status -v {{ $labels.pool }}` on pve-mgmt-01. For archive a
+              SUSPENDED or UNAVAIL state usually means the USB disk dropped off the bus;
+              check `dmesg` and the cable before anything else.
+        - alert: ZFSPoolDataErrors
+          expr: zfs_pool_data_errors > 0 or zfs_pool_scrub_errors > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "ZFS pool {{ $labels.pool }} has permanent data errors"
+            description: >
+              ZFS found blocks it could not repair. `zpool status -v {{ $labels.pool }}`
+              lists the affected files; restore or delete them, `zpool clear`, then scrub.
+              A PBS chunk under /mnt/pbs-storage/.chunks means the snapshots using it no
+              longer restore: verify the datastore and forget the failed snapshots.
+        - alert: ZFSPoolDeviceErrorsIncreasing
+          expr: zfs_pool_vdev_errors - zfs_pool_vdev_errors offset 1h > 0
+          labels:
+            severity: critical
+          annotations:
+            summary: "ZFS {{ $labels.type }} errors increasing on {{ $labels.pool }}/{{ $labels.vdev }}"
+            description: >
+              {{ $value }} new {{ $labels.type }} errors in the last hour. Check
+              `zpool status -v {{ $labels.pool }}` and `dmesg` for I/O errors; repeated
+              errors on the archive USB disk mean the disk or its bridge is failing.
+        - alert: ZFSPoolDeviceErrorsPresent
+          expr: zfs_pool_vdev_errors > 0
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "ZFS {{ $labels.pool }}/{{ $labels.vdev }} holds {{ $value }} {{ $labels.type }} errors"
+            description: >
+              Counters only reset on `zpool clear`. Once the cause is understood and
+              any data errors are resolved, clear them so a new error stands out.
+        - alert: ZFSScrubOverdue
+          expr: time() - zfs_pool_scrub_end_timestamp_seconds > 40 * 86400 and zfs_pool_scrub_running == 0
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "ZFS pool {{ $labels.pool }} has not completed a scrub in 40 days"
+            description: >
+              The monthly scrub (/etc/cron.d/zfs-scrub-all, second Wednesday 09:00) did
+              not run or did not finish. Check `zpool status {{ $labels.pool }}`.
+        - alert: ZFSPoolMetricsStale
+          expr: |
+            time() - zfs_pool_metrics_last_run_timestamp_seconds > 1800
+            or absent(zfs_pool_metrics_last_run_timestamp_seconds)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ZFS pool health metrics from pve-mgmt-01 are stale"
+            description: >
+              zfs-pool-metrics.timer stopped writing zfs_pools.prom, so the ZFS alerts
+              cannot fire. Check `systemctl status zfs-pool-metrics.service`.

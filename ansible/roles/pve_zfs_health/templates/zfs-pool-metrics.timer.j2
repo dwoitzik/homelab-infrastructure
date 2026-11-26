@@ -1,0 +1,9 @@
+[Unit]
+Description=Export ZFS pool health every {{ pve_zfs_health_metrics_interval }}
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec={{ pve_zfs_health_metrics_interval }}
+
+[Install]
+WantedBy=timers.target

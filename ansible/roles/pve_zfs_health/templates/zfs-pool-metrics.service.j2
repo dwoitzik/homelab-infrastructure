@@ -1,0 +1,6 @@
+[Unit]
+Description=Export ZFS pool health for node_exporter
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/zfs-pool-metrics.py {{ pve_zfs_health_textfile_dir }}

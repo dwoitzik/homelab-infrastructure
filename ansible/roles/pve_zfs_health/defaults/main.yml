@@ -1,0 +1,10 @@
+---
+pve_zfs_health_textfile_dir: /var/lib/node_exporter/textfile_collector
+pve_zfs_health_metrics_interval: 5min
+# Monthly scrub on the second Wednesday, 09:00. A scrub of the USB archive
+# pool takes ~6h; this keeps it clear of GC (02:00), the nightly backup
+# (03:00-04:00) and the Sunday 06:30 PBS verify.
+pve_zfs_health_scrub_minute: "0"
+pve_zfs_health_scrub_hour: "9"
+pve_zfs_health_scrub_days: "8-14"
+pve_zfs_health_scrub_weekday: 3

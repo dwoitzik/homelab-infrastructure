@@ -28,6 +28,43 @@ USB port they occupy is load-bearing** — a USB-2 port caps either at ~40 MB/s:
 
 If the archive HDD is ever re-cabled, put it back on a USB-3 port.
 
+### The `archive` pool is one USB disk with no redundancy
+
+`archive` is a single-vdev ZFS pool on the Seagate Expansion 2 TB (`sda`). It holds
+three things that matter:
+
+- the PBS datastore `Local-Backups` (`/mnt/pbs-storage`), i.e. every VM/LXC backup;
+- `garage-data`, the S3 backend for CNPG base backups and WAL, Velero and Loki;
+- `/mnt/media` (~1 TB of Jellyfin media).
+
+ZFS checksums every block, so it detects corruption on this disk, but with one copy it
+cannot repair any of it: a bad block is a permanent error in whatever file owns it. That
+happened once already: a single checksum error inside one PBS chunk made one vm/211
+snapshot unrestorable (caught by the weekly PBS verify and the ZFS error log). A failed
+disk or USB bridge takes all three datasets at once. The PBS datastore has no offsite
+copy (the Google Drive sync is disabled, REL-051), so VM/LXC backups go with it; only
+Velero's `daily-offsite` backups and the `pg_dump` archives in R2 leave the host.
+
+What is in place: `pve_zfs_health` exports pool state, read/write/checksum error
+counters, permanent data errors and scrub age (`storage.zfs` alerts page on any new
+error or data loss); a monthly scrub runs on the second Wednesday 09:00, outside the
+02:00 GC, 03:00 backup and Sunday 06:30 verify windows; PBS verifies every snapshot
+weekly. SMART is not available: the enclosure's bridge (USB ID `0bc2:2039`, `uas`
+driver) rejects ATA pass-through for every `smartctl -d` type (`sat`, `sat,12`,
+`sat,16`, `usbjmicron`, `usbsunplus`, `usbcypress`, `usbprolific`, `-T permissive`),
+so reallocated or pending sectors are invisible until ZFS sees a bad read. Binding the
+device to `usb-storage` instead of `uas` (`usb-storage.quirks=0bc2:2039:u`) sometimes
+enables pass-through on Seagate bridges, but needs a reboot or a re-plug of the disk
+that holds the pool, so it has not been tried.
+
+Mitigation to buy: a second disk of at least 2 TB, attached as a mirror
+(`zpool attach archive sda <new-disk>`). That turns detected corruption into
+self-healed corruption and survives one disk failure. A bare SATA disk in a
+SMART-capable USB enclosure (or an internal SATA/NVMe slot if the host has one free) is
+preferable to another sealed Expansion drive, so the mirror half has working SMART. A
+mirror is not a backup: an offsite copy of the PBS datastore is still the real answer
+for losing the host.
+
 ## The hard constraint: the boot NVMe is DRAM-less
 
 This is the single fact that shapes the most architecture decisions in this repo. A
