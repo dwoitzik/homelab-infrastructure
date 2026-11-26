@@ -12,6 +12,11 @@ Read `HARDWARE.md` first. The single most important constraint: **the boot NVMe 
 DRAM-less** — don't restore/stage large data onto it if the HDD-backed `media`/`archive`
 pool is available instead.
 
+The `archive` pool is a single USB disk without redundancy and holds the PBS datastore,
+Garage and the media library together; if that disk is the thing that died, PBS and
+Garage restores are gone and only the R2 offsite path (section 5b) is left. See
+`docs/HARDWARE.md`, "The `archive` pool is one USB disk with no redundancy".
+
 ## 1. Host foundation
 
 1. Confirm Proxmox boots and `pvesh` responds. Check `proxmox-boot-tool status` —

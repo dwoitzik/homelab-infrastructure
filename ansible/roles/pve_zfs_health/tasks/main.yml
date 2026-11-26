@@ -1,0 +1,70 @@
+---
+- name: Deploy the ZFS pool metrics script
+  ansible.builtin.copy:
+    src: zfs-pool-metrics.py
+    dest: /usr/local/sbin/zfs-pool-metrics.py
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy the ZFS pool metrics service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - zfs-pool-metrics.service
+    - zfs-pool-metrics.timer
+
+- name: Enable and start the ZFS pool metrics timer
+  ansible.builtin.systemd:
+    name: zfs-pool-metrics.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Deploy the monthly scrub script
+  ansible.builtin.copy:
+    src: zfs-scrub-all.sh
+    dest: /usr/local/sbin/zfs-scrub-all.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+# Debian's cron (/etc/cron.d/zfsutils-linux) is a conffile; opting each pool
+# out through its documented property survives package upgrades.
+- name: List the ZFS pools
+  ansible.builtin.command:
+    cmd: /usr/sbin/zpool list -H -o name
+  register: pve_zfs_health_pools
+  changed_when: false
+  check_mode: false
+
+- name: Read the Debian periodic-scrub setting of each pool
+  ansible.builtin.command:
+    cmd: /usr/sbin/zfs get -H -o value org.debian:periodic-scrub {{ item }}
+  loop: "{{ pve_zfs_health_pools.stdout_lines }}"
+  register: pve_zfs_health_debian_scrub
+  changed_when: false
+  check_mode: false
+
+- name: Opt the pools out of the Debian scrub cron
+  ansible.builtin.command:
+    cmd: /usr/sbin/zfs set org.debian:periodic-scrub=disable {{ item.item }}
+  loop: "{{ pve_zfs_health_debian_scrub.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stdout != "disable"
+  changed_when: true
+
+- name: Scrub all pools monthly outside the backup windows
+  ansible.builtin.cron:
+    name: zfs-scrub-all
+    cron_file: zfs-scrub-all
+    user: root
+    minute: "{{ pve_zfs_health_scrub_minute }}"
+    hour: "{{ pve_zfs_health_scrub_hour }}"
+    day: "{{ pve_zfs_health_scrub_days }}"
+    job: '[ "$(date +\%u)" -eq {{ pve_zfs_health_scrub_weekday }} ] && /usr/local/sbin/zfs-scrub-all.sh'

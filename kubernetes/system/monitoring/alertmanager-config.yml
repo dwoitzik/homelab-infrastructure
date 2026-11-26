@@ -91,7 +91,7 @@ spec:
         matchers:
           - matchType: "=~"
             name: alertname
-            value: "PBSVerifyFailed"
+            value: "PBSVerifyFailed|ZFSPoolDataErrors"
       - receiver: discord
         groupWait: 30s
         groupInterval: 15m
