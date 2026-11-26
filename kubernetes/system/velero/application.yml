@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://vmware-tanzu.github.io/helm-charts
-    targetRevision: 8.7.2
+    targetRevision: 10.1.3
     chart: velero
     helm:
       values: |
@@ -31,8 +31,10 @@ spec:
           # ADR-038: hardening for S3-compatible backends (R2, Garage); the SDK
           # otherwise attaches a CRC32 checksum to every PutObject.
           extraEnvVars:
-            AWS_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
-            AWS_RESPONSE_CHECKSUM_VALIDATION: WHEN_REQUIRED
+            - name: AWS_REQUEST_CHECKSUM_CALCULATION
+              value: WHEN_REQUIRED
+            - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+              value: WHEN_REQUIRED
           # REL-044: originally placed at the top level as `extraArgs` and
           # misspelled `--default-repo-maintenance-frequency` -- Helm silently
           # ignores unknown top-level keys, and the flag (even if it had been
