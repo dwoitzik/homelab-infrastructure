@@ -99,11 +99,14 @@ spec:
             - --node-agent-configmap=velero-node-agent-config
           resources:
             requests:
-              cpu: 50m
-              memory: 128Mi
+              cpu: 20m
+              memory: 64Mi
             limits:
               cpu: 500m
               memory: 1Gi
+        # Data mover pods are bound to the source pod's node by nodeName, so the
+        # kubelet rejects them (OutOfmemory) instead of the scheduler finding
+        # room; small requests keep them admissible on a fully requested node.
         configMaps:
           node-agent-config:
             data:
@@ -113,9 +116,9 @@ spec:
                     "globalConfig": 1
                   },
                   "podResources": {
-                    "cpuRequest": "250m",
+                    "cpuRequest": "10m",
                     "cpuLimit": "1000m",
-                    "memoryRequest": "256Mi",
+                    "memoryRequest": "32Mi",
                     "memoryLimit": "1Gi"
                   }
                 }
