@@ -1,7 +1,7 @@
 # Traefik
 
 Ingress controller for the whole cluster: every in-cluster hostname eventually routes
-through this. Deployed via the official Helm
+through this. Traefik v3, deployed via the official Helm
 chart (`application.yml`), fronted by MetalLB for its LoadBalancer IP.
 
 ## Routing
@@ -15,10 +15,8 @@ confirmed live (a bare EndpointSlice silently 404s with "subset not found"). Eve
 headless external-service pattern in this repo (Jellyfin, Atlantis, PVE/PBS, Wazuh,
 router, AdGuard) relies on this.
 
-Two IngressRoute CRD group versions coexist in this cluster
-(`ingressroutes.traefik.containo.us` and `ingressroutes.traefik.io`) — `kubectl get
-ingressroute` (bare name) is ambiguous between them and silently returns nothing.
-Always use the fully-qualified `ingressroute.traefik.io`.
+Only the `traefik.io` API group exists. The `traefik.containo.us` CRDs went away with
+the move to Traefik v3 (ADR-087).
 
 ## TLS
 
