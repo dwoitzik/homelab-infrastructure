@@ -24,7 +24,7 @@ services:
     restart: unless-stopped
 
   nzbhydra2:
-    image: lscr.io/linuxserver/nzbhydra2:latest@sha256:e97b16f007f0eb42f2ba95a6f9e0cc1413508b238a10d8893e208def9c789b1b
+    image: lscr.io/linuxserver/nzbhydra2:latest@sha256:7d272e5d458dc0d20399a28bf41efcecdfef334c5220067546ea80cf6692966a
     container_name: nzbhydra2
     networks:
       - media-acq-net
