@@ -7,63 +7,75 @@ spec:
   project: default
   source:
     repoURL: https://helm.traefik.io/traefik
-    targetRevision: 28.3.0
+    targetRevision: 42.4.3
     chart: traefik
     helm:
       values: |
         additionalArguments:
-          # REL-037: default is false, so every IngressRoute outside apps ns
-          # referencing {name: authelia, namespace: apps} was silently failing
-          # ("middleware apps/authelia is not in the IngressRoute namespace X")
-          # -- confirmed live for argo-main, grafana-main, loki-main,
-          # vault-main, status-final. Traefik fails closed on a broken
-          # middleware ref (404, not open passthrough), so this was an outage,
-          # not an exposure -- but it meant argo/grafana/vault/loki were all
-          # unreachable, and the Authelia gating never actually took effect.
-          - "--providers.kubernetescrd"
-          - "--providers.kubernetescrd.allowCrossNamespace=true"
-          - "--providers.kubernetesingress"
           - "--serverstransport.insecureskipverify=true"
-          - "--api.dashboard=true"
           - "--api.insecure=true"
-          - "--entrypoints.websecure.forwardedHeaders.trustedIPs=10.42.0.0/16,10.0.0.0/8"
-          - "--entrypoints.websecure.proxyProtocol.trustedIPs=10.42.0.0/16,10.0.0.0/8"
-          # Traefik v3 default readTimeout is 60s; large Immich uploads over
-          # NFS-backed USB storage exceed that → 502. Set to 0 (unlimited).
-          - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=0"
           # Plugin source comes from the plugin-source initContainer, never from
-          # plugins.traefik.io (ADR-079). Chart 27 has no localPlugins value.
+          # plugins.traefik.io (ADR-079). The chart's localPlugins value wants
+          # its own volume type, so the flag stays here.
           - "--experimental.localPlugins.crowdsec.moduleName=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+        providers:
+          kubernetesCRD:
+            # REL-037: IngressRoutes in argocd, monitoring, vault and kube-system
+            # use the authelia/crowdsec middlewares from apps; without this
+            # Traefik drops those routers (404).
+            allowCrossNamespace: true
+            # The startup probe and every @kubernetescrd reference use the
+            # legacy <namespace>-<name> form.
+            safeNaming: false
         ports:
+          # Chart 33+ defaults to 8080; the startup probe, the traefik-api
+          # Service, the kube-system network policy and Homepage use 9000.
+          traefik:
+            port: 9000
           web:
-            redirectTo:
-              port: websecure
+            http:
+              redirections:
+                entryPoint:
+                  to: websecure
+                  scheme: https
+                  permanent: true
           websecure:
-            tls:
-              enabled: true
-              secretName: wildcard-woitzik-dev-tls
+            http:
+              tls:
+                enabled: true
+            forwardedHeaders:
+              trustedIPs: ["10.42.0.0/16", "10.0.0.0/8"]
+            proxyProtocol:
+              trustedIPs: ["10.42.0.0/16", "10.0.0.0/8"]
+            transport:
+              respondingTimeouts:
+                # Large Immich uploads over NFS-backed USB storage outlast the
+                # 60s default and end in a 502.
+                readTimeout: 0
           # Loki push for DMZ hosts on its own entrypoint and LB IP, so the DMZ
           # firewall rule reaches one route instead of every Traefik host.
           lokipush:
             port: 3101
-            expose: false
+            expose:
+              default: false
             exposedPort: 3101
             protocol: TCP
-            tls:
-              enabled: true
-        logs:
-          general:
-            level: INFO
-          access:
-            enabled: true
-            format: json
-            fields:
-              headers:
-                defaultMode: keep
-                names:
-                  User-Agent: redact
-                  Authorization: redact
-                  Cookie: redact
+            http:
+              tls:
+                enabled: true
+        log:
+          level: INFO
+        accessLog:
+          enabled: true
+          format: json
+          fields:
+            defaultMode: keep
+            headers:
+              defaultMode: drop
+              names:
+                User-Agent: redact
+                Authorization: redact
+                Cookie: redact
         resources:
           requests:
             cpu: 100m
