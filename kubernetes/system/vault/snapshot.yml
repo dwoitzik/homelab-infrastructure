@@ -22,7 +22,7 @@ data:
     date -u +%Y-%m-%dT%H:%M:%SZ > /snapshots/.last-run
     echo "vault snapshot: $(wc -c < /snapshots/vault.snap) bytes"
 ---
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: vault-snapshot-token
