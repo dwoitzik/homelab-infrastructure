@@ -140,3 +140,13 @@ pinned release.
 
 - Revisit this ADR once a tagged `velero-plugin-for-aws` release ships the
   `o.tagging != ""` guard — move off the dev-build pin at that point.
+
+## Update: back on a tagged release
+
+`velero-plugin-for-aws` v1.14.3 added the `o.tagging != ""` guard to `PutObject`
+(checked in `object_store.go` at the v1.14.4 tag; v1.11.1, v1.12.2, v1.13.2 and v1.14.2
+still set the header unconditionally). The initContainer now runs the tagged v1.14.4
+image, digest-pinned, from the Velero 1.15 step of the 1.14 to 1.18 upgrade onward.
+The compatibility matrix pairs Velero 1.15, 1.16 and 1.17 with plugin 1.11, 1.12 and
+1.13, but those would bring the R2 failure back, so the 1.14 line (already running
+against Velero 1.14 as the dev build) stays in place for every step.
