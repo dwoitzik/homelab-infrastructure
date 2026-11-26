@@ -1,7 +1,7 @@
 # ADR-087: Move Traefik from v2.11 to v3 in two chart steps
 
 **Date:** 2026-11-26
-**Status:** Accepted, step 1 in progress
+**Status:** Accepted, applied
 
 ## Context
 
@@ -22,8 +22,9 @@ against what this cluster actually configures:
   plugin. None of the removed options (`ipWhiteList`, `sslRedirect`, `featurePolicy`,
   `stripPrefix.forceSlash`, `tls.caOptional`) is used.
 - **API group.** No object exists in `traefik.containo.us`; every resource is
-  `traefik.io/v1alpha1`. Chart 28 no longer ships the `containo.us` CRDs, so Argo CD
-  prunes the nine empty ones.
+  `traefik.io/v1alpha1`. Chart 28 no longer ships the `containo.us` CRDs. Argo CD had
+  never tracked them, so it did not prune them; the nine empty CRDs were deleted by
+  hand after step 1.
 - **Endpoints.** From v3.1 Traefik reads EndpointSlices instead of v1 Endpoints. The
   selectorless Services for hosts outside the cluster (Jellyfin, the *arr stack, PVE,
   PBS, router, Rybbit, AdGuard, Headscale on the RPi) already have mirrored
@@ -65,3 +66,11 @@ DNAT depends on do not change.
 
 - The `containo.us` CRDs are gone; `kubectl get ingressroute` is no longer ambiguous.
 - The v3 rule syntax is now the only syntax in use, which is what v4 will require.
+
+## Result
+
+- Step 1 (#1320): v3.0.2 rolled out with both pods Ready through the startup probe, 52
+  of 52 routers and every middleware enabled, the ingress smoke test (Authelia
+  redirects, direct hosts, HTTP to HTTPS, wildcard certificate, public hosts through
+  the tunnel) unchanged, and a test IP banned on the CrowdSec LAPIs answered 403.
+- Step 2: same checks against v3.7.20, recorded in its PR.
