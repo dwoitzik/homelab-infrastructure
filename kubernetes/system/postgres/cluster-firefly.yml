@@ -1,7 +1,7 @@
 # firefly-iii's postgres was a plain, unmanaged StatefulSet -- no CNPG
 # operator, no ScheduledBackup, no failover, unlike every sibling database
 # in this namespace. Database was empty at migration, no data risk.
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: postgres-firefly-cnpg-user
