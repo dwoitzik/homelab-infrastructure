@@ -25,6 +25,8 @@ monitoring.coreos.com/PodMonitor
 monitoring.coreos.com/PrometheusRule
 monitoring.coreos.com/ServiceMonitor
 networking.k8s.io/NetworkPolicy
+policies.kyverno.io/PolicyException
+policies.kyverno.io/ValidatingPolicy
 policy/PodDisruptionBudget
 postgresql.cnpg.io/Cluster
 postgresql.cnpg.io/ScheduledBackup
