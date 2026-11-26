@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://charts.external-secrets.io
-    targetRevision: 0.16.2
+    targetRevision: 2.15.0
     chart: external-secrets
     helm:
       values: |
@@ -35,6 +35,9 @@ spec:
         serviceMonitor:
           enabled: true
           namespace: monitoring
+          # The default skips the ServiceMonitor when the chart cannot see the
+          # monitoring.coreos.com API at render time, which drops metrics silently.
+          renderMode: alwaysRender
           # Prometheus only selects ServiceMonitors carrying this label.
           additionalLabels:
             release: kube-prometheus-stack
