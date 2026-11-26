@@ -91,7 +91,7 @@
         content: |
           services:
             adguardhome-sync:
-              image: ghcr.io/bakito/adguardhome-sync:latest@sha256:157e509baeef66cd400dae96c955a1e97312670e0285a92ebe2c3465b3e22e67
+              image: ghcr.io/bakito/adguardhome-sync:latest@sha256:2dc30eedebf07bbb6d2fa8988734cebe41c70f6511829ff1c37b7bc6ab172615
               container_name: adguardhome-sync
               restart: unless-stopped
               mem_limit: 128m
