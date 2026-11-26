@@ -37,9 +37,6 @@ kind: ClusterRole
 metadata:
   name: drift-checker-extra-read
 rules:
-  - apiGroups: ["kyverno.io"]
-    resources: ["clusterpolicies", "policies", "policyexceptions"]
-    verbs: ["get", "list"]
   - apiGroups: ["policies.kyverno.io"]
     resources: ["validatingpolicies", "policyexceptions"]
     verbs: ["get", "list"]
