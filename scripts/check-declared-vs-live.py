@@ -39,7 +39,7 @@ SKIP_KINDS = {"Application", "AppProject", "ApplicationSet", "Secret"}
 CLUSTER_SCOPED_KINDS = {
     "ClusterRole",
     "ClusterRoleBinding",
-    "ClusterPolicy",
+    "ValidatingPolicy",
     "PriorityClass",
     "Namespace",
     "CustomResourceDefinition",

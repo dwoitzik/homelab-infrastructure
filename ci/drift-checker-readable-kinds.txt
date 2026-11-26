@@ -16,8 +16,6 @@ core/Service
 core/ServiceAccount
 external-secrets.io/ClusterSecretStore
 external-secrets.io/ExternalSecret
-kyverno.io/ClusterPolicy
-kyverno.io/PolicyException
 metallb.io/IPAddressPool
 metallb.io/L2Advertisement
 monitoring.coreos.com/AlertmanagerConfig
