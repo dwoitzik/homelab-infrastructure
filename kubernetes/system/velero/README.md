@@ -91,8 +91,12 @@ verified restore test.
 Each PodVolumeBackup and PodVolumeRestore runs in its own short-lived pod in the
 `velero` namespace on the node of the source pod, not inside node-agent. The
 `velero-node-agent-config` ConfigMap (chart `configMaps.node-agent-config`) allows one
-such pod per node at a time and sets their resources (250m/1 CPU, 256Mi/1Gi), which
-keeps the nightly load per node where the old node-agent CPU limit had it (REL-064).
+such pod per node at a time and caps them at 1 CPU and 1Gi, which keeps the nightly
+load per node where the old node-agent CPU limit had it (REL-064). Their requests are
+deliberately tiny (10m, 32Mi): Velero binds each pod to the source pod's node with
+`nodeName`, so the scheduler never looks for room, and a node whose memory requests are
+full makes the kubelet reject the pod (`OutOfmemory`) and Velero cancel that
+PodVolumeBackup, which turns the whole backup PartiallyFailed.
 Node-agent reads the ConfigMap at start, so a change needs a node-agent restart (the
 chart rollout does that when the values change).
 
