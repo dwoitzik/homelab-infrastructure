@@ -337,4 +337,5 @@ spec:
             summary: "PBS weekly verify has not finished in 8 days, or its metrics stopped"
             description: >
               Either the weekly-verify job (Sundays 06:30) did not complete, or the
-              pbs-job-metrics cron on pve-mgmt-01 stopped writing pbs_jobs.prom.
+              pbs-job-metrics cron on pve-mgmt-01 stopped writing pbs_jobs.prom. Run
+              the cron line from `crontab -l` by hand to see why it fails.
