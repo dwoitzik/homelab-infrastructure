@@ -150,6 +150,8 @@ spec:
         metadata:
           labels:
             app: firefly-iii-cron
+            # Kept out of Velero backups even when pulled in through firefly-data.
+            velero.io/exclude-from-backup: "true"
         spec:
           restartPolicy: Never
           dnsConfig:

@@ -60,6 +60,10 @@ kind: PersistentVolumeClaim
 metadata:
   name: nextcloud-db-data-pg18
   namespace: apps
+  # Matches the daily-offsite labelSelector: since Velero 1.15 a selected PVC
+  # pulls its mounting pod into the backup, so the PVC must be excluded too.
+  labels:
+    app: postgres-nextcloud
 spec:
   accessModes: [ReadWriteOnce]
   storageClassName: nfs-client
@@ -482,6 +486,11 @@ spec:
     spec:
       ttlSecondsAfterFinished: 86400
       template:
+        metadata:
+          # Velero 1.15+ pulls pods mounting a backed-up PVC into the backup
+          # regardless of the Schedule's labelSelector; this label still wins.
+          labels:
+            velero.io/exclude-from-backup: "true"
         spec:
           restartPolicy: OnFailure
           securityContext:
