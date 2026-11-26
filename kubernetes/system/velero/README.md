@@ -86,6 +86,16 @@ PVC data. Fixed and verified with a real Kopia Pod Volume Backup test run. Both
 schedules in this directory now set it explicitly — don't remove it without a new
 verified restore test.
 
+## fs-backup data mover pods (Velero 1.17+)
+
+Each PodVolumeBackup and PodVolumeRestore runs in its own short-lived pod in the
+`velero` namespace on the node of the source pod, not inside node-agent. The
+`velero-node-agent-config` ConfigMap (chart `configMaps.node-agent-config`) allows one
+such pod per node at a time and sets their resources (250m/1 CPU, 256Mi/1Gi), which
+keeps the nightly load per node where the old node-agent CPU limit had it (REL-064).
+Node-agent reads the ConfigMap at start, so a change needs a node-agent restart (the
+chart rollout does that when the values change).
+
 ## How to restore
 
 See `docs/backup-strategy.md` / `DISASTER-RECOVERY.md` for the full procedure. In short:

@@ -192,7 +192,7 @@ data:
     NS=velero-restore-test
     SRC_NS=vault
     NTFY_URL="https://ntfy.sh/dw-homelab-a12a7b540943"
-    VELERO_VERSION=v1.16.2
+    VELERO_VERSION=v1.17.2
 
     log() { echo "[restore-test] $(date -u +%FT%TZ) $*"; }
 
