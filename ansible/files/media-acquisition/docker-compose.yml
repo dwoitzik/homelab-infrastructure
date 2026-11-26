@@ -132,7 +132,7 @@ services:
     restart: unless-stopped
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:latest@sha256:832820dec70bce9e912c6eee7a95baf6551e03dbc63325a7208daaa455423752
+    image: lscr.io/linuxserver/bazarr:latest@sha256:b3db4247d3afa0c68bc5aa311bedd67b1caf4b3eabc3a85577682970435d5013
     container_name: bazarr
     networks:
       - media-acq-net
