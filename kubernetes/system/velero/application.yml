@@ -7,13 +7,13 @@ spec:
   project: default
   source:
     repoURL: https://vmware-tanzu.github.io/helm-charts
-    targetRevision: 11.4.0
+    targetRevision: 12.2.5
     chart: velero
     helm:
       values: |
         upgradeCRDs: false
         image:
-          tag: v1.17.2
+          tag: v1.18.4
         configuration:
           backupStorageLocation:
             - name: default
