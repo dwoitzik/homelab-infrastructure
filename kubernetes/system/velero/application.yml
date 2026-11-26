@@ -7,11 +7,13 @@ spec:
   project: default
   source:
     repoURL: https://vmware-tanzu.github.io/helm-charts
-    targetRevision: 10.1.3
+    targetRevision: 11.4.0
     chart: velero
     helm:
       values: |
         upgradeCRDs: false
+        image:
+          tag: v1.17.2
         configuration:
           backupStorageLocation:
             - name: default
@@ -81,55 +83,42 @@ spec:
                       values:
                         - vm-srv-k3s-11
         deployNodeAgent: true
-        # Server process only; kopia data movement runs in the node-agent pods.
+        # Server process only; kopia data movement runs in the data mover pods.
         resources:
           requests:
             cpu: 100m
             memory: 448Mi
           limits:
             memory: 1536Mi
-        # REL-064 load-smoothing: node-agent had NO resource limits at all
-        # (confirmed live: `resources: {}` on the running DaemonSet) --
-        # kopia's own internal parallel chunking/compression could burst to
-        # every core the k3s VM has (4 vCPU) on all 3 nodes simultaneously,
-        # which is the actual driver of the 82-90C nightly spike (REL-062),
-        # not vzdump and not literally which hour it runs.
-        #
-        # v1.14.1 (this chart's pinned appVersion) has no
-        # loadConcurrency/node-agent-config knob to reduce how many
-        # PodVolumeBackups run in parallel per node -- checked directly
-        # against the running binary (`node-agent server --help`), that
-        # flag doesn't exist in this version. A CPU *limit* is the real
-        # lever actually available here: Kubernetes enforces it as a CFS
-        # quota, which throttles kopia's own internal parallelism instead
-        # of capping cross-pod concurrency -- same practical effect (flatter
-        # load, longer duration, lower peak) via the mechanism this version
-        # actually supports.
-        #
-        # ionice/nice were considered and don't apply here: node-agent's
-        # backup work runs the kopia library in-process (not exec'ing a
-        # separate `kopia` binary per operation), so there's no external
-        # process to wrap with an I/O/CPU scheduling class -- a CPU cgroup
-        # limit is the equivalent control point Kubernetes actually exposes
-        # for in-process work like this.
-        #
-        # 1000m caps each node-agent pod (one per node, 3 nodes) to 1 of the
-        # node's 4 vCPU -- worst case (all 3 nodes backing up volumes at
-        # once) is 3 cores of contention host-wide instead of previously
-        # unbounded (up to 12 cores worth, one full node each). Tradeoff:
-        # longer backup wall-clock time in exchange for a materially lower
-        # peak -- exactly what REL-064 is watching for. 250m request keeps
-        # it schedulable without reserving much when idle (backups are once
-        # nightly, not constant).
+        # REL-064: kopia runs in data mover pods since 1.17; one per node at a
+        # time, 1 CPU each, keeps the old per-node load. Default priority on
+        # purpose: a nightly job should not preempt pinned pods (ADR-083).
         nodeAgent:
           priorityClassName: node-daemon
+          extraArgs:
+            - --node-agent-configmap=velero-node-agent-config
           resources:
             requests:
-              cpu: 250m
-              memory: 256Mi
+              cpu: 50m
+              memory: 128Mi
             limits:
-              cpu: 1000m
+              cpu: 500m
               memory: 1Gi
+        configMaps:
+          node-agent-config:
+            data:
+              node-agent-config.json: |
+                {
+                  "loadConcurrency": {
+                    "globalConfig": 1
+                  },
+                  "podResources": {
+                    "cpuRequest": "250m",
+                    "cpuLimit": "1000m",
+                    "memoryRequest": "256Mi",
+                    "memoryLimit": "1Gi"
+                  }
+                }
   destination:
     server: https://kubernetes.default.svc
     namespace: velero
