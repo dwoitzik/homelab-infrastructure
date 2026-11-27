@@ -101,8 +101,9 @@ Promoted state:
 
 The `apps` namespace already allows Authelia to reach `10.0.20.3:5432`
 (NetworkPolicy `allow-egress-authelia-pg-standby` in
-`kubernetes/apps/network-policies-egress.yml`), so only the address
-changes.
+`kubernetes/apps/network-policies-egress.yml`), and the Pi's host firewall
+admits 5432 from the three k3s node IPs (`rpi_optimize_hostfw_extra_rules` in
+`ansible/host_vars/rpi-srv-02.yml`), so only the address changes.
 
 1. In `kubernetes/apps/authelia/configmap.yml` set
    `storage.postgres.address` to `'tcp://10.0.20.3:5432'`.
@@ -171,12 +172,42 @@ Drop the slot on the primary first, otherwise the primary keeps up to
 2 GB of WAL for it. Then `systemctl disable --now
 postgres-authelia-standby` and remove the data directory.
 
+## Rehearsal (2026-11-27)
+
+The live standby was never promoted. A throw-away copy was, on `rpi-srv-02`:
+
+```bash
+# pg_basebackup -X stream (temporary slot) from 10.0.20.203 into /mnt/ssd/pg-rehearsal,
+# the live standby's override.conf and pg_hba.conf with port 5499, no TCP listener,
+# its own socket and no slot; standby.signal; pg_ctl start; pg_promote(); checks; rm -rf.
+```
+
+| Step | Result |
+|---|---|
+| `pg_basebackup` | 49 MB in 1.8 s |
+| Start as standby | `in_recovery=t`, WAL receiver `streaming` |
+| `pg_promote(true, 60)` | 0.64 s to `in_recovery=f`, timeline 2 |
+| Write test | `CREATE TABLE`/`INSERT`/`DROP` committed in `authelia` |
+| Privileges | `authelia` role has INSERT/UPDATE/DELETE on every table |
+| Schema | Authelia migration version 29, same as the primary |
+| Data | `authentication_logs` 26 rows (newest 2026-11-23 15:27 UTC), `totp_configurations` 1, `user_preferences` 1, `webauthn_credentials` 0: identical to the primary |
+| Consistency | `amcheck` `bt_index_check(heapallindexed)` on all 246 btree indexes, no errors |
+| Cleanup | copy stopped and deleted; the primary shows only `rpi02_standby_slot`, standby still streaming |
+
+What it found: the Pi's host firewall (`inet hostfw`, policy drop) did not admit
+5432, so a promoted standby would have been unreachable for Authelia; a TCP connect
+from `vm-srv-k3s-11` to `10.0.20.3:5432` timed out. Fixed with the extra rule above.
+
+A live switch of Authelia to the Pi was not done: physical replication has no
+failback other than dump, rebuild of the CNPG primary and reseed (above), which is far
+riskier than the promotion it would prove. The scratch copy exercises the same binary,
+data and settings; the network path is checked separately with a connection from a
+k3s node after the firewall change.
+
 ## Known gaps
 
-- No promotion has been rehearsed. A rehearsal needs a second copy (a
-  `pg_basebackup` into a scratch directory on the Pi with its own port,
-  promoted and thrown away) so the real standby is never touched; that
-  has not been done yet.
+- The live switch (configmap address, Authelia restart) is not rehearsed; see the
+  rehearsal section for why.
 - Redis (Authelia's session cache) has no standby; sessions are lost on
   failover.
 - Failback is a dump and restore, not a resync.

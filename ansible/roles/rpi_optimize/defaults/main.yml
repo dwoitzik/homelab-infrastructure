@@ -7,3 +7,5 @@ rpi_optimize_usb_storage_quirks: []
 rpi_optimize_eeprom_boot_order: ""
 # Data SSD mounted next to the root filesystem: {uuid: ..., path: ...}.
 rpi_optimize_ssd_mount: {}
+# Extra accept rules for the host firewall's input chain (nft syntax), per host.
+rpi_optimize_hostfw_extra_rules: []

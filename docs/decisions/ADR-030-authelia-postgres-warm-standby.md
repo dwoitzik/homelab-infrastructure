@@ -3,8 +3,8 @@
 **Date:** 2026-08-27
 **Status:** Accepted and live since 2026-11-23: `rpi-srv-02` streams from
 `postgres-authelia` in recovery mode, alerted by
-`AutheliaPostgresStandbyNotStreaming`. Promotion has not been rehearsed (see the
-last status update).
+`AutheliaPostgresStandbyNotStreaming`. Promotion rehearsed on a throw-away copy on
+2026-11-27 (see the last status update).
 
 ## Context
 
@@ -353,3 +353,16 @@ differs from the design above:
 
 Not done: a promotion rehearsal. It needs a second, throw-away copy so the real
 standby is never promoted; the runbook lists the exact promotion commands instead.
+
+## Status update: promotion rehearsed (2026-11-27)
+
+A `pg_basebackup` copy of the primary on `rpi-srv-02` (own port and socket, no slot,
+the live standby's settings) was started as a standby, promoted with `pg_promote()` in
+0.64 s, written to, checked with `amcheck` on every btree index and compared with the
+primary (same Authelia schema version and row counts), then deleted. The live standby
+and its slot were not touched. Details in `docs/runbooks/failover-authelia-postgres.md`.
+
+The rehearsal found that the Pi's host firewall dropped 5432, so Authelia could not have
+reached a promoted standby. `rpi_optimize_hostfw_extra_rules` now admits 5432 from the
+three k3s node IPs only. A live switch of Authelia was judged not worth its failback
+(dump, CNPG rebuild, reseed) and was not done.
