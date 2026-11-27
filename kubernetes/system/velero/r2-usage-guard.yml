@@ -159,7 +159,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: r2-usage-guard
-              image: amazon/aws-cli:2.37.11@sha256:d55d5b391f1cc0d428a05eb07408bb1a730d7df9f656008f1117ed5e13b0c083
+              image: amazon/aws-cli:2.42.5@sha256:4e569d37c0b93893f660946f9b00a442b1172b1c4ba86338a3a1af3937ed62b5
               command: ["/bin/bash", "/scripts/r2-usage-guard.sh"]
               env:
                 # Same placeholder as r2-backuplocation.yml's s3Url -- filled
