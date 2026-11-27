@@ -299,6 +299,19 @@ spec:
             description: >
               The next snapshot may fail. Shorten the retention in the
               immich_library_mirror_target role or replace the SSD with a larger one.
+        # BOOT_ORDER 0xf14 falls back to the SD card silently when the SSD's boot
+        # partition cannot be read; the SD root is an old snapshot.
+        - alert: RpiSrv02BootedFromSdCard
+          expr: node_filesystem_size_bytes{instance="10.0.20.3:9100", mountpoint="/", device=~"/dev/mmcblk.*"}
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "rpi-srv-02 is running from its SD card instead of the SSD"
+            description: >
+              The bootloader fell back to the SD card, whose root filesystem is the
+              snapshot taken at the SSD cutover (2026-11-27). Packages and local state
+              on it are stale. See docs/runbooks/rpi-srv-02-ssd-boot.md.
         # ext4 remounts read-only (errors=remount-ro or emergency_ro) when a disk
         # drops off; every service on it fails quietly until someone looks.
         - alert: HostFilesystemReadOnly

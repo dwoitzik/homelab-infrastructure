@@ -143,7 +143,8 @@ rate it reaches 90 % around the end of December.
 
 ### Raspberry Pi SSD
 
-- [ ] Boot rpi-srv-02 from its SSD instead of the SD card
+- [x] Boot rpi-srv-02 from its SSD instead of the SD card (SD card stays as boot fallback,
+      `docs/runbooks/rpi-srv-02-ssd-boot.md`)
 - [ ] Use it as a second, physically separate backup target for small critical state
       (Vault, Vaultwarden, Headscale, kine, database dumps)
 - [ ] Evaluate running Prometheus there to take ~8 GB/day off the host NVMe and keep

@@ -10,7 +10,7 @@ for a problem this hardware doesn't have, or a regression for one it does.
 | `pve-mgmt-01` | Proxmox host, sole physical compute node | Single box — everything else (VMs, LXCs) runs on it |
 | `vm-srv-k3s-11` | k3s control-plane (sole server) | VM, boot disk on `local-lvm` |
 | `vm-srv-k3s-12`, `vm-srv-k3s-13` | k3s workers | VMs, same storage |
-| `rpi-srv-01`, `rpi-srv-02` | DNS/edge (AdGuard + Unbound, VRRP-paired via keepalived) | RPi 4B, SD card boot |
+| `rpi-srv-01`, `rpi-srv-02` | DNS/edge (AdGuard + Unbound, VRRP-paired via keepalived) | RPi 4B; `rpi-srv-01` boots from SD, `rpi-srv-02` from its USB SSD with the SD card as fallback |
 | Boot/VM-image storage | `local-lvm` (LVM-thin, VG `pve`) | **DRAM-less consumer NVMe.** No onboard write cache — every sustained write burst hits raw flash directly. |
 | Bulk/archive storage | `media`/`archive` ZFS pool | HDD-backed, ample capacity, slow — used deliberately for anything that doesn't need low latency (PBS backups, staging large restores) |
 | Immich photo library | USB-attached storage, NFS-exported | Untouched by k3s cluster lifecycle — physically independent |
@@ -443,12 +443,12 @@ impact on the network's actual resolution path, because the VIP stayed on the pr
 throughout.
 
 RPi SD cards are write-fragile — the same general class of concern as the boot NVMe, at
-smaller scale. They run DNS/edge only, never databases or heavy logging. David has
-attached a USB-SATA adapter + SSD to `rpi-srv-02` (2026-08-14: confirmed live, `sda`,
-111.8G, `usb` transport, no partition table or filesystem yet — nothing built on it) to
-reduce this risk and potentially support running a service independently of the main
-Proxmox host (e.g. Vaultwarden or Headscale). See the §4.2 architecture review for
-whether/what to place on it — do not assume a filesystem exists without checking.
+smaller scale. `rpi-srv-01` runs DNS/edge only from its SD card, never databases or heavy
+logging. `rpi-srv-02` has a 120 GB SATA SSD behind a JMicron JMS583 USB bridge
+(`152d:0583`, kept off UAS with a `usb-storage` quirk because it dropped off the bus under
+UAS on 2026-11-19). Since 2026-11-27 it boots from that SSD (`sda2` boot, `sda3` root,
+`sda1` data at `/mnt/ssd`), with the SD card left as the bootloader's fallback:
+`docs/runbooks/rpi-srv-02-ssd-boot.md`.
 
 ## What NOT to do to this hardware
 
