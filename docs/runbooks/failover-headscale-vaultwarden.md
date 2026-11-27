@@ -1,12 +1,10 @@
 # Failover Runbook: headscale + vaultwarden warm standby
 
-> **Status (2026-11-27):** identity keys, OIDC secret and image versions are deployed
-> by `ansible/roles/rpi_ha_standby` from Ansible Vault, matched to the primary by
-> `scripts/check-image-lockstep.py`. The standby was rehearsed with real tailnet clients
-> through Traefik (see "Rehearsal" at the end). **Open gap:** with `pve-mgmt-01` down
-> there is no TLS endpoint for `headscale.woitzik.dev` or `vault.woitzik.dev` that can
-> reach the Pi (Traefik and the DMZ proxy both run on that host), so step 5 only works
-> while the cluster's Traefik is up.
+> **Status (2026-11-27):** the standby can take over with `pve-mgmt-01` down. Its TLS front
+> end (`ha-standby-proxy`, Caddy on `rpi-srv-02`) holds a certificate pushed from the
+> cluster, the router moves public headscale traffic to it by itself while the standby
+> runs, and one playbook moves LAN/tailnet DNS (ADR-088). Rehearsed end to end with real
+> tailnet clients on 2026-11-27 (see "Rehearsal 2" at the end).
 
 Manual, deliberate failover to the `rpi-srv-02` standby built under
 `docs/decisions/ADR-029-warm-standby-ha-headscale-vaultwarden.md`. Not
@@ -112,70 +110,41 @@ done, or the files ended up in the wrong path
 proceeding on freshly-minted keys means every device needs re-registration
 regardless of whether you fix it later.
 
+**As soon as headscale-standby answers, the router sends new public connections for
+`headscale.woitzik.dev` to the Pi** (netwatch `ha_headscale_standby`, ADR-088), within
+about ten seconds. That also happens in a rehearsal: starting the standby is the switch.
+
 ## 5. Flip traffic to rpi-srv-02
 
-How clients reach the two apps today:
+| Clients | Normal path | During failover | How it switches |
+|---|---|---|---|
+| Internet (`headscale.woitzik.dev` only) | WAN 443 -> router dst-nat -> DMZ proxy `10.0.30.2` -> headscale LB | WAN 443 -> router dst-nat -> `10.0.20.3:8443` (Caddy, headscale only) | Automatic: netwatch on `10.0.20.3:8081` sees the standby answer and fills address list `ha_headscale_standby` |
+| LAN and tailnet (both names) | AdGuard rewrite -> Traefik `10.0.20.200` | AdGuard rewrite -> `10.0.20.3:443` (Caddy) | `ansible/ha-standby-dns.yml`, below |
+| Tailnet control URL | MagicDNS extra record -> public IP | same record (written by the standby's `headscale-public-ip-record`) -> router -> Pi | follows the internet row |
 
-- LAN clients, including tailscaled on both Pis and the in-cluster subnet router, resolve
-  `headscale.woitzik.dev` through AdGuard to Traefik (`10.0.20.200`), IngressRoute
-  `headscale-final`. `vault.woitzik.dev` takes the same path (AdGuard wildcard).
-- Clients on the internet reach `headscale.woitzik.dev` (DNS-only record) through the
-  router's port forward to the DMZ proxy (`ct-dmz-proxy-01`, NPM), which forwards to the
-  `headscale-dmz-lb` LoadBalancer `10.0.20.201:8080`. Vaultwarden is not public.
+From a workstation with the repo and the Ansible Vault password (nothing on
+`pve-mgmt-01` is involved):
 
-Traefik and NPM both terminate TLS, and both run on `pve-mgmt-01`. The standby serves
-plain HTTP on `10.0.20.3:8082` and `:8083`.
-
-**While Traefik is up** (the cluster runs but the primary pod or its volume is lost),
-route Traefik to the standby with a higher-priority IngressRoute and a selectorless
-Service; nothing ArgoCD manages is touched, so self-heal does not fight it:
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata: {name: headscale-standby, namespace: apps}
-spec:
-  ports: [{name: http, port: 8080, targetPort: 8082}]
----
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
-metadata:
-  name: headscale-standby-1
-  namespace: apps
-  labels: {kubernetes.io/service-name: headscale-standby}
-addressType: IPv4
-ports: [{name: http, port: 8082, protocol: TCP}]
-endpoints: [{addresses: ["10.0.20.3"], conditions: {ready: true}}]
----
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
-metadata: {name: headscale-standby, namespace: apps}
-spec:
-  entryPoints: [websecure]
-  routes:
-    - kind: Rule
-      match: Host(`headscale.woitzik.dev`)
-      priority: 10000
-      middlewares: [{name: websockets}]
-      services: [{name: headscale-standby, port: 8080}]
+```bash
+ansible-playbook ansible/ha-standby-dns.yml -e adguard_ha_standby_failover=true
+for s in 10.0.20.2 10.0.20.3; do dig +short @$s headscale.woitzik.dev; dig +short @$s vault.woitzik.dev; done
+# all four answers: 10.0.20.3
 ```
 
-The same pattern with port 8083 and `Host(`vault.woitzik.dev`)` (no middleware) moves
-vaultwarden. Internet clients would also need NPM's `headscale.woitzik.dev` upstream set
-to `10.0.20.3:8082` and a router rule from the DMZ to that port; neither exists.
+Each Pi restarts AdGuard once (about 15 seconds); keepalived keeps the DNS VIP on the
+other one. Do not run `site.yml` for `rpi_nodes` during a failover: it renders the
+default rewrites and moves LAN clients back to Traefik.
 
-Existing control connections stay on the old backend until they break. A client whose
+Check the router followed (any of these, whichever works from where you are):
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://10.0.20.3:8081/     # 200 = netwatch sees the standby
+curl -s -o /dev/null -w '%{http_code}\n' --resolve headscale.woitzik.dev:443:<WAN IP> https://headscale.woitzik.dev/health
+```
+
+Existing control connections stay where they are until they break. A client whose
 primary died reconnects by itself; in a rehearsal force it with
 `sudo systemctl restart tailscaled`.
-
-**With `pve-mgmt-01` down** there is no TLS endpoint left for either hostname, and
-pointing AdGuard at `10.0.20.3` does not help: clients speak HTTPS on 443. Making this
-work needs a TLS proxy on `rpi-srv-02` with a certificate for both names kept current
-off-cluster, plus the AdGuard rewrites and router port forward pointed at it. Until that
-exists, an outage of `pve-mgmt-01` leaves registered tailnet devices running on their
-last netmap (peer-to-peer traffic keeps working, no control plane) and Bitwarden clients
-on their offline vault copy; the standby data is then a fast restore source for the
-rebuilt cluster, not a live service.
 
 ## 6. Verify from a real client, not just curl
 
@@ -200,12 +169,17 @@ Mirror image, done deliberately:
 
 1. Confirm the primary's own pods are healthy again
    (`kubectl get pods -n apps -l app=headscale`, same for vaultwarden) —
-   don't flip traffic back to something still crash-looping.
-2. **Stop the standby containers first**, before flipping DNS/Tunnel back
-   — `sudo docker compose stop` in `/opt/ha-standby`. This guarantees the
-   standby stops accepting writes before the primary starts accepting
-   them again, so there's never a window with two live writers.
-3. Reverse step 5: delete the standby IngressRoute, Service and EndpointSlice.
+   don't flip traffic back to something still crash-looping. k3s starts the primary
+   by itself when the host boots; clients stay on the standby until steps 2 and 3,
+   because DNS and the router still point there. If the standby took writes you need
+   (step 5), scale the primary to 0 before anything else.
+2. **Stop the standby containers first**: `sudo docker compose stop` in
+   `/opt/ha-standby`. The standby stops accepting writes, and within about ten seconds
+   netwatch sees the health URL fail and the router sends public headscale traffic back
+   to the DMZ proxy.
+3. Move LAN/tailnet DNS back: `ansible-playbook ansible/ha-standby-dns.yml` (no flag);
+   both Pis answer `10.0.20.200` again. Restart `tailscaled` on clients you want back
+   right away; the rest reconnect when their connection to the stopped standby drops.
 4. Verify from a real client again (same checks as step 6), now against
    the primary.
 5. **Data**: while it served, the standby was the only writer, and the primary
@@ -222,15 +196,24 @@ Mirror image, done deliberately:
    unaffected by any of this) — confirm with a fresh
    `ls -la /mnt/ssd/litestream-replicas/{headscale,vaultwarden}/` shortly
    after and check the newest generation's mtime is recent.
-7. Log the incident: what triggered it, how long the standby actually
+7. Reset the standby: `sudo docker compose down`, then delete the restored databases
+   (`db.sqlite*` in the headscale data directory, `db.sqlite3*` in the vaultwarden one) so
+   only `noise_private.key` and `rsa_key.pem` remain for the next restore.
+8. Log the incident: what triggered it, how long the standby actually
    served traffic, whether anything in this runbook was wrong or
    out of date, in `phase8/LEDGER.md` and (if this runbook needs a
    correction) as a follow-up PR against this file.
 
 ## Known gaps, disclosed not hidden
 
-- No TLS endpoint off `pve-mgmt-01` (step 5): the standby only serves clients while the
-  cluster's Traefik is up. This is the main remaining work for ADR-029.
+- The certificate on the Pi lives 30 to 60 days without the cluster (cert-manager renews
+  30 days before expiry, the push runs daily). An outage longer than that needs a
+  certificate issued another way.
+- Internet clients reach Caddy on `rpi-srv-02` (server VLAN) without CrowdSec while the
+  standby runs; only headscale is served there and the router's per-source flood guard
+  applies (ADR-088).
+- Authelia is down with the cluster, so new device logins (OIDC) fail; registered devices
+  keep working.
 - The 3 static identity files are copies in Ansible Vault. If a key on the primary is
   rotated, re-encrypt it (step 0); nothing detects the mismatch automatically.
 - `headscale-config.yaml.j2`/`headscale-policy.hujson.j2` in
@@ -240,7 +223,10 @@ Mirror image, done deliberately:
   `last_seen`/endpoint updates (harmless); a device registered or a route approved on the
   standby is lost at failback.
 
-## Rehearsal (2026-11-27)
+## Rehearsal 1 (2026-11-27): through Traefik
+
+The Traefik IngressRoute used here is retired: the standby now publishes on loopback
+only, and the Caddy path of rehearsal 2 serves both cases.
 
 Scope: real tailnet clients on the standby with the primary left running, vaultwarden
 read-only. Stopping the primary was avoided because both Deployments are self-healed by
@@ -265,7 +251,7 @@ Headscale, real clients:
 |---|---|---|
 | Restore replica | 13:05:29.6 | integrity ok; 5 nodes, same names as the primary |
 | Standby up | 13:05:29.8 to 13:05:31.9 | `/health` pass, Noise key not regenerated (hash `8c6dc16d...` as primary) |
-| IngressRoute to standby (pattern from step 5) | 13:05:38.1 to 13:05:41.7 | Traefik serves the standby |
+| IngressRoute to standby (retired pattern) | 13:05:38.1 to 13:05:41.7 | Traefik serves the standby |
 | Restart tailscaled on rpi-srv-02 | 13:05:48.8 to 13:05:51.5 | `Running`, online, no re-login |
 | Restart tailscaled on rpi-srv-01 | 13:05:52.3 to 13:06:17.0 | `Running`, online, no re-login |
 | `tailscale ping rpi-srv-01` from rpi-srv-02 | | pong, direct, 3 ms |
@@ -279,3 +265,29 @@ other (`tailscale ping homelab-router-1` from rpi-srv-02: no reply): each contro
 only knew the new disco keys of its own clients. A real failover moves every client, so
 this split exists only in a rehearsal like this one. The primary served throughout; its
 database never saw the standby's writes.
+
+## Rehearsal 2 (2026-11-27): the off-host path
+
+Scope: the whole path the outage uses, Caddy on the Pi and the router netwatch included,
+with the primary left running. Clients moved: the tailscaled on both Pis; public
+connections opened during the window went to the standby as well.
+
+| Step | Time (CET) | Result |
+|---|---|---|
+| `litestream restore` of both databases | 14:01:26.4 to 14:01:26.7 | integrity ok, 5 nodes |
+| `docker compose up -d` | 14:01:28.8 | `10.0.20.3:8081` answers 200 at 14:01:29.4; Noise key hash unchanged (`8c6dc16d`) |
+| Router netwatch | 14:01:30 | address list `ha_headscale_standby` holds the WAN address |
+| TLS through Caddy | | `headscale.woitzik.dev` on 443 and 8443, `vault.woitzik.dev` on 443: 200, certificate verifies; `vault.woitzik.dev` on 8443 aborted |
+| TS2021 | | `Upgrade: tailscale-control-protocol` returns `101 Switching Protocols` on 443 and 8443; `tailscale debug ts2021` completes the Noise handshake through Caddy |
+| Hairpin to the WAN address | | lands on the standby (router dst-nat to `10.0.20.3:8443`) |
+| `ha-standby-dns.yml -e adguard_ha_standby_failover=true` | 14:02:03 to 14:03:12 | both Pis and the VIP answer `10.0.20.3` for both names |
+| Restart tailscaled, rpi-srv-02 then rpi-srv-01 | 14:03:19.4 to 14:03:26.5 | both `Running`, online on the standby, control connections on `10.0.20.3:443`; `tailscale ping rpi-srv-01` direct, 2 ms |
+| Failback: `docker compose stop` | 14:03:35 | netwatch down at 14:03:41, address list empty; hairpin answered by the primary again |
+| `ha-standby-dns.yml` (no flag) | to 14:05:04 | both Pis answer `10.0.20.200` |
+| Restart tailscaled on both Pis | to 14:05:11 | primary lists all four active nodes online; ping to rpi-srv-01 and homelab-router-1 work |
+| Litestream | 14:05 | new LTX files on the Pi after failback |
+
+The public path pointed at the standby for 2 min 11 s. Found and fixed during the
+rehearsal: the playbook's wait for AdGuard stopped at the first `connection refused`
+instead of retrying, so it ended with an error after the switch on each Pi (the switch
+itself had applied); Caddy advertised HTTP/3 on UDP ports the host firewall drops.

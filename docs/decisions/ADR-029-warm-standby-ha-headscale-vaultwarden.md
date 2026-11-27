@@ -255,3 +255,15 @@ was written for there is no way for clients to reach the standby. Closing it nee
 proxy on `rpi-srv-02` with a certificate maintained off-cluster, and the AdGuard rewrites
 and router port forward pointed at it. Until then the standby is a live failover target
 for a lost pod or volume (cluster up) and a sub-second restore source for a lost host.
+
+## Status update, 2026-11-27 (later): the gap is closed by ADR-088
+
+`ha-standby-proxy` (Caddy on `rpi-srv-02`) terminates TLS for both hostnames with a
+certificate issued in the cluster and pushed to the Pi daily; the standby containers
+publish on loopback only. The router's netwatch moves public headscale connections to the
+Pi while the standby answers, and `ansible/ha-standby-dns.yml` moves LAN/tailnet DNS. A
+second rehearsal ran the whole path with the primary left up: both Pis' tailscaled
+reconnected through the Pi's front end, TS2021 upgraded, vaultwarden served its login page
+with a valid certificate, and failback returned the router and DNS to the primary
+(runbook, "Rehearsal 2"). The failover stays manual by design: starting the standby is the
+decision, and the router follows it.

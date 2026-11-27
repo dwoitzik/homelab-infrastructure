@@ -4,6 +4,10 @@
 	auto_https off
 	admin off
 	persist_config off
+	# hostfw drops UDP 443/8443, so no HTTP/3 to advertise.
+	servers {
+		protocols h1 h2
+	}
 }
 
 (standby_tls) {

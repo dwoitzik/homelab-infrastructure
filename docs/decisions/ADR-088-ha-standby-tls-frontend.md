@@ -1,7 +1,7 @@
 # ADR-088: A TLS front end on rpi-srv-02 lets the headscale/vaultwarden standby serve without pve-mgmt-01
 
 **Date:** 2026-11-27
-**Status:** Accepted
+**Status:** Accepted, applied and rehearsed 2026-11-27
 **Relates to:** ADR-029 (warm standby), ADR-033 (public exposure allowlist), ADR-059
 (headscale public DNS), ADR-086 (WAN 443 flood guard)
 
@@ -153,3 +153,16 @@ cluster is up; during the outage itself nothing alerts, as before.
   them on the LAN, which it can already do by serving the standby itself.
 - The certificate names appear in Certificate Transparency logs. Both names are already
   public in this repository.
+
+## Implementation notes
+
+- RouterOS 7.19 rejects `http-code-min`/`http-code-max` on netwatch; its `http-get` default
+  already treats only 1xx-2xx as up, and Caddy returns 502 while the standby is stopped.
+- The push pins all three of the Pi's host keys. With only ed25519 listed, Go's SSH client
+  negotiated another key type and failed with `knownhosts: key mismatch`, the same failure
+  ADR-029 hit with Litestream.
+- Caddy serves HTTP/1.1 and HTTP/2 only: the host firewall drops UDP 443/8443, so an
+  advertised HTTP/3 endpoint would only cost clients a failed attempt.
+- blackbox-exporter does not reload its ConfigMap by itself; a new module needs
+  `POST /-/reload` (or a pod restart) before probes using it succeed.
+- Rehearsed end to end on 2026-11-27, see the runbook's "Rehearsal 2".
