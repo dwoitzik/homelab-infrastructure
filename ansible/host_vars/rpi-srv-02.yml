@@ -4,3 +4,12 @@ common_apt_upgrade_time: "06:40"
 # The SSD's JMicron JMS583 bridge (152d:0583) aborts and disconnects under UAS.
 rpi_optimize_usb_storage_quirks:
   - "152d:0583:u"
+# Root filesystem lives on the SSD (docs/runbooks/rpi-srv-02-ssd-boot.md); the
+# SD card stays bootable as the fallback in the boot order.
+rpi_optimize_initramfs_modules:
+  - usb_storage
+  - uas
+rpi_optimize_eeprom_boot_order: "0xf14"
+rpi_optimize_ssd_mount:
+  path: /mnt/ssd
+  uuid: 82267fae-e08c-441b-a534-bebf3ed407d7
