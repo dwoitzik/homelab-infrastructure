@@ -85,5 +85,6 @@ same image in the media-acquisition compose file was.
 - Two containers on `ct-srv-rybbit-01` (`promtail`, `node_exporter`) and
   several on the Pi nodes are **not** managed by any role — they were
   deployed by hand. They are outside this change and remain untracked drift.
-- `ct-mgmt-scanopy-01` was unreachable during the change, so the scanopy
-  role's pinned image could not be verified live.
+- Historical: this listed `ct-mgmt-scanopy-01` as unreachable, so the scanopy
+  daemon role's pin was not verified live. That container was never created; the
+  MGMT/DMZ Scanopy daemons and their role were retired in #1305.
