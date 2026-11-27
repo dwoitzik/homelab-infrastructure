@@ -279,18 +279,18 @@ and hijack short-hostname lookups — external and internal alike. Confirmed liv
 running the current Ansible role — but if pods are behaving oddly on DNS for hostnames
 that look otherwise correct, check this first.
 
-## 7b. headscale + vaultwarden: an off-host replica, not a standby
+## 7b. headscale + vaultwarden: replica plus a standby that needs the cluster's Traefik
 
 headscale and vaultwarden replicate their SQLite databases continuously to `rpi-srv-02`
-(Litestream, `/mnt/ssd/litestream-replicas/`). The replica survives a `pve-mgmt-01`
-loss and restores with `litestream restore` (restore-tested 2026-11-12, recovery point
-under a minute old). That is a better recovery point than the nightly backups, nothing
-more: there is no working standby to fail over to. The standby containers in
-`/opt/ha-standby` lack headscale's identity keys and the OIDC secret and have never been
-started, so `docs/runbooks/failover-headscale-vaultwarden.md` cannot be followed as
-written yet. See `docs/decisions/ADR-029-warm-standby-ha-headscale-vaultwarden.md`
-(2026-11-12 status) for what is missing. Every component, these two included, follows
-this document's rebuild path.
+(Litestream, `/mnt/ssd/litestream-replicas/`). `litestream restore` from those files takes
+under a second and gives a recovery point seconds old. The standby containers in
+`/opt/ha-standby` carry the primary's identity keys and OIDC secret and were rehearsed
+with real tailnet clients on 2026-11-27
+(`docs/runbooks/failover-headscale-vaultwarden.md`). They can only take over while the
+cluster's Traefik is up, for a lost pod or volume: with `pve-mgmt-01` down there is no TLS
+endpoint for the two hostnames (ADR-029, 2026-11-27 status). In that case registered
+tailnet devices keep working on their last netmap and Bitwarden clients on their offline
+copy; restore the replica into the rebuilt cluster.
 
 ## 7c. Authelia's Postgres: a streaming standby on rpi-srv-02
 

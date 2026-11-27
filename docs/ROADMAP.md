@@ -102,8 +102,10 @@ rate it reaches 90 % around the end of December.
 - [x] Control-plane DNS served by Cloudflare (ADR-059)
 - [x] Make the documented standby (ADR-029) real, or remove it from the docs: docs now
       describe an off-host replica, not a standby (ADR-029, 2026-11-12 status)
-- [ ] Finish the headscale/vaultwarden standby: identity keys and OIDC secret on
-      `rpi-srv-02`, standby config kept in sync with the primary, one rehearsed failover
+- [x] Finish the headscale/vaultwarden standby: identity keys and OIDC secret on
+      `rpi-srv-02`, images kept in step with the primary, failover rehearsed (2026-11-27)
+- [ ] TLS endpoint for `headscale.woitzik.dev`/`vault.woitzik.dev` on `rpi-srv-02`, so the
+      standby can serve with `pve-mgmt-01` down (ADR-029, 2026-11-27 status)
 
 ### DNS
 
