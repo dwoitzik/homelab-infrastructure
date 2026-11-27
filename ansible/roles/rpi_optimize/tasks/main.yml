@@ -70,6 +70,54 @@
     replace: '\1 usb-storage.quirks={{ rpi_optimize_usb_storage_quirks | join(",") }}'
   when: rpi_optimize_usb_storage_quirks | length > 0
 
+# usb-storage and uas are modules in the Raspberry Pi kernel; without them in
+# the initramfs a root filesystem on a USB disk is never found.
+- name: Add USB storage drivers to the initramfs
+  ansible.builtin.lineinfile:
+    path: /etc/initramfs-tools/modules
+    line: "{{ item }}"
+    regexp: "^{{ item }}$"
+  loop: "{{ rpi_optimize_initramfs_modules }}"
+  notify: Rebuild initramfs
+
+- name: Mount the data SSD
+  ansible.posix.mount:
+    path: "{{ rpi_optimize_ssd_mount.path }}"
+    src: "UUID={{ rpi_optimize_ssd_mount.uuid }}"
+    fstype: ext4
+    opts: defaults,noatime,nofail
+    dump: 0
+    passno: 2
+    state: mounted
+  when: rpi_optimize_ssd_mount | length > 0
+
+- name: Read the EEPROM bootloader config
+  ansible.builtin.command:
+    cmd: rpi-eeprom-config
+  register: rpi_optimize_eeprom_config
+  changed_when: false
+  check_mode: false
+  when: rpi_optimize_eeprom_boot_order | length > 0
+  tags: [rpi_eeprom]
+
+# --apply stages the update in /boot/firmware; the bootloader flashes it on the
+# next reboot, so this keeps reporting a change until then.
+- name: Set the EEPROM boot order
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      cfg=$(mktemp)
+      rpi-eeprom-config | grep -v '^BOOT_ORDER=' > "$cfg"
+      echo "BOOT_ORDER={{ rpi_optimize_eeprom_boot_order }}" >> "$cfg"
+      rpi-eeprom-config --apply "$cfg"
+      rm -f "$cfg"
+    executable: /bin/bash
+  changed_when: true
+  when:
+    - rpi_optimize_eeprom_boot_order | length > 0
+    - ('BOOT_ORDER=' ~ rpi_optimize_eeprom_boot_order) not in rpi_optimize_eeprom_config.stdout_lines
+  tags: [rpi_eeprom]
+
 - name: Install cpufrequtils for persistent governor configuration
   ansible.builtin.apt:
     name: cpufrequtils
