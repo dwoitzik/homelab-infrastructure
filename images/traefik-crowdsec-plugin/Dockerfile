@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 
 # CrowdSec bouncer plugin source for Traefik's experimental.localPlugins (ADR-079).
 # An initContainer copies /plugins-local into an emptyDir, so Traefik never
