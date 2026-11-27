@@ -1,4 +1,4 @@
-# 99.9% availability over 30d for every blackbox probe; burn-rate windows per ADR-085.
+# 99.9% availability over 30d for every blackbox-* probe job (not ha-standby-*, which is down by design); ADR-085.
 # Only the page alerts are critical (Discord); the 3d ticket is warning (not routed).
 # The page rules need for: because one failed probe in 60/h already exceeds 14.4x.
 
@@ -18,25 +18,25 @@ spec:
       interval: 1m
       rules:
         - record: job_instance:probe_success:rate5m
-          expr: avg_over_time(probe_success[5m])
+          expr: avg_over_time(probe_success{job=~"blackbox-.*"}[5m])
 
         - record: job_instance:probe_error:rate5m
-          expr: 1 - avg_over_time(probe_success[5m])
+          expr: 1 - avg_over_time(probe_success{job=~"blackbox-.*"}[5m])
 
     - name: slo.availability.windows
       interval: 1m
       rules:
         - record: job_instance:probe_success:rate30m
-          expr: avg_over_time(probe_success[30m])
+          expr: avg_over_time(probe_success{job=~"blackbox-.*"}[30m])
         - record: job_instance:probe_success:rate1h
-          expr: avg_over_time(probe_success[1h])
+          expr: avg_over_time(probe_success{job=~"blackbox-.*"}[1h])
         - record: job_instance:probe_success:rate6h
-          expr: avg_over_time(probe_success[6h])
+          expr: avg_over_time(probe_success{job=~"blackbox-.*"}[6h])
         # Dashboard only.
         - record: job_instance:probe_success:rate24h
-          expr: avg_over_time(probe_success[24h])
+          expr: avg_over_time(probe_success{job=~"blackbox-.*"}[24h])
         - record: job_instance:probe_success:rate3d
-          expr: avg_over_time(probe_success[3d])
+          expr: avg_over_time(probe_success{job=~"blackbox-.*"}[3d])
 
 ---
 apiVersion: monitoring.coreos.com/v1
