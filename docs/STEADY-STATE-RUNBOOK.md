@@ -83,28 +83,16 @@ token until the Vault value itself is replaced.
    (`kubectl create job -n apps renovate-manual-$(date +%s) --from=cronjob/renovate`) and
    check its log for a clean run (no `401`/`Authentication failure`).
 
-**Zombie Failed Job/pod cleanup** (applies to *any* recurring CronJob, not just Renovate):
-`failedJobsHistoryLimit` keeps old Failed Job objects around by design so they stay
-visible for triage — but `kube_job_status_failed` stays `>0` for each one until deleted,
-so `KubeJobFailed` keeps re-firing on every alert evaluation even after the underlying
-cause (e.g. the 401 above) is long fixed. Once the root cause is confirmed resolved
-(latest 1-2 runs `Complete`), clear the backlog:
+**Which alert fires.** The chart's `KubeJobFailed` is disabled; the replacements live in
+`kubernetes/system/monitoring/silent-failure-alerts.yml` (group `job-failures`):
 
-```bash
-# List failed Jobs for the CronJob in question
-kubectl get jobs -n apps --sort-by=.metadata.creationTimestamp | grep '<cronjob-name>-' | grep -v Complete
-
-# Delete them (cascades to their pods)
-kubectl delete job -n apps <job-name> [<job-name> ...]
-
-# Some pods can outlive their Job object (e.g. TTL/GC timing) — sweep stragglers directly
-kubectl get pods -n apps | grep '<cronjob-name>-' | grep -v Completed
-kubectl delete pod -n apps <pod-name> [<pod-name> ...]
-```
-
-Alert clears once `kube_job_status_failed` has no remaining series for that job name
-(check against Alertmanager's `repeat_interval` for `KubeJobFailed` — allow one cycle
-before assuming cleanup didn't take).
+- `KubeCronJobLastRunFailed` (per CronJob): the newest failed Job is younger than the
+  CronJob's `lastSuccessfulTime`, i.e. the latest outcome is a failure. It clears by
+  itself on the next successful run, so Failed Jobs kept by `failedJobsHistoryLimit` no
+  longer need deleting. A CronJob that keeps failing keeps firing.
+- `KubeJobFailed` (per Job): only Jobs that no CronJob owns (one-off Jobs, Argo hooks).
+  Nothing reruns those, so it clears only when the Job is deleted after the cause is
+  fixed: `kubectl delete job -n <ns> <job-name>`.
 
 ### `KubeNodeNotReady`
 
