@@ -483,10 +483,6 @@ import {
 # power.tf's own led_off_night/led_on_day resources already own; importing
 # both would have left two Terraform resource addresses fighting over the
 # same live scheduler on every subsequent plan.
-import {
-  to = routeros_system_scheduler.disable_unused_ports
-  id = "*2"
-}
 
 
 # Added out-of-band to unblock Enshrouded LAN play ahead of the normal apply

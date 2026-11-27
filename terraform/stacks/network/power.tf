@@ -1,27 +1,20 @@
 ###############################################################################
-# Power Efficiency — MikroTik RB5009
+# Unused ports - MikroTik RB5009
 ###############################################################################
-#
-# Active ports:  ether1 (WAN), ether2 (Admin), ether5 (Proxmox),
-#                ether6 (RPi-01), ether7 (RPi-02)
-# Unused ports:  ether3, ether4, ether8, sfpplus1
-#
-# Disabling unused ports at boot reduces power draw by ~0.1-0.2W per port
-# and prevents accidental L2 loops. Re-enable manually if a port is needed:
-#   /interface ethernet enable ether3
-###############################################################################
+# ether3, ether8 and sfp-sfpplus1 have no link. ether4 has none either but stays
+# enabled as the out-of-band MAC-WinBox port (mac-access list, ADR-086).
+# Disabling is persistent RouterOS config, so no boot scheduler is needed.
+resource "routeros_interface_ethernet" "unused" {
+  for_each     = toset(["ether3", "ether8", "sfp-sfpplus1"])
+  factory_name = each.value
+  name         = each.value
+  disabled     = true
+  comment      = "Unused port, disabled by Terraform"
+}
 
-resource "routeros_system_scheduler" "disable_unused_ports" {
-  name       = "power_disable_unused_ports"
-  start_time = "startup"
-  interval   = "0s"
-  on_event   = <<-EOF
-    /interface ethernet disable ether3
-    /interface ethernet disable ether4
-    /interface ethernet disable ether8
-    /interface ethernet disable sfpplus1
-  EOF
-  comment    = "Power: disable unused ethernet ports at boot"
+removed {
+  from = routeros_system_scheduler.disable_unused_ports
+  lifecycle { destroy = true }
 }
 
 ###############################################################################
@@ -65,8 +58,8 @@ resource "routeros_system_scheduler" "disable_unused_ports" {
 # main.tf/power.tf collision this repo already hit once, see #570) --
 # picking one mechanism (the scheduler) instead of layering both.
 #
-# Same raw-script `routeros_system_scheduler` pattern as
-# disable_unused_ports above, matching the original #493 design (not the
+# Raw-script `routeros_system_scheduler` pattern, matching the original
+# #493 design (not the
 # typed `routeros_system_led_settings` resource, to avoid a second
 # collision risk between it and the scheduler's own writes).
 #

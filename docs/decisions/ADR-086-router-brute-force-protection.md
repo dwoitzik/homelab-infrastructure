@@ -48,8 +48,8 @@ there could reach the router's login with MAC-WinBox.
 - No change to IP access from the admin VLAN or to the Terraform runner's REST path, so
   the usual management route is also the rollback route for this change.
 - MAC access from the FritzBox LAN stops working. Recovery when IP access is broken: a
-  cable on ether4 or a machine in the admin VLAN. `power_disable_unused_ports` lists ether4;
-  if that scheduler ever takes effect, the admin VLAN is the remaining MAC path.
+  cable on ether4 or a machine in the admin VLAN. ether4 is deliberately left enabled when
+  the other unused ports are disabled (`terraform/stacks/network/power.tf`).
 - A misbehaving client with more than 32 parallel connections from one public address is
   locked out of headscale for an hour. The list is visible in
   `/ip firewall address-list` (`wan_conn_flood`).

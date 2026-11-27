@@ -30,7 +30,8 @@ This document defines the logical network structure and security zones. The Mikr
 | ether5 | Proxmox Core (Ryzen 7) | Trunk | 10, 20, 30, 40 |
 | ether6 | Raspberry Pi A | Access | 20 |
 | ether7 | Raspberry Pi B | Access | 20 |
-| ether3,4,8| - | *Free* | - |
+| ether3,8,sfp-sfpplus1| - | *Unused, disabled* | - |
+| ether4| - | *Out-of-band MAC-WinBox (ADR-086), enabled* | - |
 
 ## 4. Address Allocation (VLAN 10 and 20)
 
