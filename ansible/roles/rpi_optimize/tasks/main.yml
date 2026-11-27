@@ -383,7 +383,7 @@
           tcp dport 3001 accept
           tcp dport { 80, 443 } accept
           udp dport 41641 accept
-          ip protocol vrrp accept
+          ip protocol vrrp accept{{ rpi_optimize_hostfw_extra_rules | map('regex_replace', '^', '\n    ') | join('') }}
         }
       }
     mode: '0644'

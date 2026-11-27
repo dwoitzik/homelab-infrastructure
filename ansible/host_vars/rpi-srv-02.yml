@@ -10,3 +10,7 @@ rpi_optimize_eeprom_boot_order: "0xf14"
 rpi_optimize_ssd_mount:
   path: /mnt/ssd
   uuid: 82267fae-e08c-441b-a534-bebf3ed407d7
+# Authelia's Postgres standby (ADR-030): after a promotion Authelia connects
+# from the k3s nodes (pods are SNATed to the node address).
+rpi_optimize_hostfw_extra_rules:
+  - "ip saddr { 10.0.20.11, 10.0.20.12, 10.0.20.13 } tcp dport 5432 accept"
