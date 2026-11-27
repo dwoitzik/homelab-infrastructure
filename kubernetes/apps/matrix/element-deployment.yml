@@ -22,7 +22,7 @@ spec:
             value: "1"
       containers:
       - name: element-web
-        image: vectorim/element-web:v1.12.25@sha256:ac50d4eebafd954d7d7e2887d4693bcc91c54c0d00546a3410eeae77e6b342d5
+        image: vectorim/element-web:v1.12.36@sha256:8812792403c7b9f94c0cd433bd2eb8dd9f1eb8a7908261aece71c1d5e2540561
         env:
         - name: ELEMENT_WEB_PORT
           value: "80"
