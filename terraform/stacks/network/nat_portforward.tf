@@ -103,19 +103,18 @@ resource "routeros_ip_firewall_filter" "fwd_wan_headscale_dmz" {
 # headscale standby failover (ADR-088): while headscale-standby on rpi-srv-02 answers,
 # netwatch lists the WAN address and new WAN 443 connections go to its front end.
 # Lives on the router because Terraform cannot run in the pve-mgmt-01 outage.
+# http-get counts 1xx-2xx as up (RouterOS default; 7.19 has no http-code-min/max).
 resource "routeros_tool_netwatch" "ha_headscale_standby" {
-  name          = "ha_headscale_standby"
-  type          = "http-get"
-  host          = "10.0.20.3"
-  port          = 8081
-  src_address   = "10.0.20.1"
-  http_code_min = 200
-  http_code_max = 299
-  interval      = "10s"
-  timeout       = "3s"
-  up_script     = ":if ([:len [/ip firewall address-list find list=ha_headscale_standby]] = 0) do={ /ip firewall address-list add list=ha_headscale_standby address=192.168.178.10 comment=\"netwatch ha_headscale_standby, ADR-088\" }"
-  down_script   = "/ip firewall address-list remove [find list=ha_headscale_standby]"
-  comment       = "headscale standby on rpi-srv-02 answers: public headscale goes there, ADR-088"
+  name        = "ha_headscale_standby"
+  type        = "http-get"
+  host        = "10.0.20.3"
+  port        = 8081
+  src_address = "10.0.20.1"
+  interval    = "10s"
+  timeout     = "3s"
+  up_script   = ":if ([:len [/ip firewall address-list find list=ha_headscale_standby]] = 0) do={ /ip firewall address-list add list=ha_headscale_standby address=192.168.178.10 comment=\"netwatch ha_headscale_standby, ADR-088\" }"
+  down_script = "/ip firewall address-list remove [find list=ha_headscale_standby]"
+  comment     = "headscale standby on rpi-srv-02 answers: public headscale goes there, ADR-088"
 }
 
 resource "routeros_ip_firewall_nat" "dstnat_headscale_standby" {
