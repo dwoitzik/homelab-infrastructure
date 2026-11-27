@@ -7,6 +7,10 @@ repository with 200+ pages of tags) sometimes fails, which leaves an update
 branch that bumps only the server. This check keeps such a branch red, so
 Renovate does not auto-merge it until both images move together.
 
+The headscale and vaultwarden warm standbys on rpi-srv-02 (ADR-029) must run
+the primary's version too: a standby older than the primary's database schema
+fails on its first start during a failover.
+
 Usage: check-image-lockstep.py
 """
 import pathlib
@@ -15,26 +19,34 @@ import sys
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
-# (file, image-name regex); every match in the file must carry the same tag.
+# (files, image-name regex); every match across the files must carry the same tag.
 GROUPS = [
-    ("kubernetes/apps/immich/immich.yml",
+    (["kubernetes/apps/immich/immich.yml"],
      r"ghcr\.io/immich-app/immich-(?:server|machine-learning)"),
+    (["kubernetes/apps/headscale/headscale.yml",
+      "ansible/roles/rpi_ha_standby/defaults/main.yml"],
+     r"ghcr\.io/juanfont/headscale"),
+    (["kubernetes/apps/vaultwarden/vaultwarden.yaml",
+      "ansible/roles/rpi_ha_standby/defaults/main.yml"],
+     r"vaultwarden/server"),
 ]
 
 
 def main():
     failed = False
-    for rel, pattern in GROUPS:
-        text = (REPO / rel).read_text()
-        found = re.findall(r"(" + pattern + r"):([^@\s\"']+)", text)
-        tags = {tag for _, tag in found}
-        if not found:
-            print(f"{rel}: no image matches {pattern}")
-            failed = True
-        elif len(tags) > 1:
-            print(f"{rel}: images must share one tag, found:")
-            for image, tag in sorted(set(found)):
-                print(f"  {image}:{tag}")
+    for files, pattern in GROUPS:
+        found = []
+        for rel in files:
+            text = (REPO / rel).read_text()
+            hits = re.findall(r"(" + pattern + r"):([^@\s\"']+)", text)
+            if not hits:
+                print(f"{rel}: no image matches {pattern}")
+                failed = True
+            found += [(rel, image, tag) for image, tag in hits]
+        if len({tag for _, _, tag in found}) > 1:
+            print(f"{', '.join(files)}: images must share one tag, found:")
+            for rel, image, tag in sorted(set(found)):
+                print(f"  {rel}: {image}:{tag}")
             failed = True
     return 1 if failed else 0
 

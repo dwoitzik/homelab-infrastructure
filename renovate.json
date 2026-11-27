@@ -61,6 +61,17 @@
         "imageName:\\s*(?<depName>[^:\\s]+):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[0-9a-f]{64})"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Image pins of the headscale/vaultwarden warm standby on rpi-srv-02 (ansible/roles/rpi_ha_standby, ADR-029). They must match the primary's tags (scripts/check-image-lockstep.py); the rules below put each standby image in the same PR as its primary.",
+      "managerFilePatterns": [
+        "/^ansible/roles/rpi_ha_standby/defaults/main\\.yml$/"
+      ],
+      "matchStrings": [
+        "_image:\\s*\"(?<depName>[^:\"\\s]+):(?<currentValue>[^@\"\\s]+)@(?<currentDigest>sha256:[0-9a-f]{64})\""
+      ],
+      "datasourceTemplate": "docker"
     }
   ],
   "minimumReleaseAge": "3 days",
@@ -203,6 +214,20 @@
         "immich",
         "auto-merge"
       ]
+    },
+    {
+      "description": "headscale primary (kubernetes) and its rpi-srv-02 standby pin (custom.regex) bump in one PR. platformAutomerge is off so Renovate merges only after every check, including the image-lockstep job, is green.",
+      "matchPackageNames": [
+        "ghcr.io/juanfont/headscale"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor",
+        "digest"
+      ],
+      "groupName": "headscale",
+      "automerge": true,
+      "platformAutomerge": false
     },
     {
       "description": "Major updates, any package: always PR-only, one PR per package (not grouped -- each major is its own migration, shouldn't be bundled with an unrelated one).",

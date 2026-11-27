@@ -1,11 +1,8 @@
 # Failover Runbook: headscale + vaultwarden warm standby
 
-> **Not usable yet (checked 2026-11-12).** Step 0's prerequisites are not done: the
-> headscale identity keys and OIDC secret are missing on `rpi-srv-02`, the standby
-> config lags the primary (image, policy), and this runbook has never been rehearsed.
-> Following it today would give every tailnet node a new control key. Until ADR-029's
-> 2026-11-12 status is resolved, use the Litestream replica only as a restore source
-> (`litestream restore`, §2) for a rebuild.
+> **Status (2026-11-27):** identity keys, OIDC secret and image versions are now
+> deployed by `ansible/roles/rpi_ha_standby` from Ansible Vault, matched to the primary
+> by `scripts/check-image-lockstep.py`. A rehearsal is recorded at the end of this file.
 
 Manual, deliberate failover to the `rpi-srv-02` standby built under
 `docs/decisions/ADR-029-warm-standby-ha-headscale-vaultwarden.md`. Not
@@ -18,20 +15,28 @@ primary went down).
 
 ## 0. Before you ever need this for real
 
-Confirm the two one-time manual prerequisites are done (see
-`ansible/roles/rpi_ha_standby/templates/README.md.j2`, also deployed live
-to `/opt/ha-standby/README.md` on `rpi-srv-02`):
+On `rpi-srv-02` the role deploys, from Ansible Vault:
 
-1. `private.key` + `noise_private.key` (headscale) and `rsa_key.pem`
-   (vaultwarden) copied from the live pods to
-   `/mnt/ssd/ha-standby/{headscale,vaultwarden}/data/` on `rpi-srv-02`.
-   Without these, starting the standby mints fresh identity material —
-   every existing tailnet device loses trust, every existing vaultwarden
-   session/token invalidates.
-2. `HEADSCALE_OIDC_CLIENT_SECRET` filled in at
-   `/opt/ha-standby/headscale/.env` on `rpi-srv-02`.
+1. `noise_private.key` (headscale) in `/mnt/ssd/ha-standby/headscale/data/` and
+   `rsa_key.pem` (vaultwarden) in `/mnt/ssd/ha-standby/vaultwarden/data/`, byte copies of
+   the primary's files. Without them a started standby mints fresh identity material:
+   every tailnet device loses trust in the control server, every vaultwarden session
+   token becomes invalid. headscale 0.29 uses only the Noise key; `private.key` is a
+   leftover path in the config and does not exist on the primary either.
+2. `HEADSCALE_OIDC_CLIENT_SECRET` in `/opt/ha-standby/headscale/.env`.
 
-If either is still blank, do them now, not mid-incident.
+Check they match the primary before relying on them (hashes only, nothing printed):
+
+```bash
+kubectl -n apps exec deploy/headscale -c litestream -- sha256sum /var/lib/headscale/noise_private.key
+kubectl -n apps exec deploy/vaultwarden -c litestream -- sha256sum /data/rsa_key.pem
+ssh rpi-srv-02 'sudo sha256sum /mnt/ssd/ha-standby/headscale/data/noise_private.key /mnt/ssd/ha-standby/vaultwarden/data/rsa_key.pem'
+```
+
+If a key on the primary is ever rotated, re-encrypt it into
+`vault_headscale_noise_private_key` / `vault_vaultwarden_rsa_key_pem` (pipe it from the
+pod into `ansible-vault encrypt_string --stdin-name`, never through a file) and rerun
+`ansible/rpi-ha-standby.yml`.
 
 ## 1. Confirm the primary is actually down, not just flaky
 
