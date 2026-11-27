@@ -20,7 +20,7 @@ What is actually reachable from outside the management VLANs:
 |---|---|---|
 | TCP 443 -> ct-dmz-proxy-01 (headscale) | Internet, via the FritzBox forward | CrowdSec on the nginx proxy |
 | UDP 41641 -> rpi-srv-02 (tailscaled) | Internet | WireGuard: a peer without a known key gets no answer |
-| SSH, WinBox, API, REST on the router | `Mgmt_Devices` (VLAN 10, VLAN 100) and, for 443/8728/8729, the SRV VLAN | default drop for everything else |
+| SSH, WinBox, API, REST on the router | `Mgmt_Devices` (VLAN 10, VLAN 100) and, for 443 (Terraform runner REST), the SRV VLAN | default drop for everything else |
 | MAC-Telnet, MAC-WinBox | every interface, including ether1 | admin password only |
 
 The last row is the real gap. Layer-2 management frames do not pass the IP firewall, and

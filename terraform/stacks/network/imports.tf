@@ -60,11 +60,6 @@ import {
 }
 
 import {
-  to = routeros_ip_firewall_filter.in_05_k3s_router_api
-  id = "*56"
-}
-
-import {
   to = routeros_ip_firewall_filter.in_04_atlantis_api
   id = "*58"
 }
