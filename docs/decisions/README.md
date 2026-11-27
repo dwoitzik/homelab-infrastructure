@@ -72,7 +72,7 @@ skipped by accident.
 | [085](ADR-085-slo-burn-rate-windows.md) | SLO burn-rate alerts on the SRE Workbook windows, `for:` against low probe volume | Accepted, applied |
 | [086](ADR-086-router-brute-force-protection.md) | Router brute-force protection matches what is exposed: MAC access off the WAN port, a flood guard on WAN 443 | Accepted, applied |
 | [087](ADR-087-traefik-v3.md) | Traefik v2.11 to v3 in two chart steps (28.3.0, then 42.x) | Accepted, applied |
-| [088](ADR-088-ha-standby-tls-frontend.md) | TLS front end on rpi-srv-02 for the headscale/vaultwarden standby: cluster-issued cert pushed over the Litestream SFTP account, AdGuard switch by playbook, router netwatch for the public path | Accepted |
+| [088](ADR-088-ha-standby-tls-frontend.md) | TLS front end on rpi-srv-02 for the headscale/vaultwarden standby: cluster-issued cert pushed over the Litestream SFTP account, AdGuard switch by playbook, router netwatch for the public path | Accepted, applied |
 
 ## In review, not yet in this table
 

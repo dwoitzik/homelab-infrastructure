@@ -13,8 +13,8 @@
       ansible.builtin.command:
         argv: [dig, +short, +time=2, +tries=1, "@{{ ansible_host }}", headscale.woitzik.dev]
       register: ha_standby_dns_answer
-      until: ha_standby_dns_answer.stdout | length > 0
-      retries: 15
+      until: ha_standby_dns_answer.rc == 0 and ha_standby_dns_answer.stdout | length > 0
+      retries: 30
       delay: 2
       changed_when: false
       check_mode: false

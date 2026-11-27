@@ -279,18 +279,24 @@ and hijack short-hostname lookups — external and internal alike. Confirmed liv
 running the current Ansible role — but if pods are behaving oddly on DNS for hostnames
 that look otherwise correct, check this first.
 
-## 7b. headscale + vaultwarden: replica plus a standby that needs the cluster's Traefik
+## 7b. headscale + vaultwarden: warm standby on rpi-srv-02
 
 headscale and vaultwarden replicate their SQLite databases continuously to `rpi-srv-02`
 (Litestream, `/mnt/ssd/litestream-replicas/`). `litestream restore` from those files takes
 under a second and gives a recovery point seconds old. The standby containers in
-`/opt/ha-standby` carry the primary's identity keys and OIDC secret and were rehearsed
-with real tailnet clients on 2026-11-27
-(`docs/runbooks/failover-headscale-vaultwarden.md`). They can only take over while the
-cluster's Traefik is up, for a lost pod or volume: with `pve-mgmt-01` down there is no TLS
-endpoint for the two hostnames (ADR-029, 2026-11-27 status). In that case registered
-tailnet devices keep working on their last netmap and Bitwarden clients on their offline
-copy; restore the replica into the rebuilt cluster.
+`/opt/ha-standby` carry the primary's identity keys and OIDC secret, and the always-on TLS
+front end `ha-standby-proxy` on the same Pi holds a certificate pushed from the cluster
+(ADR-088), so the standby serves with `pve-mgmt-01` down:
+
+1. On `rpi-srv-02`: restore both databases and `docker compose up -d` in `/opt/ha-standby`.
+   The router sends public headscale traffic to the Pi by itself once the standby answers.
+2. From a workstation: `ansible-playbook ansible/ha-standby-dns.yml -e adguard_ha_standby_failover=true`
+   for LAN and tailnet clients.
+
+Full steps, checks and failback in `docs/runbooks/failover-headscale-vaultwarden.md`
+(rehearsed end to end on 2026-11-27). New device logins fail meanwhile (Authelia is on the
+cluster). The certificate copy lasts 30 to 60 days without the cluster; past that, or for a
+full rebuild, restore the replica into the rebuilt cluster instead.
 
 ## 7c. Authelia's Postgres: a streaming standby on rpi-srv-02
 
