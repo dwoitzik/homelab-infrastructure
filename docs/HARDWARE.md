@@ -442,6 +442,15 @@ doesn't take down name resolution for the network. This was demonstrated live du
 impact on the network's actual resolution path, because the VIP stayed on the primary
 throughout.
 
+The opposite direction was rehearsed on 2026-11-27: `docker stop adguardhome` on
+`rpi-srv-01` (the VIP holder). `chk_dns` (interval 3 s, fall 2) failed after 5 s and the
+VIP was on `rpi-srv-02` 8.1 s after the stop. Queries for fresh names through the VIP from
+a k3s node failed for 8.7 s (connection refused, then timeouts), the same through
+the cluster's CoreDNS, then answered again. After `docker start adguardhome` the VIP
+returned to `rpi-srv-01` (rise 2, priority 150) about 10 s later with no failed query.
+Tightening `chk_dns` would shorten the gap but makes a single slow answer move the VIP;
+left as is.
+
 RPi SD cards are write-fragile — the same general class of concern as the boot NVMe, at
 smaller scale. `rpi-srv-01` runs DNS/edge only from its SD card, never databases or heavy
 logging. `rpi-srv-02` has a 120 GB SATA SSD behind a JMicron JMS583 USB bridge

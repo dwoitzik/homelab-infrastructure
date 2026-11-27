@@ -1,8 +1,9 @@
 # ADR-029: Warm-Standby HA for Headscale + Vaultwarden on rpi-srv-02
 
 **Date:** 2026-08-26
-**Status:** Replication implemented and restore-tested; the standby itself is not usable as a
-failover target (see the 2026-11-12 status update at the end)
+**Status:** Replication implemented and restore-tested; standby identity deployed and a
+failover rehearsed with real tailnet clients on 2026-11-27. It serves clients only while
+the cluster's Traefik is up (see the last status update).
 
 ## Context
 
@@ -224,3 +225,33 @@ that. Finishing the standby (identity files and OIDC secret on the Pi, config ke
 sync with the primary, one rehearsed failover and failback) stays on
 `docs/ROADMAP.md`; it needs the key material copied by the owner, which this ADR's
 Status section already explains.
+
+## Status update, 2026-11-27: identity deployed, failover rehearsed, one structural gap
+
+- **Identity and secret**: headscale's `noise_private.key`, vaultwarden's `rsa_key.pem`
+  and the headscale OIDC client secret are in Ansible Vault (piped from the pods and the
+  `headscale-oidc` Secret into `ansible-vault encrypt_string`, hashes checked against the
+  sources) and deployed by `ansible/roles/rpi_ha_standby`. headscale 0.29 has no
+  `private.key`; only the Noise key matters.
+- **Version drift**: standby images now equal the primary's (headscale v0.29.8,
+  vaultwarden 1.37.5); `scripts/check-image-lockstep.py` fails CI when they differ and
+  Renovate bumps both pins in one PR.
+- **Rehearsal** (`docs/runbooks/failover-headscale-vaultwarden.md`, "Rehearsal"):
+  headscale standby restored from the replica in 0.24 s and started with the primary's
+  key; Traefik routed `headscale.woitzik.dev` to it through an unmanaged higher-priority
+  IngressRoute; tailscaled on both Pis reconnected to the standby without re-login and
+  reached each other over the tailnet; failback the same way, Litestream shipping again
+  right after. Vaultwarden standby restored, started and served its login page with data
+  identical to the primary (read-only comparison, no client switched). The primary
+  served throughout; standby writes were discarded.
+- **Runbook errors fixed**: the restore used an SFTP URL whose key root does not have;
+  `-if-replica-exists` does not skip an existing database, and a stale August database in
+  the vaultwarden data directory would have made the restore fail; the traffic flip named
+  a Cloudflare Tunnel route that headscale never used.
+
+**Gap, not closed here**: both TLS terminators for these hostnames (Traefik and the DMZ
+proxy) run on `pve-mgmt-01`, and the standby serves plain HTTP. In the outage this ADR
+was written for there is no way for clients to reach the standby. Closing it needs a TLS
+proxy on `rpi-srv-02` with a certificate maintained off-cluster, and the AdGuard rewrites
+and router port forward pointed at it. Until then the standby is a live failover target
+for a lost pod or volume (cluster up) and a sub-second restore source for a lost host.
