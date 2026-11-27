@@ -18,6 +18,10 @@ spec:
           # plugins.traefik.io (ADR-079). The chart's localPlugins value wants
           # its own volume type, so the flag stays here.
           - "--experimental.localPlugins.crowdsec.moduleName=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+        global:
+          # Drop request headers whose names alias a managed one (Remote_User
+          # vs Remote-User); Paperless reads HTTP_REMOTE_USER, which both map to.
+          aliasHeadersStrategy: delete
         providers:
           kubernetesCRD:
             # REL-037: IngressRoutes in argocd, monitoring, vault and kube-system
