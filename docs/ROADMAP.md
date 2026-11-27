@@ -93,9 +93,8 @@ rate it reaches 90 % around the end of December.
 ### Headscale / remote access
 
 - [x] Keep Headscale current
-- [ ] Exit-node route advertisements match what each node can actually serve (ADR-043).
-      Blocked on an IPv6 uplink: no host here has IPv6 egress, and Tailscale has no
-      IPv4-only exit node. Needs FritzBox prefix delegation to the MikroTik first.
+- [x] ~~Exit-node route advertisements match what each node can actually serve
+      (ADR-043)~~ Won't do: no IPv6 in use; exit node intentionally unused.
 - [x] Direct peer connections for the subnet router instead of relayed traffic. Host side
       done (ADR-076: endpoint-independent NAT, fixed port 41641); still to prove with an
       off-LAN client, plus a UDP 41641 forward (FritzBox and MikroTik) for carriers with
@@ -153,8 +152,9 @@ rate it reaches 90 % around the end of December.
 ### Network
 
 - [x] QoS with a CAKE queue tree on the WAN interface
-- [ ] Router input chain scoped per source to the ports each one needs (IN-05 API ports
-      still open to the whole SRV VLAN with no known consumer)
+- [x] Router input chain scoped per source to the ports each one needs: IN-05 (API ports
+      8728/8729 for the whole SRV VLAN) removed, its only client was an unmanaged
+      MikroDash container that could not log in (#1345)
 - [x] Router brute-force protection reworked (ADR-086): MAC WinBox/Telnet limited to
       admin interfaces, connection-flood list for WAN 443
 - [x] Remove stale firewall rules (7 rules with zero hits removed)
@@ -196,4 +196,5 @@ posts already say the correct thing.
 - [ ] Deployable hostnames via a private kustomize overlay (ADR-048 follow-up)
 - [x] Observability gaps: Traefik, Garage and log-shipper metrics; probes for Jellyfin and Nextcloud
 - [x] SLO burn-rate rules aligned with the SRE workbook windows; annotations corrected
-- [ ] IPv6 beyond ULA once the provider delegates a prefix
+- [x] ~~IPv6 beyond ULA once the provider delegates a prefix~~ Won't do: no IPv6 in use;
+      exit node intentionally unused.
