@@ -32,9 +32,3 @@
     /usr/sbin/nft delete table inet hostfw 2>/dev/null
     /usr/sbin/nft -f /etc/nftables-hostfw.conf
   changed_when: true
-
-# raspi-firmware's post-update hook copies the new initramfs to /boot/firmware.
-- name: Rebuild initramfs
-  ansible.builtin.command:
-    cmd: update-initramfs -u -k all
-  changed_when: true

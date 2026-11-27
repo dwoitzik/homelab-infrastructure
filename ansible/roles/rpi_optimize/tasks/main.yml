@@ -70,15 +70,19 @@
     replace: '\1 usb-storage.quirks={{ rpi_optimize_usb_storage_quirks | join(",") }}'
   when: rpi_optimize_usb_storage_quirks | length > 0
 
-# usb-storage and uas are modules in the Raspberry Pi kernel; without them in
-# the initramfs a root filesystem on a USB disk is never found.
-- name: Add USB storage drivers to the initramfs
+# The Raspberry Pi Imager seed on the boot partition carries the hostname of the
+# image it was cloned from; cloud-init renders /etc/hosts from it on every boot.
+- name: Check for a cloud-init seed on the boot partition
+  ansible.builtin.stat:
+    path: "{{ rpi_optimize_config_txt | dirname }}/user-data"
+  register: rpi_optimize_user_data
+
+- name: Give the cloud-init seed this host's name
   ansible.builtin.lineinfile:
-    path: /etc/initramfs-tools/modules
-    line: "{{ item }}"
-    regexp: "^{{ item }}$"
-  loop: "{{ rpi_optimize_initramfs_modules }}"
-  notify: Rebuild initramfs
+    path: "{{ rpi_optimize_config_txt | dirname }}/user-data"
+    regexp: '^hostname:'
+    line: "hostname: {{ inventory_hostname }}"
+  when: rpi_optimize_user_data.stat.exists
 
 - name: Mount the data SSD
   ansible.posix.mount:

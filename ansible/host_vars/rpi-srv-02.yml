@@ -6,9 +6,6 @@ rpi_optimize_usb_storage_quirks:
   - "152d:0583:u"
 # Root filesystem lives on the SSD (docs/runbooks/rpi-srv-02-ssd-boot.md); the
 # SD card stays bootable as the fallback in the boot order.
-rpi_optimize_initramfs_modules:
-  - usb_storage
-  - uas
 rpi_optimize_eeprom_boot_order: "0xf14"
 rpi_optimize_ssd_mount:
   path: /mnt/ssd

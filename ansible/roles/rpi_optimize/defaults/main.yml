@@ -2,9 +2,6 @@
 rpi_optimize_reboot: false
 # VID:PID:flags entries for usb-storage.quirks (e.g. "152d:0583:u" disables UAS).
 rpi_optimize_usb_storage_quirks: []
-# Kernel modules the initramfs must carry to find a USB-attached root
-# filesystem (MODULES=dep only includes what the current root needs).
-rpi_optimize_initramfs_modules: []
 # EEPROM BOOT_ORDER, e.g. "0xf14" (USB mass storage, then SD, then retry).
 # Empty leaves the EEPROM untouched (default 0xf41, SD first).
 rpi_optimize_eeprom_boot_order: ""
