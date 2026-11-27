@@ -1,0 +1,24 @@
+---
+# Points headscale.woitzik.dev/vault.woitzik.dev at the rpi-srv-02 standby front end
+# (-e adguard_ha_standby_failover=true) or back at Traefik (default), ADR-088.
+# serial 1: AdGuard restarts on a change and keepalived keeps the VIP on the other Pi.
+- name: Point the standby hostnames at the active headscale/vaultwarden
+  hosts: rpi_nodes
+  become: true
+  serial: 1
+  roles:
+    - adguard
+  post_tasks:
+    - name: Wait for AdGuard to answer again
+      ansible.builtin.command:
+        argv: [dig, +short, +time=2, +tries=1, "@{{ ansible_host }}", headscale.woitzik.dev]
+      register: ha_standby_dns_answer
+      until: ha_standby_dns_answer.stdout | length > 0
+      retries: 15
+      delay: 2
+      changed_when: false
+      check_mode: false
+
+    - name: Show where headscale.woitzik.dev resolves on this Pi
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: headscale.woitzik.dev -> {{ ha_standby_dns_answer.stdout }}"

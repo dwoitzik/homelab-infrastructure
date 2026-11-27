@@ -1,0 +1,6 @@
+---
+# true points headscale.woitzik.dev and vault.woitzik.dev at the standby's TLS
+# front end on rpi-srv-02 instead of Traefik (ADR-088). Set it only through
+# ansible/ha-standby-dns.yml during a failover, never in inventory.
+adguard_ha_standby_failover: false
+adguard_ha_standby_frontend: 10.0.20.3

@@ -226,9 +226,19 @@ filtering:
     - domain: www.woitzik.dev
       answer: "216.198.79.65"
       enabled: true
+{% if adguard_ha_standby_failover | bool %}
+    # Failover to the rpi-srv-02 standby (ADR-088, ansible/ha-standby-dns.yml).
+    - domain: headscale.woitzik.dev
+      answer: "{{ adguard_ha_standby_frontend }}"
+      enabled: true
+    - domain: vault.woitzik.dev
+      answer: "{{ adguard_ha_standby_frontend }}"
+      enabled: true
+{% else %}
     - domain: headscale.woitzik.dev
       answer: "10.0.20.200"
       enabled: true
+{% endif %}
     # photos.woitzik.dev intentionally uses the wildcard (10.0.20.200 / Traefik)
     # so internal clients bypass Cloudflare entirely and hit Traefik directly.
     # This avoids Cloudflare's 100 MB per-request body limit on the free plan,
