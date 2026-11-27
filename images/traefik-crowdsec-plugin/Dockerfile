@@ -18,7 +18,7 @@ RUN apk add --no-cache git \
     && rm -rf /src/.git
 
 # busybox rather than scratch: the initContainer needs cp.
-FROM busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec
+FROM busybox:1.38.0@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
 
 COPY --from=source /src /plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
 
