@@ -1,0 +1,20 @@
+# TLS front end for the standby (ADR-088). Runs all the time, unlike the
+# standby containers in {{ rpi_ha_standby_compose_root }}. Host network, so
+# the inet hostfw table (rpi_optimize) filters its ports.
+services:
+  ha-standby-proxy:
+    image: {{ rpi_ha_standby_proxy_image }}
+    container_name: ha-standby-proxy
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    volumes:
+      - {{ rpi_ha_standby_proxy_root }}/Caddyfile:/etc/caddy/Caddyfile:ro
+      - {{ rpi_ha_standby_tls_dir }}:/tls:ro
+    tmpfs:
+      - /data
+      - /config

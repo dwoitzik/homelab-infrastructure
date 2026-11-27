@@ -195,7 +195,8 @@ spec:
 # ansible/roles/litestream_standby -- chrooted, SFTP-only, no shell). A
 # plain IP+port rule rather than a pod/namespaceSelector since rpi-srv-02
 # isn't a cluster member. One rule covering both apps via matchExpressions
-# rather than two near-identical policies.
+# rather than two near-identical policies. ha-standby-tls-push uses the same
+# account to deliver the standby's certificate (ADR-088).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -206,7 +207,7 @@ spec:
     matchExpressions:
       - key: app
         operator: In
-        values: ["headscale", "vaultwarden"]
+        values: ["headscale", "vaultwarden", "ha-standby-tls-push"]
   policyTypes:
     - Egress
   egress:

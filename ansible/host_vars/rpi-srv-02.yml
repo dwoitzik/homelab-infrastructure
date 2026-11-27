@@ -14,3 +14,8 @@ rpi_optimize_ssd_mount:
 # from the k3s nodes (pods are SNATed to the node address).
 rpi_optimize_hostfw_extra_rules:
   - "ip saddr { 10.0.20.11, 10.0.20.12, 10.0.20.13 } tcp dport 5432 accept"
+  # Standby TLS front end (ADR-088); 443 is already open for the haproxy VIP.
+  # 8443 takes internet clients from the router's failover dst-nat (headscale
+  # only); 8081 is the health endpoint for router netwatch and blackbox probes.
+  - "tcp dport 8443 accept"
+  - "ip saddr { 10.0.20.1, 10.0.20.11, 10.0.20.12, 10.0.20.13 } tcp dport 8081 accept"

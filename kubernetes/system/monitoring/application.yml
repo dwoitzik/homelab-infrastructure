@@ -639,6 +639,41 @@ spec:
                     replacement: nextcloud
                   - target_label: __address__
                     replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+              # Standby TLS front end on rpi-srv-02 (ADR-088): LAN and public listeners.
+              # Not named blackbox-*: ExternalProbeFailed pages on those, and this
+              # one is a warning until a failover is live (ha-standby-alerts.yml).
+              - job_name: 'ha-standby-proxy'
+                scrape_interval: 120s
+                metrics_path: /probe
+                params:
+                  module: [tls_ha_standby]
+                static_configs:
+                  - targets:
+                      - 10.0.20.3:443
+                      - 10.0.20.3:8443
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - source_labels: [__param_target]
+                    target_label: instance
+                  - target_label: __address__
+                    replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+              # 1 only while headscale-standby runs; the router keys its failover on the same URL.
+              - job_name: 'ha-standby-active'
+                scrape_interval: 60s
+                metrics_path: /probe
+                params:
+                  module: [http_2xx]
+                static_configs:
+                  - targets:
+                      - http://10.0.20.3:8081/
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: __param_target
+                  - source_labels: [__param_target]
+                    target_label: instance
+                  - target_label: __address__
+                    replacement: prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
               # The tracker endpoint woitzik.dev visitors hit, resolved via public DNS
               # through the Cloudflare tunnel. http_2xx, not http_auth_ok: a 401/403
               # here would mean the tracker is blocked, not that it is up.
