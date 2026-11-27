@@ -19,6 +19,8 @@ spec:
         defaultRules:
           disabled:
             KubeMemoryOvercommit: true
+            # Replaced by job-failures in silent-failure-alerts.yml.
+            KubeJobFailed: true
         prometheusOperator:
           resources:
             requests:

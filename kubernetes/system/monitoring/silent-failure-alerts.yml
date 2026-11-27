@@ -139,19 +139,70 @@ spec:
               the deprecation-creeps-in-unnoticed pattern this file targets. Check:
               kubectl get cronjob -n apps renovate.
 
-        - alert: RenovateJobFailing
+    # Replaces the chart's KubeJobFailed: failedJobsHistoryLimit keeps a CronJob's
+    # failed Jobs after later runs succeed, so that rule fired until the Job was
+    # deleted. CronJob-owned Jobs are judged by the CronJob's latest run instead.
+    - name: job-failures
+      rules:
+        - alert: KubeJobFailed
           expr: |
-            kube_job_status_failed{namespace="apps", job_name=~"renovate-[0-9]+"} > 0
-          for: 10m
+            kube_job_failed{job="kube-state-metrics", condition="true"} > 0
+            unless on (namespace, job_name)
+            kube_job_owner{job="kube-state-metrics", owner_kind="CronJob"}
+          for: 15m
           labels:
             severity: warning
           annotations:
-            summary: "A scheduled Renovate run failed"
+            summary: "Job {{ $labels.namespace }}/{{ $labels.job_name }} failed"
             description: >
-              A renovate-<timestamp> Job (cronjob="renovate") reported a failure. Often
-              a transient registry/API hiccup, but repeated failures mean dependency
-              scanning has silently stopped making progress. Check:
-              kubectl logs -n apps job/<job-name>.
+              A Job that no CronJob owns failed. Nothing will rerun it; check
+              kubectl logs -n {{ $labels.namespace }} job/{{ $labels.job_name }}, fix,
+              then delete the Job to clear the alert.
+
+        - alert: KubeCronJobLastRunFailed
+          # Newest failed Job of the CronJob is younger than its last success, so
+          # the latest outcome is a failure. A later successful run clears it;
+          # repeated failures keep it firing.
+          expr: |
+            (
+                max by (namespace, cronjob) (
+                  label_replace(
+                    (
+                        kube_job_created{job="kube-state-metrics"}
+                      * on (namespace, job_name) group_left (owner_name)
+                        kube_job_owner{job="kube-state-metrics", owner_kind="CronJob"}
+                    )
+                    and on (namespace, job_name)
+                    (kube_job_failed{job="kube-state-metrics", condition="true"} > 0),
+                    "cronjob", "$1", "owner_name", "(.+)"
+                  )
+                )
+              > on (namespace, cronjob)
+                kube_cronjob_status_last_successful_time{job="kube-state-metrics"}
+            )
+            or
+            (
+                max by (namespace, cronjob) (
+                  label_replace(
+                    kube_job_owner{job="kube-state-metrics", owner_kind="CronJob"}
+                    and on (namespace, job_name)
+                    (kube_job_failed{job="kube-state-metrics", condition="true"} > 0),
+                    "cronjob", "$1", "owner_name", "(.+)"
+                  )
+                )
+              unless on (namespace, cronjob)
+                kube_cronjob_status_last_successful_time{job="kube-state-metrics"}
+            )
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Latest run of CronJob {{ $labels.namespace }}/{{ $labels.cronjob }} failed"
+            description: >
+              The most recent Job of this CronJob failed and no successful run has
+              happened since. Check the newest Job:
+              kubectl get jobs -n {{ $labels.namespace }} --sort-by=.metadata.creationTimestamp
+              and its logs. Clears on the next successful run; no manual Job cleanup needed.
 
     - name: external-secrets
       rules:
