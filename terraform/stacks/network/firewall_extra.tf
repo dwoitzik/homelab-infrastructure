@@ -61,23 +61,12 @@ resource "routeros_ip_firewall_filter" "in_06_snmp" {
   }
 }
 
-# Comment kept close to the original on purpose - the rule still carries real
-# traffic (142MB+ at audit time) despite MikroDash itself being decommissioned
-# (see CHANGELOG 0.5.0). Likely picked up by a newer K3s-hosted consumer of
-# the router's binary API ports; exact consumer not identified as of
-# 2026-06-21. Do not remove without confirming nothing depends on it first.
-resource "routeros_ip_firewall_filter" "in_05_k3s_router_api" {
-  action       = "accept"
-  chain        = "input"
-  protocol     = "tcp"
-  dst_port     = "8728,8729"
-  src_address  = "10.0.20.0/24"
-  place_before = routeros_ip_firewall_filter.drop_all_input.id
-  comment      = "IN-05: Allow router API access from K3s Nodes (legacy MikroDash grant, current consumer unconfirmed, active traffic present)"
-
-  lifecycle {
-    ignore_changes = [place_before]
-  }
+# IN-05 (8728/8729 from the whole SRV VLAN) had no working consumer: the only
+# client was an unmanaged MikroDash container failing its login every 30s.
+# Admin access to the API ports stays covered by IN-02 (Mgmt_Devices).
+removed {
+  from = routeros_ip_firewall_filter.in_05_k3s_router_api
+  lifecycle { destroy = true }
 }
 
 resource "routeros_ip_firewall_filter" "in_04_atlantis_api" {
