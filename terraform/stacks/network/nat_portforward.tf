@@ -100,6 +100,94 @@ resource "routeros_ip_firewall_filter" "fwd_wan_headscale_dmz" {
   }
 }
 
+# headscale standby failover (ADR-088): while headscale-standby on rpi-srv-02 answers,
+# netwatch lists the WAN address and new WAN 443 connections go to its front end.
+# Lives on the router because Terraform cannot run in the pve-mgmt-01 outage.
+resource "routeros_tool_netwatch" "ha_headscale_standby" {
+  name          = "ha_headscale_standby"
+  type          = "http-get"
+  host          = "10.0.20.3"
+  port          = 8081
+  src_address   = "10.0.20.1"
+  http_code_min = 200
+  http_code_max = 299
+  interval      = "10s"
+  timeout       = "3s"
+  up_script     = ":if ([:len [/ip firewall address-list find list=ha_headscale_standby]] = 0) do={ /ip firewall address-list add list=ha_headscale_standby address=192.168.178.10 comment=\"netwatch ha_headscale_standby, ADR-088\" }"
+  down_script   = "/ip firewall address-list remove [find list=ha_headscale_standby]"
+  comment       = "headscale standby on rpi-srv-02 answers: public headscale goes there, ADR-088"
+}
+
+resource "routeros_ip_firewall_nat" "dstnat_headscale_standby" {
+  chain            = "dstnat"
+  action           = "dst-nat"
+  in_interface     = "ether1"
+  dst_address      = "192.168.178.10"
+  dst_address_list = "ha_headscale_standby"
+  protocol         = "tcp"
+  dst_port         = "443"
+  to_addresses     = "10.0.20.3"
+  to_ports         = "8443"
+  place_before     = routeros_ip_firewall_nat.dstnat_headscale_dmz.id
+  comment          = "headscale.woitzik.dev -> rpi-srv-02 standby front end while netwatch ha_headscale_standby is up, ADR-088"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
+resource "routeros_ip_firewall_filter" "fwd_wan_headscale_standby_flood_drop" {
+  chain            = "forward"
+  action           = "drop"
+  in_interface     = "ether1"
+  dst_address      = "10.0.20.3"
+  dst_port         = "8443"
+  protocol         = "tcp"
+  src_address_list = "wan_conn_flood"
+  place_before     = routeros_ip_firewall_filter.fwd_wan_headscale_standby.id
+  comment          = "WAN -> standby 8443: drop sources on wan_conn_flood, ADR-086/088"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
+resource "routeros_ip_firewall_filter" "fwd_wan_headscale_standby_flood_detect" {
+  chain                = "forward"
+  action               = "add-src-to-address-list"
+  in_interface         = "ether1"
+  dst_address          = "10.0.20.3"
+  dst_port             = "8443"
+  protocol             = "tcp"
+  connection_state     = "new"
+  src_address          = "!192.168.178.0/24"
+  connection_limit     = "32,32"
+  address_list         = "wan_conn_flood"
+  address_list_timeout = "1h"
+  place_before         = routeros_ip_firewall_filter.fwd_wan_headscale_standby_flood_drop.id
+  comment              = "WAN -> standby 8443: >32 concurrent connections per source, ADR-086/088"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
+resource "routeros_ip_firewall_filter" "fwd_wan_headscale_standby" {
+  chain                = "forward"
+  action               = "accept"
+  in_interface         = "ether1"
+  connection_nat_state = "dstnat"
+  dst_address          = "10.0.20.3"
+  dst_port             = "8443"
+  protocol             = "tcp"
+  place_before         = routeros_ip_firewall_filter.fwd_99_drop_all.id
+  comment              = "WAN -> headscale standby front end, matches dstnat_headscale_standby, ADR-088"
+
+  lifecycle {
+    ignore_changes = [place_before]
+  }
+}
+
 # Tailscale WireGuard: lets peers behind a hard (mobile carrier) NAT reach
 # rpi-srv-02's host tailscaled directly instead of via DERP (ADR-076). Needs the
 # manual FritzBox forward UDP 41641 -> 192.168.178.10.
