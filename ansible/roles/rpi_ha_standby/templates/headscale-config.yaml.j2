@@ -50,13 +50,9 @@ dns:
 oidc:
   issuer: "https://auth.woitzik.dev"
   client_id: "headscale"
-  # client_secret injected via HEADSCALE_OIDC_CLIENT_SECRET in
-  # {{ rpi_ha_standby_compose_root }}/headscale/.env -- not templated here,
-  # same one-time manual bootstrap as the identity key files (ADR-029).
-  # Also note: Authelia itself lives on the same pve-mgmt-01/k3s cluster
-  # this standby exists to survive losing, so OIDC login for *new* device
-  # registration will not work during a real failover -- only already-
-  # registered devices keep working. See the failover runbook.
+  # client_secret: HEADSCALE_OIDC_CLIENT_SECRET in .env. Authelia runs on the
+  # cluster this standby survives losing, so new device logins fail during a
+  # real failover; registered devices keep working.
   scope: ["openid", "profile", "email"]
   allowed_users:
     - "david@woitzik.dev"

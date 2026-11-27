@@ -8,18 +8,14 @@ a real failover -- follow the runbook:
 
 in the homelab-infrastructure repo.
 
-## One-time manual prerequisites (not yet done by an automated role)
+## Identity material
 
-1. Copy these 3 files from the live headscale/vaultwarden pods to this host
-   once (they rotate essentially never):
-   - `{{ rpi_ha_standby_data_root }}/headscale/data/private.key`
-   - `{{ rpi_ha_standby_data_root }}/headscale/data/noise_private.key`
-   - `{{ rpi_ha_standby_data_root }}/vaultwarden/data/rsa_key.pem` (and
-     `rsa_key.pub.pem`, `rsa_key.pem` alone regenerates the `.pub` on start)
-2. Fill in `HEADSCALE_OIDC_CLIENT_SECRET` in
-   `{{ rpi_ha_standby_compose_root }}/headscale/.env` (same value as the
-   live `headscale-oidc` Kubernetes Secret).
+Deployed by `ansible/roles/rpi_ha_standby` from Ansible Vault, copies of the
+primary's files:
 
-Until both are done, `docker compose up -d` will still start both
-containers, but headscale will mint a fresh node identity (breaking every
-device's tailnet trust) and OIDC login won't work against the standby.
+- `{{ rpi_ha_standby_data_root }}/headscale/data/noise_private.key`
+- `{{ rpi_ha_standby_data_root }}/vaultwarden/data/rsa_key.pem`
+- `HEADSCALE_OIDC_CLIENT_SECRET` in `{{ rpi_ha_standby_compose_root }}/headscale/.env`
+
+If headscale logs that it generated a new key on start, stop: the file is
+missing or in the wrong place, and existing nodes will not trust it.

@@ -3,10 +3,9 @@
 # item 3/6. Deployed only to rpi-srv-02 via its own playbook (same pattern
 # as litestream_standby), not folded into site.yml's shared rpi_nodes play.
 #
-# This role only lays down config + a docker-compose file. It never starts
-# the containers -- that's the failover runbook's job, after a
-# `litestream restore` and after the operator confirms the one-time manual
-# prerequisites below are in place. See this role's README.md.j2.
+# This role lays down config, the identity files and a docker-compose file.
+# It never starts the containers -- that's the failover runbook's job, after
+# a `litestream restore`.
 
 - name: Create the compose root and per-app config dirs
   ansible.builtin.file:
@@ -68,14 +67,35 @@
     group: root
     mode: '0644'
 
-- name: Deploy the headscale-standby .env (never overwritten once filled in)
+- name: Deploy the headscale-standby .env (OIDC client secret)
   ansible.builtin.template:
     src: headscale.env.j2
     dest: "{{ rpi_ha_standby_compose_root }}/headscale/.env"
     owner: root
     group: root
     mode: '0600'
-    force: false
+  no_log: true
+
+# Litestream replicates only the SQLite files. Without the primary's own key
+# files a started standby mints new ones: every tailnet node loses trust in
+# the control server and every vaultwarden session token becomes invalid.
+- name: Deploy headscale's Noise private key
+  ansible.builtin.copy:
+    content: "{{ vault_headscale_noise_private_key }}"
+    dest: "{{ rpi_ha_standby_data_root }}/headscale/data/noise_private.key"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Deploy vaultwarden's token signing key
+  ansible.builtin.copy:
+    content: "{{ vault_vaultwarden_rsa_key_pem }}"
+    dest: "{{ rpi_ha_standby_data_root }}/vaultwarden/data/rsa_key.pem"
+    owner: "{{ rpi_ha_standby_vaultwarden_uid }}"
+    group: "{{ rpi_ha_standby_vaultwarden_gid }}"
+    mode: '0600'
+  no_log: true
 
 - name: Deploy the on-host README pointing at the real runbook
   ansible.builtin.template:

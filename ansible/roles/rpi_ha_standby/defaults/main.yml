@@ -10,10 +10,11 @@ rpi_ha_standby_data_root: /mnt/ssd/ha-standby
 # deployable on its own -- the coupling is real, just not code-shared).
 rpi_ha_standby_litestream_replica_root: /mnt/ssd/litestream-replicas
 
-rpi_ha_standby_headscale_image: "ghcr.io/juanfont/headscale:v0.29.2@sha256:d337f1be4a9155b330aa9077bf6c82d24ff0581b8e69390ebc6d7c623bb339ce"
+# Same tags and digests as kubernetes/apps/{headscale,vaultwarden}; Renovate bumps both.
+rpi_ha_standby_headscale_image: "ghcr.io/juanfont/headscale:v0.29.8@sha256:f549a444481d7ab0ad8b506a7ee43cadb00001a20fbaec34b56f8ccb136735e0"
 rpi_ha_standby_headscale_host_port: 8082
 
-rpi_ha_standby_vaultwarden_image: "vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8"
+rpi_ha_standby_vaultwarden_image: "vaultwarden/server:1.37.5@sha256:4fe17f415f90087377d37c755e0ea3cf189dcc6794e49cdd2a9adbb4937d9e1f"
 rpi_ha_standby_vaultwarden_host_port: 8083
 rpi_ha_standby_vaultwarden_uid: 1000
 rpi_ha_standby_vaultwarden_gid: 1000
