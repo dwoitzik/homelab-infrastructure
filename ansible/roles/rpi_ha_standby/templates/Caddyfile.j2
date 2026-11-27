@@ -1,0 +1,43 @@
+# TLS front end for the headscale/vaultwarden standby (ADR-088). Certificate
+# files come from the cluster (ha-standby-tls-install.service), so ACME is off.
+{
+	auto_https off
+	admin off
+	persist_config off
+}
+
+(standby_tls) {
+	bind {{ rpi_ha_standby_proxy_bind }}
+	tls /tls/tls.crt /tls/tls.key
+}
+
+# LAN and tailnet clients, after the AdGuard failover rewrite.
+https://headscale.woitzik.dev:{{ rpi_ha_standby_proxy_lan_port }} {
+	import standby_tls
+	reverse_proxy 127.0.0.1:{{ rpi_ha_standby_headscale_host_port }}
+}
+
+https://vault.woitzik.dev:{{ rpi_ha_standby_proxy_lan_port }} {
+	import standby_tls
+	reverse_proxy 127.0.0.1:{{ rpi_ha_standby_vaultwarden_host_port }}
+}
+
+# Internet clients, through the router's failover dst-nat. headscale only:
+# vault.woitzik.dev is never public (ADR-033).
+https://headscale.woitzik.dev:{{ rpi_ha_standby_proxy_public_port }} {
+	import standby_tls
+	reverse_proxy 127.0.0.1:{{ rpi_ha_standby_headscale_host_port }}
+}
+
+https://:{{ rpi_ha_standby_proxy_public_port }} {
+	import standby_tls
+	abort
+}
+
+# Router netwatch (it can only GET /) and the blackbox probe: 200 only while
+# headscale-standby itself answers.
+http://{{ rpi_ha_standby_proxy_bind }}:{{ rpi_ha_standby_proxy_health_port }} {
+	bind {{ rpi_ha_standby_proxy_bind }}
+	rewrite * /health
+	reverse_proxy 127.0.0.1:{{ rpi_ha_standby_headscale_host_port }}
+}

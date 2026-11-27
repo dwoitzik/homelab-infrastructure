@@ -1,0 +1,127 @@
+# Standby TLS front end on rpi-srv-02 (ADR-088): own key, only the two names it
+# serves, so the Pi never holds the wildcard key. Pushed daily; cert-manager renews
+# 30 days ahead, so the Pi's copy outlives the cluster by weeks.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ha-standby-tls
+  namespace: apps
+spec:
+  secretName: ha-standby-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  dnsNames:
+    - headscale.woitzik.dev
+    - vault.woitzik.dev
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+---
+# rpi-srv-02's ed25519 host key: the push carries a private key, so the
+# target is pinned (ssh-keygen -lf: SHA256:1dZo4jd3loCOfYyab3O1MY6c2cN6fE+rBwEr7v07Guc).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ha-standby-tls-known-hosts
+  namespace: apps
+data:
+  known_hosts: |
+    10.0.20.3 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG77dZ2TvgmZGo1cHhq9VEe4bkRf7hFxA0EZMeculmsz
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ha-standby-tls-push
+  namespace: apps
+spec:
+  schedule: "17 4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels:
+            app: ha-standby-tls-push
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: push
+              image: rclone/rclone:1.76.0@sha256:7cbeec24a44f206067597c0368be4de90ae19a64d5113c7d1938bd737a81e466
+              command: ["/bin/sh", "-c"]
+              # Key first: the installer on the Pi rejects a pair that does not match,
+              # so a run that dies between the two files changes nothing.
+              args:
+                - |
+                  set -eu
+                  for f in tls.key tls.crt; do
+                    rclone copyto --ignore-times "/tls/$f" ":sftp:/ha-standby-tls/$f"
+                  done
+                  echo "pushed ha-standby-tls to rpi-srv-02"
+              env:
+                - name: RCLONE_CONFIG
+                  value: /tmp/rclone.conf
+                - name: RCLONE_SFTP_HOST
+                  value: 10.0.20.3
+                - name: RCLONE_SFTP_USER
+                  value: litestream
+                - name: RCLONE_SFTP_KEY_FILE
+                  value: /ssh/id_ed25519
+                - name: RCLONE_SFTP_KNOWN_HOSTS_FILE
+                  value: /known-hosts/known_hosts
+                # internal-sftp has no shell for remote hashing commands.
+                - name: RCLONE_SFTP_SHELL_TYPE
+                  value: none
+                - name: RCLONE_SFTP_DISABLE_HASHCHECK
+                  value: "true"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: tls
+                  mountPath: /tls
+                  readOnly: true
+                - name: ssh
+                  mountPath: /ssh
+                  readOnly: true
+                - name: known-hosts
+                  mountPath: /known-hosts
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+          volumes:
+            - name: tls
+              secret:
+                secretName: ha-standby-tls
+                defaultMode: 0440
+            - name: ssh
+              secret:
+                secretName: litestream-ssh-credentials
+                defaultMode: 0440
+            - name: known-hosts
+              configMap:
+                name: ha-standby-tls-known-hosts
+            - name: tmp
+              emptyDir: {}

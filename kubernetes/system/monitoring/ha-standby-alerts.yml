@@ -1,0 +1,68 @@
+# Standby TLS front end for headscale/vaultwarden on rpi-srv-02 (ADR-088).
+# Quiet in normal operation: the proxy and its certificate copy are warnings,
+# only a dead front end while the standby is serving pages.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab-ha-standby-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: ha-standby
+      rules:
+        - alert: HAStandbyProxyDown
+          expr: probe_success{job="ha-standby-proxy"} == 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Standby TLS front end {{ $labels.instance }} fails its TLS check"
+            description: >
+              ha-standby-proxy on rpi-srv-02 does not complete a verified TLS
+              handshake for headscale.woitzik.dev. A failover would have no TLS
+              endpoint. Check `docker ps` and `journalctl -u ha-standby-tls-install`
+              on rpi-srv-02 (docs/runbooks/failover-headscale-vaultwarden.md).
+
+        - alert: HAStandbyProxyDownDuringFailover
+          expr: |
+            min(probe_success{job="ha-standby-proxy"}) == 0
+            and on ()
+            max(probe_success{job="ha-standby-active"}) == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "headscale standby is serving but its TLS front end is down"
+            description: >
+              headscale-standby answers on rpi-srv-02, so the router sends public
+              headscale traffic there, but ha-standby-proxy fails its TLS check.
+              Clients cannot reach the control server.
+
+        - alert: HAStandbyActive
+          expr: max(probe_success{job="ha-standby-active"}) == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "headscale standby on rpi-srv-02 is running"
+            description: >
+              While headscale-standby answers, the router sends public
+              headscale.woitzik.dev traffic to it, and its writes are discarded at
+              failback. Expected during a failover or rehearsal only; otherwise
+              stop it (`docker compose stop` in /opt/ha-standby).
+
+        - alert: HAStandbyCertExpiringSoon
+          # cert-manager renews 30 days before expiry and the push runs daily, so
+          # under 21 days means the copy on the Pi stopped being refreshed.
+          expr: (probe_ssl_earliest_cert_expiry{job="ha-standby-proxy"} - time()) / 86400 < 21
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Standby certificate on rpi-srv-02 expires in {{ $value | humanize }} days"
+            description: >
+              The certificate ha-standby-proxy serves is not being refreshed.
+              Check CronJob apps/ha-standby-tls-push and
+              `journalctl -u ha-standby-tls-install` on rpi-srv-02.

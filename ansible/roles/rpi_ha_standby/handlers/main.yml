@@ -1,0 +1,13 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart ha-standby-proxy
+  ansible.builtin.command:
+    argv: [docker, restart, ha-standby-proxy]
+  register: rpi_ha_standby_proxy_restart
+  changed_when: true
+  failed_when:
+    - rpi_ha_standby_proxy_restart.rc != 0
+    - "'No such container' not in rpi_ha_standby_proxy_restart.stderr"

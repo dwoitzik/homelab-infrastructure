@@ -13,8 +13,9 @@ services:
     container_name: headscale-standby
     restart: unless-stopped
     command: serve
+    # Loopback only: clients come in through the TLS front end (ha-standby-proxy).
     ports:
-      - "{{ rpi_ha_standby_headscale_host_port }}:8080"
+      - "127.0.0.1:{{ rpi_ha_standby_headscale_host_port }}:8080"
     env_file:
       - {{ rpi_ha_standby_compose_root }}/headscale/.env
     volumes:
@@ -53,7 +54,7 @@ services:
     restart: unless-stopped
     user: "{{ rpi_ha_standby_vaultwarden_uid }}:{{ rpi_ha_standby_vaultwarden_gid }}"
     ports:
-      - "{{ rpi_ha_standby_vaultwarden_host_port }}:80"
+      - "127.0.0.1:{{ rpi_ha_standby_vaultwarden_host_port }}:80"
     environment:
       - SIGNUPS_ALLOWED=false
       - DOMAIN=https://vault.woitzik.dev

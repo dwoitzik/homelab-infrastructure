@@ -47,6 +47,16 @@ data:
           fail_if_body_not_matches_regexp:
             - '"installed":true,"maintenance":false'
           preferred_ip_protocol: ip4
+      # TLS handshake with full verification against the standby's front end on
+      # rpi-srv-02 (ADR-088); the upstream is usually stopped, so no HTTP check.
+      tls_ha_standby:
+        prober: tcp
+        timeout: 5s
+        tcp:
+          tls: true
+          tls_config:
+            server_name: headscale.woitzik.dev
+          preferred_ip_protocol: ip4
       http_2xx_skip_tls:
         prober: http
         timeout: 5s

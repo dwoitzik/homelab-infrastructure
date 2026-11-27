@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Installs the cluster-pushed certificate for ha-standby-proxy (ADR-088). The push
+# account can write the drop directory, so nothing is used unless the chain verifies,
+# both names match, the key matches and it is not older than the installed one.
+set -euo pipefail
+
+src={{ rpi_ha_standby_tls_incoming_dir }}
+dst={{ rpi_ha_standby_tls_dir }}
+names=({{ rpi_ha_standby_tls_names | join(' ') }})
+compose={{ rpi_ha_standby_proxy_root }}/docker-compose.yml
+
+if [[ ! -s $src/tls.crt || ! -s $src/tls.key ]]; then
+  echo "no certificate in $src yet"
+  exit 0
+fi
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+install -m 0600 "$src/tls.crt" "$tmp/tls.crt"
+install -m 0600 "$src/tls.key" "$tmp/tls.key"
+
+openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt \
+  -untrusted "$tmp/tls.crt" "$tmp/tls.crt" >/dev/null
+openssl x509 -in "$tmp/tls.crt" -noout -checkend 0 >/dev/null
+for n in "${names[@]}"; do
+  openssl x509 -in "$tmp/tls.crt" -noout -checkhost "$n" | grep -q "does match" \
+    || { echo "certificate does not cover $n" >&2; exit 1; }
+done
+if ! cmp -s <(openssl x509 -in "$tmp/tls.crt" -noout -pubkey) \
+            <(openssl pkey -in "$tmp/tls.key" -pubout); then
+  echo "key does not match certificate (push in progress?)" >&2
+  exit 1
+fi
+
+if [[ -s $dst/tls.crt ]]; then
+  if cmp -s "$tmp/tls.crt" "$dst/tls.crt" && cmp -s "$tmp/tls.key" "$dst/tls.key"; then
+    changed=0
+  else
+    new=$(date -d "$(openssl x509 -in "$tmp/tls.crt" -noout -enddate | cut -d= -f2)" +%s)
+    old=$(date -d "$(openssl x509 -in "$dst/tls.crt" -noout -enddate | cut -d= -f2)" +%s)
+    if (( new < old )); then
+      echo "refusing a certificate that expires before the installed one" >&2
+      exit 1
+    fi
+    changed=1
+  fi
+else
+  changed=1
+fi
+
+if (( changed )); then
+  install -d -m 0700 "$dst"
+  install -m 0644 "$tmp/tls.crt" "$dst/tls.crt.new"
+  install -m 0600 "$tmp/tls.key" "$dst/tls.key.new"
+  mv -f "$dst/tls.key.new" "$dst/tls.key"
+  mv -f "$dst/tls.crt.new" "$dst/tls.crt"
+  echo "installed certificate, expires $(openssl x509 -in "$dst/tls.crt" -noout -enddate | cut -d= -f2)"
+fi
+
+# Caddy reads certificate files only at start.
+if [[ -z $(docker ps -q --filter name=^ha-standby-proxy$) ]]; then
+  docker compose -f "$compose" up -d
+elif (( changed )); then
+  docker restart ha-standby-proxy >/dev/null
+  echo "restarted ha-standby-proxy"
+fi

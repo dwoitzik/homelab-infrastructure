@@ -19,3 +19,23 @@ rpi_ha_standby_vaultwarden_host_port: 8083
 rpi_ha_standby_vaultwarden_uid: 1000
 rpi_ha_standby_vaultwarden_gid: 1000
 rpi_ha_standby_busybox_image: "busybox:1.38@sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4"
+
+# TLS front end for the standby (ADR-088). Caddy runs all the time, in its own
+# compose project, so it is ready before a failover and monitored in between.
+rpi_ha_standby_proxy_root: /opt/ha-standby-proxy
+rpi_ha_standby_proxy_image: "caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0"
+rpi_ha_standby_proxy_bind: 10.0.20.3
+# LAN and tailnet clients (AdGuard failover rewrite): both hostnames.
+rpi_ha_standby_proxy_lan_port: 443
+# Internet clients via the router's failover dst-nat: headscale only (ADR-033).
+rpi_ha_standby_proxy_public_port: 8443
+# Plain-HTTP /health for router netwatch and the blackbox probe (hostfw-limited).
+rpi_ha_standby_proxy_health_port: 8081
+
+# The certificate arrives over the Litestream SFTP account (chrooted, SFTP-only)
+# from the ha-standby-tls-push CronJob in kubernetes/apps/headscale.
+rpi_ha_standby_tls_incoming_dir: "{{ rpi_ha_standby_litestream_replica_root }}/ha-standby-tls"
+rpi_ha_standby_tls_dir: "{{ rpi_ha_standby_proxy_root }}/tls"
+rpi_ha_standby_tls_names:
+  - headscale.woitzik.dev
+  - vault.woitzik.dev

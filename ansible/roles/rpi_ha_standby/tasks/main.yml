@@ -3,8 +3,9 @@
 # item 3/6. Deployed only to rpi-srv-02 via its own playbook (same pattern
 # as litestream_standby), not folded into site.yml's shared rpi_nodes play.
 #
-# This role lays down config, the identity files and a docker-compose file.
-# It never starts the containers -- that's the failover runbook's job, after
+# This role lays down config, the identity files and a docker-compose file,
+# plus the always-on TLS front end (ha-standby-proxy, ADR-088).
+# It never starts the standby containers -- that's the failover runbook's job, after
 # a `litestream restore`.
 
 - name: Create the compose root and per-app config dirs
@@ -104,3 +105,110 @@
     owner: root
     group: root
     mode: '0644'
+
+# TLS front end (ADR-088). The certificate is issued in the cluster and pushed
+# over the Litestream SFTP account; the installer validates it before use.
+- name: Create the certificate drop directory in the Litestream chroot
+  ansible.builtin.file:
+    path: "{{ rpi_ha_standby_tls_incoming_dir }}"
+    state: directory
+    owner: litestream
+    group: litestream
+    mode: '0700'
+
+- name: Create the proxy root
+  ansible.builtin.file:
+    path: "{{ rpi_ha_standby_proxy_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create the installed-certificate directory
+  ansible.builtin.file:
+    path: "{{ rpi_ha_standby_tls_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Deploy the Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ rpi_ha_standby_proxy_root }}/Caddyfile"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart ha-standby-proxy
+
+- name: Deploy the proxy compose file
+  ansible.builtin.template:
+    src: proxy-compose.yml.j2
+    dest: "{{ rpi_ha_standby_proxy_root }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy the certificate installer
+  ansible.builtin.template:
+    src: ha-standby-tls-install.sh.j2
+    dest: /usr/local/sbin/ha-standby-tls-install
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy the certificate installer service and timer
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item.name }}"
+    content: "{{ item.content }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - name: ha-standby-tls-install.service
+      content: |
+        [Unit]
+        Description=Install the cluster-pushed certificate for ha-standby-proxy (ADR-088)
+        After=docker.service
+        Requires=docker.service
+
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/local/sbin/ha-standby-tls-install
+    - name: ha-standby-tls-install.timer
+      content: |
+        [Unit]
+        Description=Install the cluster-pushed certificate for ha-standby-proxy hourly
+
+        [Timer]
+        OnBootSec=2min
+        OnUnitActiveSec=1h
+        RandomizedDelaySec=5min
+
+        [Install]
+        WantedBy=timers.target
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Reload systemd
+
+- name: Apply pending systemd reloads
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the certificate installer timer
+  ansible.builtin.systemd:
+    name: ha-standby-tls-install.timer
+    state: started
+    enabled: true
+
+- name: Check whether a certificate is installed
+  ansible.builtin.stat:
+    path: "{{ rpi_ha_standby_tls_dir }}/tls.crt"
+  register: rpi_ha_standby_tls_installed
+
+# Without a certificate Caddy cannot start; the installer starts it once the
+# first push has landed.
+- name: Start the proxy
+  community.docker.docker_compose_v2:
+    project_src: "{{ rpi_ha_standby_proxy_root }}"
+    state: present
+  when: rpi_ha_standby_tls_installed.stat.exists
