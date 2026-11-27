@@ -19,8 +19,9 @@ spec:
     size: 256
     rotationPolicy: Always
 ---
-# rpi-srv-02's ed25519 host key: the push carries a private key, so the
-# target is pinned (ssh-keygen -lf: SHA256:1dZo4jd3loCOfYyab3O1MY6c2cN6fE+rBwEr7v07Guc).
+# rpi-srv-02's host keys, pinned because the push carries a private key. All three:
+# Go's SSH client fails with "key mismatch" when the key type it negotiates is not
+# listed (same issue as ADR-029's Litestream pinning).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -28,7 +29,9 @@ metadata:
   namespace: apps
 data:
   known_hosts: |
+    10.0.20.3 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAzzhPyly5Es0xjV5INbkYHZzK+bH1iVgMTP8vFPhFblLf3Kd+/t95cQpnFw0kxBHEmBt0oBNLQv9O5zku1QWDQ=
     10.0.20.3 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG77dZ2TvgmZGo1cHhq9VEe4bkRf7hFxA0EZMeculmsz
+    10.0.20.3 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDdOeD08kxECc1846WZYNcYQF6hKBgk8YdK127uqdhgqiIpc5pmAj2BNk9MtBIHBcufiuDDU3iDBJQENAUr/Rk9SQwP4Z96Wyd+rgBtIv1YWa6TexhiUpEkgsjLbZSb7TG58S8+DgprxlNwMW91U9wRreCTPwcj7OyPVnmhz8K4vJCB9d8uoUCaiwQliQnnyBXOdtAUWd4nTc7N/QWyKZqQvJdxdK8d+03Ti76XAXApdN2RvxguOUn1eC5IuegR/jNXZ4V9WmT1+8Aa4gYunXZMbtObbmtPnpPAHsrSl8t2DnpxrVt6Eh8RBCIXcvMlBzp7/b9UJl3PVsq3Mev4FYGgAfMW2BS34TS6nt1309K/cqFcQtLmb+4+pPzUuZdP6KD3nv5tbcgyA7RRVG2rjI25lsT5VaJqH+MxwamYPamuMAqxVGYptwRHDaK+7Z8NU9hkSbhNoK7ecD4Wu41DYR4hpHnceu6GP33npgq2n+r4Glf16vA8jKrtCuxNXL7Er2k=
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -86,6 +89,9 @@ spec:
                 - name: RCLONE_SFTP_SHELL_TYPE
                   value: none
                 - name: RCLONE_SFTP_DISABLE_HASHCHECK
+                  value: "true"
+                # Secret volume files are symlinks into ..data.
+                - name: RCLONE_COPY_LINKS
                   value: "true"
               securityContext:
                 allowPrivilegeEscalation: false
