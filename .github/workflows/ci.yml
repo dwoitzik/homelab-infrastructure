@@ -358,7 +358,7 @@ jobs:
           # Default is v0.70.0. Stated explicitly so the enforced finding set is
           # auditable, and so Renovate bumps it deliberately instead of it
           # shifting when the action itself is updated.
-          version: v0.70.0
+          version: v0.76.2
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4
