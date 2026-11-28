@@ -3,7 +3,7 @@
 # CrowdSec bouncer plugin source for Traefik's experimental.localPlugins (ADR-079).
 # An initContainer copies /plugins-local into an emptyDir, so Traefik never
 # downloads the plugin at start.
-FROM alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f AS source
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS source
 
 # Renovate bumps both lines together (customManagers in renovate.json).
 # renovate: datasource=github-tags depName=maxlerebourg/crowdsec-bouncer-traefik-plugin
